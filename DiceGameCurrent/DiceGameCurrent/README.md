@@ -1,4 +1,4 @@
-# B*tches — Dice Game
+# Rolls — Dice Game
 
 Full project state. 25 Swift files, 43 resources.
 

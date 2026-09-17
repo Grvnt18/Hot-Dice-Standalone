@@ -22,6 +22,11 @@ struct DiceGameSession {
     /// session, this would deallocate immediately after assemble()
     /// returns and no contact sounds would ever play.
     let contactAudio: DiceContactAudio
+    /// Re-renders the floor and "ROLLS" text from AppTheme's current
+    /// selection. Call this whenever the player changes the color in
+    /// Settings, so a game already on screen updates live instead of only
+    /// on next launch.
+    let applyTheme: () -> Void
 }
 
 /// Assembles one complete dice scene into a given SCNView: computes the
@@ -81,13 +86,13 @@ enum DiceSceneAssembler {
             floorY: floorY
         )
 
-        DiceSceneEnvironment.addFloorSurface(
+        let floorSurfaceMaterial = DiceSceneEnvironment.addFloorSurface(
             to: scene.rootNode,
             bounds: layout.bounds,
             floorY: floorY
         )
 
-        DiceSceneEnvironment.addFloorText(
+        let floorTextMaterial = DiceSceneEnvironment.addFloorText(
             to: scene.rootNode,
             bounds: layout.bounds,
             floorY: floorY
@@ -128,6 +133,7 @@ enum DiceSceneAssembler {
         // camera on where the playfield actually is.
         rollController.playAreaBounds = layout.bounds
         rollController.floorY = floorY
+        rollController.ceilingY = floorY + PlayfieldVerticalBounds.ceilingHeight
 
         let turnController = DiceTurnController(
             round: round,
@@ -189,7 +195,13 @@ enum DiceSceneAssembler {
             rollController: rollController,
             turnController: turnController,
             tapHandler: tapHandler,
-            contactAudio: contactAudio
+            contactAudio: contactAudio,
+            applyTheme: {
+                DiceSceneEnvironment.applyTheme(
+                    surfaceMaterial: floorSurfaceMaterial,
+                    textMaterial: floorTextMaterial
+                )
+            }
         )
     }
 }

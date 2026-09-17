@@ -420,6 +420,7 @@ struct DiceGameScreen: View {
     @State private var session: DiceGameSession?
     @State private var finishedScore: Int?
     @State private var showingSettings = false
+    @ObservedObject private var theme = AppTheme.shared
     @Environment(\.scenePhase) private var scenePhase
 
 
@@ -505,6 +506,12 @@ struct DiceGameScreen: View {
         .onAppear {
             SoundEngine.shared.startMusic()
         }
+        // Re-paints the already-assembled floor/text materials in place
+        // rather than waiting for the next launch, so picking a new table
+        // color in Settings is visible the instant the sheet closes.
+        .onChange(of: theme.colorwayIndex) { _, _ in
+            session?.applyTheme()
+        }
         // The .playback audio session lets sound continue when the app
         // isn't foreground, which is correct for a game but means nothing
         // stops the music on our behalf. In Playgrounds that showed up as
@@ -531,20 +538,5 @@ struct DiceGameScreen: View {
             SoundEngine.shared.play(.turnComplete)
             finishedScore = session.turnController.currentScore
         }
-    }
-}
-
-// MARK: - Color hex helper (SwiftUI Color, not UIColor)
-
-private extension Color {
-    init(hex: String) {
-        var hexString = hex.trimmingCharacters(in: .whitespacesAndNewlines)
-        hexString = hexString.replacingOccurrences(of: "#", with: "")
-        var value: UInt64 = 0
-        Scanner(string: hexString).scanHexInt64(&value)
-        let r = Double((value & 0xFF0000) >> 16) / 255
-        let g = Double((value & 0x00FF00) >> 8) / 255
-        let b = Double(value & 0x0000FF) / 255
-        self.init(red: r, green: g, blue: b)
     }
 }

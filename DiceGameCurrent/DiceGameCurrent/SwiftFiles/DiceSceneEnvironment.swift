@@ -80,11 +80,16 @@ enum DiceSceneEnvironment {
     /// full-scene backgrounds rather than seamless repeatable patterns, so
     /// tiling them reads as an obvious grid rather than one continuous
     /// surface.
+    ///
+    /// Returns the material so the caller can hold onto it and re-run
+    /// `applyTheme` later, when the player picks a different color in
+    /// Settings while a game is already on screen.
+    @discardableResult
     static func addFloorSurface(
         to rootNode: SCNNode,
         bounds: (x: ClosedRange<Float>, z: ClosedRange<Float>),
         floorY: Float
-    ) {
+    ) -> SCNMaterial {
         let width = bounds.x.upperBound - bounds.x.lowerBound
         let depth = bounds.z.upperBound - bounds.z.lowerBound
         let centerX = (bounds.x.lowerBound + bounds.x.upperBound) / 2
@@ -98,13 +103,7 @@ enum DiceSceneEnvironment {
         // depth-write and render-order juggling those two layers needed.
         let plane = SCNPlane(width: CGFloat(width), height: CGFloat(depth))
         let material = SCNMaterial()
-        material.diffuse.contents = LowPolyTextures.facetedSurface(
-            baseColor: UIColor(hex: "#36f422").darkened(by: 0.25),
-            variation: 0.10,
-            columns: 16,
-            rows: 16,
-            seed: 20260101
-        )
+        material.diffuse.contents = facetedSurfaceTexture(baseColor: AppTheme.shared.floorBaseColor)
         material.diffuse.wrapS = .clamp
         material.diffuse.wrapT = .clamp
         // .lambert, not .physicallyBased: pure diffuse shading with no
@@ -120,6 +119,17 @@ enum DiceSceneEnvironment {
         node.castsShadow = false
 
         rootNode.addChildNode(node)
+        return material
+    }
+
+    private static func facetedSurfaceTexture(baseColor: UIColor) -> UIImage {
+        LowPolyTextures.facetedSurface(
+            baseColor: baseColor.darkened(by: 0.25),
+            variation: 0.10,
+            columns: 16,
+            rows: 16,
+            seed: 20260101
+        )
     }
 
     /// "ROLLS" written across the center of the floor in Aguafina Script,
@@ -128,15 +138,24 @@ enum DiceSceneEnvironment {
     /// background, applied to a flat plane — so the floor's own texture
     /// still shows through around the letterforms rather than sitting
     /// behind an opaque patch.
+    ///
+    /// Text color comes from AppTheme.shared.rollsTextIsDark rather than a
+    /// hardcoded white — a bright floor shade (see AppTheme's "Pale
+    /// Lavender" swatch) would otherwise wash the script out to near-
+    /// illegibility.
+    ///
+    /// Returns the material so the caller can re-run `applyTheme` when the
+    /// floor color changes later.
+    @discardableResult
     static func addFloorText(
         to rootNode: SCNNode,
         bounds: (x: ClosedRange<Float>, z: ClosedRange<Float>),
         floorY: Float
-    ) {
+    ) -> SCNMaterial {
         let playfieldWidth = bounds.x.upperBound - bounds.x.lowerBound
         let textWidth = playfieldWidth * 0.45 // was 0.3 — enlarged another 50% per request (0.2 -> 0.3 -> 0.45 across two rounds)
 
-        let textImage = renderScriptText("ROLLS", pointSize: 220)
+        let textImage = renderScriptText("ROLLS", pointSize: 220, isDark: AppTheme.shared.rollsTextIsDark)
         let aspect = textImage.size.height / max(textImage.size.width, 1)
         let textHeight = textWidth * Float(aspect)
 
@@ -157,9 +176,20 @@ enum DiceSceneEnvironment {
         node.castsShadow = false
 
         rootNode.addChildNode(node)
+        return material
     }
 
-    private static func renderScriptText(_ text: String, pointSize: CGFloat) -> UIImage {
+    /// Re-renders the floor surface and the "ROLLS" text from AppTheme's
+    /// current selection, and assigns the results onto the materials
+    /// `addFloorSurface`/`addFloorText` returned when the scene was first
+    /// assembled. Call this after the player changes the color in Settings
+    /// so an in-progress game updates live instead of only on next launch.
+    static func applyTheme(surfaceMaterial: SCNMaterial, textMaterial: SCNMaterial) {
+        surfaceMaterial.diffuse.contents = facetedSurfaceTexture(baseColor: AppTheme.shared.floorBaseColor)
+        textMaterial.diffuse.contents = renderScriptText("ROLLS", pointSize: 220, isDark: AppTheme.shared.rollsTextIsDark)
+    }
+
+    private static func renderScriptText(_ text: String, pointSize: CGFloat, isDark: Bool) -> UIImage {
         // Falls back to a system font rather than returning a zero-size
         // image if the custom font somehow still isn't available —
         // zero-size directly caused the "gameplay area not rendering" bug
@@ -170,7 +200,7 @@ enum DiceSceneEnvironment {
             ?? UIFont.italicSystemFont(ofSize: pointSize)
         let attrs: [NSAttributedString.Key: Any] = [
             .font: font,
-            .foregroundColor: UIColor.white
+            .foregroundColor: isDark ? UIColor.black : UIColor.white
         ]
         let textSize = text.size(withAttributes: attrs)
         // Generous padding — script fonts routinely have swashes/flourishes

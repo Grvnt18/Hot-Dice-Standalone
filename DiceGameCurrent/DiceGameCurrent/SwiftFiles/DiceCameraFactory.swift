@@ -19,7 +19,7 @@ enum DiceCameraFactory {
         playfieldBounds: (x: ClosedRange<Float>, z: ClosedRange<Float>),
         orthographicScale: Double,
         floorY: Float,
-        cameraHeight: Float = 15
+        cameraHeight: Float = PlayfieldVerticalBounds.cameraHeight
     ) -> SCNNode {
         let camera = SCNCamera()
         camera.usesOrthographicProjection = true

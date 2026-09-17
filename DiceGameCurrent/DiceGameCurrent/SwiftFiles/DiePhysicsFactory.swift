@@ -86,7 +86,8 @@ enum DicePlayfieldPhysics {
     static func makeContainer(
         bounds: (x: ClosedRange<Float>, z: ClosedRange<Float>),
         floorY: Float,
-        wallHeight: Float = 500.0
+        wallHeight: Float = 500.0,
+        ceilingHeight: Float = PlayfieldVerticalBounds.ceilingHeight
     ) -> SCNNode {
         let container = SCNNode()
         container.name = "playfieldContainer"
@@ -105,6 +106,22 @@ enum DicePlayfieldPhysics {
             staticCollider(
                 boxSize: SCNVector3(width, 0.7, depth),
                 position: SCNVector3(centerX, floorY, centerZ)
+            )
+        )
+
+        // Ceiling — same thickness/restitution treatment as the floor, and
+        // the actual fix for dice being able to "leave via the ceiling":
+        // without this, nothing capped how high a die could climb, and
+        // high enough (e.g. an energetic collision landing on an already-
+        // energetic bounce) closes the distance to the top-down camera
+        // itself, which clips anything inside its 0.1-unit near plane —
+        // a die that gets that high simply vanishes rather than visibly
+        // bouncing off anything. See PlayfieldVerticalBounds for why this
+        // height and the camera's are kept in one shared place.
+        container.addChildNode(
+            staticCollider(
+                boxSize: SCNVector3(width, 0.7, depth),
+                position: SCNVector3(centerX, floorY + ceilingHeight, centerZ)
             )
         )
 

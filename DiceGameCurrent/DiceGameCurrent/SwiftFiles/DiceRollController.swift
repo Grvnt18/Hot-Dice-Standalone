@@ -191,6 +191,10 @@ final class DiceRollController: NSObject, SCNSceneRendererDelegate {
     /// physics colliders and camera framing.
     var playAreaBounds: (x: ClosedRange<Float>, z: ClosedRange<Float>)?
     var floorY: Float = 0
+    /// Height of the invisible ceiling collider above floorY — see
+    /// PlayfieldVerticalBounds for why the camera, the ceiling collider,
+    /// and this all read from the same number.
+    var ceilingY: Float = PlayfieldVerticalBounds.ceilingHeight
 
     /// How many times each die has been nudged off a stack this roll.
     /// Capped so a pathological arrangement can't nudge forever and stop
@@ -426,11 +430,13 @@ final class DiceRollController: NSObject, SCNSceneRendererDelegate {
 
     /// Last-resort containment. Everything upstream is meant to prevent
     /// a die leaving the play area — thicker wall colliders, a clamped
-    /// repulsion force, a 500-unit-tall invisible ceiling. This exists
-    /// because none of that is a guarantee: physics engines can tunnel
-    /// under enough velocity, a solver can push overlapping bodies apart
-    /// violently, and a die that escapes is unrecoverable (it falls
-    /// forever, the roll never settles, and the turn can never complete).
+    /// repulsion force, an actual floor and ceiling collider (see
+    /// DicePlayfieldPhysics.makeContainer / PlayfieldVerticalBounds). This
+    /// exists because none of that is a guarantee: physics engines can
+    /// tunnel under enough velocity, a solver can push overlapping bodies
+    /// apart violently, and a die that escapes is unrecoverable (it falls
+    /// or climbs forever, the roll never settles, and the turn can never
+    /// complete).
     ///
     /// Cheap to run and impossible to notice when it does nothing, which
     /// is the right trade for a failure this severe.
@@ -447,7 +453,15 @@ final class DiceRollController: NSObject, SCNSceneRendererDelegate {
             let outOfX = p.x < bounds.x.lowerBound - margin || p.x > bounds.x.upperBound + margin
             let outOfZ = p.z < bounds.z.lowerBound - margin || p.z > bounds.z.upperBound + margin
             let belowFloor = p.y < floorY - 1.0
-            guard outOfX || outOfZ || belowFloor else { continue }
+            // Symmetric to belowFloor: a die that somehow tunnels through
+            // the ceiling collider (or gets there before it, on the very
+            // first frame after an escalated-repulsion collision) is just
+            // as unrecoverable as one that falls through the floor — it
+            // closes on the camera's near plane and vanishes rather than
+            // falling forever, but the failure (falls never settles, turn
+            // never completes) is identical.
+            let aboveCeiling = p.y > ceilingY + 1.0
+            guard outOfX || outOfZ || belowFloor || aboveCeiling else { continue }
 
             // Put it back just inside, drop its velocity, and let physics
             // resume normally from there. Zeroing velocity matters: a die
@@ -455,7 +469,8 @@ final class DiceRollController: NSObject, SCNSceneRendererDelegate {
             // simply tunnel straight back out on the next step.
             let clampedX = min(max(p.x, bounds.x.lowerBound + margin), bounds.x.upperBound - margin)
             let clampedZ = min(max(p.z, bounds.z.lowerBound + margin), bounds.z.upperBound - margin)
-            state.node.position = SCNVector3(clampedX, floorY + 1.0, clampedZ)
+            let clampedY = aboveCeiling ? ceilingY - 1.0 : floorY + 1.0
+            state.node.position = SCNVector3(clampedX, clampedY, clampedZ)
             body.resetTransform()
             body.velocity = SCNVector3Zero
             body.angularVelocity = SCNVector4(0, 1, 0, 0)

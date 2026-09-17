@@ -99,3 +99,28 @@ enum PlayfieldRim {
     /// of jumping to a different scale right where they meet.
     static let woodTileFraction: Float = 0.4
 }
+
+/// Vertical containment shared between the camera (DiceCameraFactory), the
+/// invisible ceiling collider (DicePlayfieldPhysics), and
+/// DiceRollController's containment safety net — all three need to agree on
+/// how high the play area extends.
+///
+/// Without an actual ceiling, nothing stops a die from climbing arbitrarily
+/// high above the floor — the side walls are tall enough to block any
+/// sideways escape at any height, so an unbounded top never let a die leave
+/// the playfield horizontally, but it left one real way out: gaining enough
+/// height (e.g. an energetic multi-die collision on top of an already-
+/// energetic bounce) closes the distance to the top-down camera itself.
+/// The camera's zNear plane clips anything closer than 0.1 units away, so a
+/// die climbing past roughly (cameraHeight - 0.1) simply vanishes — which
+/// reads exactly like "the die left the rolling area through the ceiling."
+enum PlayfieldVerticalBounds {
+    /// Camera height above the floor.
+    static let cameraHeight: Float = 15
+
+    /// Height of the invisible ceiling collider above the floor. Kept
+    /// comfortably below cameraHeight (5 units of margin) so a die bounces
+    /// off the ceiling — restitution 0.7, same as every other collider —
+    /// long before it gets anywhere near the camera's near clipping plane.
+    static let ceilingHeight: Float = 10
+}

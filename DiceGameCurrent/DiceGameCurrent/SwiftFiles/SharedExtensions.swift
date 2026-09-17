@@ -1,5 +1,6 @@
 import UIKit
 import SceneKit
+import SwiftUI
 import simd
 
 // Consolidated during a full-codebase review — UIColor(hex:) was
@@ -35,5 +36,23 @@ extension UIColor {
         var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         guard getHue(&h, saturation: &s, brightness: &b, alpha: &a) else { return self }
         return UIColor(hue: h, saturation: s, brightness: b * (1 - fraction), alpha: a)
+    }
+
+    /// Standard (ITU-R BT.601) relative luminance, used to decide whether
+    /// light or dark text/UI elements read better against this color.
+    var relativeLuminance: CGFloat {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        getRed(&r, green: &g, blue: &b, alpha: &a)
+        return 0.299 * r + 0.587 * g + 0.114 * b
+    }
+}
+
+// Was independently, privately defined in DiceGameShell.swift for the
+// score bar's per-die cell colors — moved here (and made non-private) so
+// AppTheme and SettingsView can share the exact same conversion instead of
+// a second copy of the same eight lines.
+extension Color {
+    init(hex: String) {
+        self.init(uiColor: UIColor(hex: hex))
     }
 }

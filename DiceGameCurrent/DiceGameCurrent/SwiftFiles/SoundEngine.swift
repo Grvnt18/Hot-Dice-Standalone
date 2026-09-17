@@ -118,6 +118,56 @@ final class SoundEngine: ObservableObject {
             // fail to start over audio setup.
             print("[SoundEngine] Audio session setup failed: \(error)")
         }
+
+        // Without this, music silently stays paused forever after ANY
+        // interruption (phone call, Siri, an alarm, another app briefly
+        // taking audio focus) — the system pauses AVAudioPlayer for the
+        // interruption's duration on our behalf, but nothing resumes it
+        // afterward unless we ask. That's the actual cause of "music stops
+        // after a long session and only comes back if you manually change
+        // the track": a longer session just means more time for some
+        // interruption to occur, and picking a track happens to force a
+        // fresh startMusic() call via selectedTrackIndex's didSet.
+        //
+        // Closure-based addObserver, not the #selector API, since
+        // SoundEngine doesn't inherit NSObject (see musicDelegate's own
+        // comment on why the same is true there).
+        NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] notification in
+            self?.handleInterruption(notification)
+        }
+    }
+
+    private func handleInterruption(_ notification: Notification) {
+        guard let info = notification.userInfo,
+              let typeValue = info[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { return }
+
+        switch type {
+        case .began:
+            // The system has already paused musicPlayer for us; nothing to
+            // do until it ends.
+            break
+        case .ended:
+            guard musicEnabled else { return }
+            let optionsValue = info[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
+            // .shouldResume specifically means the system judges it's safe
+            // to resume now (e.g. a phone call was declined rather than
+            // answered) — resuming unconditionally would restart over
+            // audio the system deliberately kept active elsewhere.
+            guard AVAudioSession.InterruptionOptions(rawValue: optionsValue).contains(.shouldResume) else { return }
+            do {
+                try AVAudioSession.sharedInstance().setActive(true)
+            } catch {
+                print("[SoundEngine] Failed to reactivate session after interruption: \(error)")
+            }
+            musicPlayer?.play()
+        @unknown default:
+            break
+        }
     }
 
     private func preload() {

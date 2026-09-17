@@ -151,12 +151,21 @@ struct DiceScoreBar: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(
-            Image(uiImage: Self.backdrop)
-                .resizable()
-                // .fill, not .fit: the bar's real aspect ratio varies by
-                // device, and .fit would letterbox the artwork with gaps.
-                .aspectRatio(contentMode: .fill)
-                .clipped()
+            // Tiled at the same fraction of the bar's width that a wall
+            // tiles the identical texture across the playfield's width
+            // (PlayfieldRim.woodTileFraction) — not a single copy stretched
+            // to fill the bar. Stretching one copy scaled the header's
+            // planks up to bar-width size while the walls kept tiling at
+            // their own, much smaller, scale, so the grain jumped to a
+            // visibly different size right at the seam between the two.
+            // Tiling both at the same fraction keeps the plank pitch
+            // continuous across that seam instead.
+            GeometryReader { geo in
+                let tileWidth = geo.size.width * CGFloat(PlayfieldRim.woodTileFraction)
+                let scale = tileWidth / Self.backdrop.size.width
+                Rectangle()
+                    .fill(ImagePaint(image: Image(uiImage: Self.backdrop), scale: scale))
+            }
         )
         // No fade animation here anymore — the 0.25s ease-out was a
         // deliberate polish touch, but it's exactly what was reading as
@@ -482,6 +491,13 @@ struct DiceGameScreen: View {
         // reliably cascade across custom sizes the same simple way), but
         // uppercase casing genuinely does cascade from one place here.
         .textCase(.uppercase)
+        // AppFonts' stackSans/aguafina use the relativeTo: overload of
+        // Font.custom so minimumScaleFactor can actually shrink them
+        // instead of clipping their last glyph (see AppFonts.swift), which
+        // as a side effect makes them respond to the system's Dynamic Type
+        // setting. Every size in this app was chosen assuming a fixed
+        // point size, so that's pinned back to the default here.
+        .dynamicTypeSize(.large)
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showingSettings) {
             SettingsView()

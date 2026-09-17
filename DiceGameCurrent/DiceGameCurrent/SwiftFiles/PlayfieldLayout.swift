@@ -89,4 +89,13 @@ enum PlayfieldRim {
     static func colliderCentreOffset(thickness: Float) -> Float {
         thickness / 2 - innerInset
     }
+
+    /// Fraction of the playfield's world width that one copy of the wood
+    /// texture spans when tiled across the walls (DiceSceneEnvironment.
+    /// addOneWall). DiceScoreBar's header background is painted with the
+    /// same fraction of its own on-screen width, rather than stretching one
+    /// copy across the whole bar — that's what keeps the plank pitch
+    /// continuous across the seam between the header and the walls instead
+    /// of jumping to a different scale right where they meet.
+    static let woodTileFraction: Float = 0.4
 }

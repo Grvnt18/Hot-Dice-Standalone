@@ -235,26 +235,30 @@ enum DiceSceneEnvironment {
         // the two runs of planking meet instead of leaving a notch.
         let endWidth = width + sideThickness * 2
 
+        // Shared with DiceScoreBar's header background — see
+        // PlayfieldRim.woodTileFraction for why both read from one number.
+        let tileWorldSize = width * PlayfieldRim.woodTileFraction
+
         // -X wall, +X wall: run along Z, so the grain tiles along `depth`.
         addOneWall(
             to: rootNode, seed: 101,
-            size: SCNVector3(sideThickness, visualHeight, depth), tileLength: depth,
+            size: SCNVector3(sideThickness, visualHeight, depth), tileLength: depth, tileWorldSize: tileWorldSize,
             position: SCNVector3(bounds.x.lowerBound - sideCentre, floorY + visualHeight / 2, centerZ)
         )
         addOneWall(
             to: rootNode, seed: 202,
-            size: SCNVector3(sideThickness, visualHeight, depth), tileLength: depth,
+            size: SCNVector3(sideThickness, visualHeight, depth), tileLength: depth, tileWorldSize: tileWorldSize,
             position: SCNVector3(bounds.x.upperBound + sideCentre, floorY + visualHeight / 2, centerZ)
         )
         // -Z wall, +Z wall: run along X, grain tiles across `width`.
         addOneWall(
             to: rootNode, seed: 303,
-            size: SCNVector3(endWidth, visualHeight, thickness), tileLength: endWidth,
+            size: SCNVector3(endWidth, visualHeight, thickness), tileLength: endWidth, tileWorldSize: tileWorldSize,
             position: SCNVector3(centerX, floorY + visualHeight / 2, bounds.z.lowerBound + inset)
         )
         addOneWall(
             to: rootNode, seed: 404,
-            size: SCNVector3(endWidth, visualHeight, thickness), tileLength: endWidth,
+            size: SCNVector3(endWidth, visualHeight, thickness), tileLength: endWidth, tileWorldSize: tileWorldSize,
             position: SCNVector3(centerX, floorY + visualHeight / 2, bounds.z.upperBound - inset)
         )
     }
@@ -264,6 +268,7 @@ enum DiceSceneEnvironment {
         seed: UInt64,
         size: SCNVector3,
         tileLength: Float,
+        tileWorldSize: Float,
         position: SCNVector3
     ) {
         let box = SCNBox(
@@ -291,7 +296,6 @@ enum DiceSceneEnvironment {
             pixelHeight: 256,
             seed: seed
         )
-        let tileWorldSize: Float = 4.0
         material.diffuse.wrapS = .repeat
         material.diffuse.wrapT = .repeat
         material.diffuse.contentsTransform = SCNMatrix4MakeScale(max(tileLength / tileWorldSize, 1), 1, 1)

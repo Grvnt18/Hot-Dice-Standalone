@@ -60,7 +60,16 @@ extension Font {
     /// a separately-exported static weight instance of the font rather
     /// than something achievable purely at the call site here.
     static func stackSans(_ size: CGFloat) -> Font {
-        .custom(AppFonts.stackSansPostScriptName, size: size)
+        // The relativeTo: overload, not plain .custom(_:size:) — the latter
+        // puts the font on a code path where `.minimumScaleFactor` doesn't
+        // reliably shrink the whole glyph run. Instead it can leave the
+        // rightmost character clipped rather than scaled down, which is
+        // exactly what was cutting off the last digit of the score on the
+        // turn-complete screen (Text(...).font(.stackSans(220)) there
+        // combines a huge fixed size with an aggressive minimumScaleFactor).
+        // relativeTo: puts Text's shrink-to-fit on the code path that
+        // actually scales the custom font instead of clipping it.
+        .custom(AppFonts.stackSansPostScriptName, size: size, relativeTo: .body)
     }
 
     /// Aguafina Script — the decorative script used for the "ROLLS" floor
@@ -69,6 +78,8 @@ extension Font {
     /// small x-height relative to their em), so call sites generally want
     /// a larger number than the Stack Sans equivalent.
     static func aguafina(_ size: CGFloat) -> Font {
-        .custom(AppFonts.aguafinaScriptPostScriptName, size: size)
+        // Same relativeTo: fix as stackSans above — this face is also used
+        // with minimumScaleFactor (the turn-complete caption).
+        .custom(AppFonts.aguafinaScriptPostScriptName, size: size, relativeTo: .body)
     }
 }

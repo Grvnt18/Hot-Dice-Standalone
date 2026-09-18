@@ -270,18 +270,18 @@ enum DiceSceneEnvironment {
         let tileWorldSize = width * PlayfieldRim.woodTileFraction
 
         // -X wall, +X wall: run along Z, so the grain should flow down the
-        // strip's own long axis (Z/depth — see addOneWall's `rotated: true`
-        // for why that needs a 90° UV swap here, not just a bigger scale).
+        // strip's own long axis (Z/depth — see addOneWall's `scaleVAxis:
+        // true` for why that means scaling V here, not U).
         addOneWall(
             to: rootNode, seed: 101,
             size: SCNVector3(sideThickness, visualHeight, depth), tileLength: depth, tileWorldSize: tileWorldSize,
-            rotated: true,
+            scaleVAxis: true,
             position: SCNVector3(bounds.x.lowerBound - sideCentre, floorY + visualHeight / 2, centerZ)
         )
         addOneWall(
             to: rootNode, seed: 202,
             size: SCNVector3(sideThickness, visualHeight, depth), tileLength: depth, tileWorldSize: tileWorldSize,
-            rotated: true,
+            scaleVAxis: true,
             position: SCNVector3(bounds.x.upperBound + sideCentre, floorY + visualHeight / 2, centerZ)
         )
         // -Z wall, +Z wall: run along X, grain tiles across `width` — this
@@ -290,13 +290,13 @@ enum DiceSceneEnvironment {
         addOneWall(
             to: rootNode, seed: 303,
             size: SCNVector3(endWidth, visualHeight, thickness), tileLength: endWidth, tileWorldSize: tileWorldSize,
-            rotated: false,
+            scaleVAxis: false,
             position: SCNVector3(centerX, floorY + visualHeight / 2, bounds.z.lowerBound + inset)
         )
         addOneWall(
             to: rootNode, seed: 404,
             size: SCNVector3(endWidth, visualHeight, thickness), tileLength: endWidth, tileWorldSize: tileWorldSize,
-            rotated: false,
+            scaleVAxis: false,
             position: SCNVector3(centerX, floorY + visualHeight / 2, bounds.z.upperBound - inset)
         )
     }
@@ -307,7 +307,7 @@ enum DiceSceneEnvironment {
         size: SCNVector3,
         tileLength: Float,
         tileWorldSize: Float,
-        rotated: Bool,
+        scaleVAxis: Bool,
         position: SCNVector3
     ) {
         let box = SCNBox(
@@ -345,30 +345,26 @@ enum DiceSceneEnvironment {
 
         // Only the box's TOP face is ever visible under a purely top-down
         // orthographic camera — the vertical side/front/back faces are
-        // edge-on and never seen. SceneKit's default box UVs map that top
-        // face's own U to the box's local X (its `width` in the SCNBox
-        // initializer) and V to local Z (its `length`). For the end walls,
-        // local X IS `endWidth`, the wall's own long axis — already
-        // aligned with the wood texture's long (shard-tiling) axis, so a
-        // plain scale of U is correct (unchanged below).
+        // edge-on and never seen. End walls' own long axis (`endWidth`)
+        // happens to be the one that scaling U tiles correctly (unchanged
+        // below). Side walls' long axis (`depth`, running screen-vertically
+        // from the header down toward the Roll button) is the OTHER one —
+        // scaling U there left it stuck on a single, untiled 0-1 pass,
+        // stretching the whole texture once across that entire long
+        // dimension instead of repeating along it: the "pattern stretched
+        // across the side bars" look.
         //
-        // For the SIDE walls, though, local X is `sideThickness` — the
-        // SHORT axis — while the long axis (`depth`, running screen-
-        // vertically from the header down toward the Roll button) is local
-        // Z, i.e. V. Scaling U there (the old code) tiled along the wrong,
-        // tiny dimension while leaving V's single 0-1 pass to stretch the
-        // whole texture once across the entire (long) depth — exactly the
-        // "pattern stretched across the side bars" look, instead of a
-        // smoothly repeating vertical grain. `rotated` swaps U and V before
-        // scaling, so the texture's own long axis lines up with the box's
-        // actual long axis and tiles along it instead.
-        if rotated {
-            var transform = SCNMatrix4Identity
-            transform.m11 = 0
-            transform.m12 = 1
-            transform.m21 = max(tileLength / tileWorldSize, 1)
-            transform.m22 = 0
-            material.diffuse.contentsTransform = transform
+        // A previous attempt fixed this with a hand-built UV-swap matrix,
+        // which relied on knowing SceneKit's exact row/column-vector
+        // multiplication convention for contentsTransform to get the swap
+        // direction right — unverifiable without a device to test on, and
+        // it didn't fix the visible result. Scaling V instead of U (still
+        // with the same well-established SCNMatrix4MakeScale used for end
+        // walls, no custom matrix and no rotation) sidesteps that entirely:
+        // whichever axis was previously left untiled just gets the scale
+        // moved onto it directly.
+        if scaleVAxis {
+            material.diffuse.contentsTransform = SCNMatrix4MakeScale(1, max(tileLength / tileWorldSize, 1), 1)
         } else {
             material.diffuse.contentsTransform = SCNMatrix4MakeScale(max(tileLength / tileWorldSize, 1), 1, 1)
         }

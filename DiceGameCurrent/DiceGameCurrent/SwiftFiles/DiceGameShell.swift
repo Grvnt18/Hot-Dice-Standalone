@@ -402,6 +402,14 @@ struct TurnCompleteOverlay: View {
                     .minimumScaleFactor(0.05)
                     .lineLimit(1)
                     .foregroundStyle(.white)
+                    // .frame(maxWidth: .infinity) expands this Text's own
+                    // layout box to the full available width, but without
+                    // this, Text defaults to LEADING alignment within a
+                    // box wider than its content — the digits (plus the
+                    // trailing anti-clipping spaces above) sat flush-left
+                    // instead of centered, unlike the caption above it
+                    // (which does set this).
+                    .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
                     .padding(.horizontal, 24)
             }

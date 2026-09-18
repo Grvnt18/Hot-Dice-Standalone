@@ -204,7 +204,13 @@ final class SoundEngine: ObservableObject {
     /// title. Baked goods, per request.
     static let tracks: [MusicTrack] = [
         MusicTrack(resource: "music_baller", displayName: "Babka"),
-        MusicTrack(resource: "music_speedrun", displayName: "Snickerdoodle")
+        MusicTrack(resource: "music_speedrun", displayName: "Snickerdoodle"),
+        MusicTrack(resource: "music_baklava", displayName: "Baklava"),
+        MusicTrack(resource: "music_focaccia", displayName: "Focaccia"),
+        MusicTrack(resource: "music_cannoli", displayName: "Cannoli"),
+        MusicTrack(resource: "music_eclair", displayName: "Éclair"),
+        MusicTrack(resource: "music_scone", displayName: "Scone"),
+        MusicTrack(resource: "music_croissant", displayName: "Croissant")
     ]
 
     /// nil = shuffle through everything; otherwise lock to one track.

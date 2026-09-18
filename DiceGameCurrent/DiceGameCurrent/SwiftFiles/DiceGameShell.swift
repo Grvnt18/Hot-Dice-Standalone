@@ -63,6 +63,41 @@ struct DiceSceneView: UIViewRepresentable {
     }
 }
 
+// MARK: - Shared header/footer wood backdrop
+
+/// Shared low-poly wood backdrop for the header (DiceScoreBar) and footer
+/// (DiceRollButton) — see WoodTiledBackground for why using the exact same
+/// image in both places (not just the same generator parameters) matters.
+private enum HeaderFooterWood {
+    static let image = LowPolyTextures.woodSurface(
+        baseColor: UIColor(hex: "#8B6039"),
+        planks: 5,
+        shardsPerPlank: 16,
+        pixelSize: 1024,
+        pixelHeight: 256,
+        seed: 77123
+    )
+}
+
+/// Tiles HeaderFooterWood.image at the same fraction of its own width that
+/// the 3D side/end walls tile their identical wood texture across the
+/// playfield (PlayfieldRim.woodTileFraction). Using the SAME source image
+/// at the SAME relative scale in the header, the walls, and the footer is
+/// what makes them read as one continuous piece of timber wrapping the
+/// whole screen — from the header, down the sides, to the Roll button —
+/// rather than three separately-styled panels that merely resemble each
+/// other.
+private struct WoodTiledBackground: View {
+    var body: some View {
+        GeometryReader { geo in
+            let tileWidth = geo.size.width * CGFloat(PlayfieldRim.woodTileFraction)
+            let scale = tileWidth / HeaderFooterWood.image.size.width
+            Rectangle()
+                .fill(ImagePaint(image: Image(uiImage: HeaderFooterWood.image), scale: scale))
+        }
+    }
+}
+
 // MARK: - Top bar (score + banked-dice history grid)
 
 struct DiceScoreBar: View {
@@ -82,21 +117,6 @@ struct DiceScoreBar: View {
     private let gridColumns = 8
     private let gridRows = 2
     private let cellSpacing: CGFloat = 4
-
-    /// Low-poly wood backdrop for the header. Uses woodSurface rather
-    /// than the general faceted generator — see that function for why
-    /// timber needs directional shards instead of equilateral ones.
-    ///
-    /// 4:1 pixel ratio because this bar is wide and short; a square source
-    /// stretched to fit would shear the grain into slivers.
-    private static let backdrop = LowPolyTextures.woodSurface(
-        baseColor: UIColor(hex: "#8B6039"),
-        planks: 5,
-        shardsPerPlank: 16,
-        pixelSize: 1024,
-        pixelHeight: 256,
-        seed: 77123
-    )
 
     var body: some View {
         HStack(spacing: 10) {
@@ -150,23 +170,7 @@ struct DiceScoreBar: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(
-            // Tiled at the same fraction of the bar's width that a wall
-            // tiles the identical texture across the playfield's width
-            // (PlayfieldRim.woodTileFraction) — not a single copy stretched
-            // to fill the bar. Stretching one copy scaled the header's
-            // planks up to bar-width size while the walls kept tiling at
-            // their own, much smaller, scale, so the grain jumped to a
-            // visibly different size right at the seam between the two.
-            // Tiling both at the same fraction keeps the plank pitch
-            // continuous across that seam instead.
-            GeometryReader { geo in
-                let tileWidth = geo.size.width * CGFloat(PlayfieldRim.woodTileFraction)
-                let scale = tileWidth / Self.backdrop.size.width
-                Rectangle()
-                    .fill(ImagePaint(image: Image(uiImage: Self.backdrop), scale: scale))
-            }
-        )
+        .background(WoodTiledBackground())
         // No fade animation here anymore — the 0.25s ease-out was a
         // deliberate polish touch, but it's exactly what was reading as
         // "delay" between confirming a selection and seeing the cell fill.
@@ -224,6 +228,15 @@ struct DiceRollButton: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
+        // Same wood as the header, tiled the same way — see
+        // WoodTiledBackground. This area grows to absorb whatever height
+        // squaring the scene above frees up (see DiceGameScreen.body), so
+        // it needed its own backdrop rather than the plain background it
+        // had when it was a thin, fixed-height strip: without one, that
+        // freed space would just be bare background instead of finishing
+        // the wood frame that now runs continuously from the header, down
+        // the sides, to here.
+        .background(WoodTiledBackground())
     }
 }
 
@@ -325,6 +338,30 @@ struct TurnCompleteOverlay: View {
     /// reward rather than something that fires on every result.
     private var showsFireworks: Bool { score <= 3 }
 
+    /// `caption`, with trailing whitespace appended before it's ever handed
+    /// to a Text view.
+    ///
+    /// This is the same fix DiceSceneEnvironment.renderScriptText already
+    /// applies to the floor's "ROLLS" text, for the same reason: Aguafina
+    /// Script's swashes extend past their own glyph's advance width, and
+    /// SwiftUI's Text (like Core Text generally) lays out and can clip
+    /// based on advance width, not actual rendered ink — so the true LAST
+    /// character's flourish (the "!" in "luck!", the "d" in "Good", the
+    /// "t" in "Great") can render partially outside the box Text computed
+    /// for the string, and gets cut there. Switching stackSans/aguafina to
+    /// the `relativeTo:` font overload (see AppFonts.swift) fixed a
+    /// related but distinct clipping bug — minimumScaleFactor's interaction
+    /// with a fixed-size custom font — and was NOT enough on its own for
+    /// this one, since this is a metrics limitation of the font itself, not
+    /// a font-API choice: no Font.custom variant reserves room for ink a
+    /// glyph's own advance width doesn't claim. The extra trailing space
+    /// gives Core Text that missing room directly, the same way
+    /// renderScriptText's own generous canvas padding does for the
+    /// UIKit-rendered floor text.
+    private var captionForDisplay: String? {
+        caption.map { $0 + "  " }
+    }
+
     var body: some View {
         ZStack {
             // Dims everything underneath by ~75% (leaves ~25% visible)
@@ -338,8 +375,8 @@ struct TurnCompleteOverlay: View {
             }
 
             VStack(spacing: 4) {
-                if let caption {
-                    Text(caption)
+                if let captionForDisplay {
+                    Text(captionForDisplay)
                         // Aguafina, and NOT uppercased — the screen-wide
                         // .textCase(.uppercase) would otherwise flatten the
                         // script's lowercase forms, which is most of what
@@ -353,7 +390,14 @@ struct TurnCompleteOverlay: View {
                         .padding(.horizontal, 28)
                 }
 
-                Text("\(score)")
+                // Trailing spaces, same reasoning as captionForDisplay
+                // above — stackSans is a plain sans face with much less
+                // overhang than Aguafina's script swashes, but the
+                // minimumScaleFactor(0.05) here is far more extreme, so
+                // the same class of advance-width-vs-ink-extent gap is
+                // cheap insurance against a repeat of the digit clipping
+                // this exact screen originally shipped with.
+                Text("\(score)  ")
                     .font(.stackSans(220))
                     .minimumScaleFactor(0.05)
                     .lineLimit(1)
@@ -427,12 +471,37 @@ struct DiceGameScreen: View {
     var body: some View {
         ZStack {
             GeometryReader { geo in
+                // The scene is sized SQUARE (its own width) rather than a
+                // fixed 70% of the screen's height — DiceSceneAssembler
+                // derives the playfield's world bounds directly from this
+                // view's own measured aspect ratio, so a square frame here
+                // is what makes the actual rolling area square, with no
+                // changes needed anywhere in the playfield/physics/camera
+                // math itself.
+                //
+                // minButtonHeight keeps the Roll button's own row from
+                // being squeezed away to nothing on a screen short enough
+                // (e.g. landscape) that header + a full square scene
+                // wouldn't leave room for it — in that case the scene
+                // gives up squareness rather than the button giving up
+                // usability. Otherwise (the normal portrait case, where
+                // 70%-of-height was always taller than the screen is
+                // wide), the scene comes out smaller than the old 70%
+                // slice, and the space that frees up is added to the
+                // button's row rather than removed from the game — see
+                // DiceRollButton's own wood backdrop for why that freed
+                // space doesn't just become bare background.
+                let headerHeight = geo.size.height * 0.15
+                let minButtonHeight: CGFloat = 100
+                let sceneHeight = min(geo.size.width, max(geo.size.height - headerHeight - minButtonHeight, 0))
+                let buttonHeight = geo.size.height - headerHeight - sceneHeight
+
                 VStack(spacing: 0) {
                     DiceScoreBar(
                         score: ui.score,
                         bankedOrder: ui.bankedOrder
                     )
-                    .frame(height: geo.size.height * 0.15) // back to 0.15 — the rectangular-cell redesign delivers the size increase without needing more vertical space
+                    .frame(height: headerHeight)
 
                     DiceSceneView(
                         session: $session,
@@ -453,7 +522,7 @@ struct DiceGameScreen: View {
                             ui.sync(from: controller)
                         }
                     )
-                        .frame(height: geo.size.height * 0.70)
+                        .frame(height: sceneHeight)
                         .background(Color.black)
                         .overlay(alignment: .topTrailing) {
                             Button {
@@ -476,7 +545,7 @@ struct DiceGameScreen: View {
                     ) {
                         rollTapped()
                     }
-                    .frame(height: geo.size.height * 0.15)
+                    .frame(height: buttonHeight)
                 }
             }
 

@@ -23,7 +23,7 @@ struct SettingsView: View {
                         Text("Music Volume")
                             .font(.stackSans(12))
                             .foregroundStyle(.secondary)
-                        TriangleSlider(value: $sound.musicVolume, tint: theme.accentColor, label: "Volume")
+                        TriangleSlider(value: $sound.musicVolume, tint: theme.accentColor)
                     }
                     // Dimmed rather than removed when music is off — a
                     // control that vanishes makes the form jump around and
@@ -55,7 +55,7 @@ struct SettingsView: View {
                         Text("Effects Volume")
                             .font(.stackSans(12))
                             .foregroundStyle(.secondary)
-                        TriangleSlider(value: $sound.sfxVolume, tint: theme.accentColor, label: "Volume")
+                        TriangleSlider(value: $sound.sfxVolume, tint: theme.accentColor)
                     }
                     .opacity(sound.sfxEnabled ? 1 : 0.4)
                     .disabled(!sound.sfxEnabled)
@@ -110,39 +110,56 @@ struct SettingsView: View {
 
 // MARK: - Table color picker
 
-/// A grid of tappable swatches, one per AppTheme.Swatch — the current
-/// green plus 11 alternates chosen to stay clear of the dice's own colors
-/// (see AppTheme.swatches). Selecting one updates AppTheme.shared
+/// A horizontal bar of tappable color stripes, one per AppTheme.Swatch —
+/// styled after the Polaroid logo's row of solid color bands rather than a
+/// grid of circles. Scrollable, since 24 swatches don't fit one screen
+/// width as fixed-size stripes. Selecting one updates AppTheme.shared
 /// immediately, same "no separate apply step" pattern as the audio
 /// controls above.
 private struct ColorwayPicker: View {
     @ObservedObject var theme: AppTheme
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 6)
+    private let stripeWidth: CGFloat = 26
+    private let stripeHeight: CGFloat = 48
+    private let selectedExtraHeight: CGFloat = 10
+    private let cornerRadius: CGFloat = 5
 
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 14) {
-            ForEach(Array(AppTheme.swatches.enumerated()), id: \.offset) { index, swatch in
-                Button {
-                    theme.colorwayIndex = index
-                } label: {
-                    Circle()
-                        .fill(Color(hex: swatch.hex))
-                        .frame(width: 34, height: 34)
-                        .overlay(
-                            Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
-                        )
-                        .overlay {
-                            if theme.colorwayIndex == index {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundStyle(swatch.isBright ? .black : .white)
-                            }
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .bottom, spacing: 5) {
+                ForEach(Array(AppTheme.swatches.enumerated()), id: \.offset) { index, swatch in
+                    let isSelected = theme.colorwayIndex == index
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            theme.colorwayIndex = index
                         }
+                    } label: {
+                        RoundedRectangle(cornerRadius: cornerRadius)
+                            .fill(Color(hex: swatch.hex))
+                            .frame(width: stripeWidth, height: isSelected ? stripeHeight + selectedExtraHeight : stripeHeight)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: cornerRadius)
+                                    .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
+                            )
+                            .overlay(alignment: .bottom) {
+                                if isSelected {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundStyle(swatch.isBright ? .black : .white)
+                                        .padding(.bottom, 6)
+                                }
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(swatch.name)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(swatch.name)
             }
+            // Bottom-aligned within a fixed-height row: every stripe sits
+            // on the same baseline regardless of its own (possibly taller,
+            // when selected) height, so the row reads as one continuous
+            // bar rather than stripes floating at different levels.
+            .frame(height: stripeHeight + selectedExtraHeight, alignment: .bottom)
+            .padding(.horizontal, 2)
         }
     }
 }

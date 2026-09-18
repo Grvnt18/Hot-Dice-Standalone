@@ -109,15 +109,15 @@ enum DicePlayfieldPhysics {
             )
         )
 
-        // Ceiling — same thickness/restitution treatment as the floor, and
-        // the actual fix for dice being able to "leave via the ceiling":
-        // without this, nothing capped how high a die could climb, and
-        // high enough (e.g. an energetic collision landing on an already-
-        // energetic bounce) closes the distance to the top-down camera
-        // itself, which clips anything inside its 0.1-unit near plane —
-        // a die that gets that high simply vanishes rather than visibly
-        // bouncing off anything. See PlayfieldVerticalBounds for why this
-        // height and the camera's are kept in one shared place.
+        // Ceiling — same thickness/restitution treatment as the floor.
+        // Originally added purely so a die could never climb high enough
+        // to close the distance to the top-down camera and vanish through
+        // its near clipping plane; now deliberately kept much LOWER (see
+        // PlayfieldVerticalBounds.ceilingHeight for the full derivation,
+        // including why it can't go arbitrarily low) so it also cuts
+        // sharply into how much vertical room a die has to gain the height
+        // a stack would need — DiceRollController's resolveStacking is
+        // still what actually guarantees no stack survives a roll.
         container.addChildNode(
             staticCollider(
                 boxSize: SCNVector3(width, 0.7, depth),

@@ -218,6 +218,7 @@ struct DiceRollButton: View {
                     .frame(height: 48)
             }
             .buttonStyle(.borderedProminent)
+            .buttonBorderShape(.roundedRectangle(radius: ControlShape.cornerRadius))
             .disabled(!isEnabled)
 
             if !subtitle.isEmpty {
@@ -541,7 +542,10 @@ struct DiceGameScreen: View {
                                     .font(.system(size: 18))
                                     .foregroundStyle(.white.opacity(0.75))
                                     .padding(9)
-                                    .background(Color.black.opacity(0.45), in: Circle())
+                                    .background(
+                                        Color.black.opacity(0.45),
+                                        in: RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
+                                    )
                             }
                             .padding(10)
                         }

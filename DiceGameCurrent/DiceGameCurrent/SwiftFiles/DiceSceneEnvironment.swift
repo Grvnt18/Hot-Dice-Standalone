@@ -219,21 +219,32 @@ enum DiceSceneEnvironment {
         }
     }
 
-    /// Visible walls around the play area — separate from the invisible
-    /// physics wall colliders in DicePlayfieldPhysics, which are kept
-    /// MUCH taller (effectively infinite containment) than these look.
+    /// Visible wood frame around the play area — separate from the
+    /// invisible physics wall colliders in DicePlayfieldPhysics, which are
+    /// kept MUCH taller (effectively infinite containment) than this looks.
     /// Decoupling visual height from physics height on purpose: a wall
-    /// tall enough to guarantee no bounce ever clears it would look
-    /// absurd (dice are small; the necessary physics margin is large),
-    /// while a wall sized to look reasonable wouldn't reliably contain
-    /// the more energetic rolls. This renders a "reasonable" rim — sized
-    /// relative to the playfield, like the raised edge of a real dice
-    /// tray — while the actual containment boundary stays far taller and
-    /// invisible.
+    /// tall enough to guarantee no bounce ever clears it would look absurd
+    /// (dice are small; the necessary physics margin is large), while a
+    /// wall sized to look reasonable wouldn't reliably contain the more
+    /// energetic rolls.
     ///
-    /// Each of the 4 walls gets a different facet seed, so no two show an
-    /// identical pattern while all share one wood tone — same intent the
-    /// four sliced photo strips served, without shipping four images.
+    /// Built as ONE continuous piece of timber wrapping the whole square
+    /// playfield, with the playable surface as a square cut out of its
+    /// middle — not four independently-textured panels. Each of the 4
+    /// segments (left/right run the full height including the corners;
+    /// top/bottom fill the remaining gap between them, so nothing overlaps)
+    /// gets its UV coordinates computed directly from world position
+    /// (worldMappedQuad) rather than SceneKit's per-object default 0-1
+    /// mapping — so the SAME point in world space always samples the SAME
+    /// texel regardless of which segment happens to cover it there. That's
+    /// what makes the grain read as one unbroken board across every seam,
+    /// including the four corners, instead of four separately-mapped
+    /// panels that merely share a wood tone. A previous version gave each
+    /// segment its own default per-object UV (needing per-segment scale/
+    /// axis corrections that were hard to get right without a device to
+    /// test on) and a different random seed per panel (so even a perfectly
+    /// aligned seam would have shown a visible break in the actual grain
+    /// pattern) — both are gone here by construction.
     static func addWalls(
         to rootNode: SCNNode,
         bounds: (x: ClosedRange<Float>, z: ClosedRange<Float>),
@@ -241,140 +252,140 @@ enum DiceSceneEnvironment {
         visualHeight: Float
     ) {
         let width = bounds.x.upperBound - bounds.x.lowerBound
-        let depth = bounds.z.upperBound - bounds.z.lowerBound
-        let centerX = (bounds.x.lowerBound + bounds.x.upperBound) / 2
-        let centerZ = (bounds.z.lowerBound + bounds.z.upperBound) / 2
-        // Both the panel thickness and its offset come from PlayfieldRim,
-        // which the physics colliders read too — see that type for why
-        // these can't be independent numbers.
-        let thickness = PlayfieldRim.visualThickness
-        let inset = PlayfieldRim.visualCentreOffset
+        // Small cosmetic reach past the nominal bounds, covering any
+        // hairline background gap right at the screen edge — much smaller
+        // than the old side-wall-only +4.0 fudge, which was compensating
+        // for the playfield being a non-square slice of a taller screen
+        // before DiceGameScreen started sizing the 3D view to a square.
+        let outerMargin: Float = 0.15
 
-        // The X walls are made MUCH thicker than the rim needs, and all of
-        // the extra is added outward, off toward the screen edge. The
-        // camera frames exactly the playfield width, so a rim panel only
-        // `thickness` wide left bare background visible beyond it at the
-        // left and right edges. Widening outward covers that margin while
-        // leaving the inner face — and therefore the playable area and the
-        // matching physics colliders — exactly where they were.
-        let sideThickness: Float = thickness + 4.0
-        // Inner face stays at the rim; the added bulk goes outward only.
-        let sideCentre = sideThickness / 2 - PlayfieldRim.innerInset
+        let cutout = (
+            x: bounds.x.lowerBound + PlayfieldRim.innerInset ... bounds.x.upperBound - PlayfieldRim.innerInset,
+            z: bounds.z.lowerBound + PlayfieldRim.innerInset ... bounds.z.upperBound - PlayfieldRim.innerInset
+        )
+        let outer = (
+            x: bounds.x.lowerBound - outerMargin ... bounds.x.upperBound + outerMargin,
+            z: bounds.z.lowerBound - outerMargin ... bounds.z.upperBound + outerMargin
+        )
 
-        // Overlap the Z walls past the corners by the side walls' width, so
-        // the two runs of planking meet instead of leaving a notch.
-        let endWidth = width + sideThickness * 2
+        let y = floorY + visualHeight
 
-        // Shared with DiceScoreBar's header background — see
+        // One shared texture and one shared UV density for every segment —
+        // see the type-level doc comment for why that (not per-segment
+        // scale corrections) is what actually guarantees a continuous,
+        // non-stretched board regardless of which world direction a given
+        // segment happens to run in.
+        let material = wallMaterial()
+        // tileWorldSize matches DiceScoreBar's header background — see
         // PlayfieldRim.woodTileFraction for why both read from one number.
         let tileWorldSize = width * PlayfieldRim.woodTileFraction
+        let uPerWorldUnit: Float = 1 / tileWorldSize
+        // The source texture is 1024x256 (4:1, wide:tall) — V needs to
+        // cycle 4x faster than U so one world-space "tile" maps onto the
+        // image without stretching its own aspect ratio.
+        let vPerWorldUnit: Float = 4 / tileWorldSize
 
-        // -X wall, +X wall: run along Z, so the grain should flow down the
-        // strip's own long axis (Z/depth — see addOneWall's `scaleVAxis:
-        // true` for why that means scaling V here, not U).
-        addOneWall(
-            to: rootNode, seed: 101,
-            size: SCNVector3(sideThickness, visualHeight, depth), tileLength: depth, tileWorldSize: tileWorldSize,
-            scaleVAxis: true,
-            position: SCNVector3(bounds.x.lowerBound - sideCentre, floorY + visualHeight / 2, centerZ)
+        // Left and right strips span the FULL outer height, including the
+        // corners; top and bottom fill just the remaining inner-width gap
+        // between them. Non-overlapping by construction, unlike the old
+        // per-box approach's deliberate corner overlap — no seam gap to
+        // cover, so nothing needs to reach past a neighbor to hide one.
+        addWorldMappedQuad(
+            to: rootNode, xRange: outer.x.lowerBound...cutout.x.lowerBound, zRange: outer.z, y: y,
+            uPerWorldUnit: uPerWorldUnit, vPerWorldUnit: vPerWorldUnit, material: material
         )
-        addOneWall(
-            to: rootNode, seed: 202,
-            size: SCNVector3(sideThickness, visualHeight, depth), tileLength: depth, tileWorldSize: tileWorldSize,
-            scaleVAxis: true,
-            position: SCNVector3(bounds.x.upperBound + sideCentre, floorY + visualHeight / 2, centerZ)
+        addWorldMappedQuad(
+            to: rootNode, xRange: cutout.x.upperBound...outer.x.upperBound, zRange: outer.z, y: y,
+            uPerWorldUnit: uPerWorldUnit, vPerWorldUnit: vPerWorldUnit, material: material
         )
-        // -Z wall, +Z wall: run along X, grain tiles across `width` — this
-        // pair's long axis already matches the texture's own long (shard)
-        // axis with no rotation needed, same as the header bar.
-        addOneWall(
-            to: rootNode, seed: 303,
-            size: SCNVector3(endWidth, visualHeight, thickness), tileLength: endWidth, tileWorldSize: tileWorldSize,
-            scaleVAxis: false,
-            position: SCNVector3(centerX, floorY + visualHeight / 2, bounds.z.lowerBound + inset)
+        addWorldMappedQuad(
+            to: rootNode, xRange: cutout.x, zRange: outer.z.lowerBound...cutout.z.lowerBound, y: y,
+            uPerWorldUnit: uPerWorldUnit, vPerWorldUnit: vPerWorldUnit, material: material
         )
-        addOneWall(
-            to: rootNode, seed: 404,
-            size: SCNVector3(endWidth, visualHeight, thickness), tileLength: endWidth, tileWorldSize: tileWorldSize,
-            scaleVAxis: false,
-            position: SCNVector3(centerX, floorY + visualHeight / 2, bounds.z.upperBound - inset)
+        addWorldMappedQuad(
+            to: rootNode, xRange: cutout.x, zRange: cutout.z.upperBound...outer.z.upperBound, y: y,
+            uPerWorldUnit: uPerWorldUnit, vPerWorldUnit: vPerWorldUnit, material: material
         )
     }
 
-    private static func addOneWall(
-        to rootNode: SCNNode,
-        seed: UInt64,
-        size: SCNVector3,
-        tileLength: Float,
-        tileWorldSize: Float,
-        scaleVAxis: Bool,
-        position: SCNVector3
-    ) {
-        let box = SCNBox(
-            width: CGFloat(size.x),
-            height: CGFloat(size.y),
-            length: CGFloat(size.z),
-            chamferRadius: 0
-        )
-
+    private static func wallMaterial() -> SCNMaterial {
         let material = SCNMaterial()
         // Same generator, palette and plank density as the header/footer
-        // backdrop (DiceGameShell.HeaderFooterWood), so the wall frame and
-        // the header/footer bars read as one continuous piece of timber
-        // rather than unrelated wood treatments that merely resemble each
-        // other. Each wall still renders its OWN generated image (different
-        // seed per wall, see addWalls) rather than reusing
-        // HeaderFooterWood.image directly — the walls are meant to show
-        // varied grain per panel, unlike the header and footer, which use
-        // the identical image so they read as literally the same board.
-        //
-        // plankHeightWorld keeps plank size consistent between walls of
-        // different lengths: without it, the short Z walls and the long X
-        // walls would tile the same image across different distances and
-        // end up with visibly different board widths.
+        // backdrop (DiceGameShell.HeaderFooterWood) — and the SAME single
+        // seed, not a different one per segment, so the frame and the
+        // header/footer read as one continuous piece of timber rather than
+        // unrelated wood treatments that merely resemble each other.
+        // (LowPolyTextures caches by these exact parameters, so this call
+        // returns the identical image HeaderFooterWood.image does, without
+        // either file needing to see the other's private constant.)
         material.diffuse.contents = LowPolyTextures.woodSurface(
             baseColor: UIColor(hex: "#8B6039"),
             planks: 5,
             shardsPerPlank: 16,
             pixelSize: 1024,
             pixelHeight: 256,
-            seed: seed
+            seed: 77123
         )
         material.diffuse.wrapS = .repeat
         material.diffuse.wrapT = .repeat
-
-        // Only the box's TOP face is ever visible under a purely top-down
-        // orthographic camera — the vertical side/front/back faces are
-        // edge-on and never seen. End walls' own long axis (`endWidth`)
-        // happens to be the one that scaling U tiles correctly (unchanged
-        // below). Side walls' long axis (`depth`, running screen-vertically
-        // from the header down toward the Roll button) is the OTHER one —
-        // scaling U there left it stuck on a single, untiled 0-1 pass,
-        // stretching the whole texture once across that entire long
-        // dimension instead of repeating along it: the "pattern stretched
-        // across the side bars" look.
-        //
-        // A previous attempt fixed this with a hand-built UV-swap matrix,
-        // which relied on knowing SceneKit's exact row/column-vector
-        // multiplication convention for contentsTransform to get the swap
-        // direction right — unverifiable without a device to test on, and
-        // it didn't fix the visible result. Scaling V instead of U (still
-        // with the same well-established SCNMatrix4MakeScale used for end
-        // walls, no custom matrix and no rotation) sidesteps that entirely:
-        // whichever axis was previously left untiled just gets the scale
-        // moved onto it directly.
-        if scaleVAxis {
-            material.diffuse.contentsTransform = SCNMatrix4MakeScale(1, max(tileLength / tileWorldSize, 1), 1)
-        } else {
-            material.diffuse.contentsTransform = SCNMatrix4MakeScale(max(tileLength / tileWorldSize, 1), 1, 1)
-        }
         material.lightingModel = .lambert
-        box.materials = [material]
+        // Per-vertex UV here is supplied explicitly (see worldMappedQuad)
+        // rather than relying on a box's default per-face mapping, so
+        // there's no default-winding assumption to get backface-culled by;
+        // double-sided is cheap insurance against that regardless.
+        material.isDoubleSided = true
+        return material
+    }
 
-        let node = SCNNode(geometry: box)
-        node.position = position
+    /// Builds and adds a single flat, upward-facing quad whose texture
+    /// coordinates are computed directly from world position — `u =
+    /// worldX * uPerWorldUnit`, `v = worldZ * vPerWorldUnit` — rather than
+    /// the 0-1 span SceneKit would give a box or plane's own local face.
+    /// Any two quads built this way that share a boundary in world space
+    /// necessarily agree on the UV at every point along it, since both
+    /// compute it from the same shared world coordinates — that's what
+    /// makes the wood grain continuous across the seam between them
+    /// without needing them to be one literal mesh.
+    ///
+    /// Only a flat quad, not a full box with real height/thickness: under
+    /// the purely top-down orthographic camera (DiceCameraFactory), a
+    /// box's vertical side faces are always edge-on and never visible, so
+    /// a box's "real" thickness was already contributing nothing to what's
+    /// actually on screen — this keeps that same top-down appearance with
+    /// far simpler geometry.
+    private static func addWorldMappedQuad(
+        to rootNode: SCNNode,
+        xRange: ClosedRange<Float>,
+        zRange: ClosedRange<Float>,
+        y: Float,
+        uPerWorldUnit: Float,
+        vPerWorldUnit: Float,
+        material: SCNMaterial
+    ) {
+        let corners: [(x: Float, z: Float)] = [
+            (xRange.lowerBound, zRange.lowerBound),
+            (xRange.upperBound, zRange.lowerBound),
+            (xRange.upperBound, zRange.upperBound),
+            (xRange.lowerBound, zRange.upperBound)
+        ]
+        let positions = corners.map { SCNVector3($0.x, y, $0.z) }
+        let normals = [SCNVector3](repeating: SCNVector3(0, 1, 0), count: 4)
+        let uvs = corners.map { CGPoint(x: CGFloat($0.x * uPerWorldUnit), y: CGFloat($0.z * vPerWorldUnit)) }
+        // Two triangles, fanned from corner 0 — standard quad triangulation.
+        let indices: [Int32] = [0, 1, 2, 0, 2, 3]
+
+        let geometry = SCNGeometry(
+            sources: [
+                SCNGeometrySource(vertices: positions),
+                SCNGeometrySource(normals: normals),
+                SCNGeometrySource(textureCoordinates: uvs)
+            ],
+            elements: [SCNGeometryElement(indices: indices, primitiveType: .triangles)]
+        )
+        geometry.materials = [material]
+
+        let node = SCNNode(geometry: geometry)
         node.castsShadow = false
-
         rootNode.addChildNode(node)
     }
 }

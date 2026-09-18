@@ -237,6 +237,111 @@ enum DieFaceLabels {
         }
     }
 
+    // MARK: - D4 corner marks (alternative to numbered faces)
+
+    /// Local-space direction of each of the tetrahedron's 4 original
+    /// vertices, in the SAME order used to build d4.obj/d4.dae (see
+    /// DieFaceNormals.d4's own comment on that sourcing) — a chamfered
+    /// vertex's cap sits exactly along its ORIGINAL (pre-chamfer) vertex
+    /// direction, by the same symmetry argument DieFaceNormals relies on
+    /// for face normals: cutting a corner off pulls its points toward the
+    /// centroid of each adjoining face, but for a REGULAR tetrahedron
+    /// those three pulled points stay centered on the original vertex's
+    /// own radial line outward from the origin.
+    private static let d4VertexDirections: [SCNVector3] = [
+        SCNVector3(0.57735, 0.57735, 0.57735),
+        SCNVector3(0.57735, -0.57735, -0.57735),
+        SCNVector3(-0.57735, 0.57735, -0.57735),
+        SCNVector3(-0.57735, -0.57735, 0.57735)
+    ]
+
+    /// Distance from center to a vertex cap's own centroid, in the mesh's
+    /// local units — computed the same way localFaceDistance is (measured
+    /// directly from the generator's vertex/face data), just for a vertex
+    /// cap instead of a main face. All 4 are identical for a regular
+    /// tetrahedron (verified: every vertex cap sits at exactly the same
+    /// distance, as symmetry demands).
+    private static let d4VertexLocalDistance: Float = 1.50111
+
+    /// Which 2 of the tetrahedron's 4 vertices (by d4VertexDirections'
+    /// index) get a mark. A regular tetrahedron's vertices are all
+    /// equivalent under its symmetry group, so which specific 2 are
+    /// chosen doesn't matter — any pair gives the same 2-marked/2-blank
+    /// split and therefore the same 50/50 odds.
+    private static let d4MarkedVertexIndices: Set<Int> = [0, 3]
+
+    /// Size of the corner mark's own square plane, in local units. Much
+    /// smaller than a numbered face's label (labelSize(forSides: 4) is
+    /// 0.90): the chamfered vertex cap itself is tiny (its own apothem is
+    /// roughly 6% of a main face's), so the mark is sized as a fraction of
+    /// the numeral label instead of trying to inscribe it in that sliver —
+    /// same "fits within the die, legible, not exactly inscribed in its
+    /// own facet" latitude labelSize's own doc comment already takes for
+    /// the numbered faces. Unverified on an actual screen, same as every
+    /// other size in this file that was chosen without a device to look
+    /// at it on.
+    private static let d4CornerMarkSize: CGFloat = 0.28
+
+    /// Alternative D4 face decoration: a plain filled circle on 2 of the
+    /// 4 corners, nothing at all on the other 2 — see
+    /// DieMaterial.applyCornerMarkD4's doc comment for why (50/50 marked-
+    /// vs-unmarked odds on any roll, instead of reading a 1-4 numeral).
+    static func addD4CornerMarks(to node: SCNNode, colorway: DieColorway) {
+        let distance = d4VertexLocalDistance * surfaceLiftFactor
+        let markImage = cornerMarkImage(colorway: colorway)
+
+        for (index, direction) in d4VertexDirections.enumerated() {
+            guard d4MarkedVertexIndices.contains(index) else { continue }
+
+            let plane = SCNPlane(width: d4CornerMarkSize, height: d4CornerMarkSize)
+            let material = SCNMaterial()
+            material.diffuse.contents = markImage
+            material.isDoubleSided = true
+            material.lightingModel = .constant
+            material.writesToDepthBuffer = false
+            material.readsFromDepthBuffer = true
+            plane.materials = [material]
+
+            let markNode = SCNNode(geometry: plane)
+            markNode.name = "cornerMark"
+            markNode.renderingOrder = 10
+
+            markNode.position = SCNVector3(
+                direction.x * distance,
+                direction.y * distance,
+                direction.z * distance
+            )
+
+            let targetNormal = simd_normalize(direction.simd)
+            let defaultFacing = simd_float3(0, 0, 1)
+            markNode.simdOrientation = simd_quatf(from: defaultFacing, to: targetNormal)
+
+            node.addChildNode(markNode)
+        }
+    }
+
+    /// A single filled circle, centered on a transparent background — the
+    /// "marked" corner's decoration. Deliberately not a numeral or any
+    /// other symbol: the whole point of this variant is a binary marked/
+    /// unmarked read, not a value to identify.
+    private static func cornerMarkImage(colorway: DieColorway) -> UIImage {
+        let size = CGSize(width: 512, height: 512)
+        let format = UIGraphicsImageRendererFormat()
+        format.opaque = false
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
+        return renderer.image { _ in
+            UIColor.clear.setFill()
+            UIRectFill(CGRect(origin: .zero, size: size))
+
+            // Margin keeps the circle from touching the plane's own edge,
+            // same visual role as the padding around a numeral.
+            let inset = size.width * 0.18
+            let circleRect = CGRect(origin: .zero, size: size).insetBy(dx: inset, dy: inset)
+            UIColor(hex: colorway.numberHex).setFill()
+            UIBezierPath(ovalIn: circleRect).fill()
+        }
+    }
+
     /// "ROLLS" in Aguafina Script, sized to fill the same square label
     /// plane a numeral would occupy. Uses aspect-aware scaling rather than
     /// a fixed point size: "ROLLS" is far wider than a single digit, so a

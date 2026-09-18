@@ -138,7 +138,44 @@ enum DieMaterial {
         rollsFaceNumber: Int? = nil,
         grainVariant: Int = 0
     ) {
-        guard node.geometry != nil else { return }
+        guard applyBodyMaterial(colorway: colorway, to: node, grainVariant: grainVariant) else { return }
+
+        DieFaceLabels.addPermanentFaceNumbers(
+            to: node,
+            sides: sides,
+            colorway: colorway,
+            rollsFaceNumber: rollsFaceNumber
+        )
+    }
+
+    /// Alternative D4 styling: no numerals at all. Two of the tetrahedron's
+    /// four corners get a plain mark, the other two get nothing — since a
+    /// tetrahedron always rests on a face with exactly one vertex pointing
+    /// up, marking half the corners gives a 50/50 marked-vs-unmarked
+    /// result on any roll, same idea as a coin flip rather than a 1-4
+    /// numbered read. Not used by this game's own pool (still numbered
+    /// d4/d6/d8/d10/d12 throughout) — a ready-to-use alternative for
+    /// wherever the wider project wants a binary-outcome d4 instead.
+    ///
+    /// Body material setup is identical to the numbered apply(sides:...)
+    /// above (same color, grain, shading model) — only the face
+    /// decoration differs, so that part is shared via applyBodyMaterial
+    /// rather than duplicated.
+    static func applyCornerMarkD4(colorway: DieColorway, to node: SCNNode, grainVariant: Int = 0) {
+        guard applyBodyMaterial(colorway: colorway, to: node, grainVariant: grainVariant) else { return }
+
+        DieFaceLabels.addD4CornerMarks(to: node, colorway: colorway)
+    }
+
+    /// Body color/grain/shading setup shared by both apply(sides:...) and
+    /// applyCornerMarkD4 — everything except the face decoration, which is
+    /// the one thing that differs between a numbered die and the
+    /// corner-marked D4 variant. Returns false (having done nothing) if
+    /// the node has no geometry yet, matching apply(sides:...)'s original
+    /// early-return behavior.
+    @discardableResult
+    private static func applyBodyMaterial(colorway: DieColorway, to node: SCNNode, grainVariant: Int) -> Bool {
+        guard node.geometry != nil else { return false }
 
         let material = SCNMaterial()
         material.diffuse.contents = UIColor(hex: colorway.bodyHex)
@@ -187,12 +224,6 @@ enum DieMaterial {
         // trading a small amount of fill-rate for guaranteed correctness.
         material.isDoubleSided = true
         node.geometry?.materials = [material]
-
-        DieFaceLabels.addPermanentFaceNumbers(
-            to: node,
-            sides: sides,
-            colorway: colorway,
-            rollsFaceNumber: rollsFaceNumber
-        )
+        return true
     }
 }

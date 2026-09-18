@@ -43,14 +43,36 @@ private enum SettleTuning {
 /// Local-space face normals for each die shape, used to figure out which
 /// face is closest to "resting flat" and snap to it cleanly.
 ///
-/// Extracted directly from the sourced .dae meshes (dice.zip), not
-/// estimated. IMPORTANT: the .dae files are authored Z-up (Blender's
-/// default) but SceneKit expects Y-up. VERIFIED: every normal below has
-/// been checked against the real face normals extracted from the .dae
-/// meshes themselves, so this no longer relies on a hand-applied axis
-/// conversion being correct. d6/d8 were already right; d10/d12 were not
-/// (see the note on those two below) and have been corrected.
+/// d6/d8/d10/d12 are extracted directly from the sourced .dae meshes
+/// (dice.zip), not estimated. IMPORTANT: the .dae files are authored Z-up
+/// (Blender's default) but SceneKit expects Y-up. VERIFIED: every normal
+/// below has been checked against the real face normals extracted from
+/// the .dae meshes themselves, so this no longer relies on a hand-applied
+/// axis conversion being correct. d6/d8 were already right; d10/d12 were
+/// not (see the note on those two below) and have been corrected.
+///
+/// d4/d20 have no sourced .dae to extract from — those meshes are
+/// generated in-code (see d4.obj/d20.obj) — so their normals are computed
+/// directly from that same generator's vertex/face data instead, which
+/// sidesteps the Z-up/Y-up conversion risk entirely (see each one's own
+/// comment below).
 enum DieFaceNormals {
+    /// Computed directly from d4.obj's own generator (a regular tetrahedron
+    /// at vertices (1,1,1), (1,-1,-1), (-1,1,-1), (-1,-1,1)) — not measured
+    /// from an authored .dae, since these meshes were generated in-code
+    /// rather than sourced from Blender. That sidesteps the Z-up/Y-up
+    /// conversion risk that caused the d10/d12 bug entirely: whatever axes
+    /// the generator used ARE the mesh's local axes, with no separate
+    /// export/import convention in between to get wrong. Order matches the
+    /// face order used when building d4.obj/d4.dae, which is also the
+    /// order DieFaceLabels numbers 1-4 in.
+    private static let d4: [SCNVector3] = [
+        SCNVector3(0.57735, 0.57735, -0.57735),
+        SCNVector3(0.57735, -0.57735, 0.57735),
+        SCNVector3(-0.57735, 0.57735, 0.57735),
+        SCNVector3(-0.57735, -0.57735, -0.57735)
+    ]
+
     private static let d6: [SCNVector3] = [
         SCNVector3(0.00000, -1.00000, 0.00000),
         SCNVector3(0.00000, 0.00000, 1.00000),
@@ -120,12 +142,43 @@ enum DieFaceNormals {
         SCNVector3(-0.52573, 0.00000, 0.85065)
     ]
 
+    /// Same sourcing as d4 above — computed directly from d20.obj's own
+    /// generator (a regular icosahedron), not measured from an authored
+    /// asset. All 20 verified programmatically to be pairwise distinct
+    /// (no accidental duplicate/mirrored face, the class of bug that hit
+    /// the old hand-derived d10/d12 values) and unit length. Order matches
+    /// the face order used when building d20.obj/d20.dae.
+    private static let d20: [SCNVector3] = [
+        SCNVector3(-0.57735, 0.57735, 0.57735),
+        SCNVector3(0.00000, 0.93417, 0.35682),
+        SCNVector3(0.00000, 0.93417, -0.35682),
+        SCNVector3(-0.57735, 0.57735, -0.57735),
+        SCNVector3(-0.93417, 0.35682, 0.00000),
+        SCNVector3(0.57735, 0.57735, 0.57735),
+        SCNVector3(-0.35682, 0.00000, 0.93417),
+        SCNVector3(-0.93417, -0.35682, 0.00000),
+        SCNVector3(-0.35682, 0.00000, -0.93417),
+        SCNVector3(0.57735, 0.57735, -0.57735),
+        SCNVector3(0.57735, -0.57735, 0.57735),
+        SCNVector3(0.00000, -0.93417, 0.35682),
+        SCNVector3(0.00000, -0.93417, -0.35682),
+        SCNVector3(0.57735, -0.57735, -0.57735),
+        SCNVector3(0.93417, -0.35682, 0.00000),
+        SCNVector3(0.35682, 0.00000, 0.93417),
+        SCNVector3(-0.57735, -0.57735, 0.57735),
+        SCNVector3(-0.57735, -0.57735, -0.57735),
+        SCNVector3(0.35682, 0.00000, -0.93417),
+        SCNVector3(0.93417, 0.35682, 0.00000)
+    ]
+
     static func normals(forSides sides: Int) -> [SCNVector3] {
         switch sides {
+        case 4: return d4
         case 6: return d6
         case 8: return d8
         case 10: return d10
         case 12: return d12
+        case 20: return d20
         default: return d6
         }
     }

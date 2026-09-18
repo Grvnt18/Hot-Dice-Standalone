@@ -22,12 +22,28 @@ enum DieFaceLabels {
     /// their previous values were never really evaluated on screen. These
     /// are a reasonable starting point, not a confirmed-good size — worth
     /// a look once you can finally see them.
+    ///
+    /// d4/d20 weren't chosen by eye like the rest (no device to look at
+    /// them on) — derived instead from a ratio measured against the two
+    /// shapes above where labelSize IS confirmed-reasonable: labelSize /
+    /// (0.85 x face apothem) is ~1.32 for d6 and ~1.41 for d8 (0.85 being
+    /// the chamfer inset fraction every mesh here shares, so this compares
+    /// against the ACTUAL rendered face size, not the pre-chamfer one).
+    /// Using 1.3 (near that range) against d4/d20's own local-unit
+    /// apothems (0.816 and 0.577, computed the same way from their
+    /// generator's vertex data) gives 0.90 and 0.64. A tetrahedron's 4
+    /// faces are proportionally much larger than a cube's 6, so a bigger
+    /// label than every other die is the expected direction, not a red
+    /// flag — but exactly like d10/d12 above, worth a look once this can
+    /// actually be seen on screen.
     private static func labelSize(forSides sides: Int) -> CGFloat {
         switch sides {
+        case 4: return 0.90
         case 6: return 0.65
         case 8: return 0.49
         case 10: return 0.455
         case 12: return 0.39
+        case 20: return 0.64
         default: return 0.40
         }
     }
@@ -65,12 +81,28 @@ enum DieFaceLabels {
     /// vertex onto its normal. Note d6 and d8 share 0.5774 in local units
     /// even though their normalized values differ — they have different
     /// normalization scales.
+    ///
+    /// d4/d20 don't have a sourced .dae to measure (see DieFaceNormals'
+    /// own note on this) — computed the same way (projecting a face
+    /// vertex onto that face's normal) directly from the generator's
+    /// plain, pre-chamfer vertex data instead. That's deliberately the
+    /// PRE-chamfer shape, not the actual (chamfered) d4.obj/d20.obj being
+    /// rendered: chamfering shrinks a face toward its own centroid without
+    /// moving that centroid or tilting the face's plane, so the plain and
+    /// chamfered versions of the same polyhedron share an identical face-
+    /// center distance — measuring the simpler, un-chamfered shape gives
+    /// the exact right answer for the chamfered mesh actually on screen.
+    /// (Confirms the same is implicitly true of d6/d8/d10/d12's own
+    /// values above, which is why measuring from the plain .dae — not the
+    /// chamfered .obj that's actually loaded — was already correct.)
     private static func localFaceDistance(forSides sides: Int) -> Float {
         switch sides {
+        case 4: return 0.5774
         case 6: return 0.5774
         case 8: return 0.5774
         case 10: return 0.6905
         case 12: return 0.7947
+        case 20: return 1.5115
         default: return 0.6
         }
     }
@@ -106,13 +138,13 @@ enum DieFaceLabels {
             // issue — the geometry/plane itself renders, but the diffuse
             // image assignment doesn't reliably stick.
             let material = SCNMaterial()
-            // On a d10/d12, 6 and 9 are indistinguishable once the die
+            // On a d10/d12/d20, 6 and 9 are indistinguishable once the die
             // lands at an arbitrary angle — the standard tabletop-dice
             // convention is to underline them so orientation is
-            // unambiguous. d6/d8 can't roll a 9 and their 6 is never
-            // ambiguous (no 9 exists to confuse it with), so they're left
-            // clean.
-            let needsUnderline = (sides == 10 || sides == 12) && (number == 6 || number == 9)
+            // unambiguous. d4/d6/d8 can't roll a 9 and their 6 (d6 only)
+            // is never ambiguous (no 9 exists to confuse it with), so
+            // they're left clean.
+            let needsUnderline = (sides == 10 || sides == 12 || sides == 20) && (number == 6 || number == 9)
             let isRollsFace = (number == rollsFaceNumber)
             material.diffuse.contents = isRollsFace
                 ? rollsWordmarkImage(colorway: colorway)

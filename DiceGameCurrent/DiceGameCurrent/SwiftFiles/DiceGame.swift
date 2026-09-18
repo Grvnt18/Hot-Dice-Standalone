@@ -15,7 +15,7 @@ import Foundation
 /// on dark bodies) — no longer manually curated per swatch, since the
 /// specific body colors are now fixed by the requested palette rather than
 /// freely chosen.
-struct DieColorway: Equatable {
+struct DieColorway: Codable, Equatable {
     let bodyHex: String
     let numberHex: String
 }
@@ -42,11 +42,29 @@ enum DiePalette {
 
 // MARK: - Die
 
-struct Die: Identifiable, Equatable {
-    let id: UUID = UUID()
+struct Die: Codable, Identifiable, Equatable {
+    // Declared without an initial value, and assigned in the init below.
+    //
+    // It used to read `let id: UUID = UUID()`. That compiles, but a `let`
+    // carrying its own initial value is silently skipped by any synthesized
+    // decoder — the property cannot be written to, so a decoded Die would
+    // quietly get a brand-new id instead of the one that was encoded. Since
+    // ids are what `setValue(for:)` and `bank(dieIDs:)` match on, that would
+    // have made a received round un-actionable in a way that produced no
+    // error, just dice that could never be selected. Taking the default into
+    // the init keeps every existing `Die(sides:colorway:)` call site working
+    // while making the property genuinely round-trippable.
+    let id: UUID
     let sides: Int              // 6, 8, 10, or 12
     let colorway: DieColorway   // permanent, unique per physical die
     var currentValue: Int?      // nil until settled — now set from the physically-landed face, see DiceGameRound.setValue(for:value:)
+
+    init(id: UUID = UUID(), sides: Int, colorway: DieColorway, currentValue: Int? = nil) {
+        self.id = id
+        self.sides = sides
+        self.colorway = colorway
+        self.currentValue = currentValue
+    }
 
     /// Points scored if this die is banked right now.
     /// Rolling the max face = 0 pts, each face below that = +1.
@@ -62,9 +80,30 @@ struct Die: Identifiable, Equatable {
 
 // MARK: - Game State
 
-final class DiceGameRound {
+/// Conforms to `Codable` so a round in progress can be written to disk and
+/// restored.
+///
+/// This is not for sending — a finished round travels as `RollsPlayerResult`,
+/// which is far smaller. It is for surviving termination. A Messages
+/// extension runs under much tighter memory limits than an app and is killed
+/// aggressively when the user switches away; without this, tapping out of
+/// Messages part-way through banking dice would silently lose the round.
+///
+/// Written out rather than synthesized because the compiler's synthesis
+/// rules for classes are easy to trip over (and there is no way to
+/// compile-check that here), and because being explicit means the encoded
+/// shape only changes when someone deliberately changes it.
+final class DiceGameRound: Codable {
 
     private(set) var pool: [Die]
+
+    /// The full 15-die pool as it was dealt, kept after `pool` starts
+    /// shrinking. Payload encoding needs it: dice travel as indices into the
+    /// dealt order, and by the time a round is finished `pool` is empty.
+    /// Rebuilding it from the seed would give the right sides and colorways
+    /// but fresh UUIDs, so it would no longer match the banked dice by id.
+    private(set) var originalPool: [Die]
+
     private(set) var bankedScore: Int = 0
     private(set) var hasRolledThisTurn: Bool = false
 
@@ -73,18 +112,54 @@ final class DiceGameRound {
     /// die can be traced across the grid regardless of its sides/type.
     private(set) var bankedOrder: [Die] = []
 
-    init() {
+    /// The seed this round was built from, carried so the pool's makeup can
+    /// be reproduced on the receiving device.
+    ///
+    /// Note this seeds the *pool*, not the results: Rolls reads each die's
+    /// value from whichever face physically lands up, and SceneKit physics
+    /// is not reproducible across devices. See `SeededGenerator`'s note.
+    let seed: UInt64
+
+    init(seed: UInt64 = SeededGenerator.newSeed()) {
+        self.seed = seed
+        var rng = SeededGenerator(seed: seed)
+
         // 12 D6, 1 D8, 1 D10, 1 D12 = 15 dice total, each given a unique
         // permanent colorway from the 15-entry palette.
-        var colorways = DiePalette.colorways
-        colorways.shuffle()
+        let colorways = rng.shuffled(DiePalette.colorways)
 
-        var sideCounts: [Int] = Array(repeating: 6, count: 12) + [8, 10, 12]
-        sideCounts.shuffle() // so colorway assignment isn't correlated with die type
+        // Shuffled so colorway assignment isn't correlated with die type.
+        let sideCounts = rng.shuffled(Array(repeating: 6, count: 12) + [8, 10, 12])
 
-        self.pool = zip(sideCounts, colorways).map { sides, colorway in
+        let dealt = zip(sideCounts, colorways).map { sides, colorway in
             Die(sides: sides, colorway: colorway)
         }
+        self.pool = dealt
+        self.originalPool = dealt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case seed, pool, originalPool, bankedScore, hasRolledThisTurn, bankedOrder
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        seed = try c.decode(UInt64.self, forKey: .seed)
+        pool = try c.decode([Die].self, forKey: .pool)
+        originalPool = try c.decode([Die].self, forKey: .originalPool)
+        bankedScore = try c.decode(Int.self, forKey: .bankedScore)
+        hasRolledThisTurn = try c.decode(Bool.self, forKey: .hasRolledThisTurn)
+        bankedOrder = try c.decode([Die].self, forKey: .bankedOrder)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(seed, forKey: .seed)
+        try c.encode(pool, forKey: .pool)
+        try c.encode(originalPool, forKey: .originalPool)
+        try c.encode(bankedScore, forKey: .bankedScore)
+        try c.encode(hasRolledThisTurn, forKey: .hasRolledThisTurn)
+        try c.encode(bankedOrder, forKey: .bankedOrder)
     }
 
     var isGameOver: Bool {

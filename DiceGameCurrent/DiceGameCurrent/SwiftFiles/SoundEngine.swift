@@ -209,7 +209,8 @@ final class SoundEngine: ObservableObject {
         MusicTrack(resource: "music_focaccia", displayName: "Focaccia"),
         MusicTrack(resource: "music_cannoli", displayName: "Cannoli"),
         MusicTrack(resource: "music_eclair", displayName: "Éclair"),
-        MusicTrack(resource: "music_scone", displayName: "Scone")
+        MusicTrack(resource: "music_scone", displayName: "Scone"),
+        MusicTrack(resource: "music_croissant", displayName: "Croissant")
     ]
 
     /// nil = shuffle through everything; otherwise lock to one track.

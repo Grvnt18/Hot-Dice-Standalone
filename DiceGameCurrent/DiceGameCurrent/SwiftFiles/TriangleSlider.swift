@@ -15,18 +15,18 @@ private struct VolumeWedge: Shape {
 }
 
 /// Triangular volume slider: a wedge that fills left-to-right with `tint`
-/// as `value` rises, "0"/"100%" labeled at the wedge's own ends, and a
-/// rounded label pill on its own row underneath — replaces the stock
-/// SwiftUI Slider in Settings to match the game's own look.
+/// as `value` rises, "0"/"100%" labeled at the wedge's own ends — replaces
+/// the stock SwiftUI Slider in Settings to match the game's own look.
 ///
-/// Every piece is a normal, separately-spaced row in one VStack — no
-/// `.overlay` plus `.offset` positioning. That combination is what
-/// previously let the pill's rendered position drift outside this view's
-/// own reported layout height (offset moves rendered content without
-/// enlarging the frame it's measured against), which is what let the pill
-/// overlap the wedge above it and whatever control sat below it in the
-/// Settings form. Plain sequential layout can't overlap by construction:
-/// every row gets real, reserved space.
+/// No rounded "Volume"-style label pill: it was previously positioned with
+/// `.overlay` plus `.offset`, which moves rendered content without
+/// enlarging the frame it's measured against — that let the pill's
+/// rendered position drift outside this view's own reported layout height
+/// and overlap the wedge above it and whatever control sat below it in the
+/// Settings form. Rather than re-fit it into the plain sequential layout
+/// that replaced that positioning, it's removed outright, per request —
+/// the section header above each slider (e.g. "Music Volume") already
+/// says what it controls.
 ///
 /// The whole wedge is one drag target rather than a knob-on-a-track: with
 /// no visible thumb in the reference art, dragging anywhere sets the value
@@ -34,7 +34,6 @@ private struct VolumeWedge: Shape {
 struct TriangleSlider: View {
     @Binding var value: Double // 0...1
     var tint: Color
-    var label: String
 
     private let wedgeHeight: CGFloat = 40
 
@@ -75,13 +74,6 @@ struct TriangleSlider: View {
             }
             .font(.stackSans(11))
             .foregroundStyle(.secondary)
-
-            Text(label)
-                .font(.stackSans(13))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 5)
-                .background(Capsule().fill(tint.opacity(0.85)))
         }
     }
 }

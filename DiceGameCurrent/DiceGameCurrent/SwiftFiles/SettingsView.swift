@@ -23,7 +23,7 @@ struct SettingsView: View {
                         Text("Music Volume")
                             .font(.stackSans(12))
                             .foregroundStyle(.secondary)
-                        TriangleSlider(value: $sound.musicVolume, tint: theme.accentColor, label: "Volume")
+                        TriangleSlider(value: $sound.musicVolume, tint: theme.accentColor)
                     }
                     // Dimmed rather than removed when music is off — a
                     // control that vanishes makes the form jump around and
@@ -55,7 +55,7 @@ struct SettingsView: View {
                         Text("Effects Volume")
                             .font(.stackSans(12))
                             .foregroundStyle(.secondary)
-                        TriangleSlider(value: $sound.sfxVolume, tint: theme.accentColor, label: "Volume")
+                        TriangleSlider(value: $sound.sfxVolume, tint: theme.accentColor)
                     }
                     .opacity(sound.sfxEnabled ? 1 : 0.4)
                     .disabled(!sound.sfxEnabled)

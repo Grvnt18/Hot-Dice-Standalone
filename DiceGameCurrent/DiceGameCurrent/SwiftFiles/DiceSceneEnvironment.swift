@@ -252,20 +252,33 @@ enum DiceSceneEnvironment {
         visualHeight: Float
     ) {
         let width = bounds.x.upperBound - bounds.x.lowerBound
-        // Small cosmetic reach past the nominal bounds, covering any
-        // hairline background gap right at the screen edge — much smaller
-        // than the old side-wall-only +4.0 fudge, which was compensating
-        // for the playfield being a non-square slice of a taller screen
-        // before DiceGameScreen started sizing the 3D view to a square.
-        let outerMargin: Float = 0.15
+        // Cosmetic reach past the nominal bounds, covering any hairline
+        // background gap right at the screen edge. Deliberately NOT one
+        // uniform value: the X (left/right) edge needs more of it than Z
+        // does. This asymmetry isn't new here — the old per-box wall code
+        // had the identical split, widening only the X walls outward
+        // ("the camera frames exactly the playfield width, so a rim panel
+        // only `thickness` wide left bare background visible beyond it at
+        // the left and right edges"), most plausibly because the SwiftUI-
+        // driven scene view's width (set indirectly, via a parent's
+        // natural sizing) and its height (set explicitly via
+        // .frame(height: sceneHeight) in DiceGameScreen) can snap to
+        // device pixels independently and land a hair off from a
+        // perfectly square 1:1 view even when both are fed the same
+        // logical value — a sub-pixel gap that only ever shows up on X.
+        // 0.5 is far more than that rounding error could plausibly be,
+        // same "generous fixed margin, don't chase the exact sub-pixel
+        // source" call the old +4.0 made.
+        let outerMarginX: Float = 0.5
+        let outerMarginZ: Float = 0.15
 
         let cutout = (
             x: bounds.x.lowerBound + PlayfieldRim.innerInset ... bounds.x.upperBound - PlayfieldRim.innerInset,
             z: bounds.z.lowerBound + PlayfieldRim.innerInset ... bounds.z.upperBound - PlayfieldRim.innerInset
         )
         let outer = (
-            x: bounds.x.lowerBound - outerMargin ... bounds.x.upperBound + outerMargin,
-            z: bounds.z.lowerBound - outerMargin ... bounds.z.upperBound + outerMargin
+            x: bounds.x.lowerBound - outerMarginX ... bounds.x.upperBound + outerMarginX,
+            z: bounds.z.lowerBound - outerMarginZ ... bounds.z.upperBound + outerMarginZ
         )
 
         let y = floorY + visualHeight

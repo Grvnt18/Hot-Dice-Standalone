@@ -218,6 +218,7 @@ struct DiceRollButton: View {
                     .frame(height: 48)
             }
             .buttonStyle(.borderedProminent)
+            .buttonBorderShape(.roundedRectangle(radius: ControlShape.cornerRadius))
             .disabled(!isEnabled)
 
             if !subtitle.isEmpty {
@@ -402,6 +403,14 @@ struct TurnCompleteOverlay: View {
                     .minimumScaleFactor(0.05)
                     .lineLimit(1)
                     .foregroundStyle(.white)
+                    // .frame(maxWidth: .infinity) expands this Text's own
+                    // layout box to the full available width, but without
+                    // this, Text defaults to LEADING alignment within a
+                    // box wider than its content — the digits (plus the
+                    // trailing anti-clipping spaces above) sat flush-left
+                    // instead of centered, unlike the caption above it
+                    // (which does set this).
+                    .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
                     .padding(.horizontal, 24)
             }
@@ -533,7 +542,10 @@ struct DiceGameScreen: View {
                                     .font(.system(size: 18))
                                     .foregroundStyle(.white.opacity(0.75))
                                     .padding(9)
-                                    .background(Color.black.opacity(0.45), in: Circle())
+                                    .background(
+                                        Color.black.opacity(0.45),
+                                        in: RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
+                                    )
                             }
                             .padding(10)
                         }

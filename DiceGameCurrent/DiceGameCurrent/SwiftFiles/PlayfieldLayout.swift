@@ -77,10 +77,6 @@ enum PlayfieldRim {
     /// the real edge of the playable surface.
     static var innerInset: Float { visualThickness - outwardOverhang }
 
-    /// Centre offset for a visible wall panel, measured inward from the
-    /// nominal bound.
-    static var visualCentreOffset: Float { visualThickness / 2 - outwardOverhang }
-
     /// Centre offset for a collider, measured OUTWARD from the nominal
     /// bound, such that its inner face lands exactly on `innerInset`.
     /// Colliders stay thick (see DicePlayfieldPhysics) for tunneling
@@ -92,11 +88,12 @@ enum PlayfieldRim {
 
     /// Fraction of the playfield's world width that one copy of the wood
     /// texture spans when tiled across the walls (DiceSceneEnvironment.
-    /// addOneWall). DiceScoreBar's header background is painted with the
-    /// same fraction of its own on-screen width, rather than stretching one
-    /// copy across the whole bar — that's what keeps the plank pitch
-    /// continuous across the seam between the header and the walls instead
-    /// of jumping to a different scale right where they meet.
+    /// addWalls, via its world-position-derived UV). DiceScoreBar's header
+    /// background is painted with the same fraction of its own on-screen
+    /// width, rather than stretching one copy across the whole bar —
+    /// that's what keeps the plank pitch continuous across the seam
+    /// between the header and the walls instead of jumping to a different
+    /// scale right where they meet.
     static let woodTileFraction: Float = 0.4
 }
 

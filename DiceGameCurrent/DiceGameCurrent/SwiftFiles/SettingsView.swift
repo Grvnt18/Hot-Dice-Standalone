@@ -18,6 +18,7 @@ struct SettingsView: View {
                 Section {
                     Toggle("Music", isOn: $sound.musicEnabled)
                         .font(.stackSans(15))
+                        .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
 
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Music Volume")
@@ -34,12 +35,24 @@ struct SettingsView: View {
                     // tag(nil as Int?) is required: the selection binding is
                     // Int?, and a plain tag(nil) can't infer that, which
                     // silently breaks matching for the Shuffle row.
+                    //
+                    // .menu style (rather than the Form default, a
+                    // navigation-link push to a separate list screen) shows
+                    // the current track title inline and in the ambient
+                    // tint color automatically — the default style's
+                    // collapsed-row preview text ignores a row Text's own
+                    // .foregroundStyle, so that alone wasn't enough to make
+                    // the title track the slider's color; this style
+                    // doesn't have that problem. Per-row foregroundStyle
+                    // stays too, for the destination list this style still
+                    // has for choosing a different track.
                     Picker("Track", selection: $sound.selectedTrackIndex) {
-                        Text("Shuffle").font(.stackSans(14)).tag(nil as Int?)
+                        Text("Shuffle").font(.stackSans(14)).foregroundStyle(theme.accentColor).tag(nil as Int?)
                         ForEach(Array(SoundEngine.tracks.enumerated()), id: \.offset) { idx, track in
-                            Text(track.displayName).font(.stackSans(14)).tag(idx as Int?)
+                            Text(track.displayName).font(.stackSans(14)).foregroundStyle(theme.accentColor).tag(idx as Int?)
                         }
                     }
+                    .pickerStyle(.menu)
                     .font(.stackSans(15))
                     .opacity(sound.musicEnabled ? 1 : 0.4)
                     .disabled(!sound.musicEnabled)
@@ -50,6 +63,7 @@ struct SettingsView: View {
                 Section {
                     Toggle("Sound Effects", isOn: $sound.sfxEnabled)
                         .font(.stackSans(15))
+                        .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
 
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Effects Volume")
@@ -99,6 +113,8 @@ struct SettingsView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                         .font(.stackSans(15))
+                        .buttonStyle(.borderedProminent)
+                        .buttonBorderShape(.roundedRectangle(radius: ControlShape.cornerRadius))
                 }
             }
             .sheet(isPresented: $showingHowToPlay) {
@@ -175,11 +191,12 @@ private extension AppTheme.Swatch {
 
 // MARK: - How to Play
 
-/// Rules reference, reachable from the settings menu. Static content — no
-/// state to observe — so a plain sheet with its own NavigationStack is all
-/// this needs.
+/// Rules reference, reachable from the settings menu. The rules text
+/// itself is static; theme is observed only so this sheet's own Done
+/// button matches the same accent color and shape as everything else.
 private struct HowToPlayView: View {
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var theme = AppTheme.shared
 
     private let sections: [(title: String, body: String)] = [
         ("The Pool", "You start with 15 dice: twelve 6-sided, one 8-sided, one 10-sided, and one 12-sided."),
@@ -201,6 +218,7 @@ private struct HowToPlayView: View {
                     }
                 }
             }
+            .tint(theme.accentColor)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
@@ -209,6 +227,8 @@ private struct HowToPlayView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                         .font(.stackSans(15))
+                        .buttonStyle(.borderedProminent)
+                        .buttonBorderShape(.roundedRectangle(radius: ControlShape.cornerRadius))
                 }
             }
         }

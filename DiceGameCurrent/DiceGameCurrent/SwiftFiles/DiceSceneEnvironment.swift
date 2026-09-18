@@ -269,26 +269,34 @@ enum DiceSceneEnvironment {
         // PlayfieldRim.woodTileFraction for why both read from one number.
         let tileWorldSize = width * PlayfieldRim.woodTileFraction
 
-        // -X wall, +X wall: run along Z, so the grain tiles along `depth`.
+        // -X wall, +X wall: run along Z, so the grain should flow down the
+        // strip's own long axis (Z/depth — see addOneWall's `rotated: true`
+        // for why that needs a 90° UV swap here, not just a bigger scale).
         addOneWall(
             to: rootNode, seed: 101,
             size: SCNVector3(sideThickness, visualHeight, depth), tileLength: depth, tileWorldSize: tileWorldSize,
+            rotated: true,
             position: SCNVector3(bounds.x.lowerBound - sideCentre, floorY + visualHeight / 2, centerZ)
         )
         addOneWall(
             to: rootNode, seed: 202,
             size: SCNVector3(sideThickness, visualHeight, depth), tileLength: depth, tileWorldSize: tileWorldSize,
+            rotated: true,
             position: SCNVector3(bounds.x.upperBound + sideCentre, floorY + visualHeight / 2, centerZ)
         )
-        // -Z wall, +Z wall: run along X, grain tiles across `width`.
+        // -Z wall, +Z wall: run along X, grain tiles across `width` — this
+        // pair's long axis already matches the texture's own long (shard)
+        // axis with no rotation needed, same as the header bar.
         addOneWall(
             to: rootNode, seed: 303,
             size: SCNVector3(endWidth, visualHeight, thickness), tileLength: endWidth, tileWorldSize: tileWorldSize,
+            rotated: false,
             position: SCNVector3(centerX, floorY + visualHeight / 2, bounds.z.lowerBound + inset)
         )
         addOneWall(
             to: rootNode, seed: 404,
             size: SCNVector3(endWidth, visualHeight, thickness), tileLength: endWidth, tileWorldSize: tileWorldSize,
+            rotated: false,
             position: SCNVector3(centerX, floorY + visualHeight / 2, bounds.z.upperBound - inset)
         )
     }
@@ -299,6 +307,7 @@ enum DiceSceneEnvironment {
         size: SCNVector3,
         tileLength: Float,
         tileWorldSize: Float,
+        rotated: Bool,
         position: SCNVector3
     ) {
         let box = SCNBox(
@@ -309,10 +318,15 @@ enum DiceSceneEnvironment {
         )
 
         let material = SCNMaterial()
-        // Same generator, palette and plank density as the header bar
-        // (DiceScoreBar.backdrop), so the frame around the playfield and
-        // the frame around the score read as one continuous piece of
-        // timber rather than two unrelated wood treatments.
+        // Same generator, palette and plank density as the header/footer
+        // backdrop (DiceGameShell.HeaderFooterWood), so the wall frame and
+        // the header/footer bars read as one continuous piece of timber
+        // rather than unrelated wood treatments that merely resemble each
+        // other. Each wall still renders its OWN generated image (different
+        // seed per wall, see addWalls) rather than reusing
+        // HeaderFooterWood.image directly — the walls are meant to show
+        // varied grain per panel, unlike the header and footer, which use
+        // the identical image so they read as literally the same board.
         //
         // plankHeightWorld keeps plank size consistent between walls of
         // different lengths: without it, the short Z walls and the long X
@@ -328,7 +342,36 @@ enum DiceSceneEnvironment {
         )
         material.diffuse.wrapS = .repeat
         material.diffuse.wrapT = .repeat
-        material.diffuse.contentsTransform = SCNMatrix4MakeScale(max(tileLength / tileWorldSize, 1), 1, 1)
+
+        // Only the box's TOP face is ever visible under a purely top-down
+        // orthographic camera — the vertical side/front/back faces are
+        // edge-on and never seen. SceneKit's default box UVs map that top
+        // face's own U to the box's local X (its `width` in the SCNBox
+        // initializer) and V to local Z (its `length`). For the end walls,
+        // local X IS `endWidth`, the wall's own long axis — already
+        // aligned with the wood texture's long (shard-tiling) axis, so a
+        // plain scale of U is correct (unchanged below).
+        //
+        // For the SIDE walls, though, local X is `sideThickness` — the
+        // SHORT axis — while the long axis (`depth`, running screen-
+        // vertically from the header down toward the Roll button) is local
+        // Z, i.e. V. Scaling U there (the old code) tiled along the wrong,
+        // tiny dimension while leaving V's single 0-1 pass to stretch the
+        // whole texture once across the entire (long) depth — exactly the
+        // "pattern stretched across the side bars" look, instead of a
+        // smoothly repeating vertical grain. `rotated` swaps U and V before
+        // scaling, so the texture's own long axis lines up with the box's
+        // actual long axis and tiles along it instead.
+        if rotated {
+            var transform = SCNMatrix4Identity
+            transform.m11 = 0
+            transform.m12 = 1
+            transform.m21 = max(tileLength / tileWorldSize, 1)
+            transform.m22 = 0
+            material.diffuse.contentsTransform = transform
+        } else {
+            material.diffuse.contentsTransform = SCNMatrix4MakeScale(max(tileLength / tileWorldSize, 1), 1, 1)
+        }
         material.lightingModel = .lambert
         box.materials = [material]
 

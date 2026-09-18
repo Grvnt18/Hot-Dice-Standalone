@@ -15,15 +15,22 @@ private struct VolumeWedge: Shape {
 }
 
 /// Triangular volume slider: a wedge that fills left-to-right with `tint`
-/// as `value` rises, "0" and "100%" labeled at the ends, and a rounded
-/// label pill straddling the baseline — replaces the stock SwiftUI Slider
-/// in Settings to match the game's own look rather than the system control.
+/// as `value` rises, "0"/"100%" labeled at the wedge's own ends, and a
+/// rounded label pill on its own row underneath — replaces the stock
+/// SwiftUI Slider in Settings to match the game's own look.
+///
+/// Every piece is a normal, separately-spaced row in one VStack — no
+/// `.overlay` plus `.offset` positioning. That combination is what
+/// previously let the pill's rendered position drift outside this view's
+/// own reported layout height (offset moves rendered content without
+/// enlarging the frame it's measured against), which is what let the pill
+/// overlap the wedge above it and whatever control sat below it in the
+/// Settings form. Plain sequential layout can't overlap by construction:
+/// every row gets real, reserved space.
 ///
 /// The whole wedge is one drag target rather than a knob-on-a-track: with
 /// no visible thumb in the reference art, dragging anywhere sets the value
-/// straight to that horizontal position, which is both simpler to
-/// implement and matches how the shape reads (there's nothing else here
-/// that looks like a handle to grab).
+/// straight to that horizontal position.
 struct TriangleSlider: View {
     @Binding var value: Double // 0...1
     var tint: Color
@@ -32,7 +39,7 @@ struct TriangleSlider: View {
     private let wedgeHeight: CGFloat = 40
 
     var body: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: 6) {
             GeometryReader { geo in
                 ZStack(alignment: .bottomLeading) {
                     VolumeWedge()
@@ -68,18 +75,13 @@ struct TriangleSlider: View {
             }
             .font(.stackSans(11))
             .foregroundStyle(.secondary)
-        }
-        .overlay(alignment: .bottom) {
+
             Text(label)
                 .font(.stackSans(13))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 5)
                 .background(Capsule().fill(tint.opacity(0.85)))
-                // Straddles the wedge's baseline and the "0"/"100%" row
-                // beneath it, matching the reference art's overlapping pill.
-                .offset(y: 6)
         }
-        .padding(.bottom, 10) // room for the pill's downward offset
     }
 }

@@ -17,14 +17,23 @@ final class AppTheme: ObservableObject {
     /// Index 0 is the game's original green, kept first and as the default
     /// so a fresh install looks exactly as it always has.
     ///
-    /// The other 11 are picked to sit away from every DieColorway.bodyHex
+    /// The other 23 are picked to sit away from every DieColorway.bodyHex
     /// (see DiceGame.swift's DiePalette) in hue/lightness, so a die of any
     /// color still reads clearly against the floor rather than blending
     /// into it — the die palette already spans yellow, light blue, sage
-    /// green, magenta, red, orange and near-white, so these lean toward
-    /// deep, muted blues/violets/reds/teals that don't overlap any of
-    /// those, plus one pale lavender to cover the "brighter shade" case
-    /// (see AppTheme.rollsTextIsDark).
+    /// green, magenta, red, orange, tan/brown and near-white, so these
+    /// lean toward deep, muted blues/violets/reds/teals/neutrals that
+    /// don't overlap any of those, plus two lighter shades (Pale Lavender,
+    /// Dusty Periwinkle) to cover the "brighter shade" case (see
+    /// AppTheme.rollsTextIsDark).
+    ///
+    /// The second batch of 12 (Deep Indigo onward) was picked to also stay
+    /// clear of the first 12 — distinct hue OR distinct lightness/
+    /// saturation from every earlier entry, not just a re-run of the same
+    /// families (e.g. Petrol Teal is bluer than Deep Teal; Storm Blue is
+    /// darker/grayer than Steel Blue; Espresso is a warm near-black
+    /// pairing with Onyx's cool near-black) — so the full 24-swatch set
+    /// reads as genuinely distinct choices rather than near-duplicates.
     static let swatches: [Swatch] = [
         Swatch(hex: "#36F422", name: "Green"),
         Swatch(hex: "#1B2A4A", name: "Midnight Navy"),
@@ -37,7 +46,19 @@ final class AppTheme: ObservableObject {
         Swatch(hex: "#6B2D5C", name: "Mauve Plum"),
         Swatch(hex: "#23424A", name: "Slate Cyan"),
         Swatch(hex: "#0C3B2E", name: "Forest"),
-        Swatch(hex: "#C9C2E0", name: "Pale Lavender")
+        Swatch(hex: "#C9C2E0", name: "Pale Lavender"),
+        Swatch(hex: "#2B1B4E", name: "Deep Indigo"),
+        Swatch(hex: "#1C2833", name: "Charcoal Blue"),
+        Swatch(hex: "#4A1027", name: "Burgundy"),
+        Swatch(hex: "#0F3B3E", name: "Petrol Teal"),
+        Swatch(hex: "#45525C", name: "Cool Slate"),
+        Swatch(hex: "#16325C", name: "Deep Sapphire"),
+        Swatch(hex: "#3B1F3A", name: "Aubergine"),
+        Swatch(hex: "#12261C", name: "Pine"),
+        Swatch(hex: "#29394A", name: "Storm Blue"),
+        Swatch(hex: "#8B93C4", name: "Dusty Periwinkle"),
+        Swatch(hex: "#6E4550", name: "Rose Gray"),
+        Swatch(hex: "#2E1C12", name: "Espresso")
     ]
 
     private enum Keys {

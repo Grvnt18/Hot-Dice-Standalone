@@ -71,7 +71,20 @@ enum DiceSpawnPattern {
                 // exact same instant — not random, so it stays part of the
                 // fixed pattern rather than reintroducing per-spawn
                 // variance.
-                let y = baseHeight + Float(positions.count % 3) * 0.15
+                //
+                // Reduced from 0.15 to 0.05 per tier alongside introducing
+                // the low anti-stacking ceiling (PlayfieldVerticalBounds.
+                // ceilingHeight, see its doc comment for the full
+                // derivation) — that ceiling has to sit low enough to be a
+                // real anti-stack constraint AND high enough to clear every
+                // spawned die's starting position (including the one
+                // oversized, 1.5x die every round always has — see
+                // DicePoolSceneBuilder.oversizeMultiplier), and the old
+                // 0.15 stagger made that window too narrow to have any
+                // comfortable safety margin either way. This still spreads
+                // spawns across 3 distinct heights, just over a smaller
+                // range.
+                let y = baseHeight + Float(positions.count % 3) * 0.05
 
                 positions.append(SCNVector3(x, y, z))
             }
@@ -82,7 +95,7 @@ enum DiceSpawnPattern {
         // the game's fixed pool size, but avoids silently dropping dice.
         while positions.count < count {
             let z = bounds.z.upperBound - cellDepth * 0.5
-            let y = baseHeight + Float(positions.count % 3) * 0.15 + 0.5
+            let y = baseHeight + Float(positions.count % 3) * 0.05 + 0.5
             positions.append(SCNVector3(centerX, y, z))
         }
 

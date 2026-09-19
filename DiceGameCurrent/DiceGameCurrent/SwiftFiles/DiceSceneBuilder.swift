@@ -24,11 +24,19 @@ enum DieMeshLibrary {
     /// than intended. d6 is unchanged because a cube's bounding box is
     /// defined by its faces, not its corners, and chamfering leaves the
     /// face planes untouched.
+    ///
+    /// 4 and 20 aren't used by this game's pool (12 d6 + one each of d8/
+    /// d10/d12 — see DiceGameRound.init) — d4.obj/d20.obj were added ahead
+    /// of that for the wider project, generated with the same 0.85 chamfer
+    /// inset as every other die, and these divisors are already measured
+    /// and ready for whenever they're needed.
     private static let sizeNormalizationScale: [Int: Float] = [
+        4: targetSize / 1.8000,
         6: targetSize / 1.1547,
         8: targetSize / 1.8000,
         10: targetSize / 1.8369,
-        12: targetSize / 1.7909
+        12: targetSize / 1.7909,
+        20: targetSize / 3.1743
     ]
 
     /// Expects each die's mesh available as a bundle resource named "d6",

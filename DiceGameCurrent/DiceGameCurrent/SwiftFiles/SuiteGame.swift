@@ -22,8 +22,8 @@ protocol SuiteGame {
     /// One-line pitch for the tile, under the name.
     static var tagline: String { get }
 
-    /// Rules, one paragraph per entry, for the How to Play sheet.
-    static var rules: [String] { get }
+    /// Rules for the How to Play sheet, as titled sections.
+    static var rules: [GameRuleSection] { get }
 
     /// Upper bound on participants. Two for everything except Rolls, which
     /// has no ceiling beyond what a group chat contains.
@@ -52,6 +52,19 @@ extension SuiteGame {
     static var maxPlayers: Int { 2 }
     static var lowestScoreWins: Bool { false }
     static var isSendable: Bool { true }
+}
+
+/// One titled block of a game's rules.
+///
+/// Titled sections rather than bare paragraphs because that is the shape
+/// HowToPlayView already rendered for Rolls, and it reads far better than
+/// a wall of text — the headings let you find the bit you actually wanted.
+struct GameRuleSection: Identifiable {
+    let title: String
+    let body: String
+
+    /// Titles are unique within a game, which is all ForEach needs.
+    var id: String { title }
 }
 
 // MARK: - The catalogue
@@ -149,10 +162,29 @@ enum RollsGame: SuiteGame {
     /// Points are penalties here — rolling a die's highest face scores 0.
     static let lowestScoreWins = true
 
-    static let rules: [String] = [
-        "Roll all 15 dice. Every die that lands is worth points you do not want — rolling a die's highest face scores 0, and each face below that costs more.",
-        "A 1 is the worst result on any die, costing that die's full size. A 1 on a d12 costs 12, not 11.",
-        "Bank at least one die each roll, then roll what is left. Keep going until every die is banked.",
-        "Lowest total wins. In a group chat everyone rolls once; if the best score is tied, the game restarts."
+    /// Moved here verbatim from HowToPlayView, which hardcoded them. The
+    /// wording was fine; it was living in the settings sheet, which meant
+    /// every game showed Rolls' rules.
+    static let rules: [GameRuleSection] = [
+        GameRuleSection(
+            title: "The Pool",
+            body: "You start with 15 dice: twelve 6-sided, one 8-sided, one 10-sided, and one 12-sided."
+        ),
+        GameRuleSection(
+            title: "Rolling",
+            body: "Tap Begin to roll every die still in the pool. Tap any settled die to select it, then tap Roll again to bank your selection and re-roll everything left."
+        ),
+        GameRuleSection(
+            title: "Scoring",
+            body: "Lower is better. Banking a die scores it against its own best face: its highest number scores 0, and every face below that costs one point per step down — except a 1, which always costs the die's full number of sides, its worst possible result."
+        ),
+        GameRuleSection(
+            title: "Banking",
+            body: "You must bank at least one die from a roll before rerolling the rest. Selecting every remaining die turns the Roll button into Finish — confirming then banks everything and ends the turn."
+        ),
+        GameRuleSection(
+            title: "Winning",
+            body: "The game ends once every die has been banked. Add up the points from every die you banked — the lowest total wins."
+        )
     ]
 }

@@ -103,9 +103,22 @@ enum FreeRollGame: SuiteGame {
     /// protocol honest rather than letting the two-player default stand.
     static let maxPlayers = 1
 
-    static let rules: [String] = [
-        "Pick up to 10 dice in any combination — d4, d6, d8, d10, d12, d20.",
-        "Roll them as many times as you like. Nothing is banked and nothing is scored.",
-        "Change the dice whenever you want; the table is rebuilt with your new picks."
+    static let rules: [GameRuleSection] = [
+        GameRuleSection(
+            title: "The Dice",
+            body: "Pick up to 10 dice in any combination using the + and - controls: d4, d6, d8, d10, d12, d20. Clear empties the table."
+        ),
+        GameRuleSection(
+            title: "Rolling",
+            body: "Tap Roll to throw everything on the table. Roll as many times as you like — nothing is banked, nothing is scored, and there is no turn to end."
+        ),
+        GameRuleSection(
+            title: "Changing Dice",
+            body: "Add or remove dice whenever you want and the table is rebuilt with your new picks. You cannot change them mid-roll; wait for the dice to settle."
+        ),
+        GameRuleSection(
+            title: "Reading the d4",
+            body: "A d4 has no face pointing up when it lands, so it is read at its point: the three faces you can see all show the same number beside the top corner, and that is the result."
+        )
     ]
 }

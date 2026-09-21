@@ -141,7 +141,7 @@ struct FreeRollScreen: View {
         .dynamicTypeSize(.large)
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showingSettings) {
-            SettingsView()
+            SettingsView(gameName: FreeRollGame.displayName, rules: FreeRollGame.rules)
         }
         .onAppear {
             AppFonts.registerIfNeeded()

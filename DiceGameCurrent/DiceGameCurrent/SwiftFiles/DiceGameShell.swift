@@ -17,7 +17,7 @@ struct DiceSceneView: UIViewRepresentable {
     let onSessionCreated: (DiceGameSession) -> Void
 
     func makeUIView(context: Context) -> SCNView {
-        let view = SCNView()
+        let view = LayoutReportingSCNView()
         view.backgroundColor = .black
         view.antialiasingMode = .multisampling4X
         view.isPlaying = true // ensures the physics/render loop actually runs continuously
@@ -25,21 +25,48 @@ struct DiceSceneView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: SCNView, context: Context) {
-        // Guarding on `session == nil` alone is racy: assembly finishes
-        // and assigns `session` asynchronously below, so if SwiftUI calls
-        // updateUIView again before that assignment lands (plausible
-        // during layout settling), the guard would still pass and a
-        // second full scene would get assembled on top of the first. The
-        // Coordinator's flag is set synchronously, immediately, closing
-        // that window — it's not subject to the same async race since
-        // nothing here awaits it.
-        guard !context.coordinator.hasStartedAssembly else { return }
+        // Re-armed on every update so the closure always writes through to
+        // the current binding rather than a stale copy.
+        (uiView as? LayoutReportingSCNView)?.onLayout = { view in
+            assembleIfReady(view, coordinator: context.coordinator)
+        }
+        assembleIfReady(uiView, coordinator: context.coordinator)
+    }
 
-        // Bounds can legitimately be zero on the first layout pass;
-        // assembly is deferred until the view has real dimensions.
+    /// Builds the scene the first time the view has real dimensions.
+    ///
+    /// Called from two places, and it needs both. `updateUIView` covers the
+    /// case where SwiftUI re-runs the body after layout; `onLayout` covers
+    /// the case where it does not.
+    ///
+    /// That second case is not hypothetical — it was a real bug. Assembly
+    /// bails out when bounds are still zero, which is normal on the first
+    /// layout pass, and the old code had no way to retry: it simply assumed
+    /// SwiftUI would call updateUIView again once the view had a size. As
+    /// the app's root view that assumption held. Presented inside a
+    /// fullScreenCover from the hub it did not — the view was created and
+    /// laid out in one pass with no observed state change afterward, so
+    /// updateUIView never ran a second time and the playfield stayed a
+    /// blank black box with an unusable Roll button. Opening Settings and
+    /// changing the table colour "fixed" it only because
+    /// theme.colorwayIndex is @Published, so mutating it re-ran the body
+    /// and finally triggered assembly. Reacting to the view actually
+    /// gaining bounds removes the guesswork.
+    private func assembleIfReady(_ uiView: SCNView, coordinator: Coordinator) {
+        // Guarding on `session == nil` alone is racy: assembly finishes
+        // and assigns `session` asynchronously below, so if this runs
+        // again before that assignment lands (plausible during layout
+        // settling, and now also reachable from layoutSubviews), the
+        // guard would still pass and a second full scene would get
+        // assembled on top of the first. The Coordinator's flag is set
+        // synchronously, immediately, closing that window — it's not
+        // subject to the same async race since nothing here awaits it.
+        guard !coordinator.hasStartedAssembly else { return }
+
+        // Bounds can legitimately be zero on the first layout pass.
         guard uiView.bounds.width > 0, uiView.bounds.height > 0 else { return }
 
-        context.coordinator.hasStartedAssembly = true
+        coordinator.hasStartedAssembly = true
 
         let newSession = DiceSceneAssembler.assemble(
             into: uiView
@@ -60,6 +87,23 @@ struct DiceSceneView: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
+    }
+}
+
+/// An SCNView that reports when UIKit lays it out.
+///
+/// UIViewRepresentable gives no hook for "the view now has real
+/// dimensions", and that is precisely the moment scene assembly has been
+/// waiting for. The callback takes the view as a parameter rather than
+/// capturing it, so the view holding the closure does not create a
+/// retain cycle.
+final class LayoutReportingSCNView: SCNView {
+    var onLayout: ((SCNView) -> Void)?
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        guard bounds.width > 0, bounds.height > 0 else { return }
+        onLayout?(self)
     }
 }
 

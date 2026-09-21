@@ -68,7 +68,11 @@ struct DiceSceneView: UIViewRepresentable {
 /// Shared low-poly wood backdrop for the header (DiceScoreBar) and footer
 /// (DiceRollButton) — see WoodTiledBackground for why using the exact same
 /// image in both places (not just the same generator parameters) matters.
-private enum HeaderFooterWood {
+// Internal rather than private: GameHubView wraps itself in the same
+// timber, and the point of this type is that every surface shares one
+// image instance — a second copy generated from the same parameters would
+// tile from a different origin and show a seam.
+enum HeaderFooterWood {
     static let image = LowPolyTextures.woodSurface(
         baseColor: UIColor(hex: "#8B6039"),
         planks: 5,
@@ -87,7 +91,7 @@ private enum HeaderFooterWood {
 /// whole screen — from the header, down the sides, to the Roll button —
 /// rather than three separately-styled panels that merely resemble each
 /// other.
-private struct WoodTiledBackground: View {
+struct WoodTiledBackground: View {
     var body: some View {
         GeometryReader { geo in
             let tileWidth = geo.size.width * CGFloat(PlayfieldRim.woodTileFraction)
@@ -469,6 +473,18 @@ final class GameUIState: ObservableObject {
 }
 
 struct DiceGameScreen: View {
+
+    /// Dismisses the game and returns to the hub.
+    ///
+    /// Optional, and nil when DiceGameScreen is the root — which is how it
+    /// ran before the hub existed, and how it will run inside a Messages
+    /// conversation where Messages supplies its own dismissal. The control
+    /// is drawn in the same overlay as the gear rather than in a navigation
+    /// bar on purpose: a nav bar consumes vertical space, and this screen
+    /// derives its square playfield from the height it is given, so a bar
+    /// would quietly reshape the board.
+    var onExit: (() -> Void)? = nil
+
     @StateObject private var ui = GameUIState()
     @State private var session: DiceGameSession?
     @State private var finishedScore: Int?
@@ -533,6 +549,24 @@ struct DiceGameScreen: View {
                     )
                         .frame(height: sceneHeight)
                         .background(Color.black)
+                        .overlay(alignment: .topLeading) {
+                            if let onExit {
+                                Button {
+                                    SoundEngine.shared.play(.buttonTap)
+                                    onExit()
+                                } label: {
+                                    Image(systemName: "chevron.left")
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundStyle(.white.opacity(0.75))
+                                        .padding(9)
+                                        .background(
+                                            Color.black.opacity(0.45),
+                                            in: RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
+                                        )
+                                }
+                                .padding(10)
+                            }
+                        }
                         .overlay(alignment: .topTrailing) {
                             Button {
                                 SoundEngine.shared.play(.buttonTap)

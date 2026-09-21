@@ -157,14 +157,25 @@ enum DicePoolSceneBuilder {
     /// Returns one SCNNode per die in the pool, keyed by the die's id so
     /// the roll controller, hit-testing, and selection UI can all look
     /// nodes up by the same id used in the logic layer (DiceGameRound).
-    static func buildNodes(for pool: [Die]) -> [UUID: SCNNode] {
+    /// Both flags default to true, which is Rolls' behaviour and what every
+    /// existing caller gets. Free Roll turns them off: it is a sandbox where
+    /// the player chose each die deliberately, so branding one of them
+    /// "ROLLS" and inflating another to 1.5x would read as a bug rather
+    /// than a flourish.
+    static func buildNodes(
+        for pool: [Die],
+        includeRollsFace: Bool = true,
+        includeOversizedDie: Bool = true
+    ) -> [UUID: SCNNode] {
         var nodesByID: [UUID: SCNNode] = [:]
 
         // One random d6 per game gets "ROLLS" in place of its 6.
-        let rollsDieID = pool.filter { $0.sides == 6 }.randomElement()?.id
+        let rollsDieID = includeRollsFace
+            ? pool.filter { $0.sides == 6 }.randomElement()?.id
+            : nil
         // Exactly one die per round is the oversized one. Drawn from the
         // whole pool, not just d6s, so any shape can be the big one.
-        let oversizedDieID = pool.randomElement()?.id
+        let oversizedDieID = includeOversizedDie ? pool.randomElement()?.id : nil
 
         for die in pool {
             guard let node = DieMeshLibrary.templateNode(forSides: die.sides) else {

@@ -109,15 +109,15 @@ struct GameCatalogEntry: Identifiable {
 
 enum GameCatalog {
 
-    /// Hub order. Rolls leads because it is the only one that opens today;
-    /// the rest render as "Soon" tiles until each is built (Free Roll is
-    /// next, then the order in the plan).
+    /// Hub order. Rolls and Free Roll open; the rest render as "Soon"
+    /// tiles until each is built, in the order listed here.
     static let all: [GameCatalogEntry] = [
         GameCatalogEntry(RollsGame.self) { onExit in
             AnyView(DiceGameScreen(onExit: onExit))
         },
-        GameCatalogEntry(id: "freeroll", displayName: "Free Roll",
-                         tagline: "Up to 10 dice. No score. Just roll."),
+        GameCatalogEntry(FreeRollGame.self) { onExit in
+            AnyView(FreeRollScreen(onExit: onExit))
+        },
         GameCatalogEntry(id: "chasing6", displayName: "Chasing 6",
                          tagline: "Five rounds, or hit the jackpot."),
         GameCatalogEntry(id: "pig", displayName: "Pig",

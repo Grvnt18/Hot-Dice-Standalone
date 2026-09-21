@@ -10,10 +10,20 @@ Only types DECLARED in this module are checked. A type we merely extend
 isn't visible here, so checking those would be all false positives."""
 import re, sys, glob, collections
 
+def _keep_interpolations(match):
+    """Blank a string literal but keep any \\(...) segments.
+
+    Swift interpolation holds real code — FreeRollPool.maxDice appeared only
+    inside "\\(pool.total) / \\(FreeRollPool.maxDice)", so blanking literals
+    wholesale hid it from this check entirely."""
+    body = match.group(0)
+    parts = re.findall(r'\\\((.*?)\)', body)
+    return '"" ' + ' '.join(parts) + ' ' if parts else '""'
+
 def strip(src):
     src = re.sub(r'/\*.*?\*/', '', src, flags=re.S)
     src = re.sub(r'//[^\n]*', '', src)
-    return re.sub(r'"(?:\\.|[^"\\])*"', '""', src)
+    return re.sub(r'"(?:\\.|[^"\\])*"', _keep_interpolations, src)
 
 def body_after(s, pos):
     i = s.find('{', pos)
@@ -31,8 +41,11 @@ members = collections.defaultdict(set)
 declared = set()          # declared here, so its full surface is visible
 own_re  = re.compile(r'\b(?:struct|class|enum|protocol|actor)\s+([A-Za-z_]\w*)')
 ext_re  = re.compile(r'\bextension\s+([A-Za-z_]\w*)')
-mem_re  = re.compile(r'\b(?:static\s+)?(?:func|var|let)\s+([A-Za-z_]\w*)')
-case_re = re.compile(r'\bcase\s+([A-Za-z_]\w*)')
+# Backticks are allowed: `default`, `case`, `class` etc. are legal member
+# names in Swift when escaped, and missing them produced a false positive on
+# FreeRollPool.default.
+mem_re  = re.compile(r'\b(?:static\s+)?(?:func|var|let)\s+`?([A-Za-z_]\w*)`?')
+case_re = re.compile(r'\bcase\s+`?([A-Za-z_]\w*)`?')
 
 for f in glob.glob('*.swift'):
     s = strip(open(f).read())

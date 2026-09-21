@@ -40,10 +40,15 @@ final class DicePoolLifecycleController {
     /// default here on purpose, since a stale placeholder range silently
     /// accepted would be worse than a compile error reminding the caller
     /// to supply the real, device-derived bounds.
+    /// `styleAsRolls` carries Rolls' two cosmetic flourishes — one d6
+    /// branded "ROLLS" and one die at 1.5x size. Defaulted to true so Rolls
+    /// is unchanged; Free Roll passes false, since in a sandbox where the
+    /// player picked each die those would look like defects.
     func setupPool(
         _ dice: [Die],
         playAreaBounds: (x: ClosedRange<Float>, z: ClosedRange<Float>),
-        restHeight: Float = 1.0
+        restHeight: Float = 1.0,
+        styleAsRolls: Bool = true
     ) {
         // Contact-audio cooldown state is keyed on node identity, so it
         // must be cleared alongside the nodes themselves — otherwise it
@@ -64,7 +69,11 @@ final class DicePoolLifecycleController {
         }
         liveDice.removeAll()
 
-        let nodesByID = DicePoolSceneBuilder.buildNodes(for: dice)
+        let nodesByID = DicePoolSceneBuilder.buildNodes(
+            for: dice,
+            includeRollsFace: styleAsRolls,
+            includeOversizedDie: styleAsRolls
+        )
         let positions = DiceSpawnPattern.positions(
             count: dice.count,
             bounds: playAreaBounds,

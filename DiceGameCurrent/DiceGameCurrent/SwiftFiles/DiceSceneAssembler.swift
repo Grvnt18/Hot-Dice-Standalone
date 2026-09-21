@@ -1,4 +1,5 @@
 import SceneKit
+import QuartzCore
 
 /// Everything needed to actually run a turn, handed back after assembly so
 /// the caller (your SwiftUI view/coordinator) can drive the game without
@@ -27,6 +28,72 @@ struct DiceGameSession {
     /// Settings, so a game already on screen updates live instead of only
     /// on next launch.
     let applyTheme: () -> Void
+}
+
+/// Everything Free Roll needs to run a sandbox: no scoring, no banking, no
+/// selection, so no DiceTurnController and no DiceTapHandler.
+///
+/// A class rather than a struct because it owns mutable wiring
+/// (`onStateChanged`) and is handed around by reference as the scene's
+/// lifetime anchor.
+final class FreeRollSession {
+    let scene: SCNScene
+    let lifecycle: DicePoolLifecycleController
+    let rollController: DiceRollController
+
+    /// Retained for the same reason DiceGameSession retains it:
+    /// SCNPhysicsWorld.contactDelegate is a WEAK reference, so without a
+    /// strong reference living as long as the session this deallocates the
+    /// moment assembly returns and no contact sounds ever play.
+    let contactAudio: DiceContactAudio
+
+    /// Needed on hand because re-picking the dice means calling
+    /// setupPool again, which requires the bounds. DiceGameSession never
+    /// exposed these — Rolls builds its pool once and never changes it.
+    let playAreaBounds: (x: ClosedRange<Float>, z: ClosedRange<Float>)
+
+    let applyTheme: () -> Void
+
+    /// Fired when the Roll button's enabled state may have changed.
+    var onStateChanged: (() -> Void)?
+
+    var isRolling: Bool { rollController.isRolling }
+
+    init(
+        scene: SCNScene,
+        lifecycle: DicePoolLifecycleController,
+        rollController: DiceRollController,
+        contactAudio: DiceContactAudio,
+        playAreaBounds: (x: ClosedRange<Float>, z: ClosedRange<Float>),
+        applyTheme: @escaping () -> Void
+    ) {
+        self.scene = scene
+        self.lifecycle = lifecycle
+        self.rollController = rollController
+        self.contactAudio = contactAudio
+        self.playAreaBounds = playAreaBounds
+        self.applyTheme = applyTheme
+    }
+
+    /// Swaps in a different set of dice. setupPool already tears the
+    /// previous pool down, so this is safe to call repeatedly.
+    func setPool(_ dice: [Die]) {
+        guard !rollController.isRolling else { return }
+        lifecycle.setupPool(dice, playAreaBounds: playAreaBounds, styleAsRolls: false)
+        onStateChanged?()
+    }
+
+    /// Throws every die again. Same two steps DiceTurnController.beginRoll
+    /// uses — the impulse and then the settle tracking — minus the scoring.
+    func roll() {
+        guard !rollController.isRolling else { return }
+        let dice = lifecycle.rollableDice
+        guard !dice.isEmpty else { return }
+        SoundEngine.shared.play(.diceRoll)
+        DiceRollImpulse.launch(dice: dice)
+        rollController.startRoll(dice: dice, currentTime: CACurrentMediaTime())
+        onStateChanged?()
+    }
 }
 
 /// Assembles one complete dice scene into a given SCNView: computes the
@@ -58,71 +125,13 @@ enum DiceSceneAssembler {
         // entirely rather than hoping view-lifecycle ordering cooperates.
         AppFonts.registerIfNeeded()
 
-        let scene = SCNScene()
-        sceneView.scene = scene
-
-        // We're supplying our own lights explicitly below — leaving this
-        // on would add an extra, uncontrolled light fighting the area
-        // light and flattening the shading we set up on purpose.
-        sceneView.autoenablesDefaultLighting = false
-
-        let floorY: Float = 0
-        let aspectRatio = Float(sceneView.bounds.width / max(sceneView.bounds.height, 1))
-        let layout = PlayfieldLayout.compute(screenAspectRatio: aspectRatio)
-
-        DicePhysicsWorldConfigurator.configure(scene.physicsWorld)
-
-        let cameraNode = DiceCameraFactory.makeTopDownCamera(
-            playfieldBounds: layout.bounds,
-            orthographicScale: layout.orthographicScale,
-            floorY: floorY
-        )
-        scene.rootNode.addChildNode(cameraNode)
-        sceneView.pointOfView = cameraNode
-
-        DiceSceneEnvironment.addLighting(
-            to: scene.rootNode,
-            playfieldBounds: layout.bounds,
-            floorY: floorY
-        )
-
-        let floorSurfaceMaterial = DiceSceneEnvironment.addFloorSurface(
-            to: scene.rootNode,
-            bounds: layout.bounds,
-            floorY: floorY
-        )
-
-        let floorTextMaterial = DiceSceneEnvironment.addFloorText(
-            to: scene.rootNode,
-            bounds: layout.bounds,
-            floorY: floorY
-        )
-
-        // Visual height only — the actual containment boundary (in
-        // DicePlayfieldPhysics.makeContainer below) is much taller and
-        // invisible, guaranteeing dice can never physically escape
-        // regardless of roll energy. This is sized to look like a
-        // reasonable dice-tray rim relative to the playfield, not to
-        // survive any particular bounce height.
-        DiceSceneEnvironment.addWalls(
-            to: scene.rootNode,
-            bounds: layout.bounds,
-            floorY: floorY,
-            visualHeight: 10.4 // doubled again from 5.2 per request
-        )
-
-        let playfieldContainer = DicePlayfieldPhysics.makeContainer(
-            bounds: layout.bounds,
-            floorY: floorY
-        )
-        scene.rootNode.addChildNode(playfieldContainer)
-
-        // Dice live under their own container node rather than directly on
-        // the scene root — keeps the scene graph organized and gives
-        // DicePoolLifecycleController one clear parent to add/remove from.
-        let diceContainer = SCNNode()
-        diceContainer.name = "diceContainer"
-        scene.rootNode.addChildNode(diceContainer)
+        let env = buildEnvironment(into: sceneView)
+        let scene = env.scene
+        let layout = env.layout
+        let floorY = env.floorY
+        let floorSurfaceMaterial = env.floorSurfaceMaterial
+        let floorTextMaterial = env.floorTextMaterial
+        let diceContainer = env.diceContainer
 
         let round = DiceGameRound()
         let lifecycle = DicePoolLifecycleController(containerNode: diceContainer)
@@ -203,5 +212,155 @@ enum DiceSceneAssembler {
                 )
             }
         )
+    }
+
+    // MARK: - Shared environment
+
+    /// Camera, lighting, floor, walls, physics container and the node dice
+    /// live under — everything both games need and neither varies.
+    ///
+    /// Extracted when Free Roll arrived. The alternative was a second copy
+    /// of ~70 lines of ordering-sensitive setup, which would have drifted
+    /// the first time either game's playfield was touched.
+    private struct Environment {
+        let scene: SCNScene
+        let layout: PlayfieldLayout.Result
+        let floorY: Float
+        let floorSurfaceMaterial: SCNMaterial
+        let floorTextMaterial: SCNMaterial
+        let diceContainer: SCNNode
+    }
+
+    private static func buildEnvironment(into sceneView: SCNView) -> Environment {
+        let scene = SCNScene()
+        sceneView.scene = scene
+
+        // We're supplying our own lights explicitly below — leaving this
+        // on would add an extra, uncontrolled light fighting the area
+        // light and flattening the shading we set up on purpose.
+        sceneView.autoenablesDefaultLighting = false
+
+        let floorY: Float = 0
+        let aspectRatio = Float(sceneView.bounds.width / max(sceneView.bounds.height, 1))
+        let layout = PlayfieldLayout.compute(screenAspectRatio: aspectRatio)
+
+        DicePhysicsWorldConfigurator.configure(scene.physicsWorld)
+
+        let cameraNode = DiceCameraFactory.makeTopDownCamera(
+            playfieldBounds: layout.bounds,
+            orthographicScale: layout.orthographicScale,
+            floorY: floorY
+        )
+        scene.rootNode.addChildNode(cameraNode)
+        sceneView.pointOfView = cameraNode
+
+        DiceSceneEnvironment.addLighting(
+            to: scene.rootNode,
+            playfieldBounds: layout.bounds,
+            floorY: floorY
+        )
+
+        let floorSurfaceMaterial = DiceSceneEnvironment.addFloorSurface(
+            to: scene.rootNode,
+            bounds: layout.bounds,
+            floorY: floorY
+        )
+
+        let floorTextMaterial = DiceSceneEnvironment.addFloorText(
+            to: scene.rootNode,
+            bounds: layout.bounds,
+            floorY: floorY
+        )
+
+        // Visual height only — the actual containment boundary (in
+        // DicePlayfieldPhysics.makeContainer below) is much taller and
+        // invisible, guaranteeing dice can never physically escape
+        // regardless of roll energy. This is sized to look like a
+        // reasonable dice-tray rim relative to the playfield, not to
+        // survive any particular bounce height.
+        DiceSceneEnvironment.addWalls(
+            to: scene.rootNode,
+            bounds: layout.bounds,
+            floorY: floorY,
+            visualHeight: 10.4 // doubled again from 5.2 per request
+        )
+
+        let playfieldContainer = DicePlayfieldPhysics.makeContainer(
+            bounds: layout.bounds,
+            floorY: floorY
+        )
+        scene.rootNode.addChildNode(playfieldContainer)
+
+        // Dice live under their own container node rather than directly on
+        // the scene root — keeps the scene graph organized and gives
+        // DicePoolLifecycleController one clear parent to add/remove from.
+        let diceContainer = SCNNode()
+        diceContainer.name = "diceContainer"
+        scene.rootNode.addChildNode(diceContainer)
+        return Environment(
+            scene: scene,
+            layout: layout,
+            floorY: floorY,
+            floorSurfaceMaterial: floorSurfaceMaterial,
+            floorTextMaterial: floorTextMaterial,
+            diceContainer: diceContainer
+        )
+    }
+
+
+    // MARK: - Free Roll
+
+    /// Same playfield, no game on top of it.
+    ///
+    /// Call once sceneView has a real, non-zero size, exactly as with
+    /// assemble(into:).
+    static func assembleFreeRoll(
+        into sceneView: SCNView,
+        pool: [Die]
+    ) -> FreeRollSession {
+        AppFonts.registerIfNeeded()
+
+        let env = buildEnvironment(into: sceneView)
+
+        let lifecycle = DicePoolLifecycleController(containerNode: env.diceContainer)
+        lifecycle.setupPool(pool, playAreaBounds: env.layout.bounds, styleAsRolls: false)
+
+        let rollController = DiceRollController()
+        rollController.playAreaBounds = env.layout.bounds
+        rollController.floorY = env.floorY
+        rollController.ceilingY = env.floorY + PlayfieldVerticalBounds.ceilingHeight
+
+        // Without this the render loop never calls the roll controller and
+        // settle detection never runs, so dice would tumble forever.
+        sceneView.delegate = rollController
+
+        let contactAudio = DiceContactAudio()
+        contactAudio.playfieldHalfWidth = max(
+            (env.layout.bounds.x.upperBound - env.layout.bounds.x.lowerBound) / 2, 0.001
+        )
+        env.scene.physicsWorld.contactDelegate = contactAudio
+        lifecycle.onPoolReset = { [weak contactAudio] in contactAudio?.reset() }
+        DiceAudioEngine.shared.start()
+
+        let session = FreeRollSession(
+            scene: env.scene,
+            lifecycle: lifecycle,
+            rollController: rollController,
+            contactAudio: contactAudio,
+            playAreaBounds: env.layout.bounds,
+            applyTheme: {
+                DiceSceneEnvironment.applyTheme(
+                    surfaceMaterial: env.floorSurfaceMaterial,
+                    textMaterial: env.floorTextMaterial
+                )
+            }
+        )
+
+        // Re-enables the Roll button the moment the last die settles.
+        rollController.onRollComplete = { [weak session] in
+            session?.onStateChanged?()
+        }
+
+        return session
     }
 }

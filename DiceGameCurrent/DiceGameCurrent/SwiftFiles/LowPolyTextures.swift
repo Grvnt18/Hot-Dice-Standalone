@@ -195,24 +195,3 @@ enum LowPolyTextures {
         return UIColor(hue: h, saturation: s, brightness: max(0, min(1, b + delta)), alpha: a)
     }
 }
-
-/// Small deterministic PRNG (SplitMix64). Foundation's random APIs can't
-/// be seeded, and these textures need to be stable across launches.
-private struct SeededGenerator {
-    private var state: UInt64
-
-    init(seed: UInt64) { self.state = seed }
-
-    mutating func next() -> UInt64 {
-        state &+= 0x9E3779B97F4A7C15
-        var z = state
-        z = (z ^ (z >> 30)) &* 0xBF58476D1CE4E5B9
-        z = (z ^ (z >> 27)) &* 0x94D049BB133111EB
-        return z ^ (z >> 31)
-    }
-
-    /// Uniform 0..<1.
-    mutating func nextUnit() -> Double {
-        Double(next() >> 11) * (1.0 / 9007199254740992.0)
-    }
-}

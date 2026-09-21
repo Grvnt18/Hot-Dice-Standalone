@@ -298,7 +298,7 @@ struct DiceRollButton: View {
 /// would show a proper end-of-turn screen or send the iMessage challenge
 /// here instead).
 /// One firework burst: particles radiating from a point, fading as they go.
-private struct FireworkBurst: View {
+struct FireworkBurst: View {
     let origin: CGPoint
     let color: Color
     let delay: Double
@@ -338,7 +338,10 @@ private struct FireworkBurst: View {
 }
 
 /// Fireworks layer — several bursts at staggered positions and delays.
-private struct FireworksView: View {
+///
+/// Internal rather than private: MatchResultView uses the same celebration
+/// so a win reads the same across the suite.
+struct FireworksView: View {
     private let bursts: [(CGPoint, Color, Double)] = [
         (CGPoint(x: 0.24, y: 0.26), .yellow, 0.0),
         (CGPoint(x: 0.76, y: 0.20), .cyan,   0.35),

@@ -136,7 +136,8 @@ enum DieMaterial {
         colorway: DieColorway,
         to node: SCNNode,
         rollsFaceNumber: Int? = nil,
-        grainVariant: Int = 0
+        grainVariant: Int = 0,
+        d4Style: DieFaceLabels.D4LabelStyle = .topRead
     ) {
         guard applyBodyMaterial(colorway: colorway, to: node, grainVariant: grainVariant) else { return }
 
@@ -144,7 +145,8 @@ enum DieMaterial {
             to: node,
             sides: sides,
             colorway: colorway,
-            rollsFaceNumber: rollsFaceNumber
+            rollsFaceNumber: rollsFaceNumber,
+            d4Style: d4Style
         )
     }
 

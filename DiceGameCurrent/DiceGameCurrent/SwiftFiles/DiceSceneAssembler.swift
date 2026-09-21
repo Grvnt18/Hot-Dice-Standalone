@@ -139,15 +139,23 @@ final class DiceTraySession {
 
     /// Throws every die again. Same two steps DiceTurnController.beginRoll
     /// uses — the impulse and then the settle tracking — minus the scoring.
-    func roll() {
-        guard !rollController.isRolling else { return }
+    ///
+    /// Returns false when nothing was thrown, which a caller that changes
+    /// state around the roll has to respect. Chasing 6 flipped itself to a
+    /// "rolling" phase and then called this; when it no-opped nothing ever
+    /// moved the phase back, leaving the game permanently stuck with a
+    /// disabled button.
+    @discardableResult
+    func roll() -> Bool {
+        guard !rollController.isRolling else { return false }
         let dice = lifecycle.rollableDice
-        guard !dice.isEmpty else { return }
+        guard !dice.isEmpty else { return false }
         SoundEngine.shared.play(.diceRoll)
         DiceRollImpulse.launch(dice: dice)
         settledThisRoll.removeAll()
         rollController.startRoll(dice: dice, currentTime: CACurrentMediaTime())
         onStateChanged?()
+        return true
     }
 }
 

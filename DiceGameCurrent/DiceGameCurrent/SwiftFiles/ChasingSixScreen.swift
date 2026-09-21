@@ -79,7 +79,7 @@ struct ChasingSixScreen: View {
 
                     DiceRollButton(
                         label: buttonLabel,
-                        isEnabled: phase == .ready || phase == .scored,
+                        isEnabled: isPrimaryEnabled,
                         subtitle: buttonSubtitle
                     ) {
                         primaryAction()
@@ -125,7 +125,7 @@ struct ChasingSixScreen: View {
         switch phase {
         case .ready:    return "Roll"
         case .rolling:  return "Rolling"
-        case .scored:   return match.isOver ? "Finish" : "Pass"
+        case .scored:   return isFinalTurn ? "Finish" : "Pass"
         case .handover: return "Pass"
         case .finished: return "Done"
         }
@@ -136,6 +136,15 @@ struct ChasingSixScreen: View {
         return lastSummary
     }
 
+    /// True when the turn just scored was the last one of the last round.
+    ///
+    /// `match.isOver` cannot answer this: the match is only finished inside
+    /// endTurn(), which this button is what triggers, so at .scored it is
+    /// always still false and the label read "Pass" on the final turn.
+    private var isFinalTurn: Bool {
+        match.round >= ChasingSixRules.roundsPerPlayer && match.activeIsLastInRound
+    }
+
     private var scoreboardSubtitle: String? {
         switch phase {
         case .ready:   return "\(match.activeDisplayName) to roll"
@@ -144,11 +153,27 @@ struct ChasingSixScreen: View {
         }
     }
 
+    /// The scene assembles only once the view has real bounds, so `session`
+    /// is nil for the first moments on screen. Requiring it here is what
+    /// stops a tap in that window flipping the game into a rolling phase
+    /// that nothing will ever move it out of.
+    private var isPrimaryEnabled: Bool {
+        switch phase {
+        case .ready:  return session != nil
+        case .scored: return true
+        default:      return false
+        }
+    }
+
     private func primaryAction() {
         switch phase {
         case .ready:
-            phase = .rolling
-            session?.roll()
+            // Phase follows the roll rather than leading it. roll() reports
+            // false when it did not throw anything, and moving first meant
+            // a no-op left the game stuck.
+            if session?.roll() == true {
+                phase = .rolling
+            }
         case .scored:
             endTurn()
         default:
@@ -159,6 +184,18 @@ struct ChasingSixScreen: View {
     // MARK: Turn flow
 
     private func scoreRoll(_ results: [DiceTraySession.DieResult]) {
+        // Score only a complete set. numbers(from:) happily turns four dice
+        // into five numbers, and a quietly wrong score is a far worse
+        // failure than an obvious one — fewer numbers means fewer possible
+        // sets, so the total would just read low with nothing to show for
+        // it. No known path drops a die (force-settled dice report through
+        // the same callback), so this should never fire; if it does, the
+        // player simply rolls again.
+        guard results.map(\.sides).sorted() == ChasingSixRules.dieSides.sorted() else {
+            phase = .ready
+            return
+        }
+
         let numbers = ChasingSixRules.numbers(from: results)
         let score = ChasingSixRules.score(
             numbers: numbers,

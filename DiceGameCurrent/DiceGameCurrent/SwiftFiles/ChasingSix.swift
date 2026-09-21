@@ -12,8 +12,9 @@ enum ChasingSixRules {
     /// `numbers(from:)`.
     static let dieSides = [4, 6, 8, 12, 20]
 
-    /// At or above this, the d20 adds its face value to the turn.
-    static let boosterThreshold = 20 - 7   // 13
+    /// At or above this, the d20 adds its face value to the turn. Put
+    /// another way, the d20's top eight faces boost and the rest do not.
+    static let boosterThreshold = 13
 
     /// At or below this, a no-match roll is a Jackpot.
     ///

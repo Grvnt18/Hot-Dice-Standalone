@@ -2,7 +2,7 @@
 design was approved on. Mirrors ChasingSixRules.numbers / .score exactly."""
 from collections import Counter
 
-BOOSTER = 20 - 7          # ChasingSixRules.boosterThreshold
+BOOSTER = 13              # ChasingSixRules.boosterThreshold
 JACKPOT = BOOSTER - 1     # ChasingSixRules.jackpotThreshold
 
 def d4_exposed(resting_face_index):

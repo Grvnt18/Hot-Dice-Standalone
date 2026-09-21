@@ -240,7 +240,12 @@ struct MatchResultView: View {
     }
 
     private var reason: String? {
-        if case .special(_, let reason) = match.outcome { return reason }
-        return nil
+        // Unwrapped explicitly rather than matching the case pattern
+        // straight against the Optional. Swift's optional promotion in
+        // pattern matching likely accepts the shorter form, but there is
+        // no compiler here to confirm it and this costs nothing.
+        guard let outcome = match.outcome,
+              case .special(_, let reason) = outcome else { return nil }
+        return reason
     }
 }

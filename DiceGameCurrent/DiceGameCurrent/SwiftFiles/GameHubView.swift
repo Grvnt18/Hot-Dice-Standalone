@@ -81,7 +81,7 @@ struct GameHubView: View {
 
     private var title: some View {
         Text("Rolls")
-            .font(AppFonts.aguafina(52))
+            .font(.aguafina(52))
             .foregroundStyle(.white)
             .shadow(color: .black.opacity(0.5), radius: 4, y: 2)
     }
@@ -115,7 +115,7 @@ private struct GameTile: View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(entry.displayName)
-                    .font(AppFonts.stackSans(17))
+                    .font(.stackSans(17))
                     .foregroundStyle(.white)
                     .lineLimit(2)
                     // Aguafina and Stack Sans both overhang their advance
@@ -125,7 +125,7 @@ private struct GameTile: View {
                     .padding(.trailing, 4)
 
                 Text(entry.tagline)
-                    .font(AppFonts.stackSans(11))
+                    .font(.stackSans(11))
                     .foregroundStyle(.white.opacity(0.7))
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -134,7 +134,7 @@ private struct GameTile: View {
 
                 if !entry.isAvailable {
                     Text("Soon")
-                        .font(AppFonts.stackSans(10))
+                        .font(.stackSans(10))
                         .foregroundStyle(.white.opacity(0.65))
                         .padding(.horizontal, 7)
                         .padding(.vertical, 3)

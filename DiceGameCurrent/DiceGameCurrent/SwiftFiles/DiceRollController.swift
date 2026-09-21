@@ -703,7 +703,14 @@ final class DiceRollController: NSObject, SCNSceneRendererDelegate {
         let sides = dieSidesByID[state.dieID] ?? 6
         let normals = DieFaceNormals.normals(forSides: sides)
 
-        FaceSnapping.snap(node: state.node, fromOrientation: trueOrientation, faceNormals: normals) { [weak self] landedFaceIndex in
+        FaceSnapping.snap(
+            node: state.node,
+            fromOrientation: trueOrientation,
+            faceNormals: normals,
+            // A d4 is read at its apex, so what matters is which face it
+            // came to rest ON — see FaceSnapping.snap's doc comment.
+            alignFace: sides == 4 ? .down : .up
+        ) { [weak self] landedFaceIndex in
             // Only now, once the snap animation has actually finished, is
             // this die's reveal considered fully complete — see
             // isFullyRevealed's doc comment for why this is tracked
@@ -715,7 +722,16 @@ final class DiceRollController: NSObject, SCNSceneRendererDelegate {
             // label physically showing on the landed face and the value
             // recorded here for scoring are now guaranteed to match,
             // since they both come from the same face-index numbering.
-            let value = landedFaceIndex + 1
+            //
+            // The d4 is the exception. It is a top-read die: the number is
+            // carried on the VERTEX pointing up, which is the vertex
+            // opposite the face it is resting on. landedFaceIndex is that
+            // resting face (alignFace: .down above), so the value comes
+            // from DieFaceLabels' face-to-vertex mapping rather than from
+            // the face index directly.
+            let value = sides == 4
+                ? DieFaceLabels.d4TopReadValue(forRestingFace: landedFaceIndex)
+                : landedFaceIndex + 1
             // No settle sound here: DiceContactAudio now plays a real
             // impact for the final contact that brought this die to rest.
             // Firing another sound at the same moment would double it.
@@ -756,15 +772,35 @@ enum FaceSnapping {
     /// given shape's raw untransformed data won every single time.
     ///
     /// Calls `completion` once the animation finishes, passing the INDEX
-    /// (into `faceNormals`) of whichever face ended up landing "up" — this
-    /// is now meaningful, not just cosmetic: DieRollController uses it
-    /// (index + 1) as the die's actual scored value, matching the same
-    /// index-order convention DieFaceLabels uses for the permanent label
-    /// physically shown on that face.
+    /// (into `faceNormals`) of whichever face ended up aligned with
+    /// `alignFace` — the die's actual scored value is derived from it, so
+    /// this is meaningful rather than cosmetic.
+    ///
+    /// `alignFace` is `.up` for every die except the d4. A tetrahedron has
+    /// no face pointing up when it rests: the resting face points straight
+    /// down and the other three sit at exactly the same angle, all reading
+    /// +0.333 against +Y. Picking "closest to up" from those three is a
+    /// three-way tie broken only by floating-point noise, and rotating the
+    /// winner to point straight up would tip the die ~70 degrees onto an
+    /// edge. Aligning the resting face DOWN is unambiguous, and it is the
+    /// pose physics already settled into, so the correction stays small.
+    enum FaceAlignment {
+        case up
+        case down
+
+        var worldDirection: simd_float3 {
+            switch self {
+            case .up:   return simd_float3(0, 1, 0)
+            case .down: return simd_float3(0, -1, 0)
+            }
+        }
+    }
+
     static func snap(
         node: SCNNode,
         fromOrientation: SCNQuaternion,
         faceNormals: [SCNVector3],
+        alignFace: FaceAlignment = .up,
         completion: ((Int) -> Void)? = nil
     ) {
         guard !faceNormals.isEmpty else {
@@ -773,15 +809,16 @@ enum FaceSnapping {
         }
 
         let currentQuat = fromOrientation.simd
-        let worldUp = simd_float3(0, 1, 0)
+        let target = alignFace.worldDirection
 
-        // Find which local face normal currently points closest to world up.
+        // Find which local face normal currently points closest to the
+        // target direction (world up for most dice, world down for a d4).
         var bestNormal = faceNormals[0].simd
         var bestDot: Float = -.greatestFiniteMagnitude
         var bestIndex = 0
         for (index, normal) in faceNormals.enumerated() {
             let worldNormal = currentQuat.act(normal.simd)
-            let dot = simd_dot(worldNormal, worldUp)
+            let dot = simd_dot(worldNormal, target)
             if dot > bestDot {
                 bestDot = dot
                 bestNormal = normal.simd
@@ -790,9 +827,9 @@ enum FaceSnapping {
         }
 
         // Rotation that takes that face normal the rest of the way to
-        // pointing exactly straight up.
+        // pointing exactly along the target direction.
         let currentWorldNormal = currentQuat.act(bestNormal)
-        let correction = simd_quatf(from: currentWorldNormal, to: worldUp)
+        let correction = simd_quatf(from: currentWorldNormal, to: target)
         let targetQuat = simd_normalize(correction * currentQuat)
 
         let duration = SettleTuning.faceSnapDuration

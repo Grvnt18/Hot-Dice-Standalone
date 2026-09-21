@@ -54,6 +54,8 @@ struct GameHubView: View {
             entry.makeView?({ openGame = nil })
         }
         .sheet(isPresented: $showingSettings) {
+            // No game, so no rules and no How to Play button. Showing some
+            // game's rules from the hub would just be arbitrary.
             SettingsView()
         }
         .onAppear {

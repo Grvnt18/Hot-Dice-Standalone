@@ -38,6 +38,10 @@ enum DieFaceLabels {
     /// actually be seen on screen.
     private static func labelSize(forSides sides: Int) -> CGFloat {
         switch sides {
+        // Unused since the d4 became top-read: addPermanentFaceNumbers
+        // routes 4-sided dice to addD4TopReadNumbers, which sizes its
+        // three-per-face numerals with d4TopReadLabelSize instead. Kept so
+        // the table stays complete for every shape the app can build.
         case 4: return 0.90
         case 6: return 0.65
         case 8: return 0.49
@@ -121,6 +125,14 @@ enum DieFaceLabels {
         colorway: DieColorway,
         rollsFaceNumber: Int? = nil
     ) {
+        // A d4 is not a "number on each face" die — it is read at the
+        // apex, with three numerals per face, one beside each corner.
+        // Different enough in both layout and meaning to be its own path.
+        if sides == 4 {
+            addD4TopReadNumbers(to: node, colorway: colorway)
+            return
+        }
+
         let normals = DieFaceNormals.normals(forSides: sides)
         let size = labelSize(forSides: sides)
 
@@ -234,6 +246,119 @@ enum DieFaceLabels {
             }
 
             node.addChildNode(labelNode)
+        }
+    }
+
+    // MARK: - D4 top-read numbering
+
+    /// Which vertex sits opposite each face, by index into
+    /// `d4VertexDirections`.
+    ///
+    /// Exact, not measured: for a tetrahedron centred on the origin, a
+    /// face's outward normal is the negation of its opposite vertex's
+    /// direction. Checked against `DieFaceNormals.d4` — F0's normal
+    /// (+,+,-) is the negation of V3 (-,-,+), and so on down the list.
+    private static let d4OppositeVertex: [Int] = [3, 2, 1, 0]
+
+    /// The number printed on each vertex, by `d4VertexDirections` index.
+    ///
+    /// The choice is arbitrary — all four vertices of a regular
+    /// tetrahedron are equivalent under its symmetry group — but it has to
+    /// be FIXED, because the numerals drawn on the faces and the value
+    /// reported when the die settles both read from this one table.
+    private static let d4VertexNumbers: [Int] = [1, 2, 3, 4]
+
+    /// The value a d4 shows when resting on `face`: the number on the
+    /// vertex pointing up, which is the vertex opposite that face.
+    ///
+    /// Called by DiceRollController once a d4 settles.
+    static func d4TopReadValue(forRestingFace face: Int) -> Int {
+        guard d4OppositeVertex.indices.contains(face) else { return 1 }
+        return d4VertexNumbers[d4OppositeVertex[face]]
+    }
+
+    /// Numeral size for the top-read layout. Smaller than
+    /// `labelSize(forSides: 4)`'s 0.90 because three now share one face
+    /// rather than one having it to itself.
+    private static let d4TopReadLabelSize: CGFloat = 0.50
+
+    /// How far out from the face's centre each numeral sits, as a fraction
+    /// of the distance from the centre to a corner.
+    ///
+    /// At 0.62 the numeral's centre lands 1.012 out of a 1.633 face
+    /// circumradius and its outer edge reaches 1.287, inside the
+    /// chamfered face's ~1.388 limit. Adjacent numerals end up 1.754
+    /// apart, more than three times the 0.50 label size, so they cannot
+    /// collide.
+    private static let d4CornerLabelRadiusFraction: Float = 0.62
+
+    /// Three numerals per face, one beside each corner, each rotated so it
+    /// reads upright when that corner is the apex.
+    ///
+    /// This is what a "top-read" d4 is: the die has no face pointing up
+    /// when it lands, so the result is read at the point instead. All
+    /// three faces you can see meet at that point and all three carry the
+    /// same number beside it.
+    private static func addD4TopReadNumbers(to node: SCNNode, colorway: DieColorway) {
+        let normals = DieFaceNormals.normals(forSides: 4)
+        let faceDistance = localFaceDistance(forSides: 4)
+
+        // Distance from a face's centre to its corners, derived from the
+        // inradius rather than hardcoded so the two cannot drift apart.
+        // For a regular tetrahedron the circumradius is 3x the inradius,
+        // so the in-face circumradius is sqrt(R^2 - r^2) = r * sqrt(8).
+        let faceCircumradius = faceDistance * (8.0 as Float).squareRoot()
+        let cornerOffset = faceCircumradius * d4CornerLabelRadiusFraction
+        let liftedDistance = faceDistance * surfaceLiftFactor
+
+        for (faceIndex, normal) in normals.enumerated() {
+            let faceNormal = simd_normalize(normal.simd)
+            let opposite = d4OppositeVertex[faceIndex]
+
+            for vertexIndex in d4VertexDirections.indices where vertexIndex != opposite {
+                // Direction from the face's centre toward this corner,
+                // flattened into the face's own plane.
+                let vertexDirection = simd_normalize(d4VertexDirections[vertexIndex].simd)
+                var towardCorner = vertexDirection
+                    - simd_dot(vertexDirection, faceNormal) * faceNormal
+                guard simd_length(towardCorner) > 0.001 else { continue }
+                towardCorner = simd_normalize(towardCorner)
+
+                let plane = SCNPlane(width: d4TopReadLabelSize, height: d4TopReadLabelSize)
+
+                let material = SCNMaterial()
+                material.diffuse.contents = labelImage(
+                    number: d4VertexNumbers[vertexIndex],
+                    colorway: colorway,
+                    underlined: false
+                )
+                material.isDoubleSided = true
+                material.lightingModel = .constant
+                material.writesToDepthBuffer = false
+                material.readsFromDepthBuffer = true
+                plane.materials = [material]
+
+                let labelNode = SCNNode(geometry: plane)
+                labelNode.name = "faceLabel"
+                labelNode.renderingOrder = 10
+
+                labelNode.position = SCNVector3(
+                    faceNormal.x * liftedDistance + towardCorner.x * cornerOffset,
+                    faceNormal.y * liftedDistance + towardCorner.y * cornerOffset,
+                    faceNormal.z * liftedDistance + towardCorner.z * cornerOffset
+                )
+
+                // Explicit basis, same technique the d10 uses: +Z out along
+                // the face normal, and +Y — which is the direction the
+                // glyph is drawn "up" — pointing at the corner. That is
+                // precisely what makes the numeral read the right way up
+                // when this corner is the one sticking up.
+                let up = towardCorner
+                let right = simd_normalize(simd_cross(up, faceNormal))
+                labelNode.simdOrientation = simd_quatf(simd_float3x3(right, up, faceNormal))
+
+                node.addChildNode(labelNode)
+            }
         }
     }
 

@@ -7,6 +7,15 @@ import UIKit
 /// pattern for AppTheme.shared, which drives the playing-surface color plus
 /// this screen's own accent.
 struct SettingsView: View {
+
+    /// The game whose rules How to Play should show, if any.
+    ///
+    /// Nil from the hub, where no game is open — the button is hidden
+    /// rather than showing some arbitrary game's rules, which is what it
+    /// did when the rules were hardcoded here.
+    var gameName: String? = nil
+    var rules: [GameRuleSection] = []
+
     @ObservedObject private var sound = SoundEngine.shared
     @ObservedObject private var theme = AppTheme.shared
     @Environment(\.dismiss) private var dismiss
@@ -88,17 +97,19 @@ struct SettingsView: View {
                         .font(.stackSans(11))
                 }
 
-                Section {
-                    Button {
-                        showingHowToPlay = true
-                    } label: {
-                        Text("How to Play")
-                            .font(.stackSans(15))
-                            .frame(maxWidth: .infinity)
+                if !rules.isEmpty {
+                    Section {
+                        Button {
+                            showingHowToPlay = true
+                        } label: {
+                            Text("How to Play")
+                                .font(.stackSans(15))
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .listRowBackground(Color.clear)
                 }
-                .listRowBackground(Color.clear)
             }
             .tint(theme.accentColor)
             .navigationBarTitleDisplayMode(.inline)
@@ -118,7 +129,7 @@ struct SettingsView: View {
                 }
             }
             .sheet(isPresented: $showingHowToPlay) {
-                HowToPlayView()
+                HowToPlayView(gameName: gameName, sections: rules)
             }
         }
     }
@@ -191,25 +202,26 @@ private extension AppTheme.Swatch {
 
 // MARK: - How to Play
 
-/// Rules reference, reachable from the settings menu. The rules text
-/// itself is static; theme is observed only so this sheet's own Done
-/// button matches the same accent color and shape as everything else.
+/// Rules reference, reachable from the settings menu.
+///
+/// The sections are handed in rather than held here. They used to be a
+/// hardcoded array of Rolls' rules, which was fine while Rolls was the
+/// whole app and wrong the moment it was not — opening this from Free Roll
+/// explained Rolls. Each game now owns its own text via SuiteGame.rules.
+///
+/// Theme is observed only so this sheet's own Done button matches the same
+/// accent color and shape as everything else.
 private struct HowToPlayView: View {
+    let gameName: String?
+    let sections: [GameRuleSection]
+
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var theme = AppTheme.shared
-
-    private let sections: [(title: String, body: String)] = [
-        ("The Pool", "You start with 15 dice: twelve 6-sided, one 8-sided, one 10-sided, and one 12-sided."),
-        ("Rolling", "Tap Begin to roll every die still in the pool. Tap any settled die to select it, then tap Roll again to bank your selection and re-roll everything left."),
-        ("Scoring", "Lower is better. Banking a die scores it against its own best face: its highest number scores 0, and every face below that costs one point per step down — except a 1, which always costs the die's full number of sides, its worst possible result."),
-        ("Banking", "You must bank at least one die from a roll before rerolling the rest. Selecting every remaining die turns the Roll button into Finish — confirming then banks everything and ends the turn."),
-        ("Winning", "The game ends once every die has been banked. Add up the points from every die you banked — the lowest total wins.")
-    ]
 
     var body: some View {
         NavigationStack {
             Form {
-                ForEach(sections, id: \.title) { section in
+                ForEach(sections) { section in
                     Section {
                         Text(section.body)
                             .font(.stackSans(14))
@@ -222,7 +234,12 @@ private struct HowToPlayView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Text("How to Play").font(.stackSans(17))
+                    // Named so it is obvious which game's rules these are,
+                    // now that the sheet is reachable from more than one.
+                    Text(gameName.map { "\($0) — How to Play" } ?? "How to Play")
+                        .font(.stackSans(17))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }

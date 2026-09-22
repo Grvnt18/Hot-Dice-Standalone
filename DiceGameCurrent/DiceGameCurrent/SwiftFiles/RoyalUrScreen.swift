@@ -135,7 +135,7 @@ struct RoyalUrScreen: View {
         .dynamicTypeSize(.large)
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showingSettings) {
-            SettingsView(gameName: RoyalUrGame.displayName, rules: RoyalUrGame.rules)
+            SettingsView(for: RoyalUrGame.self)
         }
         .onAppear {
             AppFonts.registerIfNeeded()

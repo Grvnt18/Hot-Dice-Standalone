@@ -267,7 +267,7 @@ struct BoneheadsScreen: View {
         .dynamicTypeSize(.large)
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showingSettings) {
-            SettingsView(gameName: BoneheadsGame.displayName, rules: BoneheadsGame.rules)
+            SettingsView(for: BoneheadsGame.self)
         }
         .onAppear {
             AppFonts.registerIfNeeded()

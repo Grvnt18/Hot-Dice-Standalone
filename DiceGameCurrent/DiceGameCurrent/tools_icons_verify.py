@@ -15,8 +15,10 @@ import os
 import re
 import sys
 
-SWIFT = "SwiftFiles/"
-RES = "Resources/"
+# Anchored to this script's directory, not the caller's: these used to be
+# relative, so the tool only worked from the project root.
+SWIFT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "SwiftFiles") + os.sep
+RES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Resources") + os.sep
 
 # Non-game icons, named here because nothing in the code derives them from
 # an id. Keep this list short: every entry is a name the unused-file check

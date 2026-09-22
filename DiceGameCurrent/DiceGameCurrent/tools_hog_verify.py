@@ -14,9 +14,20 @@ what every length figure in the plan was measured with.
 Expected: 14.8 messages a match, first seat winning 54.5%."""
 import random
 
+import tools_swiftconst as swiftconst
+
 TARGET = 75
 HOG_FACE = 1
 HOLD_AT = 20
+
+# The constants above are a PORT of the Swift, not a reading of it, so
+# they can drift out of agreement with the shipped game without any test
+# noticing. This states which `static let`s in Hog.swift they stand on;
+# swiftconst.expect fails by name if the Swift has moved.
+SWIFT_CONSTANTS = {
+    "hogFace": HOG_FACE,
+    "target": TARGET,
+}
 
 
 def turn(rng, banked):
@@ -47,6 +58,7 @@ def match(rng):
 
 
 def main():
+    swiftconst.expect("HOG", "Hog.swift", SWIFT_CONSTANTS)
     rng = random.Random(20260922)
 
     # A hog loses the turn, not the bank.

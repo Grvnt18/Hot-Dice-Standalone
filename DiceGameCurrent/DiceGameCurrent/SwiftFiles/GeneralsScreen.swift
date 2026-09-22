@@ -125,7 +125,7 @@ struct GeneralsScreen: View {
         .dynamicTypeSize(.large)
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showingSettings) {
-            SettingsView(gameName: GeneralsGame.displayName, rules: GeneralsGame.rules)
+            SettingsView(for: GeneralsGame.self)
         }
         .onAppear {
             AppFonts.registerIfNeeded()

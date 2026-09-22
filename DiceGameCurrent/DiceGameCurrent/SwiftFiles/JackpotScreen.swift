@@ -109,7 +109,7 @@ struct JackpotScreen: View {
         .dynamicTypeSize(.large)
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showingSettings) {
-            SettingsView(gameName: JackpotGame.displayName, rules: JackpotGame.rules)
+            SettingsView(for: JackpotGame.self)
         }
         .onAppear {
             AppFonts.registerIfNeeded()

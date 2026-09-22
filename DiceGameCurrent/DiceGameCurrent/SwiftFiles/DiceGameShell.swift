@@ -663,7 +663,7 @@ struct DiceGameScreen: View {
         .dynamicTypeSize(.large)
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showingSettings) {
-            SettingsView(gameName: RollsGame.displayName, rules: RollsGame.rules)
+            SettingsView(for: RollsGame.self)
         }
         .onAppear {
             SoundEngine.shared.startMusic()

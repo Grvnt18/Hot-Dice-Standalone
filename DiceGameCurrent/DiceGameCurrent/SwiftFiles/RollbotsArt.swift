@@ -141,7 +141,7 @@ struct NetSeatRail: View {
             // better in a rail than a short wide one, and draining downward
             // is the direction the number is going.
             GeometryReader { geo in
-                let maximum = CyberDieMaxIP
+                let maximum = RollbotsMaxIP
                 let fraction = max(0, min(1, Double(state.ip[seat]) / Double(maximum)))
                 ZStack(alignment: .bottom) {
                     Rectangle().fill(colour.opacity(0.16))
@@ -193,7 +193,13 @@ struct NetSeatRail: View {
 }
 
 /// The largest IP either runner can hold, for sizing the bars.
-private let CyberDieMaxIP = RollbotsRules.startingIP + RollbotsRules.secondSeatBonusIP
+/// The denominator both seats' IP bars share.
+///
+/// Deliberately the higher of the two starting totals rather than each
+/// seat's own: a bar only means anything next to the other one, so they
+/// have to be drawn to the same scale. Seat 0 therefore reads a hair under
+/// full at the start, which is honest — it IS a point behind.
+private let RollbotsMaxIP = RollbotsState.startingIP(1)
 
 // MARK: - Cards
 

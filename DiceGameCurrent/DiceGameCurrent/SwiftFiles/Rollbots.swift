@@ -350,10 +350,7 @@ struct RollbotsState: Codable, Equatable {
     var phaseArmed: [Bool]
 
     init(weapons: [CyberWeapon], ware: [Cyberware]) {
-        ip = [
-            RollbotsRules.startingIP,
-            RollbotsRules.startingIP + RollbotsRules.secondSeatBonusIP
-        ]
+        ip = [RollbotsState.startingIP(0), RollbotsState.startingIP(1)]
         weapon = weapons
         self.ware = ware
         wareUsed = [false, false]
@@ -369,6 +366,17 @@ struct RollbotsState: Codable, Equatable {
         case ip, weapon, ware, wareUsed = "u", charged = "c"
         case virusTurns = "v", sidearmTurns = "s", exposed = "e"
         case overclocked = "o", phaseArmed = "q"
+    }
+
+    /// What this seat began the match on, which is not the same for both.
+    ///
+    /// Seat 1 carries the second-seat bonus point, so anything that caps a
+    /// seat's IP has to ask for that seat's own ceiling rather than reach
+    /// for RollbotsRules.startingIP. The Emergency Sub-Routine's repair did
+    /// exactly that and quietly took seat 1's compensation point away the
+    /// first time they healed.
+    static func startingIP(_ seat: Int) -> Int {
+        RollbotsRules.startingIP + (seat == 1 ? RollbotsRules.secondSeatBonusIP : 0)
     }
 
     /// What this seat is actually holding right now.

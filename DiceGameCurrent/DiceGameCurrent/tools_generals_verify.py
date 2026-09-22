@@ -12,6 +12,8 @@ first-mover edge is re-measured against the shipped seat order: strict
 alternation gives the first seat ~61% of decided matches, and the snake
 this game ships takes it to ~51%."""
 import random
+
+import tools_swiftconst as swiftconst
 from collections import Counter
 
 UPPER = {"ones": 1, "twos": 2, "threes": 3, "fours": 4, "fives": 5, "sixes": 6}
@@ -22,6 +24,15 @@ CATEGORIES = list(UPPER) + [
 SNAKE = [0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0]
 ROLLS_PER_TURN = 3
 DICE_COUNT = 5
+
+# The constants above are a PORT of the Swift, not a reading of it, so
+# they can drift out of agreement with the shipped game without any test
+# noticing. This states which `static let`s in Generals.swift they stand on;
+# swiftconst.expect fails by name if the Swift has moved.
+SWIFT_CONSTANTS = {
+    "diceCount": DICE_COUNT,
+    "rollsPerTurn": ROLLS_PER_TURN,
+}
 
 
 def longest_run(faces):
@@ -115,6 +126,7 @@ def measure(order, rng, matches):
 
 
 def main():
+    swiftconst.expect("Generals", "Generals.swift", SWIFT_CONSTANTS)
     check_categories()
     rng = random.Random(20260922)
     matches = 60_000

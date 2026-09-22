@@ -80,37 +80,37 @@ struct GameRuleSection: Identifiable {
 
 /// Every game in the suite, in hub order.
 ///
-/// Type-erased into a description rather than an array of metatypes: the hub
-/// only needs to render a tile and know whether it can be opened, and the
-/// six unbuilt games have no type to point at yet. They are still listed —
-/// showing them greyed out is more honest than pretending the suite is two
-/// games, and it sets the expectation of what is coming.
+/// Type-erased into a description rather than an array of metatypes, so the
+/// hub renders a tile from a value instead of reaching into a generic type
+/// per cell.
 ///
+/// It once carried an availability flag and the hub drew a greyed "soon"
+/// tile for the games that had no view yet. All ten have one now, so the
+/// flag was permanently true and the whole branch unreachable; it came out
+/// rather than sitting there untestable.
 struct GameCatalogEntry: Identifiable {
     let id: String
     let displayName: String
     let tagline: String
-    let isAvailable: Bool
 
     /// Builds the game's root view, given the action that returns to the
-    /// hub. Nil for anything not yet implemented.
+    /// hub.
     ///
     /// The dismissal is passed *in* rather than the game reaching for an
     /// environment dismiss: games are presented full screen precisely so
     /// they keep the whole display, which means there is no navigation
     /// chrome to go back with — each game draws its own control.
-    let makeView: ((@escaping () -> Void) -> AnyView)?
+    let makeView: (@escaping () -> Void) -> AnyView
 
     init(
         id: String,
         displayName: String,
         tagline: String,
-        makeView: ((@escaping () -> Void) -> AnyView)? = nil
+        makeView: @escaping (@escaping () -> Void) -> AnyView
     ) {
         self.id = id
         self.displayName = displayName
         self.tagline = tagline
-        self.isAvailable = makeView != nil
         self.makeView = makeView
     }
 

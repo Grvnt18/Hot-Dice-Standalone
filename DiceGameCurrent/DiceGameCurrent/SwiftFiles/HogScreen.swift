@@ -104,7 +104,7 @@ struct HogScreen: View {
         .dynamicTypeSize(.large)
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showingSettings) {
-            SettingsView(gameName: HogGame.displayName, rules: HogGame.rules)
+            SettingsView(for: HogGame.self)
         }
         .onAppear {
             AppFonts.registerIfNeeded()

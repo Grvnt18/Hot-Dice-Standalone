@@ -13,10 +13,22 @@ round ties 16.7% of the time and a best-of-three on cumulative points ties
 brutal.)"""
 import random
 
+import tools_swiftconst as swiftconst
+
 QUALIFIERS = [6, 5, 4]
 DICE_COUNT = 5
 ROLLS_PER_TURN = 4
 CARGO_REROLL_HINT = 6
+
+# The constants above are a PORT of the Swift, not a reading of it, so
+# they can drift out of agreement with the shipped game without any test
+# noticing. This states which `static let`s in FreighterYachtDinghy.swift they stand on;
+# swiftconst.expect fails by name if the Swift has moved.
+SWIFT_CONSTANTS = {
+    "cargoRerollHint": CARGO_REROLL_HINT,
+    "diceCount": DICE_COUNT,
+    "rollsPerTurn": ROLLS_PER_TURN,
+}
 
 
 class Turn:
@@ -80,6 +92,7 @@ def play_turn(rng, faces=None):
 
 
 def main():
+    swiftconst.expect("F.Y.D.", "FreighterYachtDinghy.swift", SWIFT_CONSTANTS)
     rng = random.Random(20260922)
 
     # Forced order: a hand of 6-6-5-4-4 takes ONE 6, then the 5, then one 4.

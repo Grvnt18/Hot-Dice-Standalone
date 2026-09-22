@@ -4,19 +4,38 @@ import UIKit
 /// Handles tap-to-select on the dice scene. Hit-tests the tap, walks up to
 /// the tapped die's root node, confirms it's actually settled (a
 /// still-tumbling die shouldn't be selectable — mirrors the game's own
-/// rule that you can only bank a die once it's landed), then toggles
-/// selection through the turn controller, which drives the glow highlight
-/// automatically.
+/// rule that you can only bank a die once it's landed), then reports which
+/// die was tapped.
+///
+/// It used to call `DiceTurnController.toggleSelection` itself, which was
+/// its only tie to Rolls and the reason no other game could use it.
+/// Generals needs exactly this hit-testing to choose which dice to keep,
+/// so the handler now reports the die and lets the caller decide what a
+/// tap means. Rolls passes the toggle it was making anyway.
 final class DiceTapHandler: NSObject {
 
     private weak var sceneView: SCNView?
-    private let turnController: DiceTurnController
     private let rollController: DiceRollController
+    private let requireSettled: Bool
+    private let onDieTapped: (UUID) -> Void
 
-    init(sceneView: SCNView, turnController: DiceTurnController, rollController: DiceRollController) {
+    /// `requireSettled` is what Rolls needs and a keeping game cannot use.
+    /// `settledDieIDs` holds only the dice of the *current* roll, and a
+    /// reroll clears it — so in Generals, where the kept dice sit out the
+    /// throw entirely, requiring it would leave a kept die untappable and
+    /// the player unable to change their mind. A tray gates on the roll
+    /// being over instead, which is the same rule stated over the whole
+    /// table rather than over one throw.
+    init(
+        sceneView: SCNView,
+        rollController: DiceRollController,
+        requireSettled: Bool = true,
+        onDieTapped: @escaping (UUID) -> Void
+    ) {
         self.sceneView = sceneView
-        self.turnController = turnController
         self.rollController = rollController
+        self.requireSettled = requireSettled
+        self.onDieTapped = onDieTapped
         super.init()
 
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
@@ -32,12 +51,10 @@ final class DiceTapHandler: NSObject {
         ])
 
         guard let hit = hitResults.first,
-              let dieID = dieID(for: hit.node),
-              rollController.settledDieIDs.contains(dieID) else {
-            return
-        }
+              let dieID = dieID(for: hit.node) else { return }
+        if requireSettled, !rollController.settledDieIDs.contains(dieID) { return }
 
-        turnController.toggleSelection(dieID: dieID)
+        onDieTapped(dieID)
     }
 
     /// Node names are set to the die's UUID string in DicePoolSceneBuilder,

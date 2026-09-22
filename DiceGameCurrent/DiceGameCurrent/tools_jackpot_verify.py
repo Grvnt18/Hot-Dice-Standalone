@@ -1,9 +1,20 @@
 """Port of Jackpot.swift's scoring, checked against the analysis the
 design was approved on. Mirrors JackpotRules.numbers / .score exactly."""
+import tools_swiftconst as swiftconst
+
 from collections import Counter
 
 BOOSTER = 13              # JackpotRules.boosterThreshold
 JACKPOT = BOOSTER - 1     # JackpotRules.jackpotThreshold
+
+# The constants above are a PORT of the Swift, not a reading of it, so
+# they can drift out of agreement with the shipped game without any test
+# noticing. This states which `static let`s in Jackpot.swift they stand on;
+# swiftconst.expect fails by name if the Swift has moved.
+SWIFT_CONSTANTS = {
+    "boosterThreshold": BOOSTER,
+}
+
 
 def d4_exposed(resting_face_index):
     """DieFaceLabels.d4ExposedFaceNumbers(restingFace:)"""
@@ -68,3 +79,5 @@ for rest in range(4):
     assert len(ex) == 3 and len(set(ex)) == 3
     assert rest + 1 not in ex
     print("  resting face %d -> exposed %s (complement, all distinct)" % (rest + 1, ex))
+
+swiftconst.expect("Jackpot", "Jackpot.swift", SWIFT_CONSTANTS)

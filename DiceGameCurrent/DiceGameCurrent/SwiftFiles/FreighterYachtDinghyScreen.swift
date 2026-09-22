@@ -107,7 +107,7 @@ struct FreighterYachtDinghyScreen: View {
         .dynamicTypeSize(.large)
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showingSettings) {
-            SettingsView(gameName: FreighterYachtDinghyGame.displayName, rules: FreighterYachtDinghyGame.rules)
+            SettingsView(for: FreighterYachtDinghyGame.self)
         }
         .onAppear {
             AppFonts.registerIfNeeded()

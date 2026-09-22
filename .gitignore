@@ -1,0 +1,9 @@
+# The verification tools import a shared module (tools_swiftconst.py) now,
+# so Python leaves bytecode caches next to them. Nothing here belongs in
+# the repository.
+__pycache__/
+*.pyc
+
+# macOS/iPadOS file-manager litter, which Swift Playgrounds sync can drop
+# into the project folder.
+.DS_Store

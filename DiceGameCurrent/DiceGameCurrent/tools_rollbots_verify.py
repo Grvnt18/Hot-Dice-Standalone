@@ -11,6 +11,8 @@ worth once the defender plays well, and whether each Cyberware is a real
 option rather than a trap."""
 import random
 
+import tools_swiftconst as swiftconst
+
 START_IP = 16
 SECOND_SEAT_BONUS = 1
 CRIT_AT = 7
@@ -18,6 +20,22 @@ DAMAGE_SIDES = {"blade": 8, "pistol": 6, "rail": 12, "sidearm": 4}
 VIRUS_TURNS, VIRUS_DMG, VIRUS_ON = 3, 3, 3
 PHASE_COUNTER = 4
 REPAIR, SIDEARM_TURNS = 8, 4
+
+# The constants above are a PORT of the Swift, not a reading of it, so
+# they can drift out of agreement with the shipped game without any test
+# noticing. This states which `static let`s in Rollbots.swift they stand on;
+# swiftconst.expect fails by name if the Swift has moved.
+SWIFT_CONSTANTS = {
+    "critAccuracy": CRIT_AT,
+    "phaseCounterDamage": PHASE_COUNTER,
+    "repairAmount": REPAIR,
+    "secondSeatBonusIP": SECOND_SEAT_BONUS,
+    "sidearmTurns": SIDEARM_TURNS,
+    "startingIP": START_IP,
+    "virusActivatesOn": VIRUS_ON,
+    "virusDamagePerTurn": VIRUS_DMG,
+    "virusTurns": VIRUS_TURNS,
+}
 
 
 def resolve(weapon, accuracy, damage_roll, defence, defence_roll, ignores_firewall=False):
@@ -178,6 +196,7 @@ def match(rng, w0, w1, ware0=None, ware1=None):
 
 
 def main():
+    swiftconst.expect("Rollbots", "Rollbots.swift", SWIFT_CONSTANTS)
     check_document()
     check_edges()
 

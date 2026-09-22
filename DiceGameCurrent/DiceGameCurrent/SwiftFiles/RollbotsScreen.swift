@@ -176,7 +176,7 @@ struct RollbotsScreen: View {
         .dynamicTypeSize(.large)
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showingSettings) {
-            SettingsView(gameName: RollbotsGame.displayName, rules: RollbotsGame.rules)
+            SettingsView(for: RollbotsGame.self)
         }
         .onAppear {
             AppFonts.registerIfNeeded()
@@ -473,7 +473,7 @@ struct RollbotsScreen: View {
             lastLine = "\(names[seat]) armed a Quantum Phase."
             finishTurn()
         case .emergencySubroutine:
-            state.ip[seat] = min(RollbotsRules.startingIP, state.ip[seat] + Cyberware.repairAmount)
+            state.ip[seat] = min(RollbotsState.startingIP(seat), state.ip[seat] + Cyberware.repairAmount)
             state.sidearmTurns[seat] = Cyberware.sidearmTurns
             lastLine = "\(names[seat]) repaired \(Cyberware.repairAmount) IP — and is down to the Sidearm."
             finishTurn()

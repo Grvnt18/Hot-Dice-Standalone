@@ -66,9 +66,9 @@ def main():
     check("Three Thousand says Busted",
           "Busted" in rules_blob(three) and "arkle" not in rules_blob(three))
 
-    pig = source("Pig.swift")
-    check("Pig target is 75", constant(pig, "target") == 75)
-    check("Pig rules say 75", "75" in rules_blob(pig))
+    hog = source("Hog.swift")
+    check("Hog target is 75", constant(hog, "target") == 75)
+    check("Hog rules say 75", "75" in rules_blob(hog))
 
     bones = source("Boneheads.swift")
     check("Boneheads grid is 3 columns", constant(bones, "columns") == 3)

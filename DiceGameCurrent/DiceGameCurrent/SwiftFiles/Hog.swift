@@ -1,24 +1,24 @@
 import Foundation
 
-/// PIG: one die, and the only question that matters — roll again, or keep
+/// HOG: one die, and the only question that matters — roll again, or keep
 /// what you have?
 ///
 /// The shortest ruleset in the suite and the one that needs the least
 /// explaining, which is exactly why it earns its tile. Its tension already
 /// *is* the back-and-forth: every hold-or-roll decision is made against an
 /// opponent's total you can see.
-enum PigRules {
+enum HogRules {
 
     /// First to bank this wins, on the spot.
     ///
     /// Measured at 14.8 messages a match with the first seat taking 54.5%.
     /// A final-turn catch-up rule was considered and dropped: it would even
     /// the seats out to 52.8% but costs two and a half more messages, and
-    /// being cut off mid-comeback is part of what PIG is.
+    /// being cut off mid-comeback is part of what HOG is.
     static let target = 75
 
     /// Rolling this loses everything you have not banked.
-    static let pigFace = 1
+    static let hogFace = 1
 
     /// One d6, in a colour picked fresh each match.
     static func makeDice() -> [Die] {
@@ -29,11 +29,11 @@ enum PigRules {
 
 // MARK: - Describing a turn
 
-extension PigRules {
+extension HogRules {
 
     /// One line for the handover screen.
-    static func summary(player: String, banked: Int, pigged: Bool) -> String {
-        if pigged { return "\(player) rolled a 1 and lost the lot." }
+    static func summary(player: String, banked: Int, hogged: Bool) -> String {
+        if hogged { return "\(player) rolled a 1 and lost the lot." }
         if banked == 0 { return "\(player) banked nothing." }
         return "\(player) banked \(banked)."
     }
@@ -41,9 +41,9 @@ extension PigRules {
 
 // MARK: - Suite entry
 
-enum PigGame: SuiteGame {
-    static let id = "pig"
-    static let displayName = "Pig"
+enum HogGame: SuiteGame {
+    static let id = "hog"
+    static let displayName = "Hog"
     static let tagline = "Push your luck to 75."
 
     static let rules: [GameRuleSection] = [
@@ -52,7 +52,7 @@ enum PigGame: SuiteGame {
             body: "Roll one die as many times as you dare. Every face adds to your turn total — and you keep none of it until you hold."
         ),
         GameRuleSection(
-            title: "The Pig",
+            title: "The Hog",
             body: "Roll a 1 and the turn ends immediately with nothing. Everything you built up that turn is gone; your banked score is safe."
         ),
         GameRuleSection(

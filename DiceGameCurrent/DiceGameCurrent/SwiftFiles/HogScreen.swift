@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct PigScreen: View {
+struct HogScreen: View {
 
     var onExit: (() -> Void)? = nil
 
@@ -40,7 +40,7 @@ struct PigScreen: View {
 
                 VStack(spacing: 0) {
                     MatchScoreboard(
-                        // PIG is a race, not a fixed number of rounds, so
+                        // HOG is a race, not a fixed number of rounds, so
                         // there is no "round 3 of 5" to show. The strip
                         // already treats that as nil.
                         match: match,
@@ -51,8 +51,8 @@ struct PigScreen: View {
 
                     DiceTraySceneView(
                         session: $session,
-                        makeInitialDice: { PigRules.makeDice() },
-                        floorTitle: PigGame.floorTitle,
+                        makeInitialDice: { HogRules.makeDice() },
+                        floorTitle: HogGame.floorTitle,
                         onSessionCreated: { newSession in
                             newSession.onRollSettled = { results in
                                 applyRoll(results)
@@ -104,7 +104,7 @@ struct PigScreen: View {
         .dynamicTypeSize(.large)
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showingSettings) {
-            SettingsView(gameName: PigGame.displayName, rules: PigGame.rules)
+            SettingsView(gameName: HogGame.displayName, rules: HogGame.rules)
         }
         .onAppear {
             AppFonts.registerIfNeeded()
@@ -135,7 +135,7 @@ struct PigScreen: View {
 
     /// True when banking right now reaches the target.
     private var wouldWin: Bool {
-        match.score(for: match.activeParticipant) + turnTotal >= PigRules.target
+        match.score(for: match.activeParticipant) + turnTotal >= HogRules.target
     }
 
     private var subtitle: String {
@@ -143,7 +143,7 @@ struct PigScreen: View {
         case .decide:
             let banked = match.score(for: match.activeParticipant)
             if wouldWin { return "Hold now and it's over" }
-            return "Hold and you're on \(banked + turnTotal) — \(PigRules.target - banked - turnTotal) to go"
+            return "Hold and you're on \(banked + turnTotal) — \(HogRules.target - banked - turnTotal) to go"
         case .scored:
             return lastSummary ?? ""
         default:
@@ -198,14 +198,14 @@ struct PigScreen: View {
             return
         }
 
-        if face == PigRules.pigFace {
+        if face == HogRules.hogFace {
             // The turn total is lost, not the banked score — and nothing is
             // added to the match, which is the whole of the penalty.
             turnTotal = 0
-            lastSummary = PigRules.summary(
+            lastSummary = HogRules.summary(
                 player: match.activeDisplayName,
                 banked: 0,
-                pigged: true
+                hogged: true
             )
             phase = .scored
             return
@@ -225,15 +225,15 @@ struct PigScreen: View {
         match.addScore(banked)
         turnTotal = 0
 
-        if match.score(for: match.activeParticipant) >= PigRules.target {
+        if match.score(for: match.activeParticipant) >= HogRules.target {
             // Nobody gets an answering turn, so the holder is necessarily
             // the highest total: everyone else is still short of the target.
-            match.finish(lowestScoreWins: PigGame.lowestScoreWins)
+            match.finish(lowestScoreWins: HogGame.lowestScoreWins)
             phase = .finished
             return
         }
 
-        lastSummary = PigRules.summary(player: player, banked: banked, pigged: false)
+        lastSummary = HogRules.summary(player: player, banked: banked, hogged: false)
         phase = .scored
     }
 
@@ -251,7 +251,7 @@ struct PigScreen: View {
     private func startNewMatch() {
         match = TurnMatch.localTwoPlayer()
         lastSummary = nil
-        session?.setPool(PigRules.makeDice())
+        session?.setPool(HogRules.makeDice())
         beginTurn()
     }
 

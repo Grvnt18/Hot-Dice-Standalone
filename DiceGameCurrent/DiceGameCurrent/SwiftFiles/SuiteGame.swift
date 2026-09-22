@@ -143,8 +143,8 @@ enum GameCatalog {
         GameCatalogEntry(JackpotGame.self) { onExit in
             AnyView(JackpotScreen(onExit: onExit))
         },
-        GameCatalogEntry(PigGame.self) { onExit in
-            AnyView(PigScreen(onExit: onExit))
+        GameCatalogEntry(HogGame.self) { onExit in
+            AnyView(HogScreen(onExit: onExit))
         },
         GameCatalogEntry(GeneralsGame.self) { onExit in
             AnyView(GeneralsScreen(onExit: onExit))

@@ -56,7 +56,7 @@ struct ThreeThousandScreen: View {
                 VStack(spacing: 0) {
                     MatchScoreboard(
                         // A race has no round count, so the strip runs
-                        // without one — same as PIG.
+                        // without one — same as HOG.
                         match: match,
                         totalRounds: nil,
                         subtitle: scoreboardSubtitle

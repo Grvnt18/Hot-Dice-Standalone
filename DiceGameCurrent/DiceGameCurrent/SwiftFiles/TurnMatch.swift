@@ -4,7 +4,7 @@ import Foundation
 /// has scored, and whether it is over.
 ///
 /// Deliberately knows nothing about dice. Every alternating game in the
-/// suite — Jackpot, Freighter.Yacht.Dinghy, PIG, Three Thousand, Generals, Royal UR —
+/// suite — Jackpot, Freighter.Yacht.Dinghy, HOG, Three Thousand, Generals, Royal UR —
 /// needs exactly this bookkeeping and nothing about it is game-specific,
 /// so the games carry their own state separately and let this handle turns.
 ///

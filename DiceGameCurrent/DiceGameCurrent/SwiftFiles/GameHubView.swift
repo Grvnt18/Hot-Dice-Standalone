@@ -14,40 +14,22 @@ struct GameHubView: View {
     @State private var openGame: GameCatalogEntry?
 
     var body: some View {
-        // The width is measured rather than negotiated.
-        //
-        // The tiles used to be `.aspectRatio(1, contentMode: .fit)` around a
-        // resizable image with `maxHeight: .infinity`. That image has no
-        // ideal height to offer, so the square had nothing to size itself
-        // from but the name label underneath, and every tile collapsed to a
-        // postage stamp with an unreadable icon in it. Asking SwiftUI to
-        // infer a square from content that is happy at any size is the bug;
-        // handing it a number is the fix.
-        //
-        // The reader sits OUTSIDE the ScrollView on purpose. Inside one it
-        // would report the scroll content's height, not the screen's, and
-        // a GeometryReader in a scrolling stack takes all the space and
-        // breaks the scroll.
-        GeometryReader { geo in
-            let side = Self.tileSide(forWidth: geo.size.width)
+        ZStack {
+            // Same timber as every game's header and footer — the hub
+            // should read as part of the same object, not a launcher
+            // bolted onto the front.
+            WoodTiledBackground()
+                .ignoresSafeArea()
 
-            ZStack {
-                // Same timber as every game's header and footer — the hub
-                // should read as part of the same object, not a launcher
-                // bolted onto the front.
-                WoodTiledBackground()
-                    .ignoresSafeArea()
+            ScrollView {
+                VStack(spacing: 18) {
+                    title
 
-                ScrollView {
-                    VStack(spacing: 18) {
-                        title(width: geo.size.width)
-
-                        LazyVGrid(columns: Self.columns(forWidth: geo.size.width), spacing: Self.columnGap) {
-                            ForEach(GameCatalog.all) { entry in
-                                GameTile(entry: entry, side: side, accent: theme.accentColor) {
-                                    SoundEngine.shared.play(.buttonTap)
-                                    openGame = entry
-                                }
+                    LazyVGrid(columns: columns, spacing: 14) {
+                        ForEach(GameCatalog.all) { entry in
+                            GameTile(entry: entry, accent: theme.accentColor) {
+                                SoundEngine.shared.play(.buttonTap)
+                                openGame = entry
                             }
                         }
                         .padding(.horizontal, Self.gutter)
@@ -91,13 +73,13 @@ struct GameHubView: View {
         }
     }
 
-    // MARK: Geometry
-
-    /// Space either side of the grid.
-    static let gutter: CGFloat = 16
-
-    /// Space between the two columns.
-    static let columnGap: CGFloat = 14
+    // Two columns. The tiles are squares that carry artwork plus a name, and
+    // three across on a phone shrinks the icon to the point where the games
+    // stop being tellable apart at a glance.
+    private let columns = [
+        GridItem(.flexible(), spacing: 14),
+        GridItem(.flexible(), spacing: 14)
+    ]
 
     /// The tile size the layout aims for, before it is fitted to the width.
     ///
@@ -232,12 +214,15 @@ private struct GameTile: View {
                     // Stack Sans overhangs its advance width, so a trailing
                     // glyph can clip against a tight frame.
                     .padding(.trailing, 3)
-                    .frame(height: Self.labelHeight)
             }
-            // The square comes from the hub's measurement of the screen, so
-            // every tile in a row is identical by construction rather than
-            // by agreement.
-            .frame(width: side, height: side)
+            .frame(maxWidth: .infinity)
+            .padding(12)
+            // Square, not a fixed minimum height. The grid's two flexible
+            // columns give every tile the same width, so tying height to
+            // width makes them identical squares at any screen size —
+            // which a minHeight could not, since the tallest label in a row
+            // grew its own tile and left the row ragged.
+            .aspectRatio(1, contentMode: .fit)
             .background(
                 RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
                     .fill(accent.opacity(0.92))

@@ -38,27 +38,18 @@ def source(name):
     return open(path).read()
 
 
-# `static let name = 3`, `static let name: CGFloat = 16`, `let name = 3`.
-# The optional type annotation matters: the layout constants are typed,
-# because a bare 16 would infer Int where CGFloat is wanted.
-_DECL = r'(?:static\s+)?(?:private\s+)?(?:static\s+)?let\s+%s\s*(?::\s*[A-Za-z<>, ]+?)?\s*=\s*'
-
-
 def constant(text, name):
-    """The number a `let <name> = <n>` holds.
+    """The integer a `static let <name> = <n>` holds.
 
-    Accepts an optional type annotation and a decimal value, and resolves
-    `let a = b + c` one level deep, since several constants here are written
-    in terms of another rather than repeating a number (Rollbots' second-seat
-    total, for one). Returns an int where the literal is one, so the game
-    verifiers keep comparing ints to ints.
+    Also resolves `static let a = b + c` one level deep, since several
+    constants here are written in terms of another rather than repeating a
+    number (Rollbots' second-seat total, for one).
     """
-    decl = _DECL % re.escape(name)
-    m = re.search(decl + r'(\d+(?:\.\d+)?)\b', text)
+    m = re.search(r'static let %s\s*=\s*(\d+)\b' % re.escape(name), text)
     if m:
-        value = float(m.group(1))
-        return int(value) if value.is_integer() else value
-    m = re.search(decl + r'([A-Za-z0-9_.]+)\s*\+\s*([A-Za-z0-9_.]+)', text)
+        return int(m.group(1))
+    m = re.search(r'static let %s\s*=\s*([A-Za-z0-9_.]+)\s*\+\s*([A-Za-z0-9_.]+)'
+                  % re.escape(name), text)
     if m:
         return sum(_resolve(text, part) for part in (m.group(1), m.group(2)))
     raise AssertionError("no constant named %s" % name)

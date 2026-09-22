@@ -152,6 +152,9 @@ struct NetSeatRail: View {
             }
             .frame(maxHeight: .infinity)
 
+            NetIconView(name: state.activeWeapon(seat).iconName, tint: colour.opacity(0.85))
+                .frame(height: 26)
+
             Text(state.activeWeapon(seat).displayName)
                 .font(.stackSans(9))
                 .foregroundStyle(NetArt.text.opacity(0.7))
@@ -201,6 +204,8 @@ struct NetCard: View {
     /// View protocol's own requirement below.
     let summary: String
     var detail: String? = nil
+    /// A bundled mark drawn beside the text, tinted to match it.
+    var icon: String? = nil
     let tint: Color
     var isSelected: Bool = false
     var isEnabled: Bool = true
@@ -211,6 +216,12 @@ struct NetCard: View {
             SoundEngine.shared.play(.buttonTap)
             action()
         } label: {
+            HStack(spacing: 10) {
+                if let icon {
+                    NetIconView(name: icon, tint: isEnabled ? tint : NetArt.text.opacity(0.3))
+                        .frame(width: 38, height: 38)
+                }
+
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(.stackSans(13))
@@ -227,6 +238,7 @@ struct NetCard: View {
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+            }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(10)

@@ -240,6 +240,7 @@ struct RollbotsScreen: View {
                     NetCard(
                         title: weapon.displayName,
                         summary: weapon.tagline,
+                        icon: weapon.iconName,
                         tint: NetArt.seat(setupSeat),
                         isSelected: pendingWeapon == weapon
                     ) { pendingWeapon = weapon }
@@ -254,6 +255,7 @@ struct RollbotsScreen: View {
                         title: ware.displayName,
                         summary: ware.reward,
                         detail: "Strain: \(ware.strain)",
+                        icon: ware.iconName,
                         tint: NetArt.seat(setupSeat),
                         isSelected: pendingWare == ware
                     ) { pendingWare = ware }
@@ -319,6 +321,7 @@ struct RollbotsScreen: View {
                     summary: state.canFire(attacker)
                         ? "Throw for accuracy with the \(weapon.displayName). They answer it."
                         : "The Rail Rifle needs a turn to spin up. You cannot fire until it has.",
+                    icon: weapon.iconName,
                     tint: NetArt.seat(attacker)
                 ) { beginAttack() }
 
@@ -327,6 +330,7 @@ struct RollbotsScreen: View {
                         title: "Activate \(ware.displayName)",
                         summary: ware.reward,
                         detail: "Strain: \(ware.strain)",
+                        icon: ware.iconName,
                         tint: NetArt.warn
                     ) { activateWare() }
                 }
@@ -360,6 +364,7 @@ struct RollbotsScreen: View {
                     NetCard(
                         title: isCurrent ? "\(weapon.displayName) — equipped" : weapon.displayName,
                         summary: weapon.tagline,
+                        icon: weapon.iconName,
                         tint: isCurrent ? NetArt.text.opacity(0.6) : NetArt.seat(attacker),
                         isSelected: isCurrent
                     ) { completeSwap(to: weapon) }

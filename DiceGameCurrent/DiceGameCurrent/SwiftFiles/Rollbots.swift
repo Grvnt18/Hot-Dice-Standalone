@@ -90,6 +90,20 @@ enum CyberWeapon: String, CaseIterable, Codable, Identifiable {
     /// No Firewall stops it — the Rail Rifle's whole identity.
     var ignoresFirewall: Bool { self == .railRifle }
 
+    /// The bundled mark for this weapon.
+    ///
+    /// The Sidearm has no art of its own — it is what the Sub-Routine
+    /// leaves you holding rather than something you choose — so it
+    /// borrows the pistol's, which is what a sidearm is.
+    var iconName: String {
+        switch self {
+        case .monoBlade:   return "bot-blade"
+        case .smartPistol: return "bot-pistol"
+        case .railRifle:   return "bot-rail"
+        case .sidearm:     return "bot-pistol"
+        }
+    }
+
     var tagline: String {
         switch self {
         case .monoBlade:   return "d8 · cuts through half of any Firewall"
@@ -161,6 +175,15 @@ enum Cyberware: String, CaseIterable, Codable, Identifiable {
         case .corrosiveVirus:      return "Corrosive Virus"
         case .quantumPhase:        return "Quantum Phase"
         case .emergencySubroutine: return "Emergency Sub-Routine"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .neuralOverclock:     return "bot-overclock"
+        case .corrosiveVirus:      return "bot-virus"
+        case .quantumPhase:        return "bot-phase"
+        case .emergencySubroutine: return "bot-repair"
         }
     }
 

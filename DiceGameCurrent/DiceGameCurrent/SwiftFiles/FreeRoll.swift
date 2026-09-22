@@ -93,7 +93,7 @@ struct FreeRollPool: Equatable {
 enum FreeRollGame: SuiteGame {
     static let id = "freeroll"
     static let displayName = "Free Roll"
-    static let tagline = "Up to 10 dice. No score. Just roll."
+    static let tagline = "Up to \(FreeRollPool.maxDice) dice. No score. Just roll."
 
     /// The one game in the suite that cannot be sent.
     ///
@@ -109,7 +109,7 @@ enum FreeRollGame: SuiteGame {
     static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "The Dice",
-            body: "Pick up to 10 dice in any combination using the + and - controls: d4, d6, d8, d10, d12, d20. Clear empties the table."
+            body: "Pick up to \(FreeRollPool.maxDice) dice in any combination using the + and - controls: d4, d6, d8, d10, d12, d20. Clear empties the table."
         ),
         GameRuleSection(
             title: "Rolling",
@@ -118,6 +118,10 @@ enum FreeRollGame: SuiteGame {
         GameRuleSection(
             title: "Changing Dice",
             body: "Add or remove dice whenever you want and the table is rebuilt with your new picks. You cannot change them mid-roll; wait for the dice to settle."
+        ),
+        GameRuleSection(
+            title: "Totals",
+            body: "Totals is off by default — the table is the point. Switch it on and every throw reports a subtotal for each kind of die and the throw as a whole."
         ),
         GameRuleSection(
             title: "Reading the d4",

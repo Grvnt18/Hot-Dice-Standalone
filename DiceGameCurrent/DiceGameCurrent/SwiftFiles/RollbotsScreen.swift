@@ -32,6 +32,8 @@ struct RollbotsScreen: View {
         case setup
         /// Attacker chooses what to do with the turn.
         case action
+        /// Attacker is picking which weapon to switch to.
+        case swapping
         /// Accuracy die in the air.
         case rollingAccuracy
         /// Defender picks a reaction, with the accuracy already on the table.
@@ -79,15 +81,28 @@ struct RollbotsScreen: View {
                     )
                     .frame(height: panelHeight)
 
-                    Group {
+                    // The tray is mounted for the WHOLE match and every
+                    // menu is drawn over it, rather than the two swapping
+                    // places.
+                    //
+                    // This was the bug behind "only Swap Loadout works".
+                    // With the tray unmounted during .action, `session` was
+                    // nil, so every action that throws dice — Attack, and
+                    // the Corrosive Virus — bailed out of throwDice() and
+                    // silently did nothing, while the actions that throw no
+                    // dice worked fine. It also rebuilt the whole SceneKit
+                    // scene on every single throw.
+                    ZStack {
+                        tray
+
                         if phase == .setup {
-                            setupView
+                            menuBackdrop { setupView }
                         } else if phase == .action {
-                            actionView
+                            menuBackdrop { actionView }
+                        } else if phase == .swapping {
+                            menuBackdrop { swapView }
                         } else if phase == .defending {
-                            defenceView
-                        } else {
-                            tray
+                            menuBackdrop { defenceView }
                         }
                     }
                     .frame(height: bodyHeight)
@@ -148,6 +163,17 @@ struct RollbotsScreen: View {
     }
 
     // MARK: Tray
+
+    /// Darkens the dice behind a menu so its cards stay readable, without
+    /// unmounting the tray that owns the dice session.
+    private func menuBackdrop<Content: View>(
+        @ViewBuilder _ content: () -> Content
+    ) -> some View {
+        ZStack {
+            NetArt.background.opacity(0.88)
+            content()
+        }
+    }
 
     private var tray: some View {
         DiceTraySceneView(
@@ -281,6 +307,40 @@ struct RollbotsScreen: View {
         }
     }
 
+    // MARK: Swapping
+
+    private var swapView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("\(names[attacker]) — switch weapon")
+                    .font(.stackSans(13))
+                    .foregroundStyle(NetArt.seat(attacker))
+                    .padding(.top, 4)
+
+                Text("Switching costs your turn, and any held charge.")
+                    .font(.stackSans(11))
+                    .foregroundStyle(NetArt.text.opacity(0.7))
+
+                ForEach(CyberWeapon.selectable) { weapon in
+                    let isCurrent = weapon == state.weapon[attacker]
+                    NetCard(
+                        title: isCurrent ? "\(weapon.displayName) — equipped" : weapon.displayName,
+                        summary: weapon.tagline,
+                        tint: isCurrent ? NetArt.text.opacity(0.6) : NetArt.seat(attacker),
+                        isSelected: isCurrent
+                    ) { completeSwap(to: weapon) }
+                }
+
+                NetCard(
+                    title: "Cancel",
+                    summary: "Go back without spending your turn.",
+                    tint: NetArt.text.opacity(0.8)
+                ) { phase = .action }
+            }
+            .padding(.horizontal, 14)
+        }
+    }
+
     // MARK: Defence
 
     private var defenceView: some View {
@@ -382,13 +442,26 @@ struct RollbotsScreen: View {
         }
     }
 
+    /// Opens the picker rather than swapping on the spot.
+    ///
+    /// It used to cycle blindly to the next weapon in the list, so you
+    /// could not choose and could not see what you were getting.
     private func swapLoadout() {
+        phase = .swapping
+    }
+
+    private func completeSwap(to weapon: CyberWeapon) {
         let seat = attacker
-        let order = CyberWeapon.selectable
-        let index = order.firstIndex(of: state.weapon[seat]) ?? 0
-        state.weapon[seat] = order[(index + 1) % order.count]
+        guard weapon != state.weapon[seat] else {
+            // Picking what you already hold is a change of mind, not a
+            // turn — spending one by mis-tapping a menu is the worst way
+            // to lose a turn.
+            phase = .action
+            return
+        }
+        state.weapon[seat] = weapon
         state.charged[seat] = false
-        lastLine = "\(names[seat]) switched to the \(state.weapon[seat].displayName)."
+        lastLine = "\(names[seat]) switched to the \(weapon.displayName)."
         finishTurn()
     }
 
@@ -542,7 +615,7 @@ struct RollbotsScreen: View {
 
     private var primaryLabel: String {
         switch phase {
-        case .action:          return "Choose Above"
+        case .action, .swapping: return "Choose Above"
         case .rollingAccuracy: return "Rolling Accuracy"
         case .defending:       return "Choose Above"
         case .rollingDefence:  return "Rolling Defence"
@@ -558,6 +631,7 @@ struct RollbotsScreen: View {
     private var barSubtitle: String {
         switch phase {
         case .action:    return "Pick a move"
+        case .swapping:  return "Pick a weapon, or cancel"
         case .defending: return "Accuracy \(accuracy) is on the table — answer it"
         case .resolved:  return lastLine ?? ""
         default:         return ""
@@ -566,7 +640,7 @@ struct RollbotsScreen: View {
 
     private var panelSubtitle: String? {
         switch phase {
-        case .setup:     return "Loadout"
+        case .setup, .swapping: return "Loadout"
         case .defending: return "\(state.activeWeapon(attacker).displayName) incoming"
         default:         return lastLine
         }

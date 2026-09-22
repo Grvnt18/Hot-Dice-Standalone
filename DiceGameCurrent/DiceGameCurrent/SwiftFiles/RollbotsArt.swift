@@ -10,8 +10,11 @@ import SwiftUI
 /// physics, same tray, same tumble.
 enum NetArt {
 
-    static let background = Color(hex: "#05070E")
-    static let panel = Color(hex: "#0B1220")
+    static let backgroundHex = "#05070E"
+    static let panelHex = "#0B1220"
+
+    static let background = Color(hex: backgroundHex)
+    static let panel = Color(hex: panelHex)
     static let line = Color(hex: "#16E0FF")
     static let text = Color(hex: "#C9F7FF")
     static let warn = Color(hex: "#FFB340")
@@ -19,6 +22,29 @@ enum NetArt {
     /// Seat colours, also used for that seat's dice.
     static func seat(_ index: Int) -> Color {
         index == 0 ? Color(hex: "#22E3FF") : Color(hex: "#FF2D78")
+    }
+
+    /// A faceted low-poly fill, from the same generator the playfield
+    /// floor and the Royal UR board tiles use.
+    ///
+    /// This is what makes the arena read as the same app as the other
+    /// nine while keeping its own palette: the surfaces are the house
+    /// material, only the colours are the duel's. Cached inside
+    /// LowPolyTextures by its parameters, so repeated panels cost one
+    /// render between them.
+    static func faceted(
+        _ color: Color,
+        variation: CGFloat = 0.14,
+        seed: UInt64 = 5501
+    ) -> Image {
+        Image(uiImage: LowPolyTextures.facetedSurface(
+            baseColor: UIColor(color),
+            variation: variation,
+            columns: 10,
+            rows: 10,
+            pixelSize: 256,
+            seed: seed
+        ))
     }
 
     static func seatHex(_ index: Int) -> String {
@@ -35,6 +61,18 @@ enum NetArt {
     }
 }
 
+/// A faceted panel in the arena's material.
+struct NetFacet: View {
+    var color: Color = NetArt.panel
+    var variation: CGFloat = 0.14
+    var seed: UInt64 = 5501
+
+    var body: some View {
+        NetArt.faceted(color, variation: variation, seed: seed)
+            .resizable()
+    }
+}
+
 // MARK: - Background
 
 /// A receding grid. Drawn rather than tiled, because the one thing the
@@ -43,29 +81,23 @@ enum NetArt {
 struct NetGrid: View {
     var body: some View {
         ZStack {
-            NetArt.background
-            Canvas { context, size in
-                let horizon = size.height * 0.34
-                // Horizontals bunch toward the horizon, which is what sells
-                // the depth; evenly spaced lines just look like paper.
-                var i = 0
-                while true {
-                    let t = Double(i) / 16
-                    let y = horizon + (size.height - horizon) * t * t
-                    if y > size.height { break }
-                    var path = Path()
-                    path.move(to: CGPoint(x: 0, y: y))
-                    path.addLine(to: CGPoint(x: size.width, y: y))
-                    context.stroke(path, with: .color(NetArt.line.opacity(0.13)), lineWidth: 1)
-                    i += 1
-                }
-                for column in -8...8 {
-                    var path = Path()
-                    path.move(to: CGPoint(x: size.width / 2 + CGFloat(column) * 12, y: horizon))
-                    path.addLine(to: CGPoint(x: size.width / 2 + CGFloat(column) * size.width / 7,
-                                             y: size.height))
-                    context.stroke(path, with: .color(NetArt.line.opacity(0.10)), lineWidth: 1)
-                }
+            // Faceted, not drawn. The perspective grid this replaced was
+            // the one surface in the app made of flat lines rather than
+            // low-poly geometry, which is exactly what made the arena look
+            // like a different program.
+            NetFacet(color: NetArt.background, variation: 0.30, seed: 90210)
+
+            // One neon seam across the horizon, so the space still reads as
+            // a floor receding away rather than a flat wall.
+            GeometryReader { geo in
+                LinearGradient(
+                    colors: [NetArt.line.opacity(0.22), .clear],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: geo.size.height * 0.30)
+                .offset(y: geo.size.height * 0.30)
+                .blendMode(.plusLighter)
             }
             .allowsHitTesting(false)
         }
@@ -99,7 +131,7 @@ struct NetStatusPanel: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(NetArt.panel.opacity(0.85))
+        .background(NetFacet().opacity(0.92))
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(NetArt.line.opacity(0.35))
@@ -127,9 +159,10 @@ struct NetStatusPanel: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Rectangle().fill(colour.opacity(0.16))
-                    Rectangle()
-                        .fill(colour)
+                    NetFacet(color: colour, variation: 0.18, seed: 7700 + UInt64(seat))
+                        .scaledToFill()
                         .frame(width: geo.size.width * fraction)
+                        .clipped()
                 }
             }
             .frame(height: 7)
@@ -151,8 +184,9 @@ struct NetStatusPanel: View {
         }
         .padding(7)
         .background(
-            RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                .fill(Color.black.opacity(isActive ? 0.45 : 0.22))
+            NetFacet(variation: 0.10, seed: 3310)
+                .opacity(isActive ? 0.95 : 0.55)
+                .clipShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
         )
         .overlay(
             RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
@@ -212,8 +246,11 @@ struct NetCard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(10)
             .background(
-                RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                    .fill(isSelected ? tint.opacity(0.18) : Color.black.opacity(0.35))
+                ZStack {
+                    NetFacet(variation: 0.12, seed: 4120)
+                    if isSelected { tint.opacity(0.22) }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
@@ -255,7 +292,7 @@ struct NetActionBar: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(NetArt.panel.opacity(0.9))
+        .background(NetFacet().opacity(0.95))
         .overlay(alignment: .top) {
             Rectangle().fill(NetArt.line.opacity(0.35)).frame(height: 1)
         }
@@ -275,8 +312,15 @@ struct NetActionBar: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 46)
                 .background(
-                    RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                        .fill(filled ? tint.opacity(enabled ? 1 : 0.25) : Color.clear)
+                    Group {
+                        if filled {
+                            NetFacet(color: tint, variation: 0.16, seed: 6640)
+                                .opacity(enabled ? 1 : 0.3)
+                        } else {
+                            Color.clear
+                        }
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
@@ -328,8 +372,8 @@ struct NetHandoverGate: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 48)
                         .background(
-                            RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                                .fill(NetArt.seat(nextSeat))
+                            NetFacet(color: NetArt.seat(nextSeat), variation: 0.16, seed: 8820)
+                                .clipShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
                         )
                 }
                 .padding(.horizontal, 44)
@@ -389,8 +433,8 @@ struct NetResultView: View {
                             .frame(maxWidth: .infinity)
                             .frame(height: 46)
                             .background(
-                                RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                                    .fill(NetArt.line)
+                                NetFacet(color: NetArt.line, variation: 0.16, seed: 9930)
+                                    .clipShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
                             )
                     }
                     Button {

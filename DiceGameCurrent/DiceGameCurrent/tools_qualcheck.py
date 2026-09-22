@@ -8,7 +8,29 @@ stackSans` as resolving even though it lives in `extension Font`, not in
 Only types DECLARED in this module are checked. A type we merely extend
 (Color, UIColor, Font) gets most of its members from the framework, which
 isn't visible here, so checking those would be all false positives."""
-import re, sys, glob, collections
+import re, sys, os, glob, collections
+
+
+def sources():
+    """The Swift files, wherever this is run from.
+
+    It used to be a bare glob('*.swift'), which meant running it from the
+    project root — the obvious place — scanned NOTHING and printed a
+    confident PASS. A check that cannot fail is worse than no check, so
+    the path is now anchored to this script's own location and an empty
+    result is a hard error rather than a pass."""
+    if sys.argv[1:]:
+        return sorted(sys.argv[1:])
+    here = os.path.dirname(os.path.abspath(__file__))
+    found = sorted(glob.glob(os.path.join(here, "SwiftFiles", "*.swift"))
+                   or glob.glob(os.path.join(here, "*.swift")))
+    if not found:
+        sys.exit("qualcheck: found no .swift files to check — refusing to "
+                 "report a pass over nothing")
+    return found
+
+
+SOURCES = sources()
 
 def _keep_interpolations(match):
     """Blank a string literal but keep any \\(...) segments.
@@ -52,7 +74,7 @@ ext_re  = re.compile(r'\bextension\s+([A-Za-z_]\w*)')
 mem_re  = re.compile(r'\b(?:static\s+)?(?:func|var|let)\s+`?([A-Za-z_]\w*)`?')
 case_re = re.compile(r'\bcase\s+`?([A-Za-z_]\w*)`?')
 
-for f in glob.glob('*.swift'):
+for f in SOURCES:
     s = strip(open(f).read())
     for rx, is_own in ((own_re, True), (ext_re, False)):
         for m in rx.finditer(s):
@@ -79,7 +101,7 @@ SYNTH = {'allCases', 'rawValue', 'init', 'self', 'max', 'min', 'count',
 
 call_re = re.compile(r'\b([A-Z][A-Za-z0-9_]*)\.([a-z][A-Za-z0-9_]*)')
 bad = 0
-for f in sorted(sys.argv[1:] or glob.glob('*.swift')):
+for f in SOURCES:
     s = strip(open(f).read())
     for m in call_re.finditer(s):
         t, mem = m.group(1), m.group(2)
@@ -87,8 +109,66 @@ for f in sorted(sys.argv[1:] or glob.glob('*.swift')):
             continue
         line = s[:m.start()].count('\n') + 1
         have = ', '.join(sorted(members[t])[:8]) or '(nothing)'
-        print(f"  UNRESOLVED  {f}:{line}  {t}.{mem}\n"
+        print(f"  UNRESOLVED  {os.path.relpath(f)}:{line}  {t}.{mem}\n"
               f"              {t} declares: {have}")
         bad += 1
 print("qualified-call check:", "FAIL" if bad else "PASS", f"({bad} unresolved)")
-sys.exit(1 if bad else 0)
+
+
+# --- Non-escaping closure parameters captured by escaping closures ---------
+#
+# Swift refuses this, and nothing else in this tree could see it: it is a
+# type-system rule rather than a shape or a name, so the balance scan and
+# the resolver above both pass straight over it. It cost an iPad build once
+# — RollbotsScreen.menuSheet called its @ViewBuilder parameter inside a
+# GeometryReader, whose closure is stored and re-run on every layout pass,
+# and so escapes.
+#
+# This is a textual heuristic, not a type checker. It finds the one shape
+# that actually occurs here — a plain closure parameter invoked inside a
+# nested closure in the same function — and claims nothing beyond that.
+
+func_re = re.compile(r'\bfunc\s+\w+\s*(?:<[^>]*>)?\s*\(')
+param_re = re.compile(r'(?:@ViewBuilder\s+)?(?:_\s+)?(\w+)\s*:\s*(@escaping\s+)?\(\s*\)\s*->')
+
+
+def paren_span(src, i):
+    """Text inside the parentheses opening at `i`, and the closing index."""
+    depth = 0
+    while i < len(src):
+        if src[i] in '([':
+            depth += 1
+        elif src[i] in ')]':
+            depth -= 1
+            if depth == 0:
+                return src[:i], i
+        i += 1
+    return '', i
+
+
+escapes = 0
+for f in SOURCES:
+    s = strip(open(f).read())
+    for m in func_re.finditer(s):
+        open_paren = m.end() - 1
+        sig, close = paren_span(s, open_paren)
+        sig = sig[open_paren + 1:]
+        # Only plain closure params: @escaping ones are allowed to be captured.
+        names = [g[0] for g in param_re.findall(sig) if not g[1]]
+        if not names:
+            continue
+        body = body_after(s, close)
+        for name in names:
+            for hit in re.finditer(r'\b%s\s*\(\s*\)' % re.escape(name), body):
+                before = body[:hit.start()]
+                # Brace depth 1 is the function body itself; deeper means the
+                # call sits inside a closure the function hands to something
+                # that may store it.
+                depth = before.count('{') - before.count('}')
+                if depth > 1:
+                    line = s[:close].count('\n') + before.count('\n') + 1
+                    print("  ESCAPING    %s:~%d  '%s' is non-escaping but is called "
+                          "inside a nested closure" % (os.path.relpath(f), line, name))
+                    escapes += 1
+print("escaping-capture check:", "FAIL" if escapes else "PASS", "(%d captures)" % escapes)
+sys.exit(1 if bad or escapes else 0)

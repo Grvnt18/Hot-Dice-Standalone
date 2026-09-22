@@ -1,30 +1,42 @@
 import SwiftUI
 
-/// The Royal Path board, with its route traceable a square at a time.
-///
-/// **The rules are not built yet.** This is the board and a way to walk it:
-/// tap Step to move one square along the active seat's route, and Switch
-/// Seat to see the other player's — which is the one thing that has to be
-/// right before any of the movement, capture or Setback code goes in. The
-/// two routes share their last twelve squares and run the final loop in
-/// opposite directions, and that is far easier to confirm by looking at it
-/// than by reading an index table.
 struct RoyalPathScreen: View {
 
     var onExit: (() -> Void)? = nil
 
-    @State private var seat = RoyalPathBoard.bottomSeat
-    @State private var index = 0
+    /// Scores are pieces brought home, so the scoreboard is the race.
+    @State private var match = TurnMatch.localTwoPlayer()
+    @State private var state = RoyalPathState()
+    @State private var session: DiceTraySession?
+    @State private var steps = 0
+    @State private var phase: Phase = .ready
+    @State private var lastSummary: String?
+
+    /// Set when a rosette buys the same player another roll, so the board
+    /// can say why nobody handed over.
+    @State private var earnedAnotherRoll = false
+
     @State private var showingSettings = false
     @ObservedObject private var theme = AppTheme.shared
 
-    private var path: [RoyalPathBoard.Square] { RoyalPathBoard.path(for: seat) }
-
-    /// Every square walked so far, so the route reads as a trail rather
-    /// than a single marker.
-    private var walked: Set<RoyalPathBoard.Square> {
-        Set(path.prefix(index))
+    private enum Phase {
+        /// Waiting for the active player to throw.
+        case ready
+        /// Dice in the air.
+        case rolling
+        /// A roll with somewhere to go: pick the piece.
+        case choosing
+        /// A roll with nowhere to go: pick the piece that goes backwards.
+        case setback
+        /// Move made; waiting to hand over.
+        case scored
+        /// Handover gate between turns.
+        case handover
+        /// Match decided.
+        case finished
     }
+
+    private var seat: Int { match.activeIndex }
 
     var body: some View {
         ZStack {
@@ -39,28 +51,38 @@ struct RoyalPathScreen: View {
             .ignoresSafeArea()
 
             GeometryReader { geo in
-                let headerHeight = geo.size.height * 0.17
-                let buttonHeight: CGFloat = 108
+                let headerHeight = geo.size.height * 0.15
+                let boardHeight = geo.size.height * 0.24
+                let buttonHeight: CGFloat = 104
+                let trayHeight = max(geo.size.height - headerHeight - boardHeight - buttonHeight, 0)
 
                 VStack(spacing: 0) {
-                    header
-                        .frame(height: headerHeight)
+                    MatchScoreboard(
+                        match: match,
+                        totalRounds: nil,
+                        subtitle: scoreboardSubtitle
+                    )
+                    .frame(height: headerHeight)
 
                     RoyalPathBoardView(
-                        positions: positions,
-                        highlighted: walked,
-                        onTapSquare: { square in
-                            // Tapping a square on the route jumps to it,
-                            // which is quicker than stepping there when you
-                            // are checking one particular crossing.
-                            if let found = path.firstIndex(of: square) {
-                                SoundEngine.shared.play(.buttonTap)
-                                index = found + 1
+                        positions: state.positions,
+                        highlighted: highlighted,
+                        onTapSquare: { handleTap($0) }
+                    )
+                    .frame(height: boardHeight)
+                    .padding(.horizontal, 6)
+
+                    DiceTraySceneView(
+                        session: $session,
+                        makeInitialDice: { RoyalPathRules.makeDice() },
+                        onSessionCreated: { newSession in
+                            newSession.onRollSettled = { results in
+                                applyRoll(results)
                             }
                         }
                     )
-                    .frame(height: max(geo.size.height - headerHeight - buttonHeight, 0))
-                    .padding(.horizontal, 8)
+                    .frame(height: trayHeight)
+                    .background(Color.black)
                     .overlay(alignment: .topLeading) {
                         if let onExit {
                             overlayButton(systemName: "chevron.left") { onExit() }
@@ -73,69 +95,275 @@ struct RoyalPathScreen: View {
                     }
 
                     TurnActionBar(
-                        primaryLabel: index >= RoyalPathBoard.pathLength ? "Start Over" : "Step",
-                        primaryEnabled: true,
-                        secondaryLabel: "Switch Seat",
+                        primaryLabel: primaryLabel,
+                        primaryEnabled: isPrimaryEnabled,
                         subtitle: subtitle,
-                        onPrimary: { step() },
-                        onSecondary: { switchSeat() }
+                        onPrimary: { primaryAction() }
                     )
                     .frame(height: buttonHeight)
                 }
             }
+
+            if phase == .handover {
+                HandoverGate(match: match, lastTurnSummary: lastSummary) {
+                    beginTurn()
+                }
+                .transition(.opacity)
+            }
+
+            if phase == .finished {
+                MatchResultView(
+                    match: match,
+                    onPlayAgain: { startNewMatch() },
+                    onExit: { onExit?() }
+                )
+                .transition(.opacity)
+            }
         }
         .textCase(.uppercase)
         .dynamicTypeSize(.large)
+        .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showingSettings) {
             SettingsView(gameName: RoyalPathGame.displayName, rules: RoyalPathGame.rules)
         }
-        .onAppear { AppFonts.registerIfNeeded() }
-    }
-
-    /// One piece, on the square being traced. The opponent's pieces are off
-    /// the board until the rules exist to move them.
-    private var positions: [[Int]] {
-        var result: [[Int]] = [[], []]
-        if index >= 1 { result[seat] = [index] }
-        return result
-    }
-
-    private var subtitle: String {
-        guard index >= 1 else { return "Tap Step to walk the route" }
-        let onRosette = RoyalPathBoard.isRosette(seat: seat, index: index)
-        let shared = RoyalPathBoard.square(seat: seat, index: index).map(RoyalPathBoard.isShared) ?? false
-        if onRosette { return "Square \(index) — rosette" }
-        return shared ? "Square \(index) — contested" : "Square \(index) — your own"
-    }
-
-    private var header: some View {
-        ZStack {
-            WoodTiledBackground()
-            VStack(spacing: 2) {
-                Text(RoyalPathGame.displayName)
-                    .font(.aguafina(38))
-                    .foregroundStyle(.white)
-                    .padding(.trailing, 6)
-                Text(seat == RoyalPathBoard.bottomSeat ? "Player 1 — bottom row" : "Player 2 — top row")
-                    .font(.stackSans(12))
-                    .foregroundStyle(.white.opacity(0.8))
-                Text("Board preview — rules still to come")
-                    .font(.stackSans(10))
-                    .foregroundStyle(.white.opacity(0.55))
-            }
-            .padding(.vertical, 6)
+        .onAppear {
+            AppFonts.registerIfNeeded()
+            SoundEngine.shared.startMusic()
+        }
+        .onChange(of: theme.colorwayIndex) { _, _ in
+            session?.applyTheme()
         }
     }
 
-    private func step() {
-        SoundEngine.shared.play(.buttonTap)
-        index = index >= RoyalPathBoard.pathLength ? 0 : index + 1
+    // MARK: Reading the position
+
+    private var moves: [Int: Int] {
+        state.legalMoves(seat: seat, steps: steps)
     }
 
-    private func switchSeat() {
-        SoundEngine.shared.play(.buttonTap)
-        seat = seat == RoyalPathBoard.bottomSeat ? RoyalPathBoard.topSeat : RoyalPathBoard.bottomSeat
+    /// Squares a piece could move to, and which piece would go there.
+    ///
+    /// Home has no square, so it is not in here — it gets the button
+    /// instead, at `homeMove`.
+    private var destinations: [RoyalPathBoard.Square: Int] {
+        var result: [RoyalPathBoard.Square: Int] = [:]
+        for (piece, destination) in moves {
+            guard let square = RoyalPathBoard.square(seat: seat, index: destination) else { continue }
+            result[square] = piece
+        }
+        return result
     }
+
+    private var homeMove: Int? {
+        moves.first(where: { $0.value == RoyalPathRules.homeIndex })?.key
+    }
+
+    private var highlighted: Set<RoyalPathBoard.Square> {
+        switch phase {
+        case .choosing:
+            return Set(destinations.keys)
+        case .setback:
+            return Set(state.setbackCandidates(seat: seat).compactMap {
+                state.square(seat: seat, piece: $0)
+            })
+        default:
+            return []
+        }
+    }
+
+    // MARK: Button
+
+    private var primaryLabel: String {
+        switch phase {
+        case .ready:    return "Roll"
+        case .rolling:  return "Rolling"
+        case .choosing: return homeMove != nil ? "Bring One Home" : "Tap a Square"
+        case .setback:  return "Tap a Piece"
+        case .scored:   return "Pass"
+        case .handover: return "Pass"
+        case .finished: return "Done"
+        }
+    }
+
+    private var isPrimaryEnabled: Bool {
+        switch phase {
+        case .ready:    return session != nil
+        case .choosing: return homeMove != nil
+        case .scored:   return true
+        default:        return false
+        }
+    }
+
+    private var subtitle: String {
+        switch phase {
+        case .ready:
+            return earnedAnotherRoll ? "Rosette — roll again" : ""
+        case .choosing:
+            let count = moves.count
+            return "Rolled \(steps) — \(count) move\(count == 1 ? "" : "s")"
+        case .setback:
+            return "Rolled \(steps) — nowhere to go. One of yours goes back \(RoyalPathRules.setbackDistance)."
+        case .scored:
+            return lastSummary ?? ""
+        default:
+            return ""
+        }
+    }
+
+    private var scoreboardSubtitle: String? {
+        switch phase {
+        case .rolling: return "Rolling…"
+        case .finished, .handover: return nil
+        default:
+            let waiting = state.waitingCount(seat: seat)
+            let home = state.homeCount(seat: seat)
+            return "\(match.activeDisplayName) — \(waiting) waiting, \(home) home"
+        }
+    }
+
+    private func primaryAction() {
+        SoundEngine.shared.play(.buttonTap)
+        switch phase {
+        case .ready:
+            // Phase follows the roll rather than leading it — roll() reports
+            // false when it threw nothing.
+            if session?.roll() == true {
+                earnedAnotherRoll = false
+                phase = .rolling
+            }
+        case .choosing:
+            if let piece = homeMove {
+                move(piece: piece, to: RoyalPathRules.homeIndex)
+            }
+        case .scored:
+            endTurn()
+        default:
+            break
+        }
+    }
+
+    // MARK: Turn flow
+
+    private func applyRoll(_ results: [DiceTraySession.DieResult]) {
+        guard results.count == RoyalPathRules.diceCount else {
+            phase = .ready
+            return
+        }
+
+        // Held locally as well as in state: everything below decides the
+        // phase from this roll, and reading it back out of @State to do so
+        // would be relying on write ordering for no reason.
+        let rolled = RoyalPathRules.steps(from: results)
+        steps = rolled
+
+        if !state.legalMoves(seat: seat, steps: rolled).isEmpty {
+            phase = .choosing
+            return
+        }
+
+        // No move at all. If there is anything on the board it goes
+        // backwards; only a player with every piece still waiting gets a
+        // turn where nothing happens, which is about one game in seven.
+        if state.setbackCandidates(seat: seat).isEmpty {
+            lastSummary = rolled == 0
+                ? "\(match.activeDisplayName) rolled nothing."
+                : "\(match.activeDisplayName) rolled \(rolled) with nothing to move."
+            phase = .scored
+            return
+        }
+        phase = .setback
+    }
+
+    private func handleTap(_ square: RoyalPathBoard.Square) {
+        switch phase {
+        case .choosing:
+            guard let piece = destinations[square], let destination = moves[piece] else { return }
+            move(piece: piece, to: destination)
+        case .setback:
+            guard let piece = state.piece(of: seat, on: square),
+                  state.setbackCandidates(seat: seat).contains(piece) else { return }
+            applySetback(piece: piece)
+        default:
+            break
+        }
+    }
+
+    private func move(piece: Int, to destination: Int) {
+        SoundEngine.shared.play(.buttonTap)
+        let outcome = state.apply(seat: seat, piece: piece, destination: destination)
+
+        if outcome.cameHome {
+            // The scoreboard's number is pieces home, so this is the score.
+            match.addScore(1)
+        }
+
+        lastSummary = summary(for: outcome, destination: destination)
+
+        if state.winner != nil {
+            match.finish(
+                winners: [match.activeParticipant],
+                reason: "Two pieces home."
+            )
+            phase = .finished
+            return
+        }
+
+        if outcome.grantsAnotherRoll {
+            // Same seat, no handover — the rosette is the only thing in the
+            // game that keeps the dice on your side of the table.
+            earnedAnotherRoll = true
+            steps = 0
+            session?.beginTurn()
+            phase = .ready
+            return
+        }
+
+        phase = .scored
+    }
+
+    private func applySetback(piece: Int) {
+        SoundEngine.shared.play(.buttonTap)
+        let from = state.index(seat: seat, piece: piece)
+        let to = state.applySetback(seat: seat, piece: piece)
+        lastSummary = to == 0
+            ? "\(match.activeDisplayName) sent a piece back to the start."
+            : "\(match.activeDisplayName) went back \(from - to) squares."
+        phase = .scored
+    }
+
+    private func summary(for outcome: RoyalPathState.MoveOutcome, destination: Int) -> String {
+        let player = match.activeDisplayName
+        if outcome.cameHome { return "\(player) brought a piece home." }
+        if outcome.captured {
+            return outcome.landedOnRosette
+                ? "\(player) took a piece on a rosette — and rolls again."
+                : "\(player) sent a piece back to the start."
+        }
+        if outcome.landedOnRosette { return "\(player) landed on a rosette and rolls again." }
+        return "\(player) moved to square \(destination)."
+    }
+
+    private func endTurn() {
+        match.advanceTurn()
+        phase = .handover
+    }
+
+    private func beginTurn() {
+        steps = 0
+        earnedAnotherRoll = false
+        session?.beginTurn()
+        phase = .ready
+    }
+
+    private func startNewMatch() {
+        match = TurnMatch.localTwoPlayer()
+        state = RoyalPathState()
+        lastSummary = nil
+        session?.setPool(RoyalPathRules.makeDice())
+        beginTurn()
+    }
+
+    // MARK: Chrome
 
     private func overlayButton(systemName: String, action: @escaping () -> Void) -> some View {
         Button {
@@ -164,20 +392,28 @@ enum RoyalPathGame: SuiteGame {
 
     static let rules: [GameRuleSection] = [
         GameRuleSection(
-            title: "Not Finished Yet",
-            body: "The board is built; the game is not. Step walks one square along the route so you can see where it runs, and Switch Seat shows the other player's — they share everything from the fifth square on."
+            title: "The Race",
+            body: "Three pieces each, and the first player to bring two of them home wins. Your route runs sixteen squares: out along your own row, up the middle past the bridge, around the far block, and out."
         ),
         GameRuleSection(
-            title: "The Route",
-            body: "Sixteen squares. Out along your own row, up the middle past the bridge, then around the far block — and back out through the rosette you started the loop from. Your opponent runs that last loop the opposite way round."
+            title: "The Dice",
+            body: "Roll five four-sided dice. Each one showing a 1 or a 2 is worth a point, so you move anywhere from nothing to five squares — two or three most of the time."
+        ),
+        GameRuleSection(
+            title: "Moving",
+            body: "Move one piece the full count. A piece waiting to start enters that many squares along. You cannot land on your own piece, and you cannot overshoot: coming home takes the exact number."
+        ),
+        GameRuleSection(
+            title: "Capture",
+            body: "Land on your opponent's piece and it goes all the way back to the start. Every shared square can be taken, rosettes included — and since you run the final loop in opposite directions, the square one step from home is exactly where they come in."
         ),
         GameRuleSection(
             title: "Rosettes",
-            body: "The five flowered squares land on the 4th, 8th, 12th and 16th square of both players' routes. What they will do is still to be built."
+            body: "The five flowered squares fall on the 4th, 8th, 12th and 16th square of both routes. Land on one and you roll again."
         ),
         GameRuleSection(
-            title: "Coming",
-            body: "Five binary dice, three pieces each, capture on any shared square, a Setback when you cannot move, and first to bring two pieces home."
+            title: "The Setback",
+            body: "Roll nothing, or have nowhere legal to go, and you do not simply pass: one of your own pieces goes back four squares — or to the start, if something is already sitting there. You choose which."
         )
     ]
 }

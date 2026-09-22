@@ -151,6 +151,9 @@ enum GameCatalog {
         },
         GameCatalogEntry(CyberDieGame.self) { onExit in
             AnyView(CyberDieScreen(onExit: onExit))
+        },
+        GameCatalogEntry(BoneheadsGame.self) { onExit in
+            AnyView(BoneheadsScreen(onExit: onExit))
         }
     ]
 }

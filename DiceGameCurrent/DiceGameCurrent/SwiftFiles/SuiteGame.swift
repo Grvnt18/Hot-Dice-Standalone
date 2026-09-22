@@ -134,8 +134,9 @@ enum GameCatalog {
         GameCatalogEntry(ChasingSixGame.self) { onExit in
             AnyView(ChasingSixScreen(onExit: onExit))
         },
-        GameCatalogEntry(id: "pig", displayName: "Pig",
-                         tagline: "Push your luck to 75."),
+        GameCatalogEntry(PigGame.self) { onExit in
+            AnyView(PigScreen(onExit: onExit))
+        },
         GameCatalogEntry(GeneralsGame.self) { onExit in
             AnyView(GeneralsScreen(onExit: onExit))
         },

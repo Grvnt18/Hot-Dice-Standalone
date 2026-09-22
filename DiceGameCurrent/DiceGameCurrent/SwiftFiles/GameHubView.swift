@@ -82,8 +82,7 @@ struct GameHubView: View {
     ]
 
     private var title: some View {
-        Text("Rolls")
-            .font(.aguafina(52))
+        ScriptText("Rolls", size: 52)
             .foregroundStyle(.white)
             .shadow(color: .black.opacity(0.5), radius: 4, y: 2)
     }

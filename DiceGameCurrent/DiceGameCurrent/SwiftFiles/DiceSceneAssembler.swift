@@ -292,7 +292,8 @@ enum DiceSceneAssembler {
     /// layout has run) — the playfield layout is derived from its actual
     /// on-screen aspect ratio.
     static func assemble(
-        into sceneView: SCNView
+        into sceneView: SCNView,
+        title: String = RollsGame.floorTitle
     ) -> DiceGameSession {
         // Called here, as the very first thing — not relied upon via
         // SwiftUI's .onAppear on some outer view. That was the actual bug
@@ -309,7 +310,7 @@ enum DiceSceneAssembler {
         // entirely rather than hoping view-lifecycle ordering cooperates.
         AppFonts.registerIfNeeded()
 
-        let env = buildEnvironment(into: sceneView)
+        let env = buildEnvironment(into: sceneView, title: title)
         let scene = env.scene
         let layout = env.layout
         let floorY = env.floorY
@@ -394,7 +395,8 @@ enum DiceSceneAssembler {
             applyTheme: {
                 DiceSceneEnvironment.applyTheme(
                     surfaceMaterial: floorSurfaceMaterial,
-                    textMaterial: floorTextMaterial
+                    textMaterial: floorTextMaterial,
+                    title: title
                 )
             }
         )
@@ -417,7 +419,7 @@ enum DiceSceneAssembler {
         let diceContainer: SCNNode
     }
 
-    private static func buildEnvironment(into sceneView: SCNView) -> Environment {
+    private static func buildEnvironment(into sceneView: SCNView, title: String) -> Environment {
         let scene = SCNScene()
         sceneView.scene = scene
 
@@ -455,7 +457,8 @@ enum DiceSceneAssembler {
         let floorTextMaterial = DiceSceneEnvironment.addFloorText(
             to: scene.rootNode,
             bounds: layout.bounds,
-            floorY: floorY
+            floorY: floorY,
+            title: title
         )
 
         // Visual height only — the actual containment boundary (in
@@ -503,11 +506,12 @@ enum DiceSceneAssembler {
     static func assembleTray(
         into sceneView: SCNView,
         pool: [Die],
-        d4Style: DieFaceLabels.D4LabelStyle = .topRead
+        d4Style: DieFaceLabels.D4LabelStyle = .topRead,
+        title: String
     ) -> DiceTraySession {
         AppFonts.registerIfNeeded()
 
-        let env = buildEnvironment(into: sceneView)
+        let env = buildEnvironment(into: sceneView, title: title)
 
         let lifecycle = DicePoolLifecycleController(containerNode: env.diceContainer)
         lifecycle.setupPool(
@@ -544,7 +548,8 @@ enum DiceSceneAssembler {
             applyTheme: {
                 DiceSceneEnvironment.applyTheme(
                     surfaceMaterial: env.floorSurfaceMaterial,
-                    textMaterial: env.floorTextMaterial
+                    textMaterial: env.floorTextMaterial,
+                    title: title
                 )
             }
         )

@@ -50,6 +50,7 @@ struct GeneralsScreen: View {
                     DiceTraySceneView(
                         session: $session,
                         makeInitialDice: { GeneralsRules.makeDice() },
+                        floorTitle: GeneralsGame.floorTitle,
                         onSessionCreated: { newSession in
                             newSession.onRollSettled = { results in
                                 applyRoll(results)
@@ -324,10 +325,8 @@ struct GeneralsCardView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 10) {
-                Text(hand == nil ? "Scorecard" : "Claim a Category")
-                    .font(.aguafina(40))
+                ScriptText(hand == nil ? "Scorecard" : "Claim a Category", size: 40)
                     .foregroundStyle(.white)
-                    .padding(.trailing, 6)
 
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 8) {

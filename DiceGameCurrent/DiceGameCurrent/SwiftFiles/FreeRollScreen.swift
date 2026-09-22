@@ -33,6 +33,7 @@ struct FreeRollScreen: View {
                 DiceTraySceneView(
                     session: $session,
                     makeInitialDice: { pool.makeDice() },
+                    floorTitle: FreeRollGame.floorTitle,
                     onSessionCreated: { newSession in
                         // Asks the session what is on the table rather than
                         // reading `pool`. This closure outlives the body

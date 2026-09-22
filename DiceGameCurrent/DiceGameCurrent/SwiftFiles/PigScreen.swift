@@ -52,6 +52,7 @@ struct PigScreen: View {
                     DiceTraySceneView(
                         session: $session,
                         makeInitialDice: { PigRules.makeDice() },
+                        floorTitle: PigGame.floorTitle,
                         onSessionCreated: { newSession in
                             newSession.onRollSettled = { results in
                                 applyRoll(results)

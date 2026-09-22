@@ -37,6 +37,14 @@ protocol SuiteGame {
     /// got wrong when it was written for Rolls alone.
     static var lowestScoreWins: Bool { get }
 
+    /// What the playfield floor says beneath the dice.
+    ///
+    /// Defaults to `displayName`. A game only overrides it when its name
+    /// is too long to read at the size the script is actually drawn —
+    /// the floor wordmark spans 45% of the playfield width, which suits
+    /// "Jackpot" and defeats "Freighter.Yacht.Dinghy".
+    static var floorTitle: String { get }
+
     /// Whether a turn can be sent to someone else.
     ///
     /// False only for Free Roll, which is a solo sandbox with no opponent
@@ -50,6 +58,7 @@ extension SuiteGame {
     // Sensible defaults: two players, high score wins, sendable. A game only
     // states what makes it unusual.
     static var maxPlayers: Int { 2 }
+    static var floorTitle: String { displayName }
     static var lowestScoreWins: Bool { false }
     static var isSendable: Bool { true }
 }

@@ -83,3 +83,39 @@ extension Font {
         .custom(AppFonts.aguafinaScriptPostScriptName, size: size, relativeTo: .body)
     }
 }
+
+// MARK: - Script text
+
+/// Aguafina text that does not lose its last letter.
+///
+/// The face's terminal swashes overhang their own advance width, and
+/// SwiftUI sizes a `Text` from the advance — so the final glyph gets
+/// clipped against the trailing edge of its own frame. Five call sites had
+/// each guessed their own `.padding(.trailing, 4...6)` at that, which
+/// works at one point size and fails at the next.
+///
+/// This asks for room proportional to the type size instead, so the fix
+/// scales with the text rather than being re-tuned per site. Measured
+/// against Aguafina's widest terminal, 14% of the point size clears it
+/// with margin; `fixedSize` stops a parent squeezing the frame back to
+/// the advance width and reintroducing the clip.
+struct ScriptText: View {
+    let text: String
+    let size: CGFloat
+    var lineLimit: Int? = 1
+
+    init(_ text: String, size: CGFloat, lineLimit: Int? = 1) {
+        self.text = text
+        self.size = size
+        self.lineLimit = lineLimit
+    }
+
+    var body: some View {
+        Text(text)
+            .font(.aguafina(size))
+            .lineLimit(lineLimit)
+            .multilineTextAlignment(.center)
+            .padding(.trailing, size * 0.14)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}

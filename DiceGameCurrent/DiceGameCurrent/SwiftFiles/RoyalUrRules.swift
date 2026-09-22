@@ -53,24 +53,23 @@ enum RoyalUrRules {
         }
     }
 
-    /// How far this roll moves you.
+    /// How far this roll moves you: one step per marked point sticking up.
     ///
-    /// Each die is binary: the two low numbers score a pip and the two high
-    /// ones score nothing, which is an even split and — unlike "odd or
-    /// even" — reads off the die at a glance. The tray reports a d4's
+    /// Two of each die's four vertices carry a mark, so a die is an even
+    /// coin flip. The test goes through `DieFaceLabels` rather than
+    /// comparing numbers here, so the rule reads exactly what the art
+    /// draws and the two cannot drift apart. The tray reports a d4's
     /// resting face, so the apex has to be worked out first.
     static func steps(from results: [DiceTraySession.DieResult]) -> Int {
         results.reduce(0) { total, result in
-            guard result.sides == 4 else { return total }
-            let apex = DieFaceLabels.d4ApexValue(restingFace: result.value - 1)
-            return total + (apex <= 2 ? 1 : 0)
+            total + (isPip(result) ? 1 : 0)
         }
     }
 
     /// Whether one die scored, for showing the roll back to the player.
     static func isPip(_ result: DiceTraySession.DieResult) -> Bool {
         guard result.sides == 4 else { return false }
-        return DieFaceLabels.d4ApexValue(restingFace: result.value - 1) <= 2
+        return DieFaceLabels.d4ApexIsMarked(restingFace: result.value - 1)
     }
 }
 

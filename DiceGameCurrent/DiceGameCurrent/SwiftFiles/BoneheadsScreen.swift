@@ -208,6 +208,7 @@ struct BoneheadsScreen: View {
                     DiceTraySceneView(
                         session: $session,
                         makeInitialDice: { BoneheadsRules.makeDice() },
+                        floorTitle: BoneheadsGame.floorTitle,
                         onSessionCreated: { newSession in
                             newSession.onRollSettled = { results in
                                 settled(results)

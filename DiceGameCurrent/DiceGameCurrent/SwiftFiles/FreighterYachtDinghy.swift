@@ -146,6 +146,11 @@ enum FreighterYachtDinghyGame: SuiteGame {
     static let displayName = "Freighter.Yacht.Dinghy"
     static let tagline = "Ship, captain, crew. Best of three."
 
+    /// The full name is three words and two full stops, which at 45% of
+    /// the playfield width would be unreadable under the dice.
+    static let floorTitle = "F.Y.D."
+
+
     static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Your Turn",

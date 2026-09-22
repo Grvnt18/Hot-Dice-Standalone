@@ -153,6 +153,7 @@ struct RollbotsScreen: View {
         DiceTraySceneView(
             session: $session,
             makeInitialDice: { [NetArt.die(sides: RollbotsRules.accuracySides, seat: 0)] },
+            floorTitle: RollbotsGame.floorTitle,
             onSessionCreated: { newSession in
                 newSession.onRollSettled = { results in
                     settled(results)

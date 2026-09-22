@@ -75,6 +75,8 @@ struct RoyalUrScreen: View {
                     DiceTraySceneView(
                         session: $session,
                         makeInitialDice: { RoyalUrRules.makeDice() },
+                        d4Style: .markedTips,
+                        floorTitle: RoyalUrGame.floorTitle,
                         onSessionCreated: { newSession in
                             newSession.onRollSettled = { results in
                                 applyRoll(results)
@@ -397,7 +399,7 @@ enum RoyalUrGame: SuiteGame {
         ),
         GameRuleSection(
             title: "The Dice",
-            body: "Roll five four-sided dice. Each one showing a 1 or a 2 is worth a point, so you move anywhere from nothing to five squares — two or three most of the time."
+            body: "Roll five four-sided dice. Two of each die's four points are marked — count the marked points sticking up and that is how far you move, anywhere from nothing to five squares. Two or three, most of the time."
         ),
         GameRuleSection(
             title: "Moving",

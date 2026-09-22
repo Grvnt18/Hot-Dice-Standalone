@@ -58,6 +58,7 @@ struct JackpotScreen: View {
                         // three different numbers — which is what this game
                         // scores. Free Roll's top-read d4 would give one.
                         d4Style: .faceNumbers,
+                        floorTitle: JackpotGame.floorTitle,
                         onSessionCreated: { newSession in
                             newSession.onRollSettled = { results in
                                 scoreRoll(results)

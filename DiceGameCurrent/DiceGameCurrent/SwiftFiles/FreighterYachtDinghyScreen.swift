@@ -55,6 +55,7 @@ struct FreighterYachtDinghyScreen: View {
                     DiceTraySceneView(
                         session: $session,
                         makeInitialDice: { FreighterYachtDinghyRules.makeDice() },
+                        floorTitle: FreighterYachtDinghyGame.floorTitle,
                         onSessionCreated: { newSession in
                             newSession.onRollSettled = { results in
                                 applyRoll(results)

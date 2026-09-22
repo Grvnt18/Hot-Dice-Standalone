@@ -66,6 +66,7 @@ struct ThreeThousandScreen: View {
                     DiceTraySceneView(
                         session: $session,
                         makeInitialDice: { ThreeThousandRules.makeDice() },
+                        floorTitle: ThreeThousandGame.floorTitle,
                         onSessionCreated: { newSession in
                             newSession.onRollSettled = { results in
                                 applyRoll(results)

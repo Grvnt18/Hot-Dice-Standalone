@@ -169,14 +169,8 @@ struct HandoverGate: View {
                         .padding(.horizontal, 28)
                 }
 
-                Text("Pass to \(match.activeDisplayName)")
-                    .font(.aguafina(46))
+                ScriptText("Pass to \(match.activeDisplayName)", size: 46, lineLimit: 2)
                     .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                    // Aguafina's swashes overhang their advance width, so a
-                    // trailing glyph clips against a tight frame — the same
-                    // problem the Rolls score caption hit.
-                    .padding(.trailing, 6)
 
                 HStack(spacing: 14) {
                     ForEach(match.participants, id: \.self) { participant in
@@ -235,11 +229,8 @@ struct MatchResultView: View {
                 .allowsHitTesting(false)
 
             VStack(spacing: 16) {
-                Text(headline)
-                    .font(.aguafina(54))
+                ScriptText(headline, size: 54, lineLimit: 2)
                     .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                    .padding(.trailing, 6)
 
                 if let reason {
                     Text(reason)

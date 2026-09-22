@@ -10,6 +10,14 @@ struct FreeRollScreen: View {
     @State private var session: DiceTraySession?
     @State private var canRoll = false
     @State private var showingSettings = false
+
+    /// Totals are off by default: the table is the point, and a running
+    /// total was deliberately cut from this screen once already. On, it
+    /// shows both readings at once — a subtotal per die type and the
+    /// throw as a whole — since "grouped" and "overall" answer different
+    /// questions and neither is more correct.
+    @State private var showingTotals = false
+    @State private var lastThrow: [DiceTraySession.DieResult] = []
     @ObservedObject private var theme = AppTheme.shared
 
     var body: some View {
@@ -21,7 +29,9 @@ struct FreeRollScreen: View {
             // picker needs two rows of chips, which still leaves the scene
             // square on a phone — the min() below gives up squareness only
             // on a screen too short for it, exactly as Rolls does.
-            let headerHeight = geo.size.height * 0.26
+            // One row taller with totals showing, so the readout has
+            // somewhere to go rather than squeezing the chips.
+            let headerHeight = geo.size.height * (showingTotals ? 0.30 : 0.26)
             let minButtonHeight: CGFloat = 100
             let sceneHeight = min(geo.size.width, max(geo.size.height - headerHeight - minButtonHeight, 0))
             let buttonHeight = geo.size.height - headerHeight - sceneHeight
@@ -35,6 +45,9 @@ struct FreeRollScreen: View {
                     makeInitialDice: { pool.makeDice() },
                     floorTitle: FreeRollGame.floorTitle,
                     onSessionCreated: { newSession in
+                        newSession.onRollSettled = { results in
+                            lastThrow = results
+                        }
                         // Asks the session what is on the table rather than
                         // reading `pool`. This closure outlives the body
                         // evaluation that created it, so a captured @State
@@ -68,6 +81,7 @@ struct FreeRollScreen: View {
                     isEnabled: canRoll,
                     subtitle: pool.isEmpty ? "Add some dice first" : ""
                 ) {
+                    lastThrow = []
                     session?.roll()
                     canRoll = false
                 }
@@ -104,6 +118,21 @@ struct FreeRollScreen: View {
                         .foregroundStyle(.white.opacity(0.85))
 
                     Spacer()
+
+                    Button {
+                        SoundEngine.shared.play(.buttonTap)
+                        showingTotals.toggle()
+                    } label: {
+                        Text("Totals")
+                            .font(.stackSans(12))
+                            .foregroundStyle(.white.opacity(showingTotals ? 1 : 0.7))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(
+                                showingTotals ? theme.accentColor : Color.black.opacity(0.35),
+                                in: RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
+                            )
+                    }
 
                     Button {
                         // No play(.buttonTap) here — applyPool() makes that
@@ -145,9 +174,42 @@ struct FreeRollScreen: View {
                     }
                 }
                 .padding(.horizontal, 12)
+
+                if showingTotals {
+                    Text(totalsLine)
+                        .font(.stackSans(11))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                        .padding(.horizontal, 12)
+                }
             }
             .padding(.vertical, 8)
         }
+    }
+
+    /// Both readings of the last throw: each die type's subtotal, then the
+    /// whole throw. Reads "3d6 · 11   2d20 · 27   —   38".
+    private var totalsLine: String {
+        guard !lastThrow.isEmpty else { return "Roll to total" }
+        var totals: [Int: (count: Int, sum: Int)] = [:]
+        for result in lastThrow {
+            // A d4 reports the face it came to REST on, not a reading —
+            // the number you actually see is at the apex. Totalling the
+            // resting face would quietly report the wrong number for every
+            // d4 on the table.
+            let value = result.sides == 4
+                ? DieFaceLabels.d4ApexValue(restingFace: result.value - 1)
+                : result.value
+            let existing = totals[result.sides] ?? (0, 0)
+            totals[result.sides] = (existing.count + 1, existing.sum + value)
+        }
+        let groups = totals.keys.sorted().map { sides -> String in
+            let group = totals[sides] ?? (0, 0)
+            return "\(group.count)d\(sides) · \(group.sum)"
+        }
+        let overall = totals.values.reduce(0) { $0 + $1.sum }
+        return groups.joined(separator: "   ") + "   —   \(overall)"
     }
 
     private let chipColumns = Array(
@@ -162,6 +224,9 @@ struct FreeRollScreen: View {
     /// says the pool changed and the table disagrees.
     private func applyPool() {
         SoundEngine.shared.play(.buttonTap)
+        // The previous throw described dice that are no longer on the
+        // table, so it goes rather than lingering as a stale number.
+        lastThrow = []
         session?.setPool(pool.makeDice())
         canRoll = !(session?.isRolling ?? false) && !pool.isEmpty
     }

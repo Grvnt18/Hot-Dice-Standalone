@@ -4,7 +4,7 @@ import Foundation
 /// roll whether to push on or bank.
 ///
 /// The target sets the name. At 3,000 a match runs about twelve messages,
-/// half of all turns Farkle to nothing, and a banked turn averages around
+/// half of all turns bust to nothing, and a banked turn averages around
 /// 900 — so one good turn is a third of the game and a bad one costs you
 /// everything you had built.
 enum ThreeThousandRules {
@@ -84,7 +84,7 @@ extension ThreeThousandRules {
 
     /// Whether a roll contains anything at all worth setting aside.
     ///
-    /// A roll with nothing is a Farkle, which ends the turn and takes the
+    /// A roll with nothing is a Bust, which ends the turn and takes the
     /// running total with it — that is half of all turns.
     static func hasScoringDice(_ faces: [Int]) -> Bool {
         var counts: [Int: Int] = [:]
@@ -104,11 +104,11 @@ extension ThreeThousandRules {
 extension ThreeThousandRules {
 
     /// One line for the handover screen.
-    static func summary(player: String, banked: Int, lost: Int, farkled: Bool) -> String {
-        if farkled {
+    static func summary(player: String, banked: Int, lost: Int, busted: Bool) -> String {
+        if busted {
             return lost > 0
-                ? "\(player) farkled and lost \(lost)."
-                : "\(player) farkled on the first roll."
+                ? "\(player) busted and lost \(lost)."
+                : "\(player) busted on the first roll."
         }
         return "\(player) banked \(banked)."
     }
@@ -131,8 +131,8 @@ enum ThreeThousandGame: SuiteGame {
             body: "Each 1 is 100 and each 5 is 50. Three of a kind scores the face times 100 — three 1's are 1,000. Four of a kind is 1,000, five is 2,000, six is 3,000. A 1-2-3-4-5-6 straight is 1,500 and three pairs are 750."
         ),
         GameRuleSection(
-            title: "Farkle",
-            body: "Roll and find nothing that scores and you have Farkled: the turn ends and everything you had going that turn is gone. About half of all turns end this way."
+            title: "Busted",
+            body: "Roll and find nothing that scores and you are Busted: the turn ends and everything you had going that turn is gone. About half of all turns end this way."
         ),
         GameRuleSection(
             title: "Hot Dice",

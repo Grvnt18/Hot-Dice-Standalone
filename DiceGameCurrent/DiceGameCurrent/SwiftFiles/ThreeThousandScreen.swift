@@ -37,7 +37,7 @@ struct ThreeThousandScreen: View {
         case rolling
         /// A roll that scores something: set dice aside, then roll on or bank.
         case choosing
-        /// Turn over — banked or farkled; waiting to hand over.
+        /// Turn over — banked or busted; waiting to hand over.
         case scored
         /// Handover gate between turns.
         case handover
@@ -246,12 +246,12 @@ struct ThreeThousandScreen: View {
             return
         }
 
-        // Farkle. The running total goes, the banked score does not.
+        // Busted. The running total goes, the banked score does not.
         lastSummary = ThreeThousandRules.summary(
             player: match.activeDisplayName,
             banked: 0,
             lost: turnTotal,
-            farkled: true
+            busted: true
         )
         turnTotal = 0
         session?.isSelectionEnabled = false
@@ -300,7 +300,7 @@ struct ThreeThousandScreen: View {
             player: match.displayName(for: player),
             banked: total,
             lost: 0,
-            farkled: false
+            busted: false
         )
         session?.isSelectionEnabled = false
         phase = .scored

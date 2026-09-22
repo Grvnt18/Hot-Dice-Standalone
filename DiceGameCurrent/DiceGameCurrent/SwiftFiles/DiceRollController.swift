@@ -30,7 +30,10 @@ private enum SettleTuning {
     /// top of one another."
     static let maxRollDuration: TimeInterval = 5.0
     /// Dice count at which we hit the max duration ceiling.
-    static let maxDiceInPool = 15
+    /// Raised with Free Roll's ceiling: this scales the roll's time
+    /// budget, so leaving it at 15 would have given a 20-die throw the
+    /// same seconds to settle as a 15-die one.
+    static let maxDiceInPool = 20
 
     /// Duration of the corrective snap that rotates a settled die onto its
     /// nearest valid resting face, ironing out any odd angle left over from

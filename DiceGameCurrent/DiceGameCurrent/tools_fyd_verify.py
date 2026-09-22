@@ -6,14 +6,16 @@ rather than re-deriving them, so a drift between the code and the numbers
 in the plan shows up here. There is no Swift toolchain in this container,
 so this is the closest thing to running the shipped function.
 
-Expected, from the design pass: 54% of turns qualify, 46% score zero, a
-single round ties 25% of the time and a best-of-three on cumulative points
-ties 5%."""
+Expected at four rolls: 68.8% of turns qualify, 31.2% score zero, a single
+round ties 16.7% of the time and a best-of-three on cumulative points ties
+4.4%. (At the three rolls this shipped with first, those were 54.1%,
+45.9%, 24.7% and 4.8% — the fourth roll is what made the game less
+brutal.)"""
 import random
 
 QUALIFIERS = [6, 5, 4]
 DICE_COUNT = 5
-ROLLS_PER_TURN = 3
+ROLLS_PER_TURN = 4
 CARGO_REROLL_HINT = 6
 
 
@@ -100,7 +102,7 @@ def main():
 
     # An unqualified turn scores nothing however good the leftovers are.
     t = Turn()
-    for _ in range(3):
+    for _ in range(ROLLS_PER_TURN):
         t.apply([(0, 6), (1, 6), (2, 6), (3, 6), (4, 6)])
     assert t.is_out_of_rolls and not t.is_qualified and t.score == 0
 

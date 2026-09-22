@@ -145,8 +145,14 @@ private struct GameTile: View {
                         )
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: 104, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
             .padding(12)
+            // Square, not a fixed minimum height. The grid's two flexible
+            // columns give every tile the same width, so tying height to
+            // width makes them identical squares at any screen size —
+            // which a minHeight could not, since a long tagline grew its
+            // own tile and left the row ragged.
+            .aspectRatio(1, contentMode: .fit)
             .background(
                 RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
                     .fill(accent.opacity(entry.isAvailable ? 0.92 : 0.35))

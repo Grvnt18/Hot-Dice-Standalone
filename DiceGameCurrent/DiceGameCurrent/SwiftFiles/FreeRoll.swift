@@ -10,7 +10,10 @@ struct FreeRollPool: Equatable {
     /// inside what the spawn pattern lays out cleanly —
     /// `DiceSpawnPattern` fills rows of 5, 4, 3, 2, 1, so 10 dice occupy
     /// the first three rows with room to spare.
-    static let maxDice = 10
+    /// Twenty, matching the spawn pattern's slot count exactly — see
+    /// DiceSpawnPattern.rowCounts, which was extended to hold them
+    /// without overlap.
+    static let maxDice = 20
 
     /// Every die the app has a mesh for. d4 and d20 were built earlier for
     /// the wider project and have no use in Rolls itself — this is the

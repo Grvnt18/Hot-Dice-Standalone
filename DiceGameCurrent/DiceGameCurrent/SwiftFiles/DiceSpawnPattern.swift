@@ -1,8 +1,8 @@
 import SceneKit
 
 /// Predefined, deterministic spawn slot layout: a fixed triangular
-/// arrangement of 5 rows containing 5, 4, 3, 2, and 1 dice respectively
-/// (totaling exactly 15, matching the pool size) — a bowling-pin/pyramid
+/// arrangement of 6 rows containing 5, 5, 4, 3, 2 and 1 dice respectively
+/// (totaling exactly 20, matching the largest pool any game asks for) — a bowling-pin/pyramid
 /// shape rather than a plain grid. The slot coordinates are the SAME every
 /// time for given bounds — this is what guarantees zero spawn overlap,
 /// since spacing is established by construction, not by chance.
@@ -19,7 +19,20 @@ enum DiceSpawnPattern {
     /// narrower rows are horizontally centered within that same span
     /// rather than stretched to fill the full width, which is what
     /// actually produces the triangle/pyramid look.
-    private static let rowCounts = [5, 4, 3, 2, 1]
+    ///
+    /// Six rows, not five: Free Roll now goes to 20 dice and the old
+    /// [5, 4, 3, 2, 1] held exactly 15, past which the fallback at the
+    /// bottom of `positions` stacks every extra at one point — dice
+    /// spawning inside each other, which is the one thing this pattern
+    /// exists to prevent.
+    ///
+    /// The widest row stays at 5 deliberately. Horizontal spacing is
+    /// width / widest row, so going six across would have cut it from
+    /// 1.90 world units to 1.59; keeping 5 and adding a row instead
+    /// leaves it untouched and takes only depth spacing to 1.59. Both
+    /// still clear the 1.5-unit oversized die (see
+    /// DicePoolSceneBuilder.oversizeMultiplier).
+    private static let rowCounts = [5, 5, 4, 3, 2, 1]
 
     static func positions(
         count: Int,
@@ -90,7 +103,7 @@ enum DiceSpawnPattern {
             }
         }
 
-        // Defensive fallback if this is ever called with more than the 15
+        // Defensive fallback if this is ever called with more than the 20
         // dice the fixed row layout accounts for — shouldn't happen given
         // the game's fixed pool size, but avoids silently dropping dice.
         while positions.count < count {

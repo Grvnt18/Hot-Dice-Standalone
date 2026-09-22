@@ -1,4 +1,10 @@
-"""Checks every icon the code asks for is actually in Resources/.
+"""Checks every icon the code asks for is actually in Resources/, and
+that nothing unreferenced is shipped.
+
+The second half earns its keep: Icon-Master.png arrived looking like a
+blank template and was kept aside as one, when it was in fact a second
+export of the Jackpot icon. A file nothing references is worth a line of
+output rather than a silent 30KB.
 
 The loader builds a game's filename from its SuiteGame.id, and the
 Rollbots marks are named in Swift as plain strings. Either can be wrong by
@@ -43,7 +49,7 @@ def main():
     # Nothing shipped that nothing asks for.
     wanted = {"icon-%s.png" % i for i in ids} | {m + ".png" for m in marks}
     shipped = {f for f in os.listdir(RES) if f.startswith(("icon-", "bot-"))}
-    for extra in sorted(shipped - wanted - {"icon-master.png"}):
+    for extra in sorted(shipped - wanted):
         print("  %-30s shipped but unused" % extra)
 
     if failed:

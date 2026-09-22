@@ -412,7 +412,7 @@ enum RollbotsGame: SuiteGame {
         ),
         GameRuleSection(
             title: "Weapons",
-            body: "Mono-Blade: d8, and it cuts through half of any Firewall. Smart Pistol: d6, doubled on an accuracy of 7 or more, and a crit cuts armour the same way. Rail Rifle: d12 and no Firewall stops it — but it spends a turn charging first."
+            body: "Mono-Blade: d8, and it cuts through half of any Firewall. Smart Pistol: d6, doubled on an accuracy of 7 or more, and a crit cuts armour the same way. Rail Rifle: d12 and no Firewall stops it — but it spends a turn charging first. There is a fourth you never pick: the Sidearm, a d4 with no tricks at all, which is what the Emergency Sub-Routine leaves you holding."
         ),
         GameRuleSection(
             title: "Defending",

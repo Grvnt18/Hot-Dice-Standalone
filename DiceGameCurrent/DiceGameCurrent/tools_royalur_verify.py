@@ -170,6 +170,34 @@ def check_board():
     print("board: PASS (20 squares, rosettes on 4/8/12/16, 12 contested)")
 
 
+def check_trays():
+    """Waiting and finished pieces live in the board's own four-cell notch.
+
+    Mirrors RoyalUrBoard.waitingTray / .homeTray. The cells they claim must
+    be exactly the ones the board omits — putting a tray on a playable
+    square would let a piece be drawn where another piece can land."""
+    on_board = {(r, c) for r in (1, 2, 3) for c in range(1, 9)
+                if not (c in (5, 6) and r != 2)}
+    all_cells = {(r, c) for r in (1, 2, 3) for c in range(1, 9)}
+    notch = all_cells - on_board
+    assert notch == {(1, 5), (1, 6), (3, 5), (3, 6)}, notch
+
+    def waiting(seat): return (1 if seat == 1 else 3, 5)
+    def home(seat):    return (1 if seat == 1 else 3, 6)
+
+    trays = {waiting(0), home(0), waiting(1), home(1)}
+    assert trays == notch, trays
+    assert len(trays) == 4, "a tray is shared between seats"
+
+    for seat in (0, 1):
+        row = PATHS[seat][0][0]          # the row that seat's route starts on
+        assert waiting(seat)[0] == row, seat
+        assert home(seat)[0] == row, seat
+        # Waiting sits beside the entry square, home beside the exit.
+        assert waiting(seat)[1] < home(seat)[1]
+    print("trays: PASS (the four cells the board omits, one pair per row)")
+
+
 def check_rules():
     s = State()
     # Exact exit: a piece on 16 comes home on a 1 and cannot move on a 2.
@@ -202,6 +230,7 @@ def check_rules():
 
 def main():
     check_board()
+    check_trays()
     check_rules()
     rng = random.Random(20260922)
     n = 15_000

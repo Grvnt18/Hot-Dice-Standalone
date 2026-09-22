@@ -68,19 +68,27 @@ struct RollbotsScreen: View {
             NetGrid()
 
             GeometryReader { geo in
-                let panelHeight = geo.size.height * 0.20
+                // Rails down both edges rather than a band across the top:
+                // the stats cost almost no height there, and the whole
+                // middle of the screen goes to the dice.
+                //
+                // The viewing seat is always on the left — your own numbers
+                // stay where your thumb is, the same way Boneheads keeps
+                // your own grid nearest you.
+                let railWidth = min(max(geo.size.width * 0.19, 74), 104)
                 let barHeight: CGFloat = phase == .setup ? 0 : 104
-                let bodyHeight = max(geo.size.height - panelHeight - barHeight, 0)
+                let bodyHeight = max(geo.size.height - barHeight, 0)
 
-                VStack(spacing: 0) {
-                    NetStatusPanel(
+                HStack(spacing: 0) {
+                    NetSeatRail(
                         state: state,
-                        activeSeat: viewingSeat,
-                        names: names,
-                        subtitle: panelSubtitle
+                        seat: viewingSeat,
+                        name: names[viewingSeat],
+                        isActive: true
                     )
-                    .frame(height: panelHeight)
+                    .frame(width: railWidth)
 
+                    VStack(spacing: 0) {
                     // The tray is mounted for the WHOLE match and every
                     // menu is drawn over it, rather than the two swapping
                     // places.
@@ -92,20 +100,33 @@ struct RollbotsScreen: View {
                     // silently did nothing, while the actions that throw no
                     // dice worked fine. It also rebuilt the whole SceneKit
                     // scene on every single throw.
-                    ZStack {
+                    // Menus sit over the LOWER part of the tray, not all
+                    // of it. The defence menu is why: the whole point of
+                    // throwing the accuracy die before the defender
+                    // chooses is that they can see it, and a full-screen
+                    // backdrop hid the very die they were reading.
+                    ZStack(alignment: .bottom) {
                         tray
 
                         if phase == .setup {
-                            menuBackdrop { setupView }
+                            menuSheet { setupView }
                         } else if phase == .action {
-                            menuBackdrop { actionView }
+                            menuSheet { actionView }
                         } else if phase == .swapping {
-                            menuBackdrop { swapView }
+                            menuSheet { swapView }
                         } else if phase == .defending {
-                            menuBackdrop { defenceView }
+                            menuSheet { defenceView }
                         }
                     }
                     .frame(height: bodyHeight)
+                    .overlay(alignment: .topLeading) {
+                        if let onExit {
+                            overlayButton("chevron.left") { onExit() }
+                        }
+                    }
+                    .overlay(alignment: .topTrailing) {
+                        overlayButton("gearshape.fill") { showingSettings = true }
+                    }
 
                     if phase != .setup {
                         NetActionBar(
@@ -117,15 +138,16 @@ struct RollbotsScreen: View {
                         )
                         .frame(height: barHeight)
                     }
+                    }
+
+                    NetSeatRail(
+                        state: state,
+                        seat: 1 - viewingSeat,
+                        name: names[1 - viewingSeat],
+                        isActive: false
+                    )
+                    .frame(width: railWidth)
                 }
-            }
-            .overlay(alignment: .topLeading) {
-                if let onExit {
-                    overlayButton("chevron.left") { onExit() }
-                }
-            }
-            .overlay(alignment: .topTrailing) {
-                overlayButton("gearshape.fill") { showingSettings = true }
             }
 
             if let handoverTo {
@@ -166,12 +188,24 @@ struct RollbotsScreen: View {
 
     /// Darkens the dice behind a menu so its cards stay readable, without
     /// unmounting the tray that owns the dice session.
-    private func menuBackdrop<Content: View>(
+    private func menuSheet<Content: View>(
         @ViewBuilder _ content: () -> Content
     ) -> some View {
-        ZStack {
-            NetArt.background.opacity(0.88)
-            content()
+        GeometryReader { geo in
+            VStack(spacing: 0) {
+                Spacer(minLength: 0)
+                ZStack {
+                    NetFacet().opacity(0.97)
+                    content()
+                }
+                // Setup has the longest list and no dice worth seeing yet,
+                // so it takes the whole column; every other menu leaves the
+                // top of the tray clear.
+                .frame(height: geo.size.height * (phase == .setup ? 1.0 : 0.58))
+                .overlay(alignment: .top) {
+                    Rectangle().fill(NetArt.line.opacity(0.4)).frame(height: 1)
+                }
+            }
         }
     }
 
@@ -635,14 +669,6 @@ struct RollbotsScreen: View {
         case .defending: return "Accuracy \(accuracy) is on the table — answer it"
         case .resolved:  return lastLine ?? ""
         default:         return ""
-        }
-    }
-
-    private var panelSubtitle: String? {
-        switch phase {
-        case .setup, .swapping: return "Loadout"
-        case .defending: return "\(state.activeWeapon(attacker).displayName) incoming"
-        default:         return lastLine
         }
     }
 

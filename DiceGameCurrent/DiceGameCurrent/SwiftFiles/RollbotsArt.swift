@@ -107,105 +107,90 @@ struct NetGrid: View {
 
 // MARK: - Status
 
-/// Both runners' integrity, and everything currently ticking on them.
-struct NetStatusPanel: View {
+/// One runner's integrity, down the edge of the screen.
+///
+/// This was a full-width band across the top holding both seats, which
+/// cost a fifth of the height and left the dice squeezed into what was
+/// left. As two narrow rails it costs almost no height at all, and the
+/// whole middle of the screen belongs to the tray.
+struct NetSeatRail: View {
     let state: RollbotsState
-    let activeSeat: Int
-    let names: [String]
-    let subtitle: String?
+    let seat: Int
+    let name: String
+    let isActive: Bool
+
+    private var colour: Color { NetArt.seat(seat) }
 
     var body: some View {
         VStack(spacing: 6) {
-            HStack(alignment: .top, spacing: 10) {
-                bar(0)
-                bar(1)
-            }
-            if let subtitle, !subtitle.isEmpty {
-                Text(subtitle)
-                    .font(.stackSans(11))
-                    .foregroundStyle(NetArt.text.opacity(0.75))
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.7)
-                    .multilineTextAlignment(.center)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(NetFacet().opacity(0.92))
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(NetArt.line.opacity(0.35))
-                .frame(height: 1)
-        }
-    }
-
-    private func bar(_ seat: Int) -> some View {
-        let colour = NetArt.seat(seat)
-        let isActive = seat == activeSeat
-        let maximum = RollbotsRules.startingIP + RollbotsRules.secondSeatBonusIP
-        let fraction = max(0, min(1, Double(state.ip[seat]) / Double(maximum)))
-
-        return VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 4) {
-                Text(names[seat])
-                    .font(.stackSans(10))
-                    .foregroundStyle(colour.opacity(isActive ? 1 : 0.6))
-                Spacer(minLength: 0)
-                Text("\(max(0, state.ip[seat])) IP")
-                    .font(.stackSans(13))
-                    .foregroundStyle(colour)
-            }
-
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Rectangle().fill(colour.opacity(0.16))
-                    NetFacet(color: colour, variation: 0.18, seed: 7700 + UInt64(seat))
-                        .scaledToFill()
-                        .frame(width: geo.size.width * fraction)
-                        .clipped()
-                }
-            }
-            .frame(height: 7)
-            .overlay(Rectangle().stroke(colour.opacity(0.55), lineWidth: 1))
-
-            Text(state.activeWeapon(seat).displayName)
-                .font(.stackSans(9))
-                .foregroundStyle(NetArt.text.opacity(0.6))
+            Text(name)
+                .font(.stackSans(10))
+                .foregroundStyle(colour.opacity(isActive ? 1 : 0.6))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
 
-            if !statusPips(seat).isEmpty {
-                Text(statusPips(seat).joined(separator: " · "))
-                    .font(.stackSans(9))
+            Text("\(max(0, state.ip[seat]))")
+                .font(.stackSans(26))
+                .foregroundStyle(colour)
+
+            Text("IP")
+                .font(.stackSans(9))
+                .foregroundStyle(NetArt.text.opacity(0.5))
+
+            // Vertical, filling from the bottom: a tall thin bar reads far
+            // better in a rail than a short wide one, and draining downward
+            // is the direction the number is going.
+            GeometryReader { geo in
+                let maximum = CyberDieMaxIP
+                let fraction = max(0, min(1, Double(state.ip[seat]) / Double(maximum)))
+                ZStack(alignment: .bottom) {
+                    Rectangle().fill(colour.opacity(0.16))
+                    NetFacet(color: colour, variation: 0.18, seed: 7700 + UInt64(seat))
+                        .frame(height: geo.size.height * fraction)
+                }
+                .overlay(Rectangle().stroke(colour.opacity(0.55), lineWidth: 1))
+            }
+            .frame(maxHeight: .infinity)
+
+            Text(state.activeWeapon(seat).displayName)
+                .font(.stackSans(9))
+                .foregroundStyle(NetArt.text.opacity(0.7))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.6)
+
+            ForEach(statusPips, id: \.self) { pip in
+                Text(pip)
+                    .font(.stackSans(8))
                     .foregroundStyle(NetArt.warn)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.6)
+                    .minimumScaleFactor(0.5)
             }
         }
-        .padding(7)
-        .background(
-            NetFacet(variation: 0.10, seed: 3310)
-                .opacity(isActive ? 0.95 : 0.55)
-                .clipShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
-        )
+        .padding(.horizontal, 6)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(NetFacet(variation: 0.10, seed: 3310).opacity(isActive ? 0.95 : 0.6))
         .overlay(
-            RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                .stroke(colour.opacity(isActive ? 0.8 : 0.25), lineWidth: 1)
+            Rectangle().stroke(colour.opacity(isActive ? 0.8 : 0.25), lineWidth: 1)
         )
     }
 
-    /// Everything the player has to keep track of, in one line.
-    private func statusPips(_ seat: Int) -> [String] {
+    /// Everything ticking on this runner, one short line each.
+    private var statusPips: [String] {
         var pips: [String] = []
         if state.charged[seat] { pips.append("CHARGED") }
         if state.virusTurns[seat] > 0 { pips.append("VIRUS \(state.virusTurns[seat])") }
         if state.sidearmTurns[seat] > 0 { pips.append("SIDEARM \(state.sidearmTurns[seat])") }
         if state.exposed[seat] { pips.append("EXPOSED") }
-        if state.overclocked[seat] { pips.append("OVERCLOCKED") }
-        if state.phaseArmed[seat] { pips.append("PHASE ARMED") }
+        if state.overclocked[seat] { pips.append("OVERCLOCK") }
+        if state.phaseArmed[seat] { pips.append("PHASE") }
         return pips
     }
 }
+
+/// The largest IP either runner can hold, for sizing the bars.
+private let CyberDieMaxIP = RollbotsRules.startingIP + RollbotsRules.secondSeatBonusIP
 
 // MARK: - Cards
 

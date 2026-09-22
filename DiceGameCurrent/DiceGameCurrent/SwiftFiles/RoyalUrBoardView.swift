@@ -93,8 +93,16 @@ struct RoyalUrBoardView: View {
     /// enter, 1...16 is on the board, 17 is home.
     var positions: [[Int]] = [[0, 0, 0], [0, 0, 0]]
 
-    /// Squares to ring in the accent colour — the moves on offer.
+    /// Squares to ring in the accent colour — what you may tap.
     var highlighted: Set<RoyalUrBoard.Square> = []
+
+    /// The piece currently chosen, drawn with a ring of its own so you
+    /// can see which one is about to move.
+    var focused: RoyalUrBoard.Square? = nil
+
+    /// Where the chosen piece would land. Drawn heavier than a mere
+    /// highlight, because this is the one square that commits the move.
+    var destination: RoyalUrBoard.Square? = nil
 
     var onTapSquare: ((RoyalUrBoard.Square) -> Void)? = nil
 
@@ -164,18 +172,71 @@ struct RoyalUrBoardView: View {
             }
         }
 
-        // Pieces last, so they sit above the markings.
+        // The off-board trays, drawn as outlines rather than tiles so they
+        // read as somewhere pieces rest rather than somewhere they land.
+        for seat in [0, 1] {
+            tray(RoyalUrBoard.waitingTray(seat: seat), in: context, layout: layout, seat: seat)
+            tray(RoyalUrBoard.homeTray(seat: seat), in: context, layout: layout, seat: seat)
+        }
+
+        // Pieces last, so they sit above the markings. Routed through
+        // displaySquare, so a waiting or finished piece lands in its tray
+        // instead of being skipped — which is what used to make them
+        // disappear off the board entirely.
         for seat in positions.indices {
+            var stackCount: [RoyalUrBoard.Square: Int] = [:]
             for index in positions[seat] {
-                guard let square = RoyalUrBoard.square(seat: seat, index: index) else { continue }
+                guard let square = RoyalUrBoard.displaySquare(seat: seat, index: index) else { continue }
+                let slot = stackCount[square] ?? 0
+                stackCount[square] = slot + 1
+
+                let isTray = RoyalUrBoard.trayCells.contains(square)
+                let radius = layout.tile * (isTray ? 0.17 : 0.30)
+                var center = layout.center(of: square)
+                if isTray {
+                    // Three across, so three waiting pieces read as three.
+                    center.x += (CGFloat(slot) - 1) * layout.tile * 0.30
+                }
+
                 RoyalUrArt.drawPiece(
                     in: context,
-                    center: layout.center(of: square),
-                    radius: layout.tile * 0.30,
+                    center: center,
+                    radius: radius,
                     seat: seat
                 )
             }
         }
+
+        // The chosen piece and its landing square, over everything.
+        if let focused {
+            context.stroke(
+                Path(roundedRect: layout.rect(for: focused).insetBy(dx: -3, dy: -3),
+                     cornerRadius: layout.tile * 0.1),
+                with: .color(.white.opacity(0.95)),
+                lineWidth: 3
+            )
+        }
+        if let destination {
+            let rect = layout.rect(for: destination)
+            context.stroke(
+                Path(roundedRect: rect.insetBy(dx: -3, dy: -3), cornerRadius: layout.tile * 0.1),
+                with: .color(theme.accentColor),
+                lineWidth: 5
+            )
+        }
+    }
+
+    /// An empty outline where a seat's pieces wait or rest.
+    private func tray(
+        _ square: RoyalUrBoard.Square,
+        in context: GraphicsContext,
+        layout: RoyalUrLayout,
+        seat: Int
+    ) {
+        let rect = layout.rect(for: square).insetBy(dx: layout.tile * 0.10, dy: layout.tile * 0.10)
+        let shape = Path(roundedRect: rect, cornerRadius: layout.tile * 0.08)
+        context.fill(shape, with: .color(.black.opacity(0.22)))
+        context.stroke(shape, with: .color(RoyalUrArt.seatColor(seat).opacity(0.5)), lineWidth: 1.5)
     }
 
     /// Invisible buttons over each square.
@@ -185,7 +246,7 @@ struct RoyalUrBoardView: View {
     /// gets the tap target, the press feedback and the accessibility
     /// affordance for free.
     private func tapTargets(_ layout: RoyalUrLayout) -> some View {
-        ForEach(RoyalUrBoard.squares, id: \.self) { square in
+        ForEach(RoyalUrBoard.squares + RoyalUrBoard.trayCells, id: \.self) { square in
             let rect = layout.rect(for: square)
             Button {
                 onTapSquare?(square)

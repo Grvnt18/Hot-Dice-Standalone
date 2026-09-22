@@ -723,15 +723,17 @@ final class DiceRollController: NSObject, SCNSceneRendererDelegate {
             // recorded here for scoring are now guaranteed to match,
             // since they both come from the same face-index numbering.
             //
-            // The d4 is the exception. It is a top-read die: the number is
-            // carried on the VERTEX pointing up, which is the vertex
-            // opposite the face it is resting on. landedFaceIndex is that
-            // resting face (alignFace: .down above), so the value comes
-            // from DieFaceLabels' face-to-vertex mapping rather than from
-            // the face index directly.
-            let value = sides == 4
-                ? DieFaceLabels.d4TopReadValue(forRestingFace: landedFaceIndex)
-                : landedFaceIndex + 1
+            // The d4 is the exception, and what it reports is deliberately
+            // the RESTING face rather than a reading. A tetrahedron has no
+            // up face, and there are now two ways to label one — top-read
+            // (one value at the apex) and face-numbers (three values, one
+            // per visible face) — so any single "value" here would bake
+            // one game's interpretation into the physics layer. The
+            // resting face is the raw physical fact, unambiguous because
+            // it is the face snapped downward. Callers interpret it with
+            // DieFaceLabels.d4ApexValue(restingFace:) or
+            // .d4ExposedFaceNumbers(restingFace:).
+            let value = landedFaceIndex + 1
             // No settle sound here: DiceContactAudio now plays a real
             // impact for the final contact that brought this die to rest.
             // Firing another sound at the same moment would double it.

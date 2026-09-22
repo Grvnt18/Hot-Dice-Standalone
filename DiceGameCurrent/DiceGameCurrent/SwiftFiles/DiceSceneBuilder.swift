@@ -165,7 +165,8 @@ enum DicePoolSceneBuilder {
     static func buildNodes(
         for pool: [Die],
         includeRollsFace: Bool = true,
-        includeOversizedDie: Bool = true
+        includeOversizedDie: Bool = true,
+        d4Style: DieFaceLabels.D4LabelStyle = .topRead
     ) -> [UUID: SCNNode] {
         var nodesByID: [UUID: SCNNode] = [:]
 
@@ -202,7 +203,8 @@ enum DicePoolSceneBuilder {
                 colorway: die.colorway,
                 to: node,
                 rollsFaceNumber: (die.id == rollsDieID) ? 6 : nil,
-                grainVariant: Int.random(in: 0..<DieMaterial.grainVariantCount)
+                grainVariant: Int.random(in: 0..<DieMaterial.grainVariantCount),
+                d4Style: d4Style
             )
             DiePhysicsFactory.addPhysicsBody(to: node)
 

@@ -131,8 +131,9 @@ enum GameCatalog {
         GameCatalogEntry(FreeRollGame.self) { onExit in
             AnyView(FreeRollScreen(onExit: onExit))
         },
-        GameCatalogEntry(id: "chasing6", displayName: "Chasing 6",
-                         tagline: "Five rounds, or hit the jackpot."),
+        GameCatalogEntry(ChasingSixGame.self) { onExit in
+            AnyView(ChasingSixScreen(onExit: onExit))
+        },
         GameCatalogEntry(id: "pig", displayName: "Pig",
                          tagline: "Push your luck to 75."),
         GameCatalogEntry(id: "generals", displayName: "Generals",

@@ -123,13 +123,14 @@ enum DieFaceLabels {
         to node: SCNNode,
         sides: Int,
         colorway: DieColorway,
-        rollsFaceNumber: Int? = nil
+        rollsFaceNumber: Int? = nil,
+        d4Style: D4LabelStyle = .topRead
     ) {
         // A d4 is not a "number on each face" die — it is read at the
         // apex, with three numerals per face, one beside each corner.
         // Different enough in both layout and meaning to be its own path.
         if sides == 4 {
-            addD4TopReadNumbers(to: node, colorway: colorway)
+            addD4TopReadNumbers(to: node, colorway: colorway, style: d4Style)
             return
         }
 
@@ -268,13 +269,42 @@ enum DieFaceLabels {
     /// reported when the die settles both read from this one table.
     private static let d4VertexNumbers: [Int] = [1, 2, 3, 4]
 
-    /// The value a d4 shows when resting on `face`: the number on the
-    /// vertex pointing up, which is the vertex opposite that face.
+    /// How a numbered d4 is labelled.
     ///
-    /// Called by DiceRollController once a d4 settles.
-    static func d4TopReadValue(forRestingFace face: Int) -> Int {
+    /// A tetrahedron cannot carry one centred numeral per face and stay
+    /// legible: each face is visible in three orientations with a different
+    /// corner uppermost each time, so a single numeral would read upright
+    /// in at most one of them. Both modes below put numerals at the corners
+    /// for exactly that reason; they differ only in which number goes where.
+    enum D4LabelStyle {
+        /// Each corner carries its own vertex's number, so all three
+        /// visible faces show the SAME number at the apex — one value, read
+        /// at the point. Free Roll uses this.
+        case topRead
+
+        /// Each face carries its own number at all three of its corners, so
+        /// the three visible faces show three DIFFERENT numbers around the
+        /// apex — one per face, every one upright. Chasing 6 uses this,
+        /// since it reads the three exposed faces rather than a single
+        /// value.
+        case faceNumbers
+    }
+
+    /// The value shown at the apex of a top-read d4 resting on `face`: the
+    /// number on the vertex pointing up, which is the vertex opposite it.
+    static func d4ApexValue(restingFace face: Int) -> Int {
         guard d4OppositeVertex.indices.contains(face) else { return 1 }
         return d4VertexNumbers[d4OppositeVertex[face]]
+    }
+
+    /// The three face numbers visible on a `.faceNumbers` d4 resting on
+    /// `face` — every face except the one against the table.
+    ///
+    /// Always three distinct values: `{1,2,3,4}` minus the resting face's
+    /// number. That is the same distribution the apex reading produces,
+    /// which is why Chasing 6's odds are identical under either labelling.
+    static func d4ExposedFaceNumbers(restingFace face: Int) -> [Int] {
+        (1...4).filter { $0 != face + 1 }
     }
 
     /// Numeral size for the top-read layout. Smaller than
@@ -299,7 +329,11 @@ enum DieFaceLabels {
     /// when it lands, so the result is read at the point instead. All
     /// three faces you can see meet at that point and all three carry the
     /// same number beside it.
-    private static func addD4TopReadNumbers(to node: SCNNode, colorway: DieColorway) {
+    private static func addD4TopReadNumbers(
+        to node: SCNNode,
+        colorway: DieColorway,
+        style: D4LabelStyle
+    ) {
         let normals = DieFaceNormals.normals(forSides: 4)
         let faceDistance = localFaceDistance(forSides: 4)
 
@@ -327,8 +361,18 @@ enum DieFaceLabels {
                 let plane = SCNPlane(width: d4TopReadLabelSize, height: d4TopReadLabelSize)
 
                 let material = SCNMaterial()
+                // The ONLY difference between the two styles. Placement,
+                // orientation and count are identical — which number lands
+                // at this corner is what decides whether the die reads as
+                // one value at the point or three around it.
+                let number: Int
+                switch style {
+                case .topRead:     number = d4VertexNumbers[vertexIndex]
+                case .faceNumbers: number = faceIndex + 1
+                }
+
                 material.diffuse.contents = labelImage(
-                    number: d4VertexNumbers[vertexIndex],
+                    number: number,
                     colorway: colorway,
                     underlined: false
                 )

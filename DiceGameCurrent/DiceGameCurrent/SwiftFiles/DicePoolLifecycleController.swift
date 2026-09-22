@@ -48,7 +48,8 @@ final class DicePoolLifecycleController {
         _ dice: [Die],
         playAreaBounds: (x: ClosedRange<Float>, z: ClosedRange<Float>),
         restHeight: Float = 1.0,
-        styleAsRolls: Bool = true
+        styleAsRolls: Bool = true,
+        d4Style: DieFaceLabels.D4LabelStyle = .topRead
     ) {
         // Contact-audio cooldown state is keyed on node identity, so it
         // must be cleared alongside the nodes themselves — otherwise it
@@ -72,7 +73,8 @@ final class DicePoolLifecycleController {
         let nodesByID = DicePoolSceneBuilder.buildNodes(
             for: dice,
             includeRollsFace: styleAsRolls,
-            includeOversizedDie: styleAsRolls
+            includeOversizedDie: styleAsRolls,
+            d4Style: d4Style
         )
         let positions = DiceSpawnPattern.positions(
             count: dice.count,

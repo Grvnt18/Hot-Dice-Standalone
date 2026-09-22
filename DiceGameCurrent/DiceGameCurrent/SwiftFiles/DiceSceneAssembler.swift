@@ -30,13 +30,17 @@ struct DiceGameSession {
     let applyTheme: () -> Void
 }
 
-/// Everything Free Roll needs to run a sandbox: no scoring, no banking, no
-/// selection, so no DiceTurnController and no DiceTapHandler.
+/// A tray of dice you roll and read: no scoring, no banking, no selection,
+/// so no DiceTurnController and no DiceTapHandler.
 ///
-/// A class rather than a struct because it owns mutable wiring
-/// (`onStateChanged`) and is handed around by reference as the scene's
-/// lifetime anchor.
-final class FreeRollSession {
+/// Free Roll was the first consumer but never the only intended one —
+/// Chasing 6, Nautical, Generals and Three Thousand all want exactly this.
+/// Rolls keeps its own DiceGameSession, which carries the turn controller,
+/// tap selection and banking none of these games use.
+///
+/// A class rather than a struct because it owns mutable wiring and is
+/// handed around by reference as the scene's lifetime anchor.
+final class DiceTraySession {
     let scene: SCNScene
     let lifecycle: DicePoolLifecycleController
     let rollController: DiceRollController
@@ -57,6 +61,27 @@ final class FreeRollSession {
     /// Fired when the Roll button's enabled state may have changed.
     var onStateChanged: (() -> Void)?
 
+    /// Fired once every die in a roll has settled, with each die's result.
+    ///
+    /// For a d4 the reported number is the face it came to REST on, not a
+    /// reading — see DiceRollController's note. Interpret it with
+    /// `DieFaceLabels.d4ApexValue(restingFace:)` for a top-read die or
+    /// `.d4ExposedFaceNumbers(restingFace:)` for a face-numbered one.
+    var onRollSettled: (([DieResult]) -> Void)?
+
+    /// One die's outcome, with enough context to score it without going
+    /// back to the scene graph.
+    struct DieResult {
+        let id: UUID
+        let sides: Int
+        /// Top face for most dice; resting face for a d4.
+        let value: Int
+    }
+
+    /// Accumulates across a roll, then ships in one go via onRollSettled.
+    /// Keyed by die so a duplicate settle callback cannot double-count.
+    private var settledThisRoll: [UUID: DieResult] = [:]
+
     var isRolling: Bool { rollController.isRolling }
 
     init(
@@ -65,6 +90,7 @@ final class FreeRollSession {
         rollController: DiceRollController,
         contactAudio: DiceContactAudio,
         playAreaBounds: (x: ClosedRange<Float>, z: ClosedRange<Float>),
+        d4Style: DieFaceLabels.D4LabelStyle,
         applyTheme: @escaping () -> Void
     ) {
         self.scene = scene
@@ -72,27 +98,64 @@ final class FreeRollSession {
         self.rollController = rollController
         self.contactAudio = contactAudio
         self.playAreaBounds = playAreaBounds
+        self.d4Style = d4Style
         self.applyTheme = applyTheme
     }
+
+    /// The d4 labelling this tray was built with, so a re-pooled tray keeps
+    /// the same style rather than silently reverting to the default.
+    private let d4Style: DieFaceLabels.D4LabelStyle
 
     /// Swaps in a different set of dice. setupPool already tears the
     /// previous pool down, so this is safe to call repeatedly.
     func setPool(_ dice: [Die]) {
         guard !rollController.isRolling else { return }
-        lifecycle.setupPool(dice, playAreaBounds: playAreaBounds, styleAsRolls: false)
+        settledThisRoll.removeAll()
+        lifecycle.setupPool(
+            dice,
+            playAreaBounds: playAreaBounds,
+            styleAsRolls: false,
+            d4Style: d4Style
+        )
         onStateChanged?()
+    }
+
+    /// Called per die as it settles; collected until the roll completes.
+    fileprivate func recordSettled(id: UUID, value: Int) {
+        guard let sides = lifecycle.rollableDice.first(where: { $0.id == id })?.sides else { return }
+        settledThisRoll[id] = DieResult(id: id, sides: sides, value: value)
+    }
+
+    /// Called once the whole roll is done.
+    fileprivate func finishRoll() {
+        // Reported in the pool's own order rather than settle order, so a
+        // game scoring "the d6 and the d20" does not depend on which die
+        // happened to stop moving first.
+        let ordered = lifecycle.rollableDice.compactMap { settledThisRoll[$0.id] }
+        settledThisRoll.removeAll()
+        onStateChanged?()
+        if !ordered.isEmpty { onRollSettled?(ordered) }
     }
 
     /// Throws every die again. Same two steps DiceTurnController.beginRoll
     /// uses — the impulse and then the settle tracking — minus the scoring.
-    func roll() {
-        guard !rollController.isRolling else { return }
+    ///
+    /// Returns false when nothing was thrown, which a caller that changes
+    /// state around the roll has to respect. Chasing 6 flipped itself to a
+    /// "rolling" phase and then called this; when it no-opped nothing ever
+    /// moved the phase back, leaving the game permanently stuck with a
+    /// disabled button.
+    @discardableResult
+    func roll() -> Bool {
+        guard !rollController.isRolling else { return false }
         let dice = lifecycle.rollableDice
-        guard !dice.isEmpty else { return }
+        guard !dice.isEmpty else { return false }
         SoundEngine.shared.play(.diceRoll)
         DiceRollImpulse.launch(dice: dice)
+        settledThisRoll.removeAll()
         rollController.startRoll(dice: dice, currentTime: CACurrentMediaTime())
         onStateChanged?()
+        return true
     }
 }
 
@@ -308,22 +371,28 @@ enum DiceSceneAssembler {
     }
 
 
-    // MARK: - Free Roll
+    // MARK: - Dice tray
 
     /// Same playfield, no game on top of it.
     ///
     /// Call once sceneView has a real, non-zero size, exactly as with
     /// assemble(into:).
-    static func assembleFreeRoll(
+    static func assembleTray(
         into sceneView: SCNView,
-        pool: [Die]
-    ) -> FreeRollSession {
+        pool: [Die],
+        d4Style: DieFaceLabels.D4LabelStyle = .topRead
+    ) -> DiceTraySession {
         AppFonts.registerIfNeeded()
 
         let env = buildEnvironment(into: sceneView)
 
         let lifecycle = DicePoolLifecycleController(containerNode: env.diceContainer)
-        lifecycle.setupPool(pool, playAreaBounds: env.layout.bounds, styleAsRolls: false)
+        lifecycle.setupPool(
+            pool,
+            playAreaBounds: env.layout.bounds,
+            styleAsRolls: false,
+            d4Style: d4Style
+        )
 
         let rollController = DiceRollController()
         rollController.playAreaBounds = env.layout.bounds
@@ -342,12 +411,13 @@ enum DiceSceneAssembler {
         lifecycle.onPoolReset = { [weak contactAudio] in contactAudio?.reset() }
         DiceAudioEngine.shared.start()
 
-        let session = FreeRollSession(
+        let session = DiceTraySession(
             scene: env.scene,
             lifecycle: lifecycle,
             rollController: rollController,
             contactAudio: contactAudio,
             playAreaBounds: env.layout.bounds,
+            d4Style: d4Style,
             applyTheme: {
                 DiceSceneEnvironment.applyTheme(
                     surfaceMaterial: env.floorSurfaceMaterial,
@@ -356,9 +426,15 @@ enum DiceSceneAssembler {
             }
         )
 
-        // Re-enables the Roll button the moment the last die settles.
+        // Per-die results are collected as they land, then delivered in one
+        // batch when the roll completes — a game wants the whole hand, not
+        // a trickle, and the pair of callbacks below is already exactly
+        // that shape.
+        rollController.onDieSettled = { [weak session] dieID, _, value in
+            session?.recordSettled(id: dieID, value: value)
+        }
         rollController.onRollComplete = { [weak session] in
-            session?.onStateChanged?()
+            session?.finishRoll()
         }
 
         return session

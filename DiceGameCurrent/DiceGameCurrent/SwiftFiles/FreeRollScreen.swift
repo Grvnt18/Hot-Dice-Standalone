@@ -1,68 +1,4 @@
 import SwiftUI
-import SceneKit
-
-// MARK: - Scene host
-
-/// Free Roll's equivalent of `DiceSceneView`.
-///
-/// Separate rather than generic over the session type because the two wire
-/// up genuinely different things — Rolls needs a turn controller and tap
-/// handling, Free Roll needs neither. What they do share is the assembly
-/// timing, and that is the part worth getting identical: assembly is
-/// deferred until the view has real bounds, and `LayoutReportingSCNView`
-/// reports when that happens rather than leaving it to chance. See the long
-/// note on `DiceSceneView.assembleIfReady` for what goes wrong otherwise —
-/// a blank black playfield until something unrelated forces a redraw.
-struct FreeRollSceneView: UIViewRepresentable {
-    @Binding var session: FreeRollSession?
-
-    /// The pool, not the dice. `makeDice()` shuffles colourways on every
-    /// call, so storing its result here would build a fresh array on every
-    /// body evaluation and discard all but the first. The dice are made
-    /// once, at assembly.
-    let initialPool: FreeRollPool
-
-    let onSessionCreated: (FreeRollSession) -> Void
-
-    func makeUIView(context: Context) -> SCNView {
-        let view = LayoutReportingSCNView()
-        view.backgroundColor = .black
-        view.antialiasingMode = .multisampling4X
-        view.isPlaying = true
-        return view
-    }
-
-    func updateUIView(_ uiView: SCNView, context: Context) {
-        (uiView as? LayoutReportingSCNView)?.onLayout = { view in
-            assembleIfReady(view, coordinator: context.coordinator)
-        }
-        assembleIfReady(uiView, coordinator: context.coordinator)
-    }
-
-    private func assembleIfReady(_ uiView: SCNView, coordinator: Coordinator) {
-        guard !coordinator.hasStartedAssembly else { return }
-        guard uiView.bounds.width > 0, uiView.bounds.height > 0 else { return }
-
-        coordinator.hasStartedAssembly = true
-
-        let newSession = DiceSceneAssembler.assembleFreeRoll(
-            into: uiView,
-            pool: initialPool.makeDice()
-        )
-        DispatchQueue.main.async {
-            session = newSession
-            onSessionCreated(newSession)
-        }
-    }
-
-    final class Coordinator {
-        var hasStartedAssembly = false
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
-}
 
 // MARK: - Screen
 
@@ -71,7 +7,7 @@ struct FreeRollScreen: View {
     var onExit: (() -> Void)? = nil
 
     @State private var pool = FreeRollPool.default
-    @State private var session: FreeRollSession?
+    @State private var session: DiceTraySession?
     @State private var canRoll = false
     @State private var showingSettings = false
     @ObservedObject private var theme = AppTheme.shared
@@ -94,9 +30,9 @@ struct FreeRollScreen: View {
                 picker
                     .frame(height: headerHeight)
 
-                FreeRollSceneView(
+                DiceTraySceneView(
                     session: $session,
-                    initialPool: pool,
+                    makeInitialDice: { pool.makeDice() },
                     onSessionCreated: { newSession in
                         // Asks the session what is on the table rather than
                         // reading `pool`. This closure outlives the body
@@ -220,7 +156,7 @@ struct FreeRollScreen: View {
 
     /// Rebuilds the dice on the table to match the current selection.
     ///
-    /// Ignored mid-roll — `FreeRollSession.setPool` guards on that too, but
+    /// Ignored mid-roll — `DiceTraySession.setPool` guards on that too, but
     /// keeping the button state honest here avoids a moment where the UI
     /// says the pool changed and the table disagrees.
     private func applyPool() {

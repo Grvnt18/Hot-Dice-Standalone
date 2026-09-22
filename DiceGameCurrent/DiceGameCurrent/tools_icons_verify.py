@@ -18,6 +18,11 @@ import sys
 SWIFT = "SwiftFiles/"
 RES = "Resources/"
 
+# Non-game icons, named here because nothing in the code derives them from
+# an id. Keep this list short: every entry is a name the unused-file check
+# can no longer catch.
+APP_ICON = "icon-app.png"
+
 
 def source(name):
     return open(SWIFT + name).read()
@@ -38,6 +43,12 @@ def main():
         print("  %-30s %s" % (name, "ok" if ok else "MISSING"))
         failed |= not ok
 
+    # The app's own mark, which belongs to no game and so cannot be
+    # derived from an id. GameHubView draws it as GameIconView(id: "app").
+    app_ok = os.path.exists(RES + APP_ICON)
+    print("  %-30s %s" % (APP_ICON, "ok" if app_ok else "MISSING"))
+    failed |= not app_ok
+
     # The Rollbots weapon and ability marks.
     marks = sorted(set(re.findall(r'return "(bot-[a-z]+)"', source("Rollbots.swift"))))
     for mark in marks:
@@ -47,7 +58,9 @@ def main():
         failed |= not ok
 
     # Nothing shipped that nothing asks for.
-    wanted = {"icon-%s.png" % i for i in ids} | {m + ".png" for m in marks}
+    wanted = ({"icon-%s.png" % i for i in ids}
+              | {m + ".png" for m in marks}
+              | {APP_ICON})
     shipped = {f for f in os.listdir(RES) if f.startswith(("icon-", "bot-"))}
     for extra in sorted(shipped - wanted):
         print("  %-30s shipped but unused" % extra)
@@ -55,7 +68,7 @@ def main():
     if failed:
         print("icons: FAILED")
         sys.exit(1)
-    print("icons: PASS (%d games, %d marks)" % (len(ids), len(marks)))
+    print("icons: PASS (%d games, %d marks, app mark)" % (len(ids), len(marks)))
 
 
 if __name__ == "__main__":

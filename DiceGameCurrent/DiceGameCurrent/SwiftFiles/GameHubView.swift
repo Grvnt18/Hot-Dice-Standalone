@@ -82,9 +82,21 @@ struct GameHubView: View {
     ]
 
     private var title: some View {
-        ScriptText("Rolls", size: 52)
-            .foregroundStyle(.white)
-            .shadow(color: .black.opacity(0.5), radius: 4, y: 2)
+        // The suite's own mark above its name. The die stands for the app
+        // as a whole rather than for any one game, so the hub is the one
+        // screen that should carry it — and the one with room for the
+        // artwork and the wordmark both.
+        //
+        // This is NOT the iOS home-screen icon: there is no asset catalog
+        // here, so that is set in Swift Playgrounds' project settings.
+        VStack(spacing: 6) {
+            GameIconView(id: "app")
+                .frame(width: 84, height: 84)
+
+            ScriptText("Rolls", size: 52)
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.5), radius: 4, y: 2)
+        }
     }
 
     private var settingsButton: some View {

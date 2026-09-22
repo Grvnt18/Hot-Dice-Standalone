@@ -14,7 +14,23 @@ struct SettingsView: View {
     /// rather than showing some arbitrary game's rules, which is what it
     /// did when the rules were hardcoded here.
     var gameName: String? = nil
+    var tagline: String? = nil
     var rules: [GameRuleSection] = []
+
+    /// Everything a game's settings sheet needs, stated once by the game
+    /// itself rather than spelled out at each of the ten call sites.
+    ///
+    /// Same trick as `GameCatalogEntry.init(_:makeView:)`: the metadata
+    /// lives on the SuiteGame conformance, so adding a field here does not
+    /// mean editing every screen.
+    init<G: SuiteGame>(for game: G.Type) {
+        self.gameName = G.displayName
+        self.tagline = G.tagline
+        self.rules = G.rules
+    }
+
+    /// The hub's sheet: no game open, so no rules and no How to Play.
+    init() {}
 
     @ObservedObject private var sound = SoundEngine.shared
     @ObservedObject private var theme = AppTheme.shared
@@ -129,7 +145,7 @@ struct SettingsView: View {
                 }
             }
             .sheet(isPresented: $showingHowToPlay) {
-                HowToPlayView(gameName: gameName, sections: rules)
+                HowToPlayView(gameName: gameName, tagline: tagline, sections: rules)
             }
         }
     }
@@ -213,6 +229,7 @@ private extension AppTheme.Swatch {
 /// accent color and shape as everything else.
 private struct HowToPlayView: View {
     let gameName: String?
+    let tagline: String?
     let sections: [GameRuleSection]
 
     @Environment(\.dismiss) private var dismiss
@@ -221,6 +238,19 @@ private struct HowToPlayView: View {
     var body: some View {
         NavigationStack {
             Form {
+                // The one-line pitch, ahead of the rules that explain it.
+                // These lines were written for the hub tiles and lost their
+                // home when the tiles went square and icon-led; this is
+                // where a newcomer actually wants them — the shape of the
+                // game before the detail of it.
+                if let tagline, !tagline.isEmpty {
+                    Section {
+                        Text(tagline)
+                            .font(.stackSans(14))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 ForEach(sections) { section in
                     Section {
                         Text(section.body)

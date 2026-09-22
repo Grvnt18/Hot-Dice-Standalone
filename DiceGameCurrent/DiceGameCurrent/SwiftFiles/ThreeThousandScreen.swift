@@ -121,7 +121,7 @@ struct ThreeThousandScreen: View {
         .dynamicTypeSize(.large)
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showingSettings) {
-            SettingsView(gameName: ThreeThousandGame.displayName, rules: ThreeThousandGame.rules)
+            SettingsView(for: ThreeThousandGame.self)
         }
         .onAppear {
             AppFonts.registerIfNeeded()

@@ -176,7 +176,7 @@ struct RollbotsScreen: View {
         .dynamicTypeSize(.large)
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showingSettings) {
-            SettingsView(gameName: RollbotsGame.displayName, rules: RollbotsGame.rules)
+            SettingsView(for: RollbotsGame.self)
         }
         .onAppear {
             AppFonts.registerIfNeeded()
@@ -191,12 +191,23 @@ struct RollbotsScreen: View {
     private func menuSheet<Content: View>(
         @ViewBuilder _ content: () -> Content
     ) -> some View {
-        GeometryReader { geo in
+        // Built here, NOT inside the GeometryReader. GeometryReader stores
+        // its closure and re-runs it on every layout pass, so that closure
+        // escapes — and a plain (non-@escaping) parameter may not be
+        // captured by one. Swift rejects the build outright.
+        //
+        // Materialising the view once is the better of the two fixes: a
+        // View is a value, so nothing has to retain a closure, and the
+        // builder stops re-running on every resize. Named `menu` rather
+        // than `body` on purpose — a `body` inside a View has bitten this
+        // codebase before.
+        let menu = content()
+        return GeometryReader { geo in
             VStack(spacing: 0) {
                 Spacer(minLength: 0)
                 ZStack {
                     NetFacet().opacity(0.97)
-                    content()
+                    menu
                 }
                 // Setup has the longest list and no dice worth seeing yet,
                 // so it takes the whole column; every other menu leaves the
@@ -462,7 +473,7 @@ struct RollbotsScreen: View {
             lastLine = "\(names[seat]) armed a Quantum Phase."
             finishTurn()
         case .emergencySubroutine:
-            state.ip[seat] = min(RollbotsRules.startingIP, state.ip[seat] + Cyberware.repairAmount)
+            state.ip[seat] = min(RollbotsState.startingIP(seat), state.ip[seat] + Cyberware.repairAmount)
             state.sidearmTurns[seat] = Cyberware.sidearmTurns
             lastLine = "\(names[seat]) repaired \(Cyberware.repairAmount) IP — and is down to the Sidearm."
             finishTurn()

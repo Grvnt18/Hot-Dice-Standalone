@@ -9,18 +9,10 @@ Run it after touching any rules array or any tuning constant."""
 import re
 import sys
 
-SWIFT = "SwiftFiles/"
-
-
-def source(name):
-    return open(SWIFT + name).read()
-
-
-def constant(text, name):
-    """The integer a `static let <name> = <n>` holds."""
-    m = re.search(r'static let %s\s*=\s*(\d+)' % re.escape(name), text)
-    assert m, "no constant named %s" % name
-    return int(m.group(1))
+# Paths and the constant parser both come from tools_swiftconst, which
+# anchors them to the script's own directory. This used to open
+# "SwiftFiles/..." relatively, so it only worked from the project root.
+from tools_swiftconst import source, constant  # noqa: F401
 
 
 def rules_blob(text):

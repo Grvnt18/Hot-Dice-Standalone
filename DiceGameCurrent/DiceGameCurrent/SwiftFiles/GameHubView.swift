@@ -4,9 +4,9 @@ import SwiftUI
 /// the games themselves use.
 ///
 /// This is now the app's root (see `DiceGameApp`), replacing the hardcoded
-/// `DiceGameScreen()`. Games it cannot open yet are still listed, greyed
-/// out — showing eight tiles with six marked "soon" says what the suite is
-/// going to be, which hiding them would not.
+/// `DiceGameScreen()`. All ten games are playable, so every tile opens
+/// something — the greyed-out "soon" state the grid carried while the
+/// suite was being built has been removed rather than left unreachable.
 struct GameHubView: View {
 
     @ObservedObject private var theme = AppTheme.shared
@@ -28,7 +28,6 @@ struct GameHubView: View {
                     LazyVGrid(columns: columns, spacing: 14) {
                         ForEach(GameCatalog.all) { entry in
                             GameTile(entry: entry, accent: theme.accentColor) {
-                                guard entry.isAvailable else { return }
                                 SoundEngine.shared.play(.buttonTap)
                                 openGame = entry
                             }
@@ -51,7 +50,7 @@ struct GameHubView: View {
         // exactly as it had when it was the root, and the game draws its
         // own back control via onExit.
         .fullScreenCover(item: $openGame) { entry in
-            entry.makeView?({ openGame = nil })
+            entry.makeView({ openGame = nil })
         }
         .sheet(isPresented: $showingSettings) {
             // No game, so no rules and no How to Play button. Showing some
@@ -74,8 +73,9 @@ struct GameHubView: View {
         }
     }
 
-    // Two columns: the tiles need room for a name plus a tagline, and three
-    // across on a phone leaves the tagline unreadable.
+    // Two columns. The tiles are squares that carry artwork plus a name, and
+    // three across on a phone shrinks the icon to the point where the games
+    // stop being tellable apart at a glance.
     private let columns = [
         GridItem(.flexible(), spacing: 14),
         GridItem(.flexible(), spacing: 14)
@@ -143,30 +143,18 @@ private struct GameTile: View {
                     // Stack Sans overhangs its advance width, so a trailing
                     // glyph can clip against a tight frame.
                     .padding(.trailing, 3)
-
-                if !entry.isAvailable {
-                    Text("Soon")
-                        .font(.stackSans(10))
-                        .foregroundStyle(.white.opacity(0.65))
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(
-                            Color.black.opacity(0.35),
-                            in: Capsule()
-                        )
-                }
             }
             .frame(maxWidth: .infinity)
             .padding(12)
             // Square, not a fixed minimum height. The grid's two flexible
             // columns give every tile the same width, so tying height to
             // width makes them identical squares at any screen size —
-            // which a minHeight could not, since a long tagline grew its
-            // own tile and left the row ragged.
+            // which a minHeight could not, since the tallest label in a row
+            // grew its own tile and left the row ragged.
             .aspectRatio(1, contentMode: .fit)
             .background(
                 RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                    .fill(accent.opacity(entry.isAvailable ? 0.92 : 0.35))
+                    .fill(accent.opacity(0.92))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
@@ -175,9 +163,5 @@ private struct GameTile: View {
             .shadow(color: .black.opacity(0.35), radius: 3, y: 2)
         }
         .buttonStyle(.plain)
-        .disabled(!entry.isAvailable)
-        // The dimmed fill already reads as unavailable; this stops
-        // VoiceOver announcing a coming-soon tile as a live button.
-        .accessibilityHint(entry.isAvailable ? "" : "Not available yet")
     }
 }

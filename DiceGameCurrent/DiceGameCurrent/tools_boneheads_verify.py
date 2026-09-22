@@ -15,9 +15,20 @@ its own bug. Done properly it is 49.5/48.4 — the same game. The rule
 stays because it is the design's and it is simpler, not because the
 numbers require it."""
 import random
+
+import tools_swiftconst as swiftconst
 from collections import Counter
 
 COLUMNS, SLOTS = 3, 3
+
+# The constants above are a PORT of the Swift, not a reading of it, so
+# they can drift out of agreement with the shipped game without any test
+# noticing. This states which `static let`s in Boneheads.swift they stand on;
+# swiftconst.expect fails by name if the Swift has moved.
+SWIFT_CONSTANTS = {
+    "columns": COLUMNS,
+    "slotsPerColumn": SLOTS,
+}
 
 
 def column_score(dice):
@@ -107,6 +118,7 @@ def play(rng, final_turn=False):
 
 
 def main():
+    swiftconst.expect("Boneheads", "Boneheads.swift", SWIFT_CONSTANTS)
     check_scoring()
     check_strike()
 

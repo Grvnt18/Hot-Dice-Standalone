@@ -14,11 +14,27 @@ Expected at a 3,000 target: ~12 messages a match, Bust ending 50% of
 turns, a banked turn averaging ~900, first seat ~54%."""
 import random
 
+import tools_swiftconst as swiftconst
+
 TARGET = 3000
 DICE_COUNT = 6
 STRAIGHT = 1500
 THREE_PAIRS = 750
 FOUR, FIVE, SIX = 1000, 2000, 3000
+
+# The constants above are a PORT of the Swift, not a reading of it, so
+# they can drift out of agreement with the shipped game without any test
+# noticing. This states which `static let`s in ThreeThousand.swift they stand on;
+# swiftconst.expect fails by name if the Swift has moved.
+SWIFT_CONSTANTS = {
+    "diceCount": DICE_COUNT,
+    "fiveOfAKindPoints": FIVE,
+    "fourOfAKindPoints": FOUR,
+    "sixOfAKindPoints": SIX,
+    "straightPoints": STRAIGHT,
+    "target": TARGET,
+    "threePairPoints": THREE_PAIRS,
+}
 
 
 def score(faces):
@@ -164,6 +180,7 @@ def match(rng):
 
 
 def main():
+    swiftconst.expect("Three Thousand", "ThreeThousand.swift", SWIFT_CONSTANTS)
     check_scoring()
     rng = random.Random(20260922)
 

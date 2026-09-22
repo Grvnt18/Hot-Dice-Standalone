@@ -14,6 +14,8 @@ Expected: about 27 messages a match, 2.8 captures, 1.2 Setbacks, dead
 turns well under one a game, and the first seat around 52%."""
 import random
 
+import tools_swiftconst as swiftconst
+
 ROWS = 3
 BOTTOM_PATH = [
     (3, 4), (3, 3), (3, 2), (3, 1), (2, 1), (2, 2), (2, 3), (2, 4),
@@ -29,6 +31,17 @@ SETBACK = 4
 DICE = 5
 EXACT_EXIT = True
 ROSETTE_ROLLS_AGAIN = True
+
+# The constants above are a PORT of the Swift, not a reading of it, so
+# they can drift out of agreement with the shipped game without any test
+# noticing. This states which `static let`s in RoyalUrRules.swift they stand on;
+# swiftconst.expect fails by name if the Swift has moved.
+SWIFT_CONSTANTS = {
+    "diceCount": DICE,
+    "piecesPerPlayer": PIECES,
+    "piecesToWin": TO_WIN,
+    "setbackDistance": SETBACK,
+}
 
 
 def square(seat, index):
@@ -229,6 +242,7 @@ def check_rules():
 
 
 def main():
+    swiftconst.expect("Royal UR", "RoyalUrRules.swift", SWIFT_CONSTANTS)
     check_board()
     check_trays()
     check_rules()

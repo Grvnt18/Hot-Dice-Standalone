@@ -69,6 +69,72 @@ struct MatchScoreboard: View {
     }
 }
 
+// MARK: - Action bar
+
+/// The button band for a game where a turn can offer a choice.
+///
+/// `DiceRollButton` is one button and Rolls needs no more than that.
+/// Nautical's cargo reroll is the first real decision in the suite — take
+/// the throw or sail with what you have — and Generals' keep-or-score is
+/// the same shape, so the two-button case lives here rather than being
+/// rebuilt per game. With no secondary label this renders exactly like
+/// `DiceRollButton`.
+struct TurnActionBar: View {
+    let primaryLabel: String
+    let primaryEnabled: Bool
+    /// Nil when the turn offers no choice.
+    var secondaryLabel: String? = nil
+    var subtitle: String = ""
+    let onPrimary: () -> Void
+    var onSecondary: () -> Void = {}
+
+    @ObservedObject private var theme = AppTheme.shared
+
+    var body: some View {
+        VStack(spacing: 2) {
+            HStack(spacing: 10) {
+                Button {
+                    onPrimary()
+                } label: {
+                    Text(primaryLabel)
+                        .font(.stackSans(15))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                }
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.roundedRectangle(radius: ControlShape.cornerRadius))
+                .tint(theme.accentColor)
+                .disabled(!primaryEnabled)
+
+                if let secondaryLabel {
+                    Button {
+                        onSecondary()
+                    } label: {
+                        Text(secondaryLabel)
+                            .font(.stackSans(15))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 48)
+                    }
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.roundedRectangle(radius: ControlShape.cornerRadius))
+                    .tint(theme.accentColor)
+                }
+            }
+
+            if !subtitle.isEmpty {
+                Text(subtitle)
+                    .font(.stackSans(12))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(WoodTiledBackground())
+    }
+}
+
 // MARK: - Handover
 
 /// The screen between turns.

@@ -82,6 +82,18 @@ final class DiceTraySession {
     /// Keyed by die so a duplicate settle callback cannot double-count.
     private var settledThisRoll: [UUID: DieResult] = [:]
 
+    /// Every die's current face for the turn in progress, including dice
+    /// that were kept rather than rethrown.
+    ///
+    /// Without this, a partial reroll would report only the dice that
+    /// moved, so each keep would silently shrink the hand the game sees —
+    /// which is the same class of failure Chasing 6's "score only a
+    /// complete set" guard exists to catch. Entries for the dice being
+    /// thrown are dropped at the start of each roll, so a die that somehow
+    /// never reports cannot leave a stale face behind. `beginTurn()`
+    /// clears the lot.
+    private var turnValues: [UUID: DieResult] = [:]
+
     var isRolling: Bool { rollController.isRolling }
 
     init(
@@ -111,6 +123,7 @@ final class DiceTraySession {
     func setPool(_ dice: [Die]) {
         guard !rollController.isRolling else { return }
         settledThisRoll.removeAll()
+        turnValues.removeAll()
         lifecycle.setupPool(
             dice,
             playAreaBounds: playAreaBounds,
@@ -128,13 +141,25 @@ final class DiceTraySession {
 
     /// Called once the whole roll is done.
     fileprivate func finishRoll() {
+        for (id, result) in settledThisRoll { turnValues[id] = result }
+        settledThisRoll.removeAll()
         // Reported in the pool's own order rather than settle order, so a
         // game scoring "the d6 and the d20" does not depend on which die
-        // happened to stop moving first.
-        let ordered = lifecycle.rollableDice.compactMap { settledThisRoll[$0.id] }
-        settledThisRoll.removeAll()
+        // happened to stop moving first. Kept dice are included at their
+        // retained faces — see `turnValues`.
+        let ordered = lifecycle.rollableDice.compactMap { turnValues[$0.id] }
         onStateChanged?()
         if !ordered.isEmpty { onRollSettled?(ordered) }
+    }
+
+    /// Forgets the faces retained from the previous turn.
+    ///
+    /// Only games that keep dice between rolls need to call this; a game
+    /// that always throws everything drops each die's retained face as it
+    /// rethrows it anyway.
+    func beginTurn() {
+        settledThisRoll.removeAll()
+        turnValues.removeAll()
     }
 
     /// Throws every die again. Same two steps DiceTurnController.beginRoll
@@ -147,12 +172,27 @@ final class DiceTraySession {
     /// disabled button.
     @discardableResult
     func roll() -> Bool {
+        roll(keeping: [])
+    }
+
+    /// Throws every die except the ones named, which stay exactly as they
+    /// are — both on the table and in the next `onRollSettled`.
+    ///
+    /// **A kept die cannot be knocked by a rethrown one.** A die that has
+    /// settled is already `.kinematic` (see DiceRollController), and
+    /// `DiceRollImpulse.launch` sets `.dynamic` only on the dice it is
+    /// handed. Kinematic bodies ignore forces and collisions, so passing
+    /// the un-kept dice alone is the whole of what keeping requires — no
+    /// freezing, no moving dice aside.
+    @discardableResult
+    func roll(keeping keptIDs: Set<UUID>) -> Bool {
         guard !rollController.isRolling else { return false }
-        let dice = lifecycle.rollableDice
+        let dice = lifecycle.rollableDice.filter { !keptIDs.contains($0.id) }
         guard !dice.isEmpty else { return false }
         SoundEngine.shared.play(.diceRoll)
         DiceRollImpulse.launch(dice: dice)
         settledThisRoll.removeAll()
+        for die in dice { turnValues.removeValue(forKey: die.id) }
         rollController.startRoll(dice: dice, currentTime: CACurrentMediaTime())
         onStateChanged?()
         return true

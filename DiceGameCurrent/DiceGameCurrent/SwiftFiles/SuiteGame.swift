@@ -140,8 +140,9 @@ enum GameCatalog {
                          tagline: "One scorecard. Claim it first."),
         GameCatalogEntry(id: "three_thousand", displayName: "Three Thousand",
                          tagline: "Bank it or lose it."),
-        GameCatalogEntry(id: "nautical654", displayName: "Nautical 6-5-4",
-                         tagline: "Ship, captain, crew. Best of three."),
+        GameCatalogEntry(NauticalGame.self) { onExit in
+            AnyView(NauticalScreen(onExit: onExit))
+        },
         GameCatalogEntry(id: "royal_path", displayName: "The Royal Path",
                          tagline: "Race, capture, come home.")
     ]

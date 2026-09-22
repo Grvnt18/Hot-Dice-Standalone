@@ -1,12 +1,12 @@
 import SwiftUI
 
-struct NauticalScreen: View {
+struct FreighterYachtDinghyScreen: View {
 
     var onExit: (() -> Void)? = nil
 
     @State private var match = TurnMatch.localTwoPlayer()
     @State private var session: DiceTraySession?
-    @State private var turn = NauticalRules.Turn()
+    @State private var turn = FreighterYachtDinghyRules.Turn()
     @State private var phase: Phase = .ready
     @State private var lastSummary: String?
     @State private var showingSettings = false
@@ -14,7 +14,7 @@ struct NauticalScreen: View {
     /// Normally three. A tie at the end pushes this out by one and the
     /// match plays a sudden-death round — which happens about 1 game in 20,
     /// often enough to need handling and rare enough to stay a moment.
-    @State private var roundsThisMatch = NauticalRules.roundsPerPlayer
+    @State private var roundsThisMatch = FreighterYachtDinghyRules.roundsPerPlayer
 
     @ObservedObject private var theme = AppTheme.shared
 
@@ -54,7 +54,7 @@ struct NauticalScreen: View {
 
                     DiceTraySceneView(
                         session: $session,
-                        makeInitialDice: { NauticalRules.makeDice() },
+                        makeInitialDice: { FreighterYachtDinghyRules.makeDice() },
                         onSessionCreated: { newSession in
                             newSession.onRollSettled = { results in
                                 applyRoll(results)
@@ -106,7 +106,7 @@ struct NauticalScreen: View {
         .dynamicTypeSize(.large)
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showingSettings) {
-            SettingsView(gameName: NauticalGame.displayName, rules: NauticalGame.rules)
+            SettingsView(gameName: FreighterYachtDinghyGame.displayName, rules: FreighterYachtDinghyGame.rules)
         }
         .onAppear {
             AppFonts.registerIfNeeded()
@@ -135,7 +135,7 @@ struct NauticalScreen: View {
         case .ready:
             guard turn.rollsUsed > 0 else { return "" }
             let left = turn.rollsRemaining
-            let needs = NauticalRules.needed(after: turn) ?? ""
+            let needs = FreighterYachtDinghyRules.needed(after: turn) ?? ""
             return "Looking for a \(needs) — \(left) roll\(left == 1 ? "" : "s") left"
         case .decide:
             let total = turn.score
@@ -166,7 +166,7 @@ struct NauticalScreen: View {
 
     /// The scene assembles only once the view has real bounds, so `session`
     /// is nil for the first moments on screen — rolling is gated on it for
-    /// the same reason Chasing 6 gates it.
+    /// the same reason Jackpot gates it.
     private var isPrimaryEnabled: Bool {
         switch phase {
         case .ready, .decide: return session != nil
@@ -199,7 +199,7 @@ struct NauticalScreen: View {
         // Score only a full hand. Kept dice report at their retained faces,
         // so this is five every time; anything less would silently cost the
         // player a qualifier they actually rolled.
-        guard results.count == NauticalRules.diceCount else {
+        guard results.count == FreighterYachtDinghyRules.diceCount else {
             // No known path drops a die, so this should never fire. If it
             // does, hand the throw back rather than claiming off a hand we
             // cannot trust — the roll is not counted, because apply() is
@@ -230,7 +230,7 @@ struct NauticalScreen: View {
     /// path through .decide can add it twice.
     private func settleTurn() {
         match.addScore(turn.score)
-        lastSummary = NauticalRules.summary(for: turn, player: match.activeDisplayName)
+        lastSummary = FreighterYachtDinghyRules.summary(for: turn, player: match.activeDisplayName)
         phase = .scored
     }
 
@@ -246,7 +246,7 @@ struct NauticalScreen: View {
                 // Sudden death: one more round each, decided the same way.
                 roundsThisMatch += 1
             } else {
-                match.finish(lowestScoreWins: NauticalGame.lowestScoreWins)
+                match.finish(lowestScoreWins: FreighterYachtDinghyGame.lowestScoreWins)
                 phase = .finished
                 return
             }
@@ -264,16 +264,16 @@ struct NauticalScreen: View {
 
     /// Clears the dice the previous player kept and starts a fresh turn.
     private func beginTurn() {
-        turn = NauticalRules.Turn()
+        turn = FreighterYachtDinghyRules.Turn()
         session?.beginTurn()
         phase = .ready
     }
 
     private func startNewMatch() {
         match = TurnMatch.localTwoPlayer()
-        roundsThisMatch = NauticalRules.roundsPerPlayer
+        roundsThisMatch = FreighterYachtDinghyRules.roundsPerPlayer
         lastSummary = nil
-        session?.setPool(NauticalRules.makeDice())
+        session?.setPool(FreighterYachtDinghyRules.makeDice())
         beginTurn()
     }
 

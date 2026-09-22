@@ -1,7 +1,7 @@
-"""Port of the shipped Nautical 6-5-4 turn logic, re-run against the
+"""Port of the shipped Freighter.Yacht.Dinghy turn logic, re-run against the
 analysis the rules were chosen from.
 
-Mirrors NauticalRules.Turn.apply / .score in Nautical.swift line for line
+Mirrors FreighterYachtDinghyRules.Turn.apply / .score in Freighter.Yacht.Dinghy.swift line for line
 rather than re-deriving them, so a drift between the code and the numbers
 in the plan shows up here. There is no Swift toolchain in this container,
 so this is the closest thing to running the shipped function.
@@ -18,7 +18,7 @@ CARGO_REROLL_HINT = 6
 
 
 class Turn:
-    """NauticalRules.Turn."""
+    """FreighterYachtDinghyRules.Turn."""
 
     def __init__(self):
         self.claimed = []          # die ids, in claim order
@@ -60,7 +60,7 @@ class Turn:
 
 
 def play_turn(rng, faces=None):
-    """NauticalScreen's turn flow, with the cargo reroll taken on the hint."""
+    """FreighterYachtDinghyScreen's turn flow, with the cargo reroll taken on the hint."""
     turn = Turn()
     hand = {i: 0 for i in range(DICE_COUNT)}
     while True:

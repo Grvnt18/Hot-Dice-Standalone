@@ -1,8 +1,8 @@
-"""Port of the shipped Royal Path rules, re-run against the analysis the
+"""Port of the shipped Royal UR rules, re-run against the analysis the
 rule choices were made from.
 
-Mirrors RoyalPathBoard and RoyalPathState in RoyalPathBoard.swift and
-RoyalPathRules.swift: the same route and mirror, capture only on shared
+Mirrors RoyalUrBoard and RoyalUrState in RoyalUrBoard.swift and
+RoyalUrRules.swift: the same route and mirror, capture only on shared
 squares, the exact-exit requirement, the rosette's extra roll, and a
 Setback that goes back four or to the start if that square is taken.
 There is no Swift toolchain in this container.
@@ -219,7 +219,7 @@ def main():
     assert 24 < messages < 30, messages
     assert captures > 2.0, captures
     assert dead < 0.5, dead
-    print("Royal Path: PASS")
+    print("Royal UR: PASS")
 
 
 if __name__ == "__main__":

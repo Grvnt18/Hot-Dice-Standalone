@@ -204,7 +204,7 @@ struct ThreeThousandScreen: View {
 
     /// The scene assembles only once the view has real bounds, so `session`
     /// is nil for the first moments on screen — rolling is gated on it for
-    /// the same reason Chasing 6 gates it.
+    /// the same reason Jackpot gates it.
     private var isPrimaryEnabled: Bool {
         switch phase {
         case .ready:    return session != nil

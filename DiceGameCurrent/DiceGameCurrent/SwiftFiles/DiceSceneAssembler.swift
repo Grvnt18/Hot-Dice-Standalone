@@ -34,7 +34,7 @@ struct DiceGameSession {
 /// so no DiceTurnController and no DiceTapHandler.
 ///
 /// Free Roll was the first consumer but never the only intended one —
-/// Chasing 6, Nautical, Generals and Three Thousand all want exactly this.
+/// Jackpot, Freighter.Yacht.Dinghy, Generals and Three Thousand all want exactly this.
 /// Rolls keeps its own DiceGameSession, which carries the turn controller,
 /// tap selection and banking none of these games use.
 ///
@@ -66,7 +66,7 @@ final class DiceTraySession {
 
     /// Whether taps select dice at all.
     ///
-    /// Off by default: Free Roll, Chasing 6 and Nautical all select
+    /// Off by default: Free Roll, Jackpot and Freighter.Yacht.Dinghy all select
     /// nothing, and a die that pulses when brushed would be a bug in each
     /// of them. Generals turns it on for the part of a turn where keeping
     /// is a decision, and off again while the dice are in the air.
@@ -117,7 +117,7 @@ final class DiceTraySession {
     ///
     /// Without this, a partial reroll would report only the dice that
     /// moved, so each keep would silently shrink the hand the game sees —
-    /// which is the same class of failure Chasing 6's "score only a
+    /// which is the same class of failure Jackpot's "score only a
     /// complete set" guard exists to catch. Entries for the dice being
     /// thrown are dropped at the start of each roll, so a die that somehow
     /// never reports cannot leave a stale face behind. `beginTurn()`
@@ -247,7 +247,7 @@ final class DiceTraySession {
     /// uses — the impulse and then the settle tracking — minus the scoring.
     ///
     /// Returns false when nothing was thrown, which a caller that changes
-    /// state around the roll has to respect. Chasing 6 flipped itself to a
+    /// state around the roll has to respect. Jackpot flipped itself to a
     /// "rolling" phase and then called this; when it no-opped nothing ever
     /// moved the phase back, leaving the game permanently stuck with a
     /// disabled button.

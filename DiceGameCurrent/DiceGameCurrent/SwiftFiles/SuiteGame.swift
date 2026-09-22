@@ -131,8 +131,8 @@ enum GameCatalog {
         GameCatalogEntry(FreeRollGame.self) { onExit in
             AnyView(FreeRollScreen(onExit: onExit))
         },
-        GameCatalogEntry(ChasingSixGame.self) { onExit in
-            AnyView(ChasingSixScreen(onExit: onExit))
+        GameCatalogEntry(JackpotGame.self) { onExit in
+            AnyView(JackpotScreen(onExit: onExit))
         },
         GameCatalogEntry(PigGame.self) { onExit in
             AnyView(PigScreen(onExit: onExit))
@@ -143,14 +143,14 @@ enum GameCatalog {
         GameCatalogEntry(ThreeThousandGame.self) { onExit in
             AnyView(ThreeThousandScreen(onExit: onExit))
         },
-        GameCatalogEntry(NauticalGame.self) { onExit in
-            AnyView(NauticalScreen(onExit: onExit))
+        GameCatalogEntry(FreighterYachtDinghyGame.self) { onExit in
+            AnyView(FreighterYachtDinghyScreen(onExit: onExit))
         },
-        GameCatalogEntry(RoyalPathGame.self) { onExit in
-            AnyView(RoyalPathScreen(onExit: onExit))
+        GameCatalogEntry(RoyalUrGame.self) { onExit in
+            AnyView(RoyalUrScreen(onExit: onExit))
         },
-        GameCatalogEntry(CyberDieGame.self) { onExit in
-            AnyView(CyberDieScreen(onExit: onExit))
+        GameCatalogEntry(RollbotsGame.self) { onExit in
+            AnyView(RollbotsScreen(onExit: onExit))
         },
         GameCatalogEntry(BoneheadsGame.self) { onExit in
             AnyView(BoneheadsScreen(onExit: onExit))

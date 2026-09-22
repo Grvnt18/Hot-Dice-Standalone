@@ -1,11 +1,11 @@
 import SwiftUI
 
-struct CyberDieScreen: View {
+struct RollbotsScreen: View {
 
     var onExit: (() -> Void)? = nil
 
     @State private var match = TurnMatch.localTwoPlayer()
-    @State private var state = CyberDieState(
+    @State private var state = RollbotsState(
         weapons: [.monoBlade, .monoBlade],
         ware: [.corrosiveVirus, .corrosiveVirus]
     )
@@ -139,7 +139,7 @@ struct CyberDieScreen: View {
         .dynamicTypeSize(.large)
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showingSettings) {
-            SettingsView(gameName: CyberDieGame.displayName, rules: CyberDieGame.rules)
+            SettingsView(gameName: RollbotsGame.displayName, rules: RollbotsGame.rules)
         }
         .onAppear {
             AppFonts.registerIfNeeded()
@@ -152,7 +152,7 @@ struct CyberDieScreen: View {
     private var tray: some View {
         DiceTraySceneView(
             session: $session,
-            makeInitialDice: { [NetArt.die(sides: CyberDieRules.accuracySides, seat: 0)] },
+            makeInitialDice: { [NetArt.die(sides: RollbotsRules.accuracySides, seat: 0)] },
             onSessionCreated: { newSession in
                 newSession.onRollSettled = { results in
                     settled(results)
@@ -337,12 +337,12 @@ struct CyberDieScreen: View {
         usedOverclock = state.overclocked[attacker]
         if usedOverclock {
             // Forced to the top of the die; nothing is thrown for it.
-            accuracy = CyberDieRules.overclockAccuracy
+            accuracy = RollbotsRules.overclockAccuracy
             phase = .defending
             handoverTo = defender
             return
         }
-        if throwDice(sides: CyberDieRules.accuracySides, seat: attacker) {
+        if throwDice(sides: RollbotsRules.accuracySides, seat: attacker) {
             phase = .rollingAccuracy
         }
     }
@@ -362,7 +362,7 @@ struct CyberDieScreen: View {
             lastLine = "\(names[seat]) armed a Quantum Phase."
             finishTurn()
         case .emergencySubroutine:
-            state.ip[seat] = min(CyberDieRules.startingIP, state.ip[seat] + Cyberware.repairAmount)
+            state.ip[seat] = min(RollbotsRules.startingIP, state.ip[seat] + Cyberware.repairAmount)
             state.sidearmTurns[seat] = Cyberware.sidearmTurns
             lastLine = "\(names[seat]) repaired \(Cyberware.repairAmount) IP — and is down to the Sidearm."
             finishTurn()
@@ -444,7 +444,7 @@ struct CyberDieScreen: View {
 
     private func resolveExchange(damageRoll: Int) {
         let weapon = state.activeWeapon(attacker)
-        let resolution = CyberDieRules.resolve(
+        let resolution = RollbotsRules.resolve(
             weapon: weapon,
             accuracy: accuracy,
             damageRoll: damageRoll,
@@ -468,7 +468,7 @@ struct CyberDieScreen: View {
         finishTurn()
     }
 
-    private func line(for r: CyberDieRules.Resolution, weapon: CyberWeapon) -> String {
+    private func line(for r: RollbotsRules.Resolution, weapon: CyberWeapon) -> String {
         if r.evaded && r.counter > 0 {
             return "Phased clean through — and hit back for \(r.counter)."
         }
@@ -527,7 +527,7 @@ struct CyberDieScreen: View {
     /// table, so whatever is rolling is unambiguous.
     /// Returns false when nothing was thrown, which every caller has to
     /// respect: no throw means no settle callback, and a phase that moved
-    /// first would be a phase nothing could move back. Chasing 6 shipped
+    /// first would be a phase nothing could move back. Jackpot shipped
     /// that bug once already.
     @discardableResult
     private func throwDice(sides: Int, seat: Int) -> Bool {
@@ -578,7 +578,7 @@ struct CyberDieScreen: View {
 
     private func startNewMatch() {
         match = TurnMatch.localTwoPlayer()
-        state = CyberDieState(weapons: [.monoBlade, .monoBlade],
+        state = RollbotsState(weapons: [.monoBlade, .monoBlade],
                               ware: [.corrosiveVirus, .corrosiveVirus])
         setupSeat = 0
         pendingWeapon = nil

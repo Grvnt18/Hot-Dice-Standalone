@@ -1,9 +1,9 @@
-"""Renders the Royal Path board to an SVG, from the same arithmetic the
+"""Renders the Royal UR board to an SVG, from the same arithmetic the
 shipped SwiftUI draws it with.
 
 There is no Swift toolchain, iOS SDK or display in this container, so board
-art cannot be checked by building it. This mirrors RoyalPathLayout and the
-markings in RoyalPathBoardView.swift — the same tile/gap/margin ratios, the
+art cannot be checked by building it. This mirrors RoyalUrLayout and the
+markings in RoyalUrBoardView.swift — the same tile/gap/margin ratios, the
 same square list, the same motif geometry — so the proportions, the missing
 bridge corners and the rosette placement can at least be looked at before
 the iPad sees them.
@@ -11,7 +11,7 @@ the iPad sees them.
 It is a preview, not a pixel match: the SVG uses flat fills where the app
 uses its faceted low-poly texture and tiled timber.
 
-    python3 tools_royalpath_preview.py > board.svg
+    python3 tools_royalur_preview.py > board.svg
 """
 import math
 import sys
@@ -49,7 +49,7 @@ def decor(square):
 
 
 class Layout:
-    """RoyalPathLayout."""
+    """RoyalUrLayout."""
 
     def __init__(self, width):
         self.tile = width / 8.92

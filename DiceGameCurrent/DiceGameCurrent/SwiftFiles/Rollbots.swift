@@ -1,6 +1,6 @@
 import Foundation
 
-/// CyberDie NetDuel: two netrunners, one arena, and a reaction to every
+/// Rollbots: two netrunners, one arena, and a reaction to every
 /// single attack.
 ///
 /// Built from a design document written for a chat bot. Every probability
@@ -9,7 +9,7 @@ import Foundation
 /// computed what happens once the defender plays well, and that is where
 /// the balance was. See `CyberWeapon` and `Cyberware` for what changed and
 /// by how much.
-enum CyberDieRules {
+enum RollbotsRules {
 
     /// Integrity Points. The document says 20; that measures 15.7 turns,
     /// which is 31 messages in a thread and the longest game in the suite
@@ -227,7 +227,7 @@ extension Cyberware {
 
 // MARK: - Resolving an attack
 
-extension CyberDieRules {
+extension RollbotsRules {
 
     /// Everything one exchange produced, for the log line and the screen.
     struct Resolution: Equatable {
@@ -307,7 +307,7 @@ extension CyberDieRules {
 // MARK: - Match state
 
 /// Both runners, everything ticking on them, and whose deck is hot.
-struct CyberDieState: Codable, Equatable {
+struct RollbotsState: Codable, Equatable {
 
     var ip: [Int]
     var weapon: [CyberWeapon]
@@ -327,8 +327,8 @@ struct CyberDieState: Codable, Equatable {
 
     init(weapons: [CyberWeapon], ware: [Cyberware]) {
         ip = [
-            CyberDieRules.startingIP,
-            CyberDieRules.startingIP + CyberDieRules.secondSeatBonusIP
+            RollbotsRules.startingIP,
+            RollbotsRules.startingIP + RollbotsRules.secondSeatBonusIP
         ]
         weapon = weapons
         self.ware = ware
@@ -373,15 +373,15 @@ struct CyberDieState: Codable, Equatable {
 
 // MARK: - Suite entry
 
-enum CyberDieGame: SuiteGame {
-    static let id = "cyberdie"
-    static let displayName = "CyberDie NetDuel"
+enum RollbotsGame: SuiteGame {
+    static let id = "rollbots"
+    static let displayName = "Rollbots"
     static let tagline = "Duel in the net. Answer every shot."
 
     static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "The Duel",
-            body: "Two netrunners, \(CyberDieRules.startingIP) Integrity Points each. Take your opponent to zero. The second runner starts one point up, because striking first is worth about four percent."
+            body: "Two netrunners, \(RollbotsRules.startingIP) Integrity Points each. Take your opponent to zero. The second runner starts one point up, because striking first is worth about four percent."
         ),
         GameRuleSection(
             title: "Attacking",

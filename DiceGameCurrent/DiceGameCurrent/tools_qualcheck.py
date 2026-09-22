@@ -41,7 +41,7 @@ members = collections.defaultdict(set)
 declared = set()          # declared here, so its full surface is visible
 conformances = collections.defaultdict(set)   # type -> protocols/bases it lists
 # Capture any inheritance clause so protocol defaults can be credited to the
-# conforming type. Without this, ChasingSixGame.lowestScoreWins looked
+# conforming type. Without this, JackpotGame.lowestScoreWins looked
 # unresolved: it is supplied by `extension SuiteGame`, not declared on the
 # enum itself.
 own_re  = re.compile(r'\b(?:struct|class|enum|protocol|actor)\s+([A-Za-z_]\w*)\s*(?::\s*([^{\n]+))?')

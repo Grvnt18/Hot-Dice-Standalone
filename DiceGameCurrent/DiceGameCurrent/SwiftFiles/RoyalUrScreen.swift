@@ -1,12 +1,12 @@
 import SwiftUI
 
-struct RoyalPathScreen: View {
+struct RoyalUrScreen: View {
 
     var onExit: (() -> Void)? = nil
 
     /// Scores are pieces brought home, so the scoreboard is the race.
     @State private var match = TurnMatch.localTwoPlayer()
-    @State private var state = RoyalPathState()
+    @State private var state = RoyalUrState()
     @State private var session: DiceTraySession?
     @State private var steps = 0
     @State private var phase: Phase = .ready
@@ -64,7 +64,7 @@ struct RoyalPathScreen: View {
                     )
                     .frame(height: headerHeight)
 
-                    RoyalPathBoardView(
+                    RoyalUrBoardView(
                         positions: state.positions,
                         highlighted: highlighted,
                         onTapSquare: { handleTap($0) }
@@ -74,7 +74,7 @@ struct RoyalPathScreen: View {
 
                     DiceTraySceneView(
                         session: $session,
-                        makeInitialDice: { RoyalPathRules.makeDice() },
+                        makeInitialDice: { RoyalUrRules.makeDice() },
                         onSessionCreated: { newSession in
                             newSession.onRollSettled = { results in
                                 applyRoll(results)
@@ -124,7 +124,7 @@ struct RoyalPathScreen: View {
         .dynamicTypeSize(.large)
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showingSettings) {
-            SettingsView(gameName: RoyalPathGame.displayName, rules: RoyalPathGame.rules)
+            SettingsView(gameName: RoyalUrGame.displayName, rules: RoyalUrGame.rules)
         }
         .onAppear {
             AppFonts.registerIfNeeded()
@@ -145,20 +145,20 @@ struct RoyalPathScreen: View {
     ///
     /// Home has no square, so it is not in here — it gets the button
     /// instead, at `homeMove`.
-    private var destinations: [RoyalPathBoard.Square: Int] {
-        var result: [RoyalPathBoard.Square: Int] = [:]
+    private var destinations: [RoyalUrBoard.Square: Int] {
+        var result: [RoyalUrBoard.Square: Int] = [:]
         for (piece, destination) in moves {
-            guard let square = RoyalPathBoard.square(seat: seat, index: destination) else { continue }
+            guard let square = RoyalUrBoard.square(seat: seat, index: destination) else { continue }
             result[square] = piece
         }
         return result
     }
 
     private var homeMove: Int? {
-        moves.first(where: { $0.value == RoyalPathRules.homeIndex })?.key
+        moves.first(where: { $0.value == RoyalUrRules.homeIndex })?.key
     }
 
-    private var highlighted: Set<RoyalPathBoard.Square> {
+    private var highlighted: Set<RoyalUrBoard.Square> {
         switch phase {
         case .choosing:
             return Set(destinations.keys)
@@ -202,7 +202,7 @@ struct RoyalPathScreen: View {
             let count = moves.count
             return "Rolled \(steps) — \(count) move\(count == 1 ? "" : "s")"
         case .setback:
-            return "Rolled \(steps) — nowhere to go. One of yours goes back \(RoyalPathRules.setbackDistance)."
+            return "Rolled \(steps) — nowhere to go. One of yours goes back \(RoyalUrRules.setbackDistance)."
         case .scored:
             return lastSummary ?? ""
         default:
@@ -233,7 +233,7 @@ struct RoyalPathScreen: View {
             }
         case .choosing:
             if let piece = homeMove {
-                move(piece: piece, to: RoyalPathRules.homeIndex)
+                move(piece: piece, to: RoyalUrRules.homeIndex)
             }
         case .scored:
             endTurn()
@@ -245,7 +245,7 @@ struct RoyalPathScreen: View {
     // MARK: Turn flow
 
     private func applyRoll(_ results: [DiceTraySession.DieResult]) {
-        guard results.count == RoyalPathRules.diceCount else {
+        guard results.count == RoyalUrRules.diceCount else {
             phase = .ready
             return
         }
@@ -253,7 +253,7 @@ struct RoyalPathScreen: View {
         // Held locally as well as in state: everything below decides the
         // phase from this roll, and reading it back out of @State to do so
         // would be relying on write ordering for no reason.
-        let rolled = RoyalPathRules.steps(from: results)
+        let rolled = RoyalUrRules.steps(from: results)
         steps = rolled
 
         if !state.legalMoves(seat: seat, steps: rolled).isEmpty {
@@ -274,7 +274,7 @@ struct RoyalPathScreen: View {
         phase = .setback
     }
 
-    private func handleTap(_ square: RoyalPathBoard.Square) {
+    private func handleTap(_ square: RoyalUrBoard.Square) {
         switch phase {
         case .choosing:
             guard let piece = destinations[square], let destination = moves[piece] else { return }
@@ -331,7 +331,7 @@ struct RoyalPathScreen: View {
         phase = .scored
     }
 
-    private func summary(for outcome: RoyalPathState.MoveOutcome, destination: Int) -> String {
+    private func summary(for outcome: RoyalUrState.MoveOutcome, destination: Int) -> String {
         let player = match.activeDisplayName
         if outcome.cameHome { return "\(player) brought a piece home." }
         if outcome.captured {
@@ -357,9 +357,9 @@ struct RoyalPathScreen: View {
 
     private func startNewMatch() {
         match = TurnMatch.localTwoPlayer()
-        state = RoyalPathState()
+        state = RoyalUrState()
         lastSummary = nil
-        session?.setPool(RoyalPathRules.makeDice())
+        session?.setPool(RoyalUrRules.makeDice())
         beginTurn()
     }
 
@@ -385,9 +385,9 @@ struct RoyalPathScreen: View {
 
 // MARK: - Suite entry
 
-enum RoyalPathGame: SuiteGame {
-    static let id = "royal_path"
-    static let displayName = "The Royal Path"
+enum RoyalUrGame: SuiteGame {
+    static let id = "royal_ur"
+    static let displayName = "Royal UR"
     static let tagline = "Race, capture, come home."
 
     static let rules: [GameRuleSection] = [

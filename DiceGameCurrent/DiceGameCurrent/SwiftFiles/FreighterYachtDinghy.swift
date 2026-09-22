@@ -1,12 +1,12 @@
 import Foundation
 
-/// Nautical 6-5-4: find a Ship, a Captain and a Crew, then sail with
+/// Freighter.Yacht.Dinghy: find a Ship, a Captain and a Crew, then sail with
 /// whatever cargo is left.
 ///
 /// Three rounds, each played as its own turn rather than batched, so every
 /// round lands as its own reveal and the last is played knowing exactly
 /// what is needed.
-enum NauticalRules {
+enum FreighterYachtDinghyRules {
 
     /// Rounds each player plays. Best of three on cumulative points.
     static let roundsPerPlayer = 3
@@ -43,7 +43,7 @@ enum NauticalRules {
 
 // MARK: - One turn
 
-extension NauticalRules {
+extension FreighterYachtDinghyRules {
 
     /// The state of a single turn: what has been claimed, what is riding as
     /// cargo, and how many rolls are left.
@@ -70,9 +70,9 @@ extension NauticalRules {
         /// nothing, which is the only way one is ever made.
         init() {}
 
-        var isQualified: Bool { claimed.count == NauticalRules.qualifiers.count }
+        var isQualified: Bool { claimed.count == FreighterYachtDinghyRules.qualifiers.count }
 
-        var rollsRemaining: Int { max(0, NauticalRules.rollsPerTurn - rollsUsed) }
+        var rollsRemaining: Int { max(0, FreighterYachtDinghyRules.rollsPerTurn - rollsUsed) }
 
         /// Cargo total, or 0 for a turn that never qualified.
         var score: Int { isQualified ? cargo.reduce(0) { $0 + $1.value } : 0 }
@@ -97,8 +97,8 @@ extension NauticalRules {
 
             // Strict order, one die per qualifier. A roll of 6-6-5-4-4
             // takes one 6, then the 5, then one 4 — never two 6's.
-            while claimed.count < NauticalRules.qualifiers.count,
-                  let index = unclaimed.firstIndex(where: { $0.value == NauticalRules.qualifiers[claimed.count] }) {
+            while claimed.count < FreighterYachtDinghyRules.qualifiers.count,
+                  let index = unclaimed.firstIndex(where: { $0.value == FreighterYachtDinghyRules.qualifiers[claimed.count] }) {
                 claimed.append(unclaimed[index].id)
                 unclaimed.remove(at: index)
             }
@@ -117,7 +117,7 @@ extension NauticalRules {
 
 // MARK: - Describing a turn
 
-extension NauticalRules {
+extension FreighterYachtDinghyRules {
 
     /// The names, in claim order.
     static let qualifierNames = ["Ship", "Captain", "Crew"]
@@ -141,9 +141,9 @@ extension NauticalRules {
 
 // MARK: - Suite entry
 
-enum NauticalGame: SuiteGame {
-    static let id = "nautical654"
-    static let displayName = "Nautical 6-5-4"
+enum FreighterYachtDinghyGame: SuiteGame {
+    static let id = "fyd"
+    static let displayName = "Freighter.Yacht.Dinghy"
     static let tagline = "Ship, captain, crew. Best of three."
 
     static let rules: [GameRuleSection] = [

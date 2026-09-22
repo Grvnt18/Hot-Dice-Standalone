@@ -74,7 +74,7 @@ struct MatchScoreboard: View {
 /// The button band for a game where a turn can offer a choice.
 ///
 /// `DiceRollButton` is one button and Rolls needs no more than that.
-/// Nautical's cargo reroll is the first real decision in the suite — take
+/// Freighter.Yacht.Dinghy's cargo reroll is the first real decision in the suite — take
 /// the throw or sail with what you have — and Generals' keep-or-score is
 /// the same shape, so the two-button case lives here rather than being
 /// rebuilt per game. With no secondary label this renders exactly like

@@ -1,6 +1,6 @@
 import Foundation
 
-/// The Royal Path board: which squares exist, which are rosettes, and the
+/// Royal UR board: which squares exist, which are rosettes, and the
 /// route each player walks.
 ///
 /// Pure geometry — no pieces, no dice, no turn state. The board is the one
@@ -12,7 +12,7 @@ import Foundation
 /// The shape is the traditional one: a 4x3 block, a two-square bridge along
 /// the middle row, and a 2x3 block — twenty squares, with the four corners
 /// of the bridge missing.
-enum RoyalPathBoard {
+enum RoyalUrBoard {
 
     static let rows = 3
     static let columns = 8
@@ -120,7 +120,7 @@ enum RoyalPathBoard {
 
 // MARK: - Decoration
 
-extension RoyalPathBoard {
+extension RoyalUrBoard {
 
     /// The six markings the traditional board carries, one per square.
     ///

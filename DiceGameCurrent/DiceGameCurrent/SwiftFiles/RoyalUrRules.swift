@@ -1,13 +1,13 @@
 import Foundation
 
-/// The Royal Path: three pieces each, five binary dice, and a board where
+/// Royal UR: three pieces each, five binary dice, and a board where
 /// nearly every square can be taken from you.
 ///
 /// Measured over 15,000 simulated games with both seats playing the same
 /// way: **27 messages a match, 2.8 captures, 1.2 Setbacks**, and the first
 /// seat winning 52%. The two numbers that move it most are below, at
 /// `rosetteGrantsAnotherRoll` and `requiresExactExit`.
-enum RoyalPathRules {
+enum RoyalUrRules {
 
     /// Five dice, each scoring one or nothing — 0 to 5 a turn, averaging
     /// 2.5. Four dice average 2.0 and make for a longer, thinner game.
@@ -24,7 +24,7 @@ enum RoyalPathRules {
     static let setbackDistance = 4
 
     /// One past the last square on the path.
-    static let homeIndex = RoyalPathBoard.pathLength + 1
+    static let homeIndex = RoyalUrBoard.pathLength + 1
 
     /// A piece comes home only on an exact count; an overshoot is not a
     /// legal move.
@@ -78,14 +78,14 @@ enum RoyalPathRules {
 
 /// Where the six pieces are. Index 0 is waiting to enter, 1...16 is on the
 /// board, and `homeIndex` is home.
-struct RoyalPathState: Codable, Equatable {
+struct RoyalUrState: Codable, Equatable {
 
     /// `positions[seat][piece]`.
     private(set) var positions: [[Int]]
 
     init() {
         positions = Array(
-            repeating: Array(repeating: 0, count: RoyalPathRules.piecesPerPlayer),
+            repeating: Array(repeating: 0, count: RoyalUrRules.piecesPerPlayer),
             count: 2
         )
     }
@@ -97,7 +97,7 @@ struct RoyalPathState: Codable, Equatable {
     func index(seat: Int, piece: Int) -> Int { positions[seat][piece] }
 
     func homeCount(seat: Int) -> Int {
-        positions[seat].filter { $0 == RoyalPathRules.homeIndex }.count
+        positions[seat].filter { $0 == RoyalUrRules.homeIndex }.count
     }
 
     func waitingCount(seat: Int) -> Int {
@@ -111,18 +111,18 @@ struct RoyalPathState: Codable, Equatable {
     }
 
     private func isOnBoard(_ index: Int) -> Bool {
-        index >= 1 && index <= RoyalPathBoard.pathLength
+        index >= 1 && index <= RoyalUrBoard.pathLength
     }
 
     /// The square a piece occupies, or nil when it is waiting or home.
-    func square(seat: Int, piece: Int) -> RoyalPathBoard.Square? {
-        RoyalPathBoard.square(seat: seat, index: positions[seat][piece])
+    func square(seat: Int, piece: Int) -> RoyalUrBoard.Square? {
+        RoyalUrBoard.square(seat: seat, index: positions[seat][piece])
     }
 
     /// Which piece of a seat's is standing on a square, if any.
-    func piece(of seat: Int, on square: RoyalPathBoard.Square) -> Int? {
+    func piece(of seat: Int, on square: RoyalUrBoard.Square) -> Int? {
         positions[seat].indices.first {
-            RoyalPathBoard.square(seat: seat, index: positions[seat][$0]) == square
+            RoyalUrBoard.square(seat: seat, index: positions[seat][$0]) == square
         }
     }
 
@@ -138,16 +138,16 @@ struct RoyalPathState: Codable, Equatable {
         var moves: [Int: Int] = [:]
         for piece in positions[seat].indices {
             let from = positions[seat][piece]
-            guard from != RoyalPathRules.homeIndex else { continue }
+            guard from != RoyalUrRules.homeIndex else { continue }
 
             var destination = from + steps
-            if destination > RoyalPathRules.homeIndex {
-                guard !RoyalPathRules.requiresExactExit else { continue }
-                destination = RoyalPathRules.homeIndex
+            if destination > RoyalUrRules.homeIndex {
+                guard !RoyalUrRules.requiresExactExit else { continue }
+                destination = RoyalUrRules.homeIndex
             }
 
-            if destination < RoyalPathRules.homeIndex,
-               let target = RoyalPathBoard.square(seat: seat, index: destination),
+            if destination < RoyalUrRules.homeIndex,
+               let target = RoyalUrBoard.square(seat: seat, index: destination),
                occupiedBySelf(seat: seat, square: target, ignoring: piece) {
                 continue
             }
@@ -156,17 +156,17 @@ struct RoyalPathState: Codable, Equatable {
         return moves
     }
 
-    private func occupiedBySelf(seat: Int, square: RoyalPathBoard.Square, ignoring piece: Int) -> Bool {
+    private func occupiedBySelf(seat: Int, square: RoyalUrBoard.Square, ignoring piece: Int) -> Bool {
         positions[seat].indices.contains {
-            $0 != piece && RoyalPathBoard.square(seat: seat, index: positions[seat][$0]) == square
+            $0 != piece && RoyalUrBoard.square(seat: seat, index: positions[seat][$0]) == square
         }
     }
 
     /// The opponent piece a move would send home, if any.
     func capture(seat: Int, destination: Int) -> Int? {
-        guard destination < RoyalPathRules.homeIndex,
-              let square = RoyalPathBoard.square(seat: seat, index: destination),
-              RoyalPathBoard.isShared(square) else { return nil }
+        guard destination < RoyalUrRules.homeIndex,
+              let square = RoyalUrBoard.square(seat: seat, index: destination),
+              RoyalUrBoard.isShared(square) else { return nil }
         return piece(of: 1 - seat, on: square)
     }
 
@@ -178,7 +178,7 @@ struct RoyalPathState: Codable, Equatable {
 
         /// A rosette buys another roll — nothing else does.
         var grantsAnotherRoll: Bool {
-            landedOnRosette && RoyalPathRules.rosetteGrantsAnotherRoll
+            landedOnRosette && RoyalUrRules.rosetteGrantsAnotherRoll
         }
     }
 
@@ -192,8 +192,8 @@ struct RoyalPathState: Codable, Equatable {
 
         return MoveOutcome(
             captured: captured != nil,
-            cameHome: destination == RoyalPathRules.homeIndex,
-            landedOnRosette: RoyalPathBoard.isRosette(seat: seat, index: destination)
+            cameHome: destination == RoyalUrRules.homeIndex,
+            landedOnRosette: RoyalUrBoard.isRosette(seat: seat, index: destination)
         )
     }
 
@@ -217,8 +217,8 @@ struct RoyalPathState: Codable, Equatable {
     /// it goes all the way back to the start. A Setback never captures:
     /// being unable to move should not be a way to take a piece.
     func setbackDestination(seat: Int, piece: Int) -> Int {
-        let target = positions[seat][piece] - RoyalPathRules.setbackDistance
-        guard target >= 1, let square = RoyalPathBoard.square(seat: seat, index: target) else {
+        let target = positions[seat][piece] - RoyalUrRules.setbackDistance
+        guard target >= 1, let square = RoyalUrBoard.square(seat: seat, index: target) else {
             return 0
         }
         let occupied = occupiedBySelf(seat: seat, square: square, ignoring: piece)
@@ -236,7 +236,7 @@ struct RoyalPathState: Codable, Equatable {
     // MARK: Winning
 
     var winner: Int? {
-        for seat in positions.indices where homeCount(seat: seat) >= RoyalPathRules.piecesToWin {
+        for seat in positions.indices where homeCount(seat: seat) >= RoyalUrRules.piecesToWin {
             return seat
         }
         return nil

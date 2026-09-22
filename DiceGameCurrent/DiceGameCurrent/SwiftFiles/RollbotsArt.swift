@@ -77,7 +77,7 @@ struct NetGrid: View {
 
 /// Both runners' integrity, and everything currently ticking on them.
 struct NetStatusPanel: View {
-    let state: CyberDieState
+    let state: RollbotsState
     let activeSeat: Int
     let names: [String]
     let subtitle: String?
@@ -110,7 +110,7 @@ struct NetStatusPanel: View {
     private func bar(_ seat: Int) -> some View {
         let colour = NetArt.seat(seat)
         let isActive = seat == activeSeat
-        let maximum = CyberDieRules.startingIP + CyberDieRules.secondSeatBonusIP
+        let maximum = RollbotsRules.startingIP + RollbotsRules.secondSeatBonusIP
         let fraction = max(0, min(1, Double(state.ip[seat]) / Double(maximum)))
 
         return VStack(alignment: .leading, spacing: 3) {
@@ -342,7 +342,7 @@ struct NetHandoverGate: View {
 // MARK: - Result
 
 struct NetResultView: View {
-    let state: CyberDieState
+    let state: RollbotsState
     let names: [String]
     /// Empty on a System Draw.
     let winners: [Int]

@@ -284,7 +284,7 @@ enum DieFaceLabels {
 
         /// Each face carries its own number at all three of its corners, so
         /// the three visible faces show three DIFFERENT numbers around the
-        /// apex — one per face, every one upright. Chasing 6 uses this,
+        /// apex — one per face, every one upright. Jackpot uses this,
         /// since it reads the three exposed faces rather than a single
         /// value.
         case faceNumbers
@@ -302,7 +302,7 @@ enum DieFaceLabels {
     ///
     /// Always three distinct values: `{1,2,3,4}` minus the resting face's
     /// number. That is the same distribution the apex reading produces,
-    /// which is why Chasing 6's odds are identical under either labelling.
+    /// which is why Jackpot's odds are identical under either labelling.
     static func d4ExposedFaceNumbers(restingFace face: Int) -> [Int] {
         (1...4).filter { $0 != face + 1 }
     }

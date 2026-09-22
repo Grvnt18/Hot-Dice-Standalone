@@ -4,7 +4,7 @@ import Foundation
 /// has scored, and whether it is over.
 ///
 /// Deliberately knows nothing about dice. Every alternating game in the
-/// suite — Chasing 6, Nautical, PIG, Three Thousand, Generals, Royal Path —
+/// suite — Jackpot, Freighter.Yacht.Dinghy, PIG, Three Thousand, Generals, Royal UR —
 /// needs exactly this bookkeeping and nothing about it is game-specific,
 /// so the games carry their own state separately and let this handle turns.
 ///
@@ -49,7 +49,7 @@ struct TurnMatch: Codable, Equatable {
     enum Outcome: Codable, Equatable {
         /// Ended normally; `winners` has more than one entry on a draw.
         case decided(winners: [String])
-        /// Ended early by a game-specific condition — Chasing 6's Jackpot
+        /// Ended early by a game-specific condition — Jackpot's Jackpot
         /// is the first of these. Carried separately so the result screen
         /// can say *why* rather than only who.
         case special(winners: [String], reason: String)

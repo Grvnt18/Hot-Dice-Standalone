@@ -1,10 +1,10 @@
 import Foundation
 
-/// Chasing 6: roll a polyhedral set, score matching sets, chase the Jackpot.
+/// Jackpot: roll a polyhedral set, score matching sets, chase the Jackpot.
 ///
 /// Five rounds each, alternating, so you see your opponent's round before
 /// you roll yours.
-enum ChasingSixRules {
+enum JackpotRules {
 
     static let roundsPerPlayer = 5
 
@@ -29,7 +29,7 @@ enum ChasingSixRules {
 
 // MARK: - Reading the dice
 
-extension ChasingSixRules {
+extension JackpotRules {
 
     /// The seven numbers a settled set produces.
     ///
@@ -61,7 +61,7 @@ extension ChasingSixRules {
 
 // MARK: - Scoring
 
-extension ChasingSixRules {
+extension JackpotRules {
 
     struct TurnScore: Equatable {
         /// Points from matching sets.
@@ -138,7 +138,7 @@ extension ChasingSixRules {
 
 // MARK: - Jackpot resolution
 
-extension ChasingSixRules {
+extension JackpotRules {
 
     /// Who a Jackpot leaves standing at the end of a round.
     ///
@@ -157,7 +157,7 @@ extension ChasingSixRules {
 
 // MARK: - The pool
 
-extension ChasingSixRules {
+extension JackpotRules {
 
     /// A fresh set of dice, one colourway each.
     ///
@@ -174,9 +174,9 @@ extension ChasingSixRules {
 
 // MARK: - Suite entry
 
-enum ChasingSixGame: SuiteGame {
-    static let id = "chasing6"
-    static let displayName = "Chasing 6"
+enum JackpotGame: SuiteGame {
+    static let id = "jackpot"
+    static let displayName = "Jackpot"
     static let tagline = "Five rounds, or hit the jackpot."
 
     static let rules: [GameRuleSection] = [

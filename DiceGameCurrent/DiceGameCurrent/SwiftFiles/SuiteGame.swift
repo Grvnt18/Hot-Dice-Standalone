@@ -146,8 +146,9 @@ enum GameCatalog {
         GameCatalogEntry(NauticalGame.self) { onExit in
             AnyView(NauticalScreen(onExit: onExit))
         },
-        GameCatalogEntry(id: "royal_path", displayName: "The Royal Path",
-                         tagline: "Race, capture, come home.")
+        GameCatalogEntry(RoyalPathGame.self) { onExit in
+            AnyView(RoyalPathScreen(onExit: onExit))
+        }
     ]
 }
 

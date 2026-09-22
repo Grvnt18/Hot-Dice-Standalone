@@ -32,10 +32,10 @@ struct GameHubView: View {
                                 openGame = entry
                             }
                         }
+                        .padding(.horizontal, Self.gutter)
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.vertical, 22)
                 }
-                .padding(.vertical, 22)
             }
         }
         .overlay(alignment: .topTrailing) { settingsButton }
@@ -81,7 +81,45 @@ struct GameHubView: View {
         GridItem(.flexible(), spacing: 14)
     ]
 
-    private var title: some View {
+    /// The tile size the layout aims for, before it is fitted to the width.
+    ///
+    /// Roughly a thumb's width. Everything else follows from it: the column
+    /// count is however many of these fit, and the actual side is that
+    /// count divided back into the real width.
+    static let targetTile: CGFloat = 180
+
+    /// How many columns a given width should carry.
+    ///
+    /// Two at the bottom, because one column of giant tiles is a list, not a
+    /// grid; five at the top, because past that the name under each icon
+    /// stops being readable. An iPad gets more games per screen rather than
+    /// bigger ones — which is the difference between filling a screen and
+    /// scaling to it.
+    static func columnCount(forWidth width: CGFloat) -> Int {
+        let usable = width - gutter * 2 + columnGap
+        let fits = Int(usable / (targetTile + columnGap))
+        return min(max(fits, 2), 5)
+    }
+
+    /// The square each tile occupies, for a given width.
+    ///
+    /// The floor matters: a GeometryReader reports a width of zero on its
+    /// first pass, and a tile of zero is how the icons vanished before.
+    static func tileSide(forWidth width: CGFloat) -> CGFloat {
+        let count = CGFloat(columnCount(forWidth: width))
+        let available = width - gutter * 2 - columnGap * (count - 1)
+        return max(120, available / count)
+    }
+
+    /// Fixed rather than flexible now that the side is known: a fixed column
+    /// and a fixed tile cannot disagree about the width, which is what left
+    /// the old layout negotiating a size neither side had an opinion about.
+    static func columns(forWidth width: CGFloat) -> [GridItem] {
+        Array(repeating: GridItem(.fixed(tileSide(forWidth: width)), spacing: columnGap),
+              count: columnCount(forWidth: width))
+    }
+
+    private func title(width: CGFloat) -> some View {
         // The suite's own mark above its name. The die stands for the app
         // as a whole rather than for any one game, so the hub is the one
         // screen that should carry it — and the one with room for the
@@ -91,12 +129,21 @@ struct GameHubView: View {
         // here, so that is set in Swift Playgrounds' project settings.
         VStack(spacing: 6) {
             GameIconView(id: "app")
-                .frame(width: 84, height: 84)
+                // Proportional, like the tiles, so the mark keeps its
+                // weight against them on a phone and on an iPad alike.
+                .frame(width: Self.headerMark(forWidth: width),
+                       height: Self.headerMark(forWidth: width))
 
             ScriptText("Rolls", size: 52)
                 .foregroundStyle(.white)
                 .shadow(color: .black.opacity(0.5), radius: 4, y: 2)
         }
+    }
+
+    /// The suite mark above the wordmark, bounded at both ends: big enough
+    /// to read on a phone, not so big it dwarfs the grid on an iPad.
+    static func headerMark(forWidth width: CGFloat) -> CGFloat {
+        min(max(width * 0.22, 72), 120)
     }
 
     private var settingsButton: some View {
@@ -121,8 +168,31 @@ struct GameHubView: View {
 
 private struct GameTile: View {
     let entry: GameCatalogEntry
+
+    /// The square this tile fills, measured by the hub rather than inferred.
+    let side: CGFloat
+
     let accent: Color
     let action: () -> Void
+
+    /// Inset from the tile edge to the artwork.
+    private static let inset: CGFloat = 10
+
+    /// Space between the icon and the name.
+    private static let gap: CGFloat = 6
+
+    /// Room for the name: two lines of Stack Sans at 13pt.
+    private static let labelHeight: CGFloat = 34
+
+    /// What is left for the artwork once the name has its room.
+    ///
+    /// Everything above is a constant, so this is the whole reason the icon
+    /// is now legible: it is a stated fraction of a known square rather than
+    /// whatever a resizable image could negotiate out of a stack that had no
+    /// height to give it.
+    static func iconSide(tile: CGFloat) -> CGFloat {
+        max(40, tile - inset * 2 - labelHeight - gap)
+    }
 
     var body: some View {
         Button(action: action) {
@@ -130,9 +200,10 @@ private struct GameTile: View {
             // tagline is dropped rather than squeezed: on a square tile at
             // phone width there is room for artwork or for a sentence, and
             // the artwork says more.
-            VStack(spacing: 6) {
+            VStack(spacing: Self.gap) {
                 GameIconView(id: entry.id)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(width: Self.iconSide(tile: side),
+                           height: Self.iconSide(tile: side))
 
                 Text(entry.displayName)
                     .font(.stackSans(13))

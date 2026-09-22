@@ -82,10 +82,21 @@ struct GameHubView: View {
     ]
 
     private var title: some View {
-        Text("Rolls")
-            .font(.aguafina(52))
-            .foregroundStyle(.white)
-            .shadow(color: .black.opacity(0.5), radius: 4, y: 2)
+        // The suite's own mark above its name. The die stands for the app
+        // as a whole rather than for any one game, so the hub is the one
+        // screen that should carry it — and the one with room for the
+        // artwork and the wordmark both.
+        //
+        // This is NOT the iOS home-screen icon: there is no asset catalog
+        // here, so that is set in Swift Playgrounds' project settings.
+        VStack(spacing: 6) {
+            GameIconView(id: "app")
+                .frame(width: 84, height: 84)
+
+            ScriptText("Rolls", size: 52)
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.5), radius: 4, y: 2)
+        }
     }
 
     private var settingsButton: some View {
@@ -115,24 +126,23 @@ private struct GameTile: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 6) {
+            // The icon carries the tile and the name sits under it. The
+            // tagline is dropped rather than squeezed: on a square tile at
+            // phone width there is room for artwork or for a sentence, and
+            // the artwork says more.
+            VStack(spacing: 6) {
+                GameIconView(id: entry.id)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
                 Text(entry.displayName)
-                    .font(.stackSans(17))
+                    .font(.stackSans(13))
                     .foregroundStyle(.white)
                     .lineLimit(2)
-                    // Aguafina and Stack Sans both overhang their advance
-                    // width, so a trailing glyph can clip against a tight
-                    // frame — the same problem the score caption hit. Room
-                    // on the right rather than a scale factor.
-                    .padding(.trailing, 4)
-
-                Text(entry.tagline)
-                    .font(.stackSans(11))
-                    .foregroundStyle(.white.opacity(0.7))
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Spacer(minLength: 0)
+                    .multilineTextAlignment(.center)
+                    .minimumScaleFactor(0.7)
+                    // Stack Sans overhangs its advance width, so a trailing
+                    // glyph can clip against a tight frame.
+                    .padding(.trailing, 3)
 
                 if !entry.isAvailable {
                     Text("Soon")
@@ -146,8 +156,14 @@ private struct GameTile: View {
                         )
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: 104, alignment: .topLeading)
+            .frame(maxWidth: .infinity)
             .padding(12)
+            // Square, not a fixed minimum height. The grid's two flexible
+            // columns give every tile the same width, so tying height to
+            // width makes them identical squares at any screen size —
+            // which a minHeight could not, since a long tagline grew its
+            // own tile and left the row ragged.
+            .aspectRatio(1, contentMode: .fit)
             .background(
                 RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
                     .fill(accent.opacity(entry.isAvailable ? 0.92 : 0.35))

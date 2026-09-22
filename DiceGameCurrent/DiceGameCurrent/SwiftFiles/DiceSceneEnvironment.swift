@@ -150,12 +150,13 @@ enum DiceSceneEnvironment {
     static func addFloorText(
         to rootNode: SCNNode,
         bounds: (x: ClosedRange<Float>, z: ClosedRange<Float>),
-        floorY: Float
+        floorY: Float,
+        title: String
     ) -> SCNMaterial {
         let playfieldWidth = bounds.x.upperBound - bounds.x.lowerBound
         let textWidth = playfieldWidth * 0.45 // was 0.3 — enlarged another 50% per request (0.2 -> 0.3 -> 0.45 across two rounds)
 
-        let textImage = renderScriptText("ROLLS", pointSize: 220, isDark: AppTheme.shared.rollsTextIsDark)
+        let textImage = renderScriptText(title, pointSize: 220, isDark: AppTheme.shared.rollsTextIsDark)
         let aspect = textImage.size.height / max(textImage.size.width, 1)
         let textHeight = textWidth * Float(aspect)
 
@@ -184,9 +185,13 @@ enum DiceSceneEnvironment {
     /// `addFloorSurface`/`addFloorText` returned when the scene was first
     /// assembled. Call this after the player changes the color in Settings
     /// so an in-progress game updates live instead of only on next launch.
-    static func applyTheme(surfaceMaterial: SCNMaterial, textMaterial: SCNMaterial) {
+    static func applyTheme(
+        surfaceMaterial: SCNMaterial,
+        textMaterial: SCNMaterial,
+        title: String
+    ) {
         surfaceMaterial.diffuse.contents = facetedSurfaceTexture(baseColor: AppTheme.shared.floorBaseColor)
-        textMaterial.diffuse.contents = renderScriptText("ROLLS", pointSize: 220, isDark: AppTheme.shared.rollsTextIsDark)
+        textMaterial.diffuse.contents = renderScriptText(title, pointSize: 220, isDark: AppTheme.shared.rollsTextIsDark)
     }
 
     private static func renderScriptText(_ text: String, pointSize: CGFloat, isDark: Bool) -> UIImage {
@@ -202,12 +207,29 @@ enum DiceSceneEnvironment {
             .font: font,
             .foregroundColor: isDark ? UIColor.black : UIColor.white
         ]
-        let textSize = text.size(withAttributes: attrs)
-        // Generous padding — script fonts routinely have swashes/flourishes
-        // that extend beyond the nominal glyph bounding box, which a tight
-        // canvas would clip.
-        let padding: CGFloat = pointSize * 0.3
-        let canvasSize = CGSize(width: textSize.width + padding * 2, height: textSize.height + padding * 2)
+        // Measured as INK, not as advance — this is what was clipping the
+        // last letter. `size(withAttributes:)` returns the typographic
+        // advance width, and a script face's final swash overhangs its own
+        // advance by design, so the glyph extends past the canvas however
+        // much padding is added around it. `.usesDeviceMetrics` asks for
+        // the actual drawn bounds instead, including that overhang and any
+        // negative left bearing, and drawing at -origin puts every inked
+        // pixel inside the canvas.
+        let unbounded = CGSize(width: CGFloat.greatestFiniteMagnitude,
+                               height: CGFloat.greatestFiniteMagnitude)
+        let ink = (text as NSString).boundingRect(
+            with: unbounded,
+            options: [.usesLineFragmentOrigin, .usesDeviceMetrics],
+            attributes: attrs,
+            context: nil
+        )
+        // A little air beyond the ink, so the wordmark is not flush to the
+        // texture's edge where filtering could nibble at it.
+        let padding: CGFloat = pointSize * 0.12
+        let canvasSize = CGSize(
+            width: ceil(ink.width) + padding * 2,
+            height: ceil(ink.height) + padding * 2
+        )
 
         let format = UIGraphicsImageRendererFormat()
         format.opaque = false
@@ -215,7 +237,10 @@ enum DiceSceneEnvironment {
         return renderer.image { _ in
             UIColor.clear.setFill()
             UIRectFill(CGRect(origin: .zero, size: canvasSize))
-            text.draw(at: CGPoint(x: padding, y: padding), withAttributes: attrs)
+            text.draw(
+                at: CGPoint(x: padding - ink.origin.x, y: padding - ink.origin.y),
+                withAttributes: attrs
+            )
         }
     }
 

@@ -1,6 +1,6 @@
 import Foundation
 
-/// CyberDie NetDuel: two netrunners, one arena, and a reaction to every
+/// Rollbots: two netrunners, one arena, and a reaction to every
 /// single attack.
 ///
 /// Built from a design document written for a chat bot. Every probability
@@ -9,7 +9,7 @@ import Foundation
 /// computed what happens once the defender plays well, and that is where
 /// the balance was. See `CyberWeapon` and `Cyberware` for what changed and
 /// by how much.
-enum CyberDieRules {
+enum RollbotsRules {
 
     /// Integrity Points. The document says 20; that measures 15.7 turns,
     /// which is 31 messages in a thread and the longest game in the suite
@@ -90,6 +90,21 @@ enum CyberWeapon: String, CaseIterable, Codable, Identifiable {
     /// No Firewall stops it — the Rail Rifle's whole identity.
     var ignoresFirewall: Bool { self == .railRifle }
 
+    /// The bundled mark for this weapon.
+    ///
+    /// The Sidearm has one of its own. It borrowed the pistol's at first,
+    /// for want of art, and that read wrong: the rail showed the same
+    /// silhouette whether you had *chosen* the Smart Pistol or been cut
+    /// down to the Sidearm, which are opposite situations.
+    var iconName: String {
+        switch self {
+        case .monoBlade:   return "bot-blade"
+        case .smartPistol: return "bot-pistol"
+        case .railRifle:   return "bot-rail"
+        case .sidearm:     return "bot-sidearm"
+        }
+    }
+
     var tagline: String {
         switch self {
         case .monoBlade:   return "d8 · cuts through half of any Firewall"
@@ -164,6 +179,15 @@ enum Cyberware: String, CaseIterable, Codable, Identifiable {
         }
     }
 
+    var iconName: String {
+        switch self {
+        case .neuralOverclock:     return "bot-overclock"
+        case .corrosiveVirus:      return "bot-virus"
+        case .quantumPhase:        return "bot-phase"
+        case .emergencySubroutine: return "bot-repair"
+        }
+    }
+
     var reward: String {
         switch self {
         case .neuralOverclock:
@@ -227,7 +251,7 @@ extension Cyberware {
 
 // MARK: - Resolving an attack
 
-extension CyberDieRules {
+extension RollbotsRules {
 
     /// Everything one exchange produced, for the log line and the screen.
     struct Resolution: Equatable {
@@ -307,7 +331,7 @@ extension CyberDieRules {
 // MARK: - Match state
 
 /// Both runners, everything ticking on them, and whose deck is hot.
-struct CyberDieState: Codable, Equatable {
+struct RollbotsState: Codable, Equatable {
 
     var ip: [Int]
     var weapon: [CyberWeapon]
@@ -327,8 +351,8 @@ struct CyberDieState: Codable, Equatable {
 
     init(weapons: [CyberWeapon], ware: [Cyberware]) {
         ip = [
-            CyberDieRules.startingIP,
-            CyberDieRules.startingIP + CyberDieRules.secondSeatBonusIP
+            RollbotsRules.startingIP,
+            RollbotsRules.startingIP + RollbotsRules.secondSeatBonusIP
         ]
         weapon = weapons
         self.ware = ware
@@ -373,15 +397,15 @@ struct CyberDieState: Codable, Equatable {
 
 // MARK: - Suite entry
 
-enum CyberDieGame: SuiteGame {
-    static let id = "cyberdie"
-    static let displayName = "CyberDie NetDuel"
+enum RollbotsGame: SuiteGame {
+    static let id = "rollbots"
+    static let displayName = "Rollbots"
     static let tagline = "Duel in the net. Answer every shot."
 
     static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "The Duel",
-            body: "Two netrunners, \(CyberDieRules.startingIP) Integrity Points each. Take your opponent to zero. The second runner starts one point up, because striking first is worth about four percent."
+            body: "Two netrunners, \(RollbotsRules.startingIP) Integrity Points each. Take your opponent to zero. The second runner starts one point up, because striking first is worth about four percent."
         ),
         GameRuleSection(
             title: "Attacking",
@@ -389,7 +413,7 @@ enum CyberDieGame: SuiteGame {
         ),
         GameRuleSection(
             title: "Weapons",
-            body: "Mono-Blade: d8, and it cuts through half of any Firewall. Smart Pistol: d6, doubled on an accuracy of 7 or more, and a crit cuts armour the same way. Rail Rifle: d12 and no Firewall stops it — but it spends a turn charging first."
+            body: "Mono-Blade: d8, and it cuts through half of any Firewall. Smart Pistol: d6, doubled on an accuracy of 7 or more, and a crit cuts armour the same way. Rail Rifle: d12 and no Firewall stops it — but it spends a turn charging first. There is a fourth you never pick: the Sidearm, a d4 with no tricks at all, which is what the Emergency Sub-Routine leaves you holding."
         ),
         GameRuleSection(
             title: "Defending",

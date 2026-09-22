@@ -1,24 +1,26 @@
-"""Port of the shipped Nautical 6-5-4 turn logic, re-run against the
+"""Port of the shipped Freighter.Yacht.Dinghy turn logic, re-run against the
 analysis the rules were chosen from.
 
-Mirrors NauticalRules.Turn.apply / .score in Nautical.swift line for line
+Mirrors FreighterYachtDinghyRules.Turn.apply / .score in Freighter.Yacht.Dinghy.swift line for line
 rather than re-deriving them, so a drift between the code and the numbers
 in the plan shows up here. There is no Swift toolchain in this container,
 so this is the closest thing to running the shipped function.
 
-Expected, from the design pass: 54% of turns qualify, 46% score zero, a
-single round ties 25% of the time and a best-of-three on cumulative points
-ties 5%."""
+Expected at four rolls: 68.8% of turns qualify, 31.2% score zero, a single
+round ties 16.7% of the time and a best-of-three on cumulative points ties
+4.4%. (At the three rolls this shipped with first, those were 54.1%,
+45.9%, 24.7% and 4.8% — the fourth roll is what made the game less
+brutal.)"""
 import random
 
 QUALIFIERS = [6, 5, 4]
 DICE_COUNT = 5
-ROLLS_PER_TURN = 3
+ROLLS_PER_TURN = 4
 CARGO_REROLL_HINT = 6
 
 
 class Turn:
-    """NauticalRules.Turn."""
+    """FreighterYachtDinghyRules.Turn."""
 
     def __init__(self):
         self.claimed = []          # die ids, in claim order
@@ -60,7 +62,7 @@ class Turn:
 
 
 def play_turn(rng, faces=None):
-    """NauticalScreen's turn flow, with the cargo reroll taken on the hint."""
+    """FreighterYachtDinghyScreen's turn flow, with the cargo reroll taken on the hint."""
     turn = Turn()
     hand = {i: 0 for i in range(DICE_COUNT)}
     while True:
@@ -100,7 +102,7 @@ def main():
 
     # An unqualified turn scores nothing however good the leftovers are.
     t = Turn()
-    for _ in range(3):
+    for _ in range(ROLLS_PER_TURN):
         t.apply([(0, 6), (1, 6), (2, 6), (3, 6), (4, 6)])
     assert t.is_out_of_rolls and not t.is_qualified and t.score == 0
 

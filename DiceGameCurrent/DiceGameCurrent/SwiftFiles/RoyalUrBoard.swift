@@ -1,6 +1,6 @@
 import Foundation
 
-/// The Royal Path board: which squares exist, which are rosettes, and the
+/// Royal UR board: which squares exist, which are rosettes, and the
 /// route each player walks.
 ///
 /// Pure geometry — no pieces, no dice, no turn state. The board is the one
@@ -12,7 +12,7 @@ import Foundation
 /// The shape is the traditional one: a 4x3 block, a two-square bridge along
 /// the middle row, and a 2x3 block — twenty squares, with the four corners
 /// of the bridge missing.
-enum RoyalPathBoard {
+enum RoyalUrBoard {
 
     static let rows = 3
     static let columns = 8
@@ -82,6 +82,41 @@ enum RoyalPathBoard {
         Square(row: 3, column: 7)    // 16 rosette
     ]
 
+    // MARK: Off-board trays
+
+    /// Where a seat's pieces wait before entering.
+    ///
+    /// The traditional board has a four-square gap in its middle — the
+    /// cells `squares` skips — and nothing has ever used it. Waiting and
+    /// finished pieces go there, which means they are drawn somewhere
+    /// instead of vanishing, and they land where that player's route
+    /// actually begins and ends: the waiting tray sits beside the entry
+    /// square, home beside the exit.
+    static func waitingTray(seat: Int) -> Square {
+        Square(row: seat == topSeat ? 1 : 3, column: 5)
+    }
+
+    /// Where a seat's finished pieces rest.
+    static func homeTray(seat: Int) -> Square {
+        Square(row: seat == topSeat ? 1 : 3, column: 6)
+    }
+
+    /// Both trays for both seats — the four cells the board itself omits.
+    static var trayCells: [Square] {
+        [0, 1].flatMap { [waitingTray(seat: $0), homeTray(seat: $0)] }
+    }
+
+    /// The cell a piece is drawn in, wherever it is in its life: waiting,
+    /// on the route, or home.
+    ///
+    /// One mapping for both drawing and tapping, so a piece can never be
+    /// shown somewhere it cannot be tapped.
+    static func displaySquare(seat: Int, index: Int) -> Square? {
+        if index <= 0 { return waitingTray(seat: seat) }
+        if index > pathLength { return homeTray(seat: seat) }
+        return square(seat: seat, index: index)
+    }
+
     /// Mirrors a square across the middle row — which is the whole of the
     /// difference between the two players' routes.
     static func mirrored(_ square: Square) -> Square {
@@ -120,7 +155,7 @@ enum RoyalPathBoard {
 
 // MARK: - Decoration
 
-extension RoyalPathBoard {
+extension RoyalUrBoard {
 
     /// The six markings the traditional board carries, one per square.
     ///

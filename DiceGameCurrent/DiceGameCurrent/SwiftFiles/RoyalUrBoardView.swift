@@ -13,7 +13,7 @@ import UIKit
 /// markings themselves follow the traditional board: rosettes, eyes, the
 /// five-dot quincunx, a dotted field, a grid of squares, and the
 /// zigzag-and-five.
-enum RoyalPathArt {
+enum RoyalUrArt {
 
     static let ink = Color(hex: "#1B2A4A")
     static let petalRed = Color(hex: "#DB362C")
@@ -33,7 +33,7 @@ enum RoyalPathArt {
     /// Seat 0 takes the red of the rosette petals, seat 1 the navy, so the
     /// pieces belong to the board rather than sitting on top of it.
     static func seatColor(_ seat: Int) -> Color {
-        seat == RoyalPathBoard.bottomSeat ? petalRed : ink
+        seat == RoyalUrBoard.bottomSeat ? petalRed : ink
     }
 }
 
@@ -45,7 +45,7 @@ enum RoyalPathArt {
 /// a margin of frame around the outside, so its natural aspect is a little
 /// over 2.5:1. Everything is derived from one tile size, which keeps the
 /// gaps and the frame in proportion at any scale.
-struct RoyalPathLayout {
+struct RoyalUrLayout {
 
     let tile: CGFloat
     let gap: CGFloat
@@ -68,7 +68,7 @@ struct RoyalPathLayout {
         )
     }
 
-    func rect(for square: RoyalPathBoard.Square) -> CGRect {
+    func rect(for square: RoyalUrBoard.Square) -> CGRect {
         CGRect(
             x: origin.x + margin + CGFloat(square.column - 1) * (tile + gap),
             y: origin.y + margin + CGFloat(square.row - 1) * (tile + gap),
@@ -77,7 +77,7 @@ struct RoyalPathLayout {
         )
     }
 
-    func center(of square: RoyalPathBoard.Square) -> CGPoint {
+    func center(of square: RoyalUrBoard.Square) -> CGPoint {
         let r = rect(for: square)
         return CGPoint(x: r.midX, y: r.midY)
     }
@@ -87,22 +87,30 @@ struct RoyalPathLayout {
 
 /// The board itself: frame, twenty marked squares, and whatever pieces are
 /// standing on them.
-struct RoyalPathBoardView: View {
+struct RoyalUrBoardView: View {
 
     /// Where each seat's pieces are, as path indices: 0 is waiting to
     /// enter, 1...16 is on the board, 17 is home.
     var positions: [[Int]] = [[0, 0, 0], [0, 0, 0]]
 
-    /// Squares to ring in the accent colour — the moves on offer.
-    var highlighted: Set<RoyalPathBoard.Square> = []
+    /// Squares to ring in the accent colour — what you may tap.
+    var highlighted: Set<RoyalUrBoard.Square> = []
 
-    var onTapSquare: ((RoyalPathBoard.Square) -> Void)? = nil
+    /// The piece currently chosen, drawn with a ring of its own so you
+    /// can see which one is about to move.
+    var focused: RoyalUrBoard.Square? = nil
+
+    /// Where the chosen piece would land. Drawn heavier than a mere
+    /// highlight, because this is the one square that commits the move.
+    var destination: RoyalUrBoard.Square? = nil
+
+    var onTapSquare: ((RoyalUrBoard.Square) -> Void)? = nil
 
     @ObservedObject private var theme = AppTheme.shared
 
     var body: some View {
         GeometryReader { geo in
-            let layout = RoyalPathLayout(size: geo.size)
+            let layout = RoyalUrLayout(size: geo.size)
 
             ZStack {
                 // The frame is the app's own timber, pushed darker so it
@@ -131,10 +139,10 @@ struct RoyalPathBoardView: View {
 
     // MARK: Drawing
 
-    private func draw(in context: GraphicsContext, layout: RoyalPathLayout) {
-        let texture = context.resolve(Image(uiImage: RoyalPathArt.tileTexture))
+    private func draw(in context: GraphicsContext, layout: RoyalUrLayout) {
+        let texture = context.resolve(Image(uiImage: RoyalUrArt.tileTexture))
 
-        for square in RoyalPathBoard.squares {
+        for square in RoyalUrBoard.squares {
             let rect = layout.rect(for: square)
             let shape = Path(roundedRect: rect, cornerRadius: layout.tile * 0.08)
 
@@ -146,11 +154,11 @@ struct RoyalPathBoardView: View {
             tile.clip(to: shape)
             tile.draw(texture, in: rect)
 
-            context.stroke(shape, with: .color(RoyalPathArt.ink.opacity(0.75)), lineWidth: 1.5)
+            context.stroke(shape, with: .color(RoyalUrArt.ink.opacity(0.75)), lineWidth: 1.5)
 
             let inset = rect.insetBy(dx: layout.tile * 0.09, dy: layout.tile * 0.09)
-            RoyalPathArt.draw(
-                RoyalPathBoard.decor(at: square),
+            RoyalUrArt.draw(
+                RoyalUrBoard.decor(at: square),
                 in: context,
                 rect: inset
             )
@@ -164,18 +172,71 @@ struct RoyalPathBoardView: View {
             }
         }
 
-        // Pieces last, so they sit above the markings.
+        // The off-board trays, drawn as outlines rather than tiles so they
+        // read as somewhere pieces rest rather than somewhere they land.
+        for seat in [0, 1] {
+            tray(RoyalUrBoard.waitingTray(seat: seat), in: context, layout: layout, seat: seat)
+            tray(RoyalUrBoard.homeTray(seat: seat), in: context, layout: layout, seat: seat)
+        }
+
+        // Pieces last, so they sit above the markings. Routed through
+        // displaySquare, so a waiting or finished piece lands in its tray
+        // instead of being skipped — which is what used to make them
+        // disappear off the board entirely.
         for seat in positions.indices {
+            var stackCount: [RoyalUrBoard.Square: Int] = [:]
             for index in positions[seat] {
-                guard let square = RoyalPathBoard.square(seat: seat, index: index) else { continue }
-                RoyalPathArt.drawPiece(
+                guard let square = RoyalUrBoard.displaySquare(seat: seat, index: index) else { continue }
+                let slot = stackCount[square] ?? 0
+                stackCount[square] = slot + 1
+
+                let isTray = RoyalUrBoard.trayCells.contains(square)
+                let radius = layout.tile * (isTray ? 0.17 : 0.30)
+                var center = layout.center(of: square)
+                if isTray {
+                    // Three across, so three waiting pieces read as three.
+                    center.x += (CGFloat(slot) - 1) * layout.tile * 0.30
+                }
+
+                RoyalUrArt.drawPiece(
                     in: context,
-                    center: layout.center(of: square),
-                    radius: layout.tile * 0.30,
+                    center: center,
+                    radius: radius,
                     seat: seat
                 )
             }
         }
+
+        // The chosen piece and its landing square, over everything.
+        if let focused {
+            context.stroke(
+                Path(roundedRect: layout.rect(for: focused).insetBy(dx: -3, dy: -3),
+                     cornerRadius: layout.tile * 0.1),
+                with: .color(.white.opacity(0.95)),
+                lineWidth: 3
+            )
+        }
+        if let destination {
+            let rect = layout.rect(for: destination)
+            context.stroke(
+                Path(roundedRect: rect.insetBy(dx: -3, dy: -3), cornerRadius: layout.tile * 0.1),
+                with: .color(theme.accentColor),
+                lineWidth: 5
+            )
+        }
+    }
+
+    /// An empty outline where a seat's pieces wait or rest.
+    private func tray(
+        _ square: RoyalUrBoard.Square,
+        in context: GraphicsContext,
+        layout: RoyalUrLayout,
+        seat: Int
+    ) {
+        let rect = layout.rect(for: square).insetBy(dx: layout.tile * 0.10, dy: layout.tile * 0.10)
+        let shape = Path(roundedRect: rect, cornerRadius: layout.tile * 0.08)
+        context.fill(shape, with: .color(.black.opacity(0.22)))
+        context.stroke(shape, with: .color(RoyalUrArt.seatColor(seat).opacity(0.5)), lineWidth: 1.5)
     }
 
     /// Invisible buttons over each square.
@@ -184,8 +245,8 @@ struct RoyalPathBoardView: View {
     /// reports a point and would need the hit test done by hand, and this
     /// gets the tap target, the press feedback and the accessibility
     /// affordance for free.
-    private func tapTargets(_ layout: RoyalPathLayout) -> some View {
-        ForEach(RoyalPathBoard.squares, id: \.self) { square in
+    private func tapTargets(_ layout: RoyalUrLayout) -> some View {
+        ForEach(RoyalUrBoard.squares + RoyalUrBoard.trayCells, id: \.self) { square in
             let rect = layout.rect(for: square)
             Button {
                 onTapSquare?(square)
@@ -200,9 +261,9 @@ struct RoyalPathBoardView: View {
 
 // MARK: - Markings
 
-extension RoyalPathArt {
+extension RoyalUrArt {
 
-    static func draw(_ decor: RoyalPathBoard.Decor, in context: GraphicsContext, rect: CGRect) {
+    static func draw(_ decor: RoyalUrBoard.Decor, in context: GraphicsContext, rect: CGRect) {
         switch decor {
         case .rosette:     rosette(context, rect)
         case .eyes:        eyes(context, rect)

@@ -284,10 +284,35 @@ enum DieFaceLabels {
 
         /// Each face carries its own number at all three of its corners, so
         /// the three visible faces show three DIFFERENT numbers around the
-        /// apex — one per face, every one upright. Chasing 6 uses this,
+        /// apex — one per face, every one upright. Jackpot uses this,
         /// since it reads the three exposed faces rather than a single
         /// value.
         case faceNumbers
+
+        /// No numbers at all: two of the four vertices carry a mark, and
+        /// you read the die by whether the point sticking up is marked.
+        ///
+        /// The traditional Royal UR die. It is the same placement as
+        /// `topRead` — a label beside every corner of every face — with a
+        /// pip instead of a numeral, and nothing drawn beside the two
+        /// unmarked vertices. Because the marked vertices are exactly the
+        /// ones `topRead` numbers 1 and 2, a marked-tip die and a numbered
+        /// one produce identical results; only the reading is easier.
+        case markedTips
+    }
+
+    /// Which vertex numbers carry a mark on a `.markedTips` d4.
+    ///
+    /// Two of four, so the die is an even coin flip. This is the single
+    /// source of truth for both the art and the rule that reads it — see
+    /// `RoyalUrRules.steps`, which counts marked apexes rather than
+    /// testing numbers of its own.
+    static let d4MarkedVertexNumbers: Set<Int> = [1, 2]
+
+    /// Whether the apex of a marked-tip d4 resting on `face` is marked —
+    /// which is to say, whether that die scored.
+    static func d4ApexIsMarked(restingFace face: Int) -> Bool {
+        d4MarkedVertexNumbers.contains(d4ApexValue(restingFace: face))
     }
 
     /// The value shown at the apex of a top-read d4 resting on `face`: the
@@ -302,7 +327,7 @@ enum DieFaceLabels {
     ///
     /// Always three distinct values: `{1,2,3,4}` minus the resting face's
     /// number. That is the same distribution the apex reading produces,
-    /// which is why Chasing 6's odds are identical under either labelling.
+    /// which is why Jackpot's odds are identical under either labelling.
     static func d4ExposedFaceNumbers(restingFace face: Int) -> [Int] {
         (1...4).filter { $0 != face + 1 }
     }
@@ -358,24 +383,38 @@ enum DieFaceLabels {
                 guard simd_length(towardCorner) > 0.001 else { continue }
                 towardCorner = simd_normalize(towardCorner)
 
+                // The ONLY difference between the styles. Placement,
+                // orientation and count are identical — what lands at this
+                // corner is what decides whether the die reads as one
+                // value at the point, three around it, or a bare mark.
+                let image: UIImage
+                switch style {
+                case .topRead:
+                    image = labelImage(
+                        number: d4VertexNumbers[vertexIndex],
+                        colorway: colorway,
+                        underlined: false
+                    )
+                case .faceNumbers:
+                    image = labelImage(
+                        number: faceIndex + 1,
+                        colorway: colorway,
+                        underlined: false
+                    )
+                case .markedTips:
+                    // An unmarked vertex gets nothing at all, which is what
+                    // makes the die readable at a glance: count the pips
+                    // around the point that is sticking up.
+                    guard d4MarkedVertexNumbers.contains(d4VertexNumbers[vertexIndex]) else {
+                        continue
+                    }
+                    image = pipImage(colorway: colorway)
+                }
+
                 let plane = SCNPlane(width: d4TopReadLabelSize, height: d4TopReadLabelSize)
 
                 let material = SCNMaterial()
-                // The ONLY difference between the two styles. Placement,
-                // orientation and count are identical — which number lands
-                // at this corner is what decides whether the die reads as
-                // one value at the point or three around it.
-                let number: Int
-                switch style {
-                case .topRead:     number = d4VertexNumbers[vertexIndex]
-                case .faceNumbers: number = faceIndex + 1
-                }
-
-                material.diffuse.contents = labelImage(
-                    number: number,
-                    colorway: colorway,
-                    underlined: false
-                )
+                material.diffuse.contents = image
                 material.isDoubleSided = true
                 material.lightingModel = .constant
                 material.writesToDepthBuffer = false
@@ -549,6 +588,34 @@ enum DieFaceLabels {
                 x: (size.width - textSize.width) / 2,
                 y: (size.height - textSize.height) / 2
             ), withAttributes: attrs)
+        }
+    }
+
+    /// A single filled mark, for a `.markedTips` d4.
+    ///
+    /// Same canvas and same colour as a numeral so a marked die sits in
+    /// the set beside the numbered ones — a dot where a digit would be,
+    /// not a different kind of die.
+    private static func pipImage(colorway: DieColorway) -> UIImage {
+        let size = CGSize(width: 512, height: 512)
+        let format = UIGraphicsImageRendererFormat()
+        format.opaque = false
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
+        return renderer.image { context in
+            UIColor.clear.setFill()
+            UIRectFill(CGRect(origin: .zero, size: size))
+
+            // 0.62 of the canvas, which lands the mark at roughly the
+            // visual weight of the numerals it replaces.
+            let diameter = size.width * 0.62
+            let rect = CGRect(
+                x: (size.width - diameter) / 2,
+                y: (size.height - diameter) / 2,
+                width: diameter,
+                height: diameter
+            )
+            UIColor(hex: colorway.numberHex).setFill()
+            context.cgContext.fillEllipse(in: rect)
         }
     }
 

@@ -25,6 +25,10 @@ struct DiceTraySceneView: UIViewRepresentable {
 
     var d4Style: DieFaceLabels.D4LabelStyle = .topRead
 
+    /// What the playfield floor says under the dice. Each game passes its
+    /// own, so the board no longer claims to be Rolls.
+    let floorTitle: String
+
     let onSessionCreated: (DiceTraySession) -> Void
 
     func makeUIView(context: Context) -> SCNView {
@@ -51,7 +55,8 @@ struct DiceTraySceneView: UIViewRepresentable {
         let newSession = DiceSceneAssembler.assembleTray(
             into: uiView,
             pool: makeInitialDice(),
-            d4Style: d4Style
+            d4Style: d4Style,
+            title: floorTitle
         )
         DispatchQueue.main.async {
             session = newSession

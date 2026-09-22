@@ -1,31 +1,25 @@
 import SwiftUI
 
-struct NauticalScreen: View {
+struct HogScreen: View {
 
     var onExit: (() -> Void)? = nil
 
     @State private var match = TurnMatch.localTwoPlayer()
     @State private var session: DiceTraySession?
-    @State private var turn = NauticalRules.Turn()
+    @State private var turnTotal = 0
     @State private var phase: Phase = .ready
     @State private var lastSummary: String?
     @State private var showingSettings = false
-
-    /// Normally three. A tie at the end pushes this out by one and the
-    /// match plays a sudden-death round — which happens about 1 game in 20,
-    /// often enough to need handling and rare enough to stay a moment.
-    @State private var roundsThisMatch = NauticalRules.roundsPerPlayer
-
     @ObservedObject private var theme = AppTheme.shared
 
     private enum Phase {
         /// Waiting for the active player to throw.
         case ready
-        /// Dice in the air.
+        /// The die is in the air.
         case rolling
-        /// Qualified with rolls left: rethrow the cargo, or sail.
+        /// A face is up and it was not a 1: roll on, or hold.
         case decide
-        /// Turn over; waiting to hand over or finish.
+        /// Turn over; waiting to hand over.
         case scored
         /// Handover gate between turns.
         case handover
@@ -46,15 +40,19 @@ struct NauticalScreen: View {
 
                 VStack(spacing: 0) {
                     MatchScoreboard(
+                        // HOG is a race, not a fixed number of rounds, so
+                        // there is no "round 3 of 5" to show. The strip
+                        // already treats that as nil.
                         match: match,
-                        totalRounds: roundsThisMatch,
+                        totalRounds: nil,
                         subtitle: scoreboardSubtitle
                     )
                     .frame(height: headerHeight)
 
                     DiceTraySceneView(
                         session: $session,
-                        makeInitialDice: { NauticalRules.makeDice() },
+                        makeInitialDice: { HogRules.makeDice() },
+                        floorTitle: HogGame.floorTitle,
                         onSessionCreated: { newSession in
                             newSession.onRollSettled = { results in
                                 applyRoll(results)
@@ -77,10 +75,10 @@ struct NauticalScreen: View {
                     TurnActionBar(
                         primaryLabel: primaryLabel,
                         primaryEnabled: isPrimaryEnabled,
-                        secondaryLabel: phase == .decide ? "Set Sail" : nil,
+                        secondaryLabel: phase == .decide ? holdLabel : nil,
                         subtitle: subtitle,
                         onPrimary: { primaryAction() },
-                        onSecondary: { setSail() }
+                        onSecondary: { hold() }
                     )
                     .frame(height: buttonHeight)
                 }
@@ -106,7 +104,7 @@ struct NauticalScreen: View {
         .dynamicTypeSize(.large)
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showingSettings) {
-            SettingsView(gameName: NauticalGame.displayName, rules: NauticalGame.rules)
+            SettingsView(gameName: HogGame.displayName, rules: HogGame.rules)
         }
         .onAppear {
             AppFonts.registerIfNeeded()
@@ -121,26 +119,31 @@ struct NauticalScreen: View {
 
     private var primaryLabel: String {
         switch phase {
-        case .ready:    return turn.rollsUsed == 0 ? "Roll" : "Roll Again"
+        case .ready:    return "Roll"
         case .rolling:  return "Rolling"
-        case .decide:   return "Reroll Cargo"
-        case .scored:   return isFinalTurn ? "Finish" : "Pass"
+        case .decide:   return "Roll Again"
+        case .scored:   return "Pass"
         case .handover: return "Pass"
         case .finished: return "Done"
         }
     }
 
+    /// Says what holding is worth, because that is the whole decision.
+    private var holdLabel: String {
+        wouldWin ? "Hold & Win" : "Hold \(turnTotal)"
+    }
+
+    /// True when banking right now reaches the target.
+    private var wouldWin: Bool {
+        match.score(for: match.activeParticipant) + turnTotal >= HogRules.target
+    }
+
     private var subtitle: String {
         switch phase {
-        case .ready:
-            guard turn.rollsUsed > 0 else { return "" }
-            let left = turn.rollsRemaining
-            let needs = NauticalRules.needed(after: turn) ?? ""
-            return "Looking for a \(needs) — \(left) roll\(left == 1 ? "" : "s") left"
         case .decide:
-            let total = turn.score
-            let left = turn.rollsRemaining
-            return "Cargo \(total) — \(left) roll\(left == 1 ? "" : "s") left"
+            let banked = match.score(for: match.activeParticipant)
+            if wouldWin { return "Hold now and it's over" }
+            return "Hold and you're on \(banked + turnTotal) — \(HogRules.target - banked - turnTotal) to go"
         case .scored:
             return lastSummary ?? ""
         default:
@@ -148,29 +151,22 @@ struct NauticalScreen: View {
         }
     }
 
-    /// True when the turn just scored was the last one of the last round.
-    /// `match.isOver` cannot answer this — the match only finishes inside
-    /// endTurn(), which this button is what triggers.
-    private var isFinalTurn: Bool {
-        match.round >= roundsThisMatch && match.activeIsLastInRound
-    }
-
     private var scoreboardSubtitle: String? {
         switch phase {
         case .ready:   return "\(match.activeDisplayName) to roll"
         case .rolling: return "Rolling…"
-        case .decide:  return "\(match.activeDisplayName) — Ship, Captain, Crew"
+        case .decide:  return "Turn \(turnTotal) — not yours yet"
         default:       return nil
         }
     }
 
     /// The scene assembles only once the view has real bounds, so `session`
     /// is nil for the first moments on screen — rolling is gated on it for
-    /// the same reason Chasing 6 gates it.
+    /// the same reason Jackpot gates it.
     private var isPrimaryEnabled: Bool {
         switch phase {
-        case .ready, .decide: return session != nil
-        case .scored:         return true
+        case .ready:          return session != nil
+        case .decide, .scored: return true
         default:              return false
         }
     }
@@ -179,10 +175,10 @@ struct NauticalScreen: View {
         SoundEngine.shared.play(.buttonTap)
         switch phase {
         case .ready, .decide:
-            // Phase follows the roll rather than leading it: roll() reports
+            // Phase follows the roll rather than leading it — roll() reports
             // false when it threw nothing, and moving first meant a no-op
             // left the game stuck in a phase nothing could leave.
-            if session?.roll(keeping: turn.keptIDs) == true {
+            if session?.roll() == true {
                 phase = .rolling
             }
         case .scored:
@@ -194,86 +190,68 @@ struct NauticalScreen: View {
 
     // MARK: Turn flow
 
-    /// Folds a settled roll in and decides what the turn does next.
     private func applyRoll(_ results: [DiceTraySession.DieResult]) {
-        // Score only a full hand. Kept dice report at their retained faces,
-        // so this is five every time; anything less would silently cost the
-        // player a qualifier they actually rolled.
-        guard results.count == NauticalRules.diceCount else {
-            // No known path drops a die, so this should never fire. If it
-            // does, hand the throw back rather than claiming off a hand we
-            // cannot trust — the roll is not counted, because apply() is
-            // what advances rollsUsed and it has not run.
+        // One die, one face. Anything else means the tray reported something
+        // this game cannot read, so hand the throw back rather than guessing.
+        guard results.count == 1, let face = results.first?.value else {
             phase = .ready
             return
         }
 
-        turn.apply(results)
-
-        if turn.isQualified && !turn.isOutOfRolls {
-            phase = .decide
-        } else if turn.isQualified || turn.isOutOfRolls {
-            settleTurn()
-        } else {
-            phase = .ready
+        if face == HogRules.hogFace {
+            // The turn total is lost, not the banked score — and nothing is
+            // added to the match, which is the whole of the penalty.
+            turnTotal = 0
+            lastSummary = HogRules.summary(
+                player: match.activeDisplayName,
+                banked: 0,
+                hogged: true
+            )
+            phase = .scored
+            return
         }
+
+        turnTotal += face
+        phase = .decide
     }
 
-    /// Takes the cargo as it stands and ends the turn.
-    private func setSail() {
+    /// Banks the turn total, and ends the match if it reaches the target.
+    private func hold() {
         SoundEngine.shared.play(.buttonTap)
         guard phase == .decide else { return }
-        settleTurn()
-    }
 
-    /// Banks the turn's points. The one place the score is added, so no
-    /// path through .decide can add it twice.
-    private func settleTurn() {
-        match.addScore(turn.score)
-        lastSummary = NauticalRules.summary(for: turn, player: match.activeDisplayName)
+        let player = match.activeDisplayName
+        let banked = turnTotal
+        match.addScore(banked)
+        turnTotal = 0
+
+        if match.score(for: match.activeParticipant) >= HogRules.target {
+            // Nobody gets an answering turn, so the holder is necessarily
+            // the highest total: everyone else is still short of the target.
+            match.finish(lowestScoreWins: HogGame.lowestScoreWins)
+            phase = .finished
+            return
+        }
+
+        lastSummary = HogRules.summary(player: player, banked: banked, hogged: false)
         phase = .scored
     }
 
-    /// Hands over, and resolves the match if this completed the last round.
     private func endTurn() {
-        let wasLastInRound = match.activeIsLastInRound
-        let finishedRound = match.round
-
         match.advanceTurn()
-
-        if wasLastInRound && finishedRound >= roundsThisMatch {
-            if isTied {
-                // Sudden death: one more round each, decided the same way.
-                roundsThisMatch += 1
-            } else {
-                match.finish(lowestScoreWins: NauticalGame.lowestScoreWins)
-                phase = .finished
-                return
-            }
-        }
-
         phase = .handover
     }
 
-    /// True when more than one participant is on the leading total.
-    private var isTied: Bool {
-        let totals = match.participants.map { match.score(for: $0) }
-        guard let best = totals.max() else { return false }
-        return totals.filter { $0 == best }.count > 1
-    }
-
-    /// Clears the dice the previous player kept and starts a fresh turn.
     private func beginTurn() {
-        turn = NauticalRules.Turn()
+        turnTotal = 0
         session?.beginTurn()
         phase = .ready
     }
 
     private func startNewMatch() {
         match = TurnMatch.localTwoPlayer()
-        roundsThisMatch = NauticalRules.roundsPerPlayer
         lastSummary = nil
-        session?.setPool(NauticalRules.makeDice())
+        session?.setPool(HogRules.makeDice())
         beginTurn()
     }
 

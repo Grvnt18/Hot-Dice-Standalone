@@ -1,25 +1,31 @@
 import SwiftUI
 
-struct PigScreen: View {
+struct FreighterYachtDinghyScreen: View {
 
     var onExit: (() -> Void)? = nil
 
     @State private var match = TurnMatch.localTwoPlayer()
     @State private var session: DiceTraySession?
-    @State private var turnTotal = 0
+    @State private var turn = FreighterYachtDinghyRules.Turn()
     @State private var phase: Phase = .ready
     @State private var lastSummary: String?
     @State private var showingSettings = false
+
+    /// Normally three. A tie at the end pushes this out by one and the
+    /// match plays a sudden-death round — which happens about 1 game in 20,
+    /// often enough to need handling and rare enough to stay a moment.
+    @State private var roundsThisMatch = FreighterYachtDinghyRules.roundsPerPlayer
+
     @ObservedObject private var theme = AppTheme.shared
 
     private enum Phase {
         /// Waiting for the active player to throw.
         case ready
-        /// The die is in the air.
+        /// Dice in the air.
         case rolling
-        /// A face is up and it was not a 1: roll on, or hold.
+        /// Qualified with rolls left: rethrow the cargo, or sail.
         case decide
-        /// Turn over; waiting to hand over.
+        /// Turn over; waiting to hand over or finish.
         case scored
         /// Handover gate between turns.
         case handover
@@ -40,18 +46,16 @@ struct PigScreen: View {
 
                 VStack(spacing: 0) {
                     MatchScoreboard(
-                        // PIG is a race, not a fixed number of rounds, so
-                        // there is no "round 3 of 5" to show. The strip
-                        // already treats that as nil.
                         match: match,
-                        totalRounds: nil,
+                        totalRounds: roundsThisMatch,
                         subtitle: scoreboardSubtitle
                     )
                     .frame(height: headerHeight)
 
                     DiceTraySceneView(
                         session: $session,
-                        makeInitialDice: { PigRules.makeDice() },
+                        makeInitialDice: { FreighterYachtDinghyRules.makeDice() },
+                        floorTitle: FreighterYachtDinghyGame.floorTitle,
                         onSessionCreated: { newSession in
                             newSession.onRollSettled = { results in
                                 applyRoll(results)
@@ -74,10 +78,10 @@ struct PigScreen: View {
                     TurnActionBar(
                         primaryLabel: primaryLabel,
                         primaryEnabled: isPrimaryEnabled,
-                        secondaryLabel: phase == .decide ? holdLabel : nil,
+                        secondaryLabel: phase == .decide ? "Set Sail" : nil,
                         subtitle: subtitle,
                         onPrimary: { primaryAction() },
-                        onSecondary: { hold() }
+                        onSecondary: { setSail() }
                     )
                     .frame(height: buttonHeight)
                 }
@@ -103,7 +107,7 @@ struct PigScreen: View {
         .dynamicTypeSize(.large)
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showingSettings) {
-            SettingsView(gameName: PigGame.displayName, rules: PigGame.rules)
+            SettingsView(gameName: FreighterYachtDinghyGame.displayName, rules: FreighterYachtDinghyGame.rules)
         }
         .onAppear {
             AppFonts.registerIfNeeded()
@@ -118,31 +122,26 @@ struct PigScreen: View {
 
     private var primaryLabel: String {
         switch phase {
-        case .ready:    return "Roll"
+        case .ready:    return turn.rollsUsed == 0 ? "Roll" : "Roll Again"
         case .rolling:  return "Rolling"
-        case .decide:   return "Roll Again"
-        case .scored:   return "Pass"
+        case .decide:   return "Reroll Cargo"
+        case .scored:   return isFinalTurn ? "Finish" : "Pass"
         case .handover: return "Pass"
         case .finished: return "Done"
         }
     }
 
-    /// Says what holding is worth, because that is the whole decision.
-    private var holdLabel: String {
-        wouldWin ? "Hold & Win" : "Hold \(turnTotal)"
-    }
-
-    /// True when banking right now reaches the target.
-    private var wouldWin: Bool {
-        match.score(for: match.activeParticipant) + turnTotal >= PigRules.target
-    }
-
     private var subtitle: String {
         switch phase {
+        case .ready:
+            guard turn.rollsUsed > 0 else { return "" }
+            let left = turn.rollsRemaining
+            let needs = FreighterYachtDinghyRules.needed(after: turn) ?? ""
+            return "Looking for a \(needs) — \(left) roll\(left == 1 ? "" : "s") left"
         case .decide:
-            let banked = match.score(for: match.activeParticipant)
-            if wouldWin { return "Hold now and it's over" }
-            return "Hold and you're on \(banked + turnTotal) — \(PigRules.target - banked - turnTotal) to go"
+            let total = turn.score
+            let left = turn.rollsRemaining
+            return "Cargo \(total) — \(left) roll\(left == 1 ? "" : "s") left"
         case .scored:
             return lastSummary ?? ""
         default:
@@ -150,22 +149,29 @@ struct PigScreen: View {
         }
     }
 
+    /// True when the turn just scored was the last one of the last round.
+    /// `match.isOver` cannot answer this — the match only finishes inside
+    /// endTurn(), which this button is what triggers.
+    private var isFinalTurn: Bool {
+        match.round >= roundsThisMatch && match.activeIsLastInRound
+    }
+
     private var scoreboardSubtitle: String? {
         switch phase {
         case .ready:   return "\(match.activeDisplayName) to roll"
         case .rolling: return "Rolling…"
-        case .decide:  return "Turn \(turnTotal) — not yours yet"
+        case .decide:  return "\(match.activeDisplayName) — Ship, Captain, Crew"
         default:       return nil
         }
     }
 
     /// The scene assembles only once the view has real bounds, so `session`
     /// is nil for the first moments on screen — rolling is gated on it for
-    /// the same reason Chasing 6 gates it.
+    /// the same reason Jackpot gates it.
     private var isPrimaryEnabled: Bool {
         switch phase {
-        case .ready:          return session != nil
-        case .decide, .scored: return true
+        case .ready, .decide: return session != nil
+        case .scored:         return true
         default:              return false
         }
     }
@@ -174,10 +180,10 @@ struct PigScreen: View {
         SoundEngine.shared.play(.buttonTap)
         switch phase {
         case .ready, .decide:
-            // Phase follows the roll rather than leading it — roll() reports
+            // Phase follows the roll rather than leading it: roll() reports
             // false when it threw nothing, and moving first meant a no-op
             // left the game stuck in a phase nothing could leave.
-            if session?.roll() == true {
+            if session?.roll(keeping: turn.keptIDs) == true {
                 phase = .rolling
             }
         case .scored:
@@ -189,68 +195,86 @@ struct PigScreen: View {
 
     // MARK: Turn flow
 
+    /// Folds a settled roll in and decides what the turn does next.
     private func applyRoll(_ results: [DiceTraySession.DieResult]) {
-        // One die, one face. Anything else means the tray reported something
-        // this game cannot read, so hand the throw back rather than guessing.
-        guard results.count == 1, let face = results.first?.value else {
+        // Score only a full hand. Kept dice report at their retained faces,
+        // so this is five every time; anything less would silently cost the
+        // player a qualifier they actually rolled.
+        guard results.count == FreighterYachtDinghyRules.diceCount else {
+            // No known path drops a die, so this should never fire. If it
+            // does, hand the throw back rather than claiming off a hand we
+            // cannot trust — the roll is not counted, because apply() is
+            // what advances rollsUsed and it has not run.
             phase = .ready
             return
         }
 
-        if face == PigRules.pigFace {
-            // The turn total is lost, not the banked score — and nothing is
-            // added to the match, which is the whole of the penalty.
-            turnTotal = 0
-            lastSummary = PigRules.summary(
-                player: match.activeDisplayName,
-                banked: 0,
-                pigged: true
-            )
-            phase = .scored
-            return
-        }
+        turn.apply(results)
 
-        turnTotal += face
-        phase = .decide
+        if turn.isQualified && !turn.isOutOfRolls {
+            phase = .decide
+        } else if turn.isQualified || turn.isOutOfRolls {
+            settleTurn()
+        } else {
+            phase = .ready
+        }
     }
 
-    /// Banks the turn total, and ends the match if it reaches the target.
-    private func hold() {
+    /// Takes the cargo as it stands and ends the turn.
+    private func setSail() {
         SoundEngine.shared.play(.buttonTap)
         guard phase == .decide else { return }
+        settleTurn()
+    }
 
-        let player = match.activeDisplayName
-        let banked = turnTotal
-        match.addScore(banked)
-        turnTotal = 0
-
-        if match.score(for: match.activeParticipant) >= PigRules.target {
-            // Nobody gets an answering turn, so the holder is necessarily
-            // the highest total: everyone else is still short of the target.
-            match.finish(lowestScoreWins: PigGame.lowestScoreWins)
-            phase = .finished
-            return
-        }
-
-        lastSummary = PigRules.summary(player: player, banked: banked, pigged: false)
+    /// Banks the turn's points. The one place the score is added, so no
+    /// path through .decide can add it twice.
+    private func settleTurn() {
+        match.addScore(turn.score)
+        lastSummary = FreighterYachtDinghyRules.summary(for: turn, player: match.activeDisplayName)
         phase = .scored
     }
 
+    /// Hands over, and resolves the match if this completed the last round.
     private func endTurn() {
+        let wasLastInRound = match.activeIsLastInRound
+        let finishedRound = match.round
+
         match.advanceTurn()
+
+        if wasLastInRound && finishedRound >= roundsThisMatch {
+            if isTied {
+                // Sudden death: one more round each, decided the same way.
+                roundsThisMatch += 1
+            } else {
+                match.finish(lowestScoreWins: FreighterYachtDinghyGame.lowestScoreWins)
+                phase = .finished
+                return
+            }
+        }
+
         phase = .handover
     }
 
+    /// True when more than one participant is on the leading total.
+    private var isTied: Bool {
+        let totals = match.participants.map { match.score(for: $0) }
+        guard let best = totals.max() else { return false }
+        return totals.filter { $0 == best }.count > 1
+    }
+
+    /// Clears the dice the previous player kept and starts a fresh turn.
     private func beginTurn() {
-        turnTotal = 0
+        turn = FreighterYachtDinghyRules.Turn()
         session?.beginTurn()
         phase = .ready
     }
 
     private func startNewMatch() {
         match = TurnMatch.localTwoPlayer()
+        roundsThisMatch = FreighterYachtDinghyRules.roundsPerPlayer
         lastSummary = nil
-        session?.setPool(PigRules.makeDice())
+        session?.setPool(FreighterYachtDinghyRules.makeDice())
         beginTurn()
     }
 

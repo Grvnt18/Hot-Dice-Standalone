@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct ChasingSixScreen: View {
+struct JackpotScreen: View {
 
     var onExit: (() -> Void)? = nil
 
@@ -45,19 +45,20 @@ struct ChasingSixScreen: View {
                 VStack(spacing: 0) {
                     MatchScoreboard(
                         match: match,
-                        totalRounds: ChasingSixRules.roundsPerPlayer,
+                        totalRounds: JackpotRules.roundsPerPlayer,
                         subtitle: scoreboardSubtitle
                     )
                     .frame(height: headerHeight)
 
                     DiceTraySceneView(
                         session: $session,
-                        makeInitialDice: { ChasingSixRules.makeDice() },
+                        makeInitialDice: { JackpotRules.makeDice() },
                         // The d4 carries each face's number at all three of
                         // its corners, so the three visible faces read as
                         // three different numbers — which is what this game
                         // scores. Free Roll's top-read d4 would give one.
                         d4Style: .faceNumbers,
+                        floorTitle: JackpotGame.floorTitle,
                         onSessionCreated: { newSession in
                             newSession.onRollSettled = { results in
                                 scoreRoll(results)
@@ -108,7 +109,7 @@ struct ChasingSixScreen: View {
         .dynamicTypeSize(.large)
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showingSettings) {
-            SettingsView(gameName: ChasingSixGame.displayName, rules: ChasingSixGame.rules)
+            SettingsView(gameName: JackpotGame.displayName, rules: JackpotGame.rules)
         }
         .onAppear {
             AppFonts.registerIfNeeded()
@@ -142,7 +143,7 @@ struct ChasingSixScreen: View {
     /// endTurn(), which this button is what triggers, so at .scored it is
     /// always still false and the label read "Pass" on the final turn.
     private var isFinalTurn: Bool {
-        match.round >= ChasingSixRules.roundsPerPlayer && match.activeIsLastInRound
+        match.round >= JackpotRules.roundsPerPlayer && match.activeIsLastInRound
     }
 
     private var scoreboardSubtitle: String? {
@@ -191,15 +192,15 @@ struct ChasingSixScreen: View {
         // it. No known path drops a die (force-settled dice report through
         // the same callback), so this should never fire; if it does, the
         // player simply rolls again.
-        guard results.map(\.sides).sorted() == ChasingSixRules.dieSides.sorted() else {
+        guard results.map(\.sides).sorted() == JackpotRules.dieSides.sorted() else {
             phase = .ready
             return
         }
 
-        let numbers = ChasingSixRules.numbers(from: results)
-        let score = ChasingSixRules.score(
+        let numbers = JackpotRules.numbers(from: results)
+        let score = JackpotRules.score(
             numbers: numbers,
-            d20: ChasingSixRules.d20Face(from: results)
+            d20: JackpotRules.d20Face(from: results)
         )
 
         let player = match.activeDisplayName
@@ -208,7 +209,7 @@ struct ChasingSixScreen: View {
         } else {
             match.addScore(score.total)
         }
-        lastSummary = ChasingSixRules.summary(for: score, player: player)
+        lastSummary = JackpotRules.summary(for: score, player: player)
         phase = .scored
     }
 
@@ -222,7 +223,7 @@ struct ChasingSixScreen: View {
         if wasLastInRound {
             // The Equalizer resolves here, not when the Jackpot was rolled:
             // everyone has now had their turn in that round.
-            if let winners = ChasingSixRules.jackpotWinners(jackpotsThisRound) {
+            if let winners = JackpotRules.jackpotWinners(jackpotsThisRound) {
                 match.finish(
                     winners: winners,
                     reason: "Jackpot in round \(finishedRound)."
@@ -233,8 +234,8 @@ struct ChasingSixScreen: View {
             // Two jackpots in the same round cancel each other; play goes on.
             jackpotsThisRound.removeAll()
 
-            if finishedRound >= ChasingSixRules.roundsPerPlayer {
-                match.finish(lowestScoreWins: ChasingSixGame.lowestScoreWins)
+            if finishedRound >= JackpotRules.roundsPerPlayer {
+                match.finish(lowestScoreWins: JackpotGame.lowestScoreWins)
                 phase = .finished
                 return
             }
@@ -247,7 +248,7 @@ struct ChasingSixScreen: View {
         match = TurnMatch.localTwoPlayer()
         jackpotsThisRound.removeAll()
         lastSummary = nil
-        session?.setPool(ChasingSixRules.makeDice())
+        session?.setPool(JackpotRules.makeDice())
         phase = .ready
     }
 

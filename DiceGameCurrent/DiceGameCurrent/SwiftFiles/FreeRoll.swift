@@ -10,7 +10,10 @@ struct FreeRollPool: Equatable {
     /// inside what the spawn pattern lays out cleanly —
     /// `DiceSpawnPattern` fills rows of 5, 4, 3, 2, 1, so 10 dice occupy
     /// the first three rows with room to spare.
-    static let maxDice = 10
+    /// Twenty, matching the spawn pattern's slot count exactly — see
+    /// DiceSpawnPattern.rowCounts, which was extended to hold them
+    /// without overlap.
+    static let maxDice = 20
 
     /// Every die the app has a mesh for. d4 and d20 were built earlier for
     /// the wider project and have no use in Rolls itself — this is the
@@ -90,7 +93,7 @@ struct FreeRollPool: Equatable {
 enum FreeRollGame: SuiteGame {
     static let id = "freeroll"
     static let displayName = "Free Roll"
-    static let tagline = "Up to 10 dice. No score. Just roll."
+    static let tagline = "Up to \(FreeRollPool.maxDice) dice. No score. Just roll."
 
     /// The one game in the suite that cannot be sent.
     ///
@@ -106,7 +109,7 @@ enum FreeRollGame: SuiteGame {
     static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "The Dice",
-            body: "Pick up to 10 dice in any combination using the + and - controls: d4, d6, d8, d10, d12, d20. Clear empties the table."
+            body: "Pick up to \(FreeRollPool.maxDice) dice in any combination using the + and - controls: d4, d6, d8, d10, d12, d20. Clear empties the table."
         ),
         GameRuleSection(
             title: "Rolling",
@@ -115,6 +118,10 @@ enum FreeRollGame: SuiteGame {
         GameRuleSection(
             title: "Changing Dice",
             body: "Add or remove dice whenever you want and the table is rebuilt with your new picks. You cannot change them mid-roll; wait for the dice to settle."
+        ),
+        GameRuleSection(
+            title: "Totals",
+            body: "Totals is off by default — the table is the point. Switch it on and every throw reports a subtotal for each kind of die and the throw as a whole."
         ),
         GameRuleSection(
             title: "Reading the d4",

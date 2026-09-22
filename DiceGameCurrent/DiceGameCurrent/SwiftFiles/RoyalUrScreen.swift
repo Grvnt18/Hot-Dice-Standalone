@@ -1,14 +1,21 @@
 import SwiftUI
 
-struct RoyalPathScreen: View {
+struct RoyalUrScreen: View {
 
     var onExit: (() -> Void)? = nil
 
     /// Scores are pieces brought home, so the scoreboard is the race.
     @State private var match = TurnMatch.localTwoPlayer()
-    @State private var state = RoyalPathState()
+    @State private var state = RoyalUrState()
     @State private var session: DiceTraySession?
     @State private var steps = 0
+
+    /// The piece the player has chosen but not yet committed.
+    ///
+    /// Royal UR is the one game in the suite where a mis-tap can cost
+    /// sixteen squares, so a move takes two taps: one to choose, one to
+    /// commit. Nothing moves while this is merely set.
+    @State private var selectedPiece: Int?
     @State private var phase: Phase = .ready
     @State private var lastSummary: String?
 
@@ -64,9 +71,11 @@ struct RoyalPathScreen: View {
                     )
                     .frame(height: headerHeight)
 
-                    RoyalPathBoardView(
+                    RoyalUrBoardView(
                         positions: state.positions,
                         highlighted: highlighted,
+                        focused: focusedSquare,
+                        destination: previewSquare,
                         onTapSquare: { handleTap($0) }
                     )
                     .frame(height: boardHeight)
@@ -74,7 +83,9 @@ struct RoyalPathScreen: View {
 
                     DiceTraySceneView(
                         session: $session,
-                        makeInitialDice: { RoyalPathRules.makeDice() },
+                        makeInitialDice: { RoyalUrRules.makeDice() },
+                        d4Style: .markedTips,
+                        floorTitle: RoyalUrGame.floorTitle,
                         onSessionCreated: { newSession in
                             newSession.onRollSettled = { results in
                                 applyRoll(results)
@@ -124,7 +135,7 @@ struct RoyalPathScreen: View {
         .dynamicTypeSize(.large)
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showingSettings) {
-            SettingsView(gameName: RoyalPathGame.displayName, rules: RoyalPathGame.rules)
+            SettingsView(gameName: RoyalUrGame.displayName, rules: RoyalUrGame.rules)
         }
         .onAppear {
             AppFonts.registerIfNeeded()
@@ -141,33 +152,54 @@ struct RoyalPathScreen: View {
         state.legalMoves(seat: seat, steps: steps)
     }
 
-    /// Squares a piece could move to, and which piece would go there.
+    /// Where a piece is drawn right now — its square, or its tray.
+    private func shown(_ piece: Int) -> RoyalUrBoard.Square? {
+        RoyalUrBoard.displaySquare(seat: seat, index: state.index(seat: seat, piece: piece))
+    }
+
+    /// Where the chosen piece would land.
+    private var destinationSquare: RoyalUrBoard.Square? {
+        guard let selectedPiece, let target = moves[selectedPiece] else { return nil }
+        return RoyalUrBoard.displaySquare(seat: seat, index: target)
+    }
+
+    /// Where a Setback would put the chosen piece.
+    private var setbackSquare: RoyalUrBoard.Square? {
+        guard let selectedPiece else { return nil }
+        return RoyalUrBoard.displaySquare(
+            seat: seat,
+            index: state.setbackDestination(seat: seat, piece: selectedPiece)
+        )
+    }
+
+    /// Everything tappable right now.
     ///
-    /// Home has no square, so it is not in here — it gets the button
-    /// instead, at `homeMove`.
-    private var destinations: [RoyalPathBoard.Square: Int] {
-        var result: [RoyalPathBoard.Square: Int] = [:]
-        for (piece, destination) in moves {
-            guard let square = RoyalPathBoard.square(seat: seat, index: destination) else { continue }
-            result[square] = piece
-        }
-        return result
-    }
-
-    private var homeMove: Int? {
-        moves.first(where: { $0.value == RoyalPathRules.homeIndex })?.key
-    }
-
-    private var highlighted: Set<RoyalPathBoard.Square> {
+    /// Before a choice that is every piece the roll can move, so you can
+    /// see what is actually on offer; after one it is just the square
+    /// that commits it.
+    private var highlighted: Set<RoyalUrBoard.Square> {
         switch phase {
         case .choosing:
-            return Set(destinations.keys)
+            guard selectedPiece == nil else { return [] }
+            return Set(moves.keys.compactMap { shown($0) })
         case .setback:
-            return Set(state.setbackCandidates(seat: seat).compactMap {
-                state.square(seat: seat, piece: $0)
-            })
+            guard selectedPiece == nil else { return [] }
+            return Set(state.setbackCandidates(seat: seat).compactMap { shown($0) })
         default:
             return []
+        }
+    }
+
+    private var focusedSquare: RoyalUrBoard.Square? {
+        guard let selectedPiece, phase == .choosing || phase == .setback else { return nil }
+        return shown(selectedPiece)
+    }
+
+    private var previewSquare: RoyalUrBoard.Square? {
+        switch phase {
+        case .choosing: return destinationSquare
+        case .setback:  return setbackSquare
+        default:        return nil
         }
     }
 
@@ -177,8 +209,8 @@ struct RoyalPathScreen: View {
         switch phase {
         case .ready:    return "Roll"
         case .rolling:  return "Rolling"
-        case .choosing: return homeMove != nil ? "Bring One Home" : "Tap a Square"
-        case .setback:  return "Tap a Piece"
+        case .choosing: return selectedPiece == nil ? "Tap a Piece" : "Move"
+        case .setback:  return selectedPiece == nil ? "Tap a Piece" : "Send It Back"
         case .scored:   return "Pass"
         case .handover: return "Pass"
         case .finished: return "Done"
@@ -188,7 +220,7 @@ struct RoyalPathScreen: View {
     private var isPrimaryEnabled: Bool {
         switch phase {
         case .ready:    return session != nil
-        case .choosing: return homeMove != nil
+        case .choosing, .setback: return selectedPiece != nil
         case .scored:   return true
         default:        return false
         }
@@ -199,10 +231,16 @@ struct RoyalPathScreen: View {
         case .ready:
             return earnedAnotherRoll ? "Rosette — roll again" : ""
         case .choosing:
+            guard selectedPiece == nil else {
+                return "Tap the ringed square to move, or pick another piece"
+            }
             let count = moves.count
-            return "Rolled \(steps) — \(count) move\(count == 1 ? "" : "s")"
+            return "Rolled \(steps) — \(count) piece\(count == 1 ? "" : "s") can move"
         case .setback:
-            return "Rolled \(steps) — nowhere to go. One of yours goes back \(RoyalPathRules.setbackDistance)."
+            guard selectedPiece == nil else {
+                return "Tap the ringed square to send it back, or pick another"
+            }
+            return "Rolled \(steps) — nowhere to go. One of yours goes back \(RoyalUrRules.setbackDistance)."
         case .scored:
             return lastSummary ?? ""
         default:
@@ -232,9 +270,9 @@ struct RoyalPathScreen: View {
                 phase = .rolling
             }
         case .choosing:
-            if let piece = homeMove {
-                move(piece: piece, to: RoyalPathRules.homeIndex)
-            }
+            commitMove()
+        case .setback:
+            commitSetback()
         case .scored:
             endTurn()
         default:
@@ -245,7 +283,7 @@ struct RoyalPathScreen: View {
     // MARK: Turn flow
 
     private func applyRoll(_ results: [DiceTraySession.DieResult]) {
-        guard results.count == RoyalPathRules.diceCount else {
+        guard results.count == RoyalUrRules.diceCount else {
             phase = .ready
             return
         }
@@ -253,8 +291,9 @@ struct RoyalPathScreen: View {
         // Held locally as well as in state: everything below decides the
         // phase from this roll, and reading it back out of @State to do so
         // would be relying on write ordering for no reason.
-        let rolled = RoyalPathRules.steps(from: results)
+        let rolled = RoyalUrRules.steps(from: results)
         steps = rolled
+        selectedPiece = nil
 
         if !state.legalMoves(seat: seat, steps: rolled).isEmpty {
             phase = .choosing
@@ -274,18 +313,42 @@ struct RoyalPathScreen: View {
         phase = .setback
     }
 
-    private func handleTap(_ square: RoyalPathBoard.Square) {
+    private func handleTap(_ square: RoyalUrBoard.Square) {
         switch phase {
         case .choosing:
-            guard let piece = destinations[square], let destination = moves[piece] else { return }
-            move(piece: piece, to: destination)
+            // Tapping one of your movable pieces chooses it, and tapping
+            // another switches — nothing commits until the landing square
+            // itself is tapped.
+            if let piece = moves.keys.first(where: { shown($0) == square }) {
+                SoundEngine.shared.play(.buttonTap)
+                selectedPiece = piece
+                return
+            }
+            if square == destinationSquare { commitMove() }
+
         case .setback:
-            guard let piece = state.piece(of: seat, on: square),
-                  state.setbackCandidates(seat: seat).contains(piece) else { return }
-            applySetback(piece: piece)
+            if let piece = state.setbackCandidates(seat: seat).first(where: { shown($0) == square }) {
+                SoundEngine.shared.play(.buttonTap)
+                selectedPiece = piece
+                return
+            }
+            if square == setbackSquare { commitSetback() }
+
         default:
             break
         }
+    }
+
+    private func commitMove() {
+        guard let piece = selectedPiece, let destination = moves[piece] else { return }
+        selectedPiece = nil
+        move(piece: piece, to: destination)
+    }
+
+    private func commitSetback() {
+        guard let piece = selectedPiece else { return }
+        selectedPiece = nil
+        applySetback(piece: piece)
     }
 
     private func move(piece: Int, to destination: Int) {
@@ -331,7 +394,7 @@ struct RoyalPathScreen: View {
         phase = .scored
     }
 
-    private func summary(for outcome: RoyalPathState.MoveOutcome, destination: Int) -> String {
+    private func summary(for outcome: RoyalUrState.MoveOutcome, destination: Int) -> String {
         let player = match.activeDisplayName
         if outcome.cameHome { return "\(player) brought a piece home." }
         if outcome.captured {
@@ -350,6 +413,7 @@ struct RoyalPathScreen: View {
 
     private func beginTurn() {
         steps = 0
+        selectedPiece = nil
         earnedAnotherRoll = false
         session?.beginTurn()
         phase = .ready
@@ -357,9 +421,10 @@ struct RoyalPathScreen: View {
 
     private func startNewMatch() {
         match = TurnMatch.localTwoPlayer()
-        state = RoyalPathState()
+        selectedPiece = nil
+        state = RoyalUrState()
         lastSummary = nil
-        session?.setPool(RoyalPathRules.makeDice())
+        session?.setPool(RoyalUrRules.makeDice())
         beginTurn()
     }
 
@@ -385,9 +450,9 @@ struct RoyalPathScreen: View {
 
 // MARK: - Suite entry
 
-enum RoyalPathGame: SuiteGame {
-    static let id = "royal_path"
-    static let displayName = "The Royal Path"
+enum RoyalUrGame: SuiteGame {
+    static let id = "royal_ur"
+    static let displayName = "Royal UR"
     static let tagline = "Race, capture, come home."
 
     static let rules: [GameRuleSection] = [
@@ -397,7 +462,7 @@ enum RoyalPathGame: SuiteGame {
         ),
         GameRuleSection(
             title: "The Dice",
-            body: "Roll five four-sided dice. Each one showing a 1 or a 2 is worth a point, so you move anywhere from nothing to five squares — two or three most of the time."
+            body: "Roll five four-sided dice. Two of each die's four points are marked — count the marked points sticking up and that is how far you move, anywhere from nothing to five squares. Two or three, most of the time."
         ),
         GameRuleSection(
             title: "Moving",

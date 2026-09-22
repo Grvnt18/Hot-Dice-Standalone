@@ -37,7 +37,7 @@ struct ThreeThousandScreen: View {
         case rolling
         /// A roll that scores something: set dice aside, then roll on or bank.
         case choosing
-        /// Turn over — banked or farkled; waiting to hand over.
+        /// Turn over — banked or busted; waiting to hand over.
         case scored
         /// Handover gate between turns.
         case handover
@@ -56,7 +56,7 @@ struct ThreeThousandScreen: View {
                 VStack(spacing: 0) {
                     MatchScoreboard(
                         // A race has no round count, so the strip runs
-                        // without one — same as PIG.
+                        // without one — same as HOG.
                         match: match,
                         totalRounds: nil,
                         subtitle: scoreboardSubtitle
@@ -66,6 +66,7 @@ struct ThreeThousandScreen: View {
                     DiceTraySceneView(
                         session: $session,
                         makeInitialDice: { ThreeThousandRules.makeDice() },
+                        floorTitle: ThreeThousandGame.floorTitle,
                         onSessionCreated: { newSession in
                             newSession.onRollSettled = { results in
                                 applyRoll(results)
@@ -204,7 +205,7 @@ struct ThreeThousandScreen: View {
 
     /// The scene assembles only once the view has real bounds, so `session`
     /// is nil for the first moments on screen — rolling is gated on it for
-    /// the same reason Chasing 6 gates it.
+    /// the same reason Jackpot gates it.
     private var isPrimaryEnabled: Bool {
         switch phase {
         case .ready:    return session != nil
@@ -245,12 +246,12 @@ struct ThreeThousandScreen: View {
             return
         }
 
-        // Farkle. The running total goes, the banked score does not.
+        // Busted. The running total goes, the banked score does not.
         lastSummary = ThreeThousandRules.summary(
             player: match.activeDisplayName,
             banked: 0,
             lost: turnTotal,
-            farkled: true
+            busted: true
         )
         turnTotal = 0
         session?.isSelectionEnabled = false
@@ -299,7 +300,7 @@ struct ThreeThousandScreen: View {
             player: match.displayName(for: player),
             banked: total,
             lost: 0,
-            farkled: false
+            busted: false
         )
         session?.isSelectionEnabled = false
         phase = .scored

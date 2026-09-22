@@ -1,16 +1,16 @@
-"""Port of ChasingSix.swift's scoring, checked against the analysis the
-design was approved on. Mirrors ChasingSixRules.numbers / .score exactly."""
+"""Port of Jackpot.swift's scoring, checked against the analysis the
+design was approved on. Mirrors JackpotRules.numbers / .score exactly."""
 from collections import Counter
 
-BOOSTER = 13              # ChasingSixRules.boosterThreshold
-JACKPOT = BOOSTER - 1     # ChasingSixRules.jackpotThreshold
+BOOSTER = 13              # JackpotRules.boosterThreshold
+JACKPOT = BOOSTER - 1     # JackpotRules.jackpotThreshold
 
 def d4_exposed(resting_face_index):
     """DieFaceLabels.d4ExposedFaceNumbers(restingFace:)"""
     return [n for n in range(1, 5) if n != resting_face_index + 1]
 
 def numbers_from(results):
-    """ChasingSixRules.numbers(from:) — results are (sides, value)."""
+    """JackpotRules.numbers(from:) — results are (sides, value)."""
     out = []
     for sides, value in results:
         if sides == 4:
@@ -20,7 +20,7 @@ def numbers_from(results):
     return out
 
 def score(numbers, d20):
-    """ChasingSixRules.score(numbers:d20:)"""
+    """JackpotRules.score(numbers:d20:)"""
     counts = Counter(numbers)
     sets = sorted(((v, c) for v, c in counts.items() if c >= 2),
                   key=lambda t: (t[1], t[0]), reverse=True)

@@ -10,7 +10,7 @@ let a player smuggle a non-scoring die out of the cup.
 There is no Swift toolchain in this container, so this is the closest
 thing to running the shipped function.
 
-Expected at a 3,000 target: ~12 messages a match, Farkle ending 50% of
+Expected at a 3,000 target: ~12 messages a match, Bust ending 50% of
 turns, a banked turn averaging ~900, first seat ~54%."""
 import random
 
@@ -106,7 +106,7 @@ def check_scoring():
     assert score([2, 3, 4, 5, 6]) is None
     assert score([5]) == 50
 
-    # Farkle detection agrees with the scorer on whole rolls.
+    # Bust detection agrees with the scorer on whole rolls.
     assert not has_scoring_dice([2, 2, 3, 3, 4, 6])
     assert not has_scoring_dice([2, 3, 4])
     assert has_scoring_dice([2, 2, 3, 3, 4, 4])   # three pairs
@@ -137,7 +137,7 @@ def play_turn(rng, threshold=500, need=None, mine=0):
     while True:
         faces = [rng.randint(1, 6) for _ in range(dice)]
         if not has_scoring_dice(faces):
-            return 0                                   # Farkle
+            return 0                                   # Bust
         points, used = best_take(faces)
         total += points
         left = dice - used
@@ -170,8 +170,8 @@ def main():
     n = 60_000
     turns = [play_turn(rng) for _ in range(n)]
     banked = [t for t in turns if t]
-    farkle = 1 - len(banked) / n
-    print("Farkle rate          %.0f%%" % (farkle * 100))
+    bust = 1 - len(banked) / n
+    print("Bust rate          %.0f%%" % (bust * 100))
     print("mean when banked     %.0f" % (sum(banked) / len(banked)))
 
     m = 20_000
@@ -181,7 +181,7 @@ def main():
     print("messages per match   %.1f" % messages)
     print("first seat wins      %.1f%%" % (first * 100))
 
-    assert 0.45 < farkle < 0.55, farkle
+    assert 0.45 < bust < 0.55, bust
     assert 800 < sum(banked) / len(banked) < 1000
     assert 11.0 < messages < 13.5, messages
     print("Three Thousand: PASS")

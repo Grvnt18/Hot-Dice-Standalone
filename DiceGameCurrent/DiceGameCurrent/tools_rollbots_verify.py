@@ -1,7 +1,7 @@
-"""Port of the shipped CyberDie NetDuel resolution, re-run against both the
+"""Port of the shipped Rollbots resolution, re-run against both the
 design document's own figures and the tuning that followed.
 
-Mirrors CyberDieRules.resolve and CyberDieState in CyberDie.swift. There is
+Mirrors RollbotsRules.resolve and RollbotsState in Rollbots.swift. There is
 no Swift toolchain in this container.
 
 The document's four stated probabilities are checked first, because they
@@ -21,7 +21,7 @@ REPAIR, SIDEARM_TURNS = 8, 4
 
 
 def resolve(weapon, accuracy, damage_roll, defence, defence_roll, ignores_firewall=False):
-    """CyberDieRules.resolve."""
+    """RollbotsRules.resolve."""
     crit = (weapon == "pistol" and accuracy >= CRIT_AT)
     raw = damage_roll * 2 if crit else damage_roll
 
@@ -207,7 +207,7 @@ def main():
         print("  %-11s %.1f%%" % (kind, wr * 100))
         assert 0.44 < wr < 0.62, (kind, wr)
 
-    print("\nCyberDie NetDuel: PASS")
+    print("\nRollbots: PASS")
 
 
 if __name__ == "__main__":

@@ -1,11 +1,11 @@
 import SwiftUI
 
-struct CyberDieScreen: View {
+struct RollbotsScreen: View {
 
     var onExit: (() -> Void)? = nil
 
     @State private var match = TurnMatch.localTwoPlayer()
-    @State private var state = CyberDieState(
+    @State private var state = RollbotsState(
         weapons: [.monoBlade, .monoBlade],
         ware: [.corrosiveVirus, .corrosiveVirus]
     )
@@ -32,6 +32,8 @@ struct CyberDieScreen: View {
         case setup
         /// Attacker chooses what to do with the turn.
         case action
+        /// Attacker is picking which weapon to switch to.
+        case swapping
         /// Accuracy die in the air.
         case rollingAccuracy
         /// Defender picks a reaction, with the accuracy already on the table.
@@ -66,31 +68,65 @@ struct CyberDieScreen: View {
             NetGrid()
 
             GeometryReader { geo in
-                let panelHeight = geo.size.height * 0.20
+                // Rails down both edges rather than a band across the top:
+                // the stats cost almost no height there, and the whole
+                // middle of the screen goes to the dice.
+                //
+                // The viewing seat is always on the left — your own numbers
+                // stay where your thumb is, the same way Boneheads keeps
+                // your own grid nearest you.
+                let railWidth = min(max(geo.size.width * 0.19, 74), 104)
                 let barHeight: CGFloat = phase == .setup ? 0 : 104
-                let bodyHeight = max(geo.size.height - panelHeight - barHeight, 0)
+                let bodyHeight = max(geo.size.height - barHeight, 0)
 
-                VStack(spacing: 0) {
-                    NetStatusPanel(
+                HStack(spacing: 0) {
+                    NetSeatRail(
                         state: state,
-                        activeSeat: viewingSeat,
-                        names: names,
-                        subtitle: panelSubtitle
+                        seat: viewingSeat,
+                        name: names[viewingSeat],
+                        isActive: true
                     )
-                    .frame(height: panelHeight)
+                    .frame(width: railWidth)
 
-                    Group {
+                    VStack(spacing: 0) {
+                    // The tray is mounted for the WHOLE match and every
+                    // menu is drawn over it, rather than the two swapping
+                    // places.
+                    //
+                    // This was the bug behind "only Swap Loadout works".
+                    // With the tray unmounted during .action, `session` was
+                    // nil, so every action that throws dice — Attack, and
+                    // the Corrosive Virus — bailed out of throwDice() and
+                    // silently did nothing, while the actions that throw no
+                    // dice worked fine. It also rebuilt the whole SceneKit
+                    // scene on every single throw.
+                    // Menus sit over the LOWER part of the tray, not all
+                    // of it. The defence menu is why: the whole point of
+                    // throwing the accuracy die before the defender
+                    // chooses is that they can see it, and a full-screen
+                    // backdrop hid the very die they were reading.
+                    ZStack(alignment: .bottom) {
+                        tray
+
                         if phase == .setup {
-                            setupView
+                            menuSheet { setupView }
                         } else if phase == .action {
-                            actionView
+                            menuSheet { actionView }
+                        } else if phase == .swapping {
+                            menuSheet { swapView }
                         } else if phase == .defending {
-                            defenceView
-                        } else {
-                            tray
+                            menuSheet { defenceView }
                         }
                     }
                     .frame(height: bodyHeight)
+                    .overlay(alignment: .topLeading) {
+                        if let onExit {
+                            overlayButton("chevron.left") { onExit() }
+                        }
+                    }
+                    .overlay(alignment: .topTrailing) {
+                        overlayButton("gearshape.fill") { showingSettings = true }
+                    }
 
                     if phase != .setup {
                         NetActionBar(
@@ -102,15 +138,16 @@ struct CyberDieScreen: View {
                         )
                         .frame(height: barHeight)
                     }
+                    }
+
+                    NetSeatRail(
+                        state: state,
+                        seat: 1 - viewingSeat,
+                        name: names[1 - viewingSeat],
+                        isActive: false
+                    )
+                    .frame(width: railWidth)
                 }
-            }
-            .overlay(alignment: .topLeading) {
-                if let onExit {
-                    overlayButton("chevron.left") { onExit() }
-                }
-            }
-            .overlay(alignment: .topTrailing) {
-                overlayButton("gearshape.fill") { showingSettings = true }
             }
 
             if let handoverTo {
@@ -139,7 +176,7 @@ struct CyberDieScreen: View {
         .dynamicTypeSize(.large)
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showingSettings) {
-            SettingsView(gameName: CyberDieGame.displayName, rules: CyberDieGame.rules)
+            SettingsView(gameName: RollbotsGame.displayName, rules: RollbotsGame.rules)
         }
         .onAppear {
             AppFonts.registerIfNeeded()
@@ -149,10 +186,34 @@ struct CyberDieScreen: View {
 
     // MARK: Tray
 
+    /// Darkens the dice behind a menu so its cards stay readable, without
+    /// unmounting the tray that owns the dice session.
+    private func menuSheet<Content: View>(
+        @ViewBuilder _ content: () -> Content
+    ) -> some View {
+        GeometryReader { geo in
+            VStack(spacing: 0) {
+                Spacer(minLength: 0)
+                ZStack {
+                    NetFacet().opacity(0.97)
+                    content()
+                }
+                // Setup has the longest list and no dice worth seeing yet,
+                // so it takes the whole column; every other menu leaves the
+                // top of the tray clear.
+                .frame(height: geo.size.height * (phase == .setup ? 1.0 : 0.58))
+                .overlay(alignment: .top) {
+                    Rectangle().fill(NetArt.line.opacity(0.4)).frame(height: 1)
+                }
+            }
+        }
+    }
+
     private var tray: some View {
         DiceTraySceneView(
             session: $session,
-            makeInitialDice: { [NetArt.die(sides: CyberDieRules.accuracySides, seat: 0)] },
+            makeInitialDice: { [NetArt.die(sides: RollbotsRules.accuracySides, seat: 0)] },
+            floorTitle: RollbotsGame.floorTitle,
             onSessionCreated: { newSession in
                 newSession.onRollSettled = { results in
                     settled(results)
@@ -179,6 +240,7 @@ struct CyberDieScreen: View {
                     NetCard(
                         title: weapon.displayName,
                         summary: weapon.tagline,
+                        icon: weapon.iconName,
                         tint: NetArt.seat(setupSeat),
                         isSelected: pendingWeapon == weapon
                     ) { pendingWeapon = weapon }
@@ -193,6 +255,7 @@ struct CyberDieScreen: View {
                         title: ware.displayName,
                         summary: ware.reward,
                         detail: "Strain: \(ware.strain)",
+                        icon: ware.iconName,
                         tint: NetArt.seat(setupSeat),
                         isSelected: pendingWare == ware
                     ) { pendingWare = ware }
@@ -258,6 +321,7 @@ struct CyberDieScreen: View {
                     summary: state.canFire(attacker)
                         ? "Throw for accuracy with the \(weapon.displayName). They answer it."
                         : "The Rail Rifle needs a turn to spin up. You cannot fire until it has.",
+                    icon: weapon.iconName,
                     tint: NetArt.seat(attacker)
                 ) { beginAttack() }
 
@@ -266,6 +330,7 @@ struct CyberDieScreen: View {
                         title: "Activate \(ware.displayName)",
                         summary: ware.reward,
                         detail: "Strain: \(ware.strain)",
+                        icon: ware.iconName,
                         tint: NetArt.warn
                     ) { activateWare() }
                 }
@@ -275,6 +340,41 @@ struct CyberDieScreen: View {
                     summary: "Spend the turn changing weapon. Any held charge is lost.",
                     tint: NetArt.text.opacity(0.8)
                 ) { swapLoadout() }
+            }
+            .padding(.horizontal, 14)
+        }
+    }
+
+    // MARK: Swapping
+
+    private var swapView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("\(names[attacker]) — switch weapon")
+                    .font(.stackSans(13))
+                    .foregroundStyle(NetArt.seat(attacker))
+                    .padding(.top, 4)
+
+                Text("Switching costs your turn, and any held charge.")
+                    .font(.stackSans(11))
+                    .foregroundStyle(NetArt.text.opacity(0.7))
+
+                ForEach(CyberWeapon.selectable) { weapon in
+                    let isCurrent = weapon == state.weapon[attacker]
+                    NetCard(
+                        title: isCurrent ? "\(weapon.displayName) — equipped" : weapon.displayName,
+                        summary: weapon.tagline,
+                        icon: weapon.iconName,
+                        tint: isCurrent ? NetArt.text.opacity(0.6) : NetArt.seat(attacker),
+                        isSelected: isCurrent
+                    ) { completeSwap(to: weapon) }
+                }
+
+                NetCard(
+                    title: "Cancel",
+                    summary: "Go back without spending your turn.",
+                    tint: NetArt.text.opacity(0.8)
+                ) { phase = .action }
             }
             .padding(.horizontal, 14)
         }
@@ -337,12 +437,12 @@ struct CyberDieScreen: View {
         usedOverclock = state.overclocked[attacker]
         if usedOverclock {
             // Forced to the top of the die; nothing is thrown for it.
-            accuracy = CyberDieRules.overclockAccuracy
+            accuracy = RollbotsRules.overclockAccuracy
             phase = .defending
             handoverTo = defender
             return
         }
-        if throwDice(sides: CyberDieRules.accuracySides, seat: attacker) {
+        if throwDice(sides: RollbotsRules.accuracySides, seat: attacker) {
             phase = .rollingAccuracy
         }
     }
@@ -362,7 +462,7 @@ struct CyberDieScreen: View {
             lastLine = "\(names[seat]) armed a Quantum Phase."
             finishTurn()
         case .emergencySubroutine:
-            state.ip[seat] = min(CyberDieRules.startingIP, state.ip[seat] + Cyberware.repairAmount)
+            state.ip[seat] = min(RollbotsRules.startingIP, state.ip[seat] + Cyberware.repairAmount)
             state.sidearmTurns[seat] = Cyberware.sidearmTurns
             lastLine = "\(names[seat]) repaired \(Cyberware.repairAmount) IP — and is down to the Sidearm."
             finishTurn()
@@ -381,13 +481,26 @@ struct CyberDieScreen: View {
         }
     }
 
+    /// Opens the picker rather than swapping on the spot.
+    ///
+    /// It used to cycle blindly to the next weapon in the list, so you
+    /// could not choose and could not see what you were getting.
     private func swapLoadout() {
+        phase = .swapping
+    }
+
+    private func completeSwap(to weapon: CyberWeapon) {
         let seat = attacker
-        let order = CyberWeapon.selectable
-        let index = order.firstIndex(of: state.weapon[seat]) ?? 0
-        state.weapon[seat] = order[(index + 1) % order.count]
+        guard weapon != state.weapon[seat] else {
+            // Picking what you already hold is a change of mind, not a
+            // turn — spending one by mis-tapping a menu is the worst way
+            // to lose a turn.
+            phase = .action
+            return
+        }
+        state.weapon[seat] = weapon
         state.charged[seat] = false
-        lastLine = "\(names[seat]) switched to the \(state.weapon[seat].displayName)."
+        lastLine = "\(names[seat]) switched to the \(weapon.displayName)."
         finishTurn()
     }
 
@@ -444,7 +557,7 @@ struct CyberDieScreen: View {
 
     private func resolveExchange(damageRoll: Int) {
         let weapon = state.activeWeapon(attacker)
-        let resolution = CyberDieRules.resolve(
+        let resolution = RollbotsRules.resolve(
             weapon: weapon,
             accuracy: accuracy,
             damageRoll: damageRoll,
@@ -468,7 +581,7 @@ struct CyberDieScreen: View {
         finishTurn()
     }
 
-    private func line(for r: CyberDieRules.Resolution, weapon: CyberWeapon) -> String {
+    private func line(for r: RollbotsRules.Resolution, weapon: CyberWeapon) -> String {
         if r.evaded && r.counter > 0 {
             return "Phased clean through — and hit back for \(r.counter)."
         }
@@ -527,7 +640,7 @@ struct CyberDieScreen: View {
     /// table, so whatever is rolling is unambiguous.
     /// Returns false when nothing was thrown, which every caller has to
     /// respect: no throw means no settle callback, and a phase that moved
-    /// first would be a phase nothing could move back. Chasing 6 shipped
+    /// first would be a phase nothing could move back. Jackpot shipped
     /// that bug once already.
     @discardableResult
     private func throwDice(sides: Int, seat: Int) -> Bool {
@@ -541,7 +654,7 @@ struct CyberDieScreen: View {
 
     private var primaryLabel: String {
         switch phase {
-        case .action:          return "Choose Above"
+        case .action, .swapping: return "Choose Above"
         case .rollingAccuracy: return "Rolling Accuracy"
         case .defending:       return "Choose Above"
         case .rollingDefence:  return "Rolling Defence"
@@ -557,17 +670,10 @@ struct CyberDieScreen: View {
     private var barSubtitle: String {
         switch phase {
         case .action:    return "Pick a move"
+        case .swapping:  return "Pick a weapon, or cancel"
         case .defending: return "Accuracy \(accuracy) is on the table — answer it"
         case .resolved:  return lastLine ?? ""
         default:         return ""
-        }
-    }
-
-    private var panelSubtitle: String? {
-        switch phase {
-        case .setup:     return "Loadout"
-        case .defending: return "\(state.activeWeapon(attacker).displayName) incoming"
-        default:         return lastLine
         }
     }
 
@@ -578,7 +684,7 @@ struct CyberDieScreen: View {
 
     private func startNewMatch() {
         match = TurnMatch.localTwoPlayer()
-        state = CyberDieState(weapons: [.monoBlade, .monoBlade],
+        state = RollbotsState(weapons: [.monoBlade, .monoBlade],
                               ware: [.corrosiveVirus, .corrosiveVirus])
         setupSeat = 0
         pendingWeapon = nil

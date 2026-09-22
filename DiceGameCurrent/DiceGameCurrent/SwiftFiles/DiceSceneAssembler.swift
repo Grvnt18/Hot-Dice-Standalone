@@ -78,6 +78,14 @@ final class DiceTraySession {
     /// reroll will leave alone — pass them straight to `roll(keeping:)`.
     private(set) var selectedIDs: Set<UUID> = []
 
+    /// Selected dice that can no longer be un-selected.
+    ///
+    /// A subset of `selectedIDs`, so `roll(keeping: selectedIDs)` still
+    /// keeps them. Three Thousand needs this: dice set aside on an earlier
+    /// roll of the same turn are already scored, and without a lock a tap
+    /// could put one back in the cup and score it twice.
+    private(set) var lockedIDs: Set<UUID> = []
+
     /// Retained for the same reason `DiceGameSession` retains its own: the
     /// gesture recognizer holds its target weakly, so without a strong
     /// reference here taps would stop working the moment assembly returned.
@@ -147,6 +155,7 @@ final class DiceTraySession {
         // tap handler's own settled check, which cannot serve a keeping
         // game — see DiceTapHandler's note on requireSettled.
         guard isSelectionEnabled, !rollController.isRolling else { return }
+        guard !lockedIDs.contains(dieID) else { return }
         guard let node = lifecycle.rollableDice.first(where: { $0.id == dieID })?.node else { return }
         let nowSelected = !selectedIDs.contains(dieID)
         if nowSelected {
@@ -159,6 +168,20 @@ final class DiceTraySession {
         onSelectionChanged?(selectedIDs)
     }
 
+    /// Freezes the current selection: those dice keep sitting out every
+    /// reroll, and a tap will no longer release them.
+    ///
+    /// Locking does not clear the selection — the locked dice stay in
+    /// `selectedIDs` precisely so the next `roll(keeping: selectedIDs)`
+    /// leaves them alone.
+    func lockSelection() {
+        lockedIDs.formUnion(selectedIDs)
+        for die in lifecycle.rollableDice where lockedIDs.contains(die.id) {
+            DieSelectionHighlight.setLocked(true, on: die.node)
+        }
+        onSelectionChanged?(selectedIDs)
+    }
+
     /// Drops every selection and stops the highlights.
     ///
     /// Walks the whole pool rather than only `selectedIDs`, so a die left
@@ -166,6 +189,7 @@ final class DiceTraySession {
     /// dice were swapped — is put back to full opacity.
     func clearSelection() {
         selectedIDs.removeAll()
+        lockedIDs.removeAll()
         for die in lifecycle.rollableDice {
             DieSelectionHighlight.setSelected(false, on: die.node)
         }
@@ -179,6 +203,7 @@ final class DiceTraySession {
         settledThisRoll.removeAll()
         turnValues.removeAll()
         selectedIDs.removeAll()
+        lockedIDs.removeAll()
         lifecycle.setupPool(
             dice,
             playAreaBounds: playAreaBounds,

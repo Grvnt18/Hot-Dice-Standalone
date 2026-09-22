@@ -17,6 +17,21 @@ enum DieSelectionHighlight {
 
     private static let pulseActionKey = "selectionPulse"
 
+    /// How a die held back from a reroll reads once it is no longer a
+    /// choice: the pulse stops and it sits dimmed.
+    ///
+    /// Three Thousand needs "already banked this turn" to look different
+    /// from "choosing right now" — a pulsing die invites a tap, and a
+    /// locked one will refuse it. Steady rather than animated is the point:
+    /// nothing about it is asking for attention any more.
+    private static let lockedOpacity: CGFloat = 0.55
+
+    /// Marks a die as locked — set aside for good, for this turn.
+    static func setLocked(_ locked: Bool, on dieNode: SCNNode) {
+        dieNode.removeAction(forKey: pulseActionKey)
+        dieNode.opacity = locked ? lockedOpacity : 1.0
+    }
+
     /// Call this whenever a die's selected state changes — e.g. from
     /// DiceTurnController.toggleSelection. Safe to call repeatedly.
     static func setSelected(_ selected: Bool, on dieNode: SCNNode) {

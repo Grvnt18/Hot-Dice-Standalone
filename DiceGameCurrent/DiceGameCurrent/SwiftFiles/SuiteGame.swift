@@ -134,18 +134,21 @@ enum GameCatalog {
         GameCatalogEntry(ChasingSixGame.self) { onExit in
             AnyView(ChasingSixScreen(onExit: onExit))
         },
-        GameCatalogEntry(id: "pig", displayName: "Pig",
-                         tagline: "Push your luck to 75."),
+        GameCatalogEntry(PigGame.self) { onExit in
+            AnyView(PigScreen(onExit: onExit))
+        },
         GameCatalogEntry(GeneralsGame.self) { onExit in
             AnyView(GeneralsScreen(onExit: onExit))
         },
-        GameCatalogEntry(id: "three_thousand", displayName: "Three Thousand",
-                         tagline: "Bank it or lose it."),
+        GameCatalogEntry(ThreeThousandGame.self) { onExit in
+            AnyView(ThreeThousandScreen(onExit: onExit))
+        },
         GameCatalogEntry(NauticalGame.self) { onExit in
             AnyView(NauticalScreen(onExit: onExit))
         },
-        GameCatalogEntry(id: "royal_path", displayName: "The Royal Path",
-                         tagline: "Race, capture, come home.")
+        GameCatalogEntry(RoyalPathGame.self) { onExit in
+            AnyView(RoyalPathScreen(onExit: onExit))
+        }
     ]
 }
 

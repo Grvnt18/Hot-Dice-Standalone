@@ -136,8 +136,9 @@ enum GameCatalog {
         },
         GameCatalogEntry(id: "pig", displayName: "Pig",
                          tagline: "Push your luck to 75."),
-        GameCatalogEntry(id: "generals", displayName: "Generals",
-                         tagline: "One scorecard. Claim it first."),
+        GameCatalogEntry(GeneralsGame.self) { onExit in
+            AnyView(GeneralsScreen(onExit: onExit))
+        },
         GameCatalogEntry(id: "three_thousand", displayName: "Three Thousand",
                          tagline: "Bank it or lose it."),
         GameCatalogEntry(NauticalGame.self) { onExit in

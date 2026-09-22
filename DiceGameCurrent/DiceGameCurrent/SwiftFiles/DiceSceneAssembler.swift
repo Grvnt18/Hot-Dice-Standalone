@@ -61,6 +61,28 @@ final class DiceTraySession {
     /// Fired when the Roll button's enabled state may have changed.
     var onStateChanged: (() -> Void)?
 
+    /// Fired when the player taps a die and the selection changes.
+    var onSelectionChanged: ((Set<UUID>) -> Void)?
+
+    /// Whether taps select dice at all.
+    ///
+    /// Off by default: Free Roll, Chasing 6 and Nautical all select
+    /// nothing, and a die that pulses when brushed would be a bug in each
+    /// of them. Generals turns it on for the part of a turn where keeping
+    /// is a decision, and off again while the dice are in the air.
+    var isSelectionEnabled = false {
+        didSet { if !isSelectionEnabled { clearSelection() } }
+    }
+
+    /// Dice the player has tapped. In a keeping game these are the dice a
+    /// reroll will leave alone — pass them straight to `roll(keeping:)`.
+    private(set) var selectedIDs: Set<UUID> = []
+
+    /// Retained for the same reason `DiceGameSession` retains its own: the
+    /// gesture recognizer holds its target weakly, so without a strong
+    /// reference here taps would stop working the moment assembly returned.
+    fileprivate(set) var tapHandler: DiceTapHandler?
+
     /// Fired once every die in a roll has settled, with each die's result.
     ///
     /// For a d4 the reported number is the face it came to REST on, not a
@@ -118,12 +140,45 @@ final class DiceTraySession {
     /// the same style rather than silently reverting to the default.
     private let d4Style: DieFaceLabels.D4LabelStyle
 
+    /// Toggles one die's kept state, if selection is on and the die has
+    /// landed.
+    func toggleSelection(dieID: UUID) {
+        // Nothing on the table is selectable mid-throw. This replaces the
+        // tap handler's own settled check, which cannot serve a keeping
+        // game — see DiceTapHandler's note on requireSettled.
+        guard isSelectionEnabled, !rollController.isRolling else { return }
+        guard let node = lifecycle.rollableDice.first(where: { $0.id == dieID })?.node else { return }
+        let nowSelected = !selectedIDs.contains(dieID)
+        if nowSelected {
+            selectedIDs.insert(dieID)
+        } else {
+            selectedIDs.remove(dieID)
+        }
+        SoundEngine.shared.play(.buttonTap)
+        DieSelectionHighlight.setSelected(nowSelected, on: node)
+        onSelectionChanged?(selectedIDs)
+    }
+
+    /// Drops every selection and stops the highlights.
+    ///
+    /// Walks the whole pool rather than only `selectedIDs`, so a die left
+    /// pulsing by any path — a re-pooled tray, a selection made before the
+    /// dice were swapped — is put back to full opacity.
+    func clearSelection() {
+        selectedIDs.removeAll()
+        for die in lifecycle.rollableDice {
+            DieSelectionHighlight.setSelected(false, on: die.node)
+        }
+        onSelectionChanged?(selectedIDs)
+    }
+
     /// Swaps in a different set of dice. setupPool already tears the
     /// previous pool down, so this is safe to call repeatedly.
     func setPool(_ dice: [Die]) {
         guard !rollController.isRolling else { return }
         settledThisRoll.removeAll()
         turnValues.removeAll()
+        selectedIDs.removeAll()
         lifecycle.setupPool(
             dice,
             playAreaBounds: playAreaBounds,
@@ -160,6 +215,7 @@ final class DiceTraySession {
     func beginTurn() {
         settledThisRoll.removeAll()
         turnValues.removeAll()
+        clearSelection()
     }
 
     /// Throws every die again. Same two steps DiceTurnController.beginRoll
@@ -296,8 +352,10 @@ enum DiceSceneAssembler {
 
         let tapHandler = DiceTapHandler(
             sceneView: sceneView,
-            turnController: turnController,
-            rollController: rollController
+            rollController: rollController,
+            onDieTapped: { [weak turnController] dieID in
+                turnController?.toggleSelection(dieID: dieID)
+            }
         )
 
         return DiceGameSession(
@@ -463,6 +521,15 @@ enum DiceSceneAssembler {
                     surfaceMaterial: env.floorSurfaceMaterial,
                     textMaterial: env.floorTextMaterial
                 )
+            }
+        )
+
+        session.tapHandler = DiceTapHandler(
+            sceneView: sceneView,
+            rollController: rollController,
+            requireSettled: false,
+            onDieTapped: { [weak session] dieID in
+                session?.toggleSelection(dieID: dieID)
             }
         )
 

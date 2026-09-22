@@ -29,8 +29,6 @@ struct GameHubView: View {
         // a GeometryReader in a scrolling stack takes all the space and
         // breaks the scroll.
         GeometryReader { geo in
-            let side = Self.tileSide(forWidth: geo.size.width)
-
             ZStack {
                 // Same timber as every game's header and footer — the hub
                 // should read as part of the same object, not a launcher
@@ -40,17 +38,20 @@ struct GameHubView: View {
 
                 ScrollView {
                     VStack(spacing: 18) {
-                        title(width: geo.size.width)
+                        HubTitle(width: geo.size.width)
 
-                        LazyVGrid(columns: Self.columns(forWidth: geo.size.width), spacing: Self.columnGap) {
+                        LazyVGrid(columns: HubLayout.columns(forWidth: geo.size.width),
+                                  spacing: HubLayout.columnGap) {
                             ForEach(GameCatalog.all) { entry in
-                                GameTile(entry: entry, side: side, accent: theme.accentColor) {
+                                GameTile(entry: entry,
+                                         side: HubLayout.tileSide(forWidth: geo.size.width),
+                                         accent: theme.accentColor) {
                                     SoundEngine.shared.play(.buttonTap)
                                     openGame = entry
                                 }
                             }
                         }
-                        .padding(.horizontal, Self.gutter)
+                        .padding(.horizontal, HubLayout.gutter)
                     }
                     .padding(.vertical, 22)
                 }
@@ -91,7 +92,35 @@ struct GameHubView: View {
         }
     }
 
-    // MARK: Geometry
+    private var settingsButton: some View {
+        Button {
+            SoundEngine.shared.play(.buttonTap)
+            showingSettings = true
+        } label: {
+            Image(systemName: "gearshape.fill")
+                .font(.system(size: 18))
+                .foregroundStyle(.white.opacity(0.75))
+                .padding(9)
+                .background(
+                    Color.black.opacity(0.45),
+                    in: RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
+                )
+        }
+        .padding(10)
+    }
+}
+
+// MARK: - Geometry
+
+/// Where every size on the hub comes from.
+///
+/// A file-scope enum, like `PlayfieldLayout`, rather than statics on the
+/// view. Two reasons, and the second is the one that matters: layout
+/// arithmetic is not view state, and a plain top-level type is resolved
+/// without the compiler having to reason about the `View` whose `body` is
+/// asking — which is what the previous shape, `Self.gutter` inside a
+/// ViewBuilder, made it do.
+enum HubLayout {
 
     /// Space either side of the grid.
     static let gutter: CGFloat = 16
@@ -137,26 +166,14 @@ struct GameHubView: View {
               count: columnCount(forWidth: width))
     }
 
-    private func title(width: CGFloat) -> some View {
-        // The suite's own mark above its name. The die stands for the app
-        // as a whole rather than for any one game, so the hub is the one
-        // screen that should carry it — and the one with room for the
-        // artwork and the wordmark both.
-        //
-        // This is NOT the iOS home-screen icon: there is no asset catalog
-        // here, so that is set in Swift Playgrounds' project settings.
-        VStack(spacing: 6) {
-            GameIconView(id: "app")
-                // Proportional, like the tiles, so the mark keeps its
-                // weight against them on a phone and on an iPad alike.
-                .frame(width: Self.headerMark(forWidth: width),
-                       height: Self.headerMark(forWidth: width))
+    /// Inset from a tile's edge to its artwork.
+    static let inset: CGFloat = 10
 
-            ScriptText("Rolls", size: 52)
-                .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.5), radius: 4, y: 2)
-        }
-    }
+    /// Space between a tile's icon and its name.
+    static let gap: CGFloat = 6
+
+    /// Room for a tile's name: two lines of Stack Sans at 13pt.
+    static let labelHeight: CGFloat = 34
 
     /// The suite mark above the wordmark, bounded at both ends: big enough
     /// to read on a phone, not so big it dwarfs the grid on an iPad.
@@ -164,21 +181,46 @@ struct GameHubView: View {
         min(max(width * 0.22, 72), 120)
     }
 
-    private var settingsButton: some View {
-        Button {
-            SoundEngine.shared.play(.buttonTap)
-            showingSettings = true
-        } label: {
-            Image(systemName: "gearshape.fill")
-                .font(.system(size: 18))
-                .foregroundStyle(.white.opacity(0.75))
-                .padding(9)
-                .background(
-                    Color.black.opacity(0.45),
-                    in: RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                )
+    /// What is left for the artwork once the name has its room.
+    ///
+    /// Everything above is a constant, so this is the whole reason the icon
+    /// is legible: it is a stated fraction of a known square rather than
+    /// whatever a resizable image could negotiate out of a stack that had no
+    /// height to give it.
+    static func iconSide(tile: CGFloat) -> CGFloat {
+        max(40, tile - inset * 2 - labelHeight - gap)
+    }
+}
+
+// MARK: - Title
+
+/// The suite's own mark above its name.
+///
+/// A struct rather than a method on the hub, for the same reason `GameTile`
+/// is one: a view that takes a measurement is a view with a property, and
+/// it keeps `body` a plain list of subviews instead of a call the
+/// type-checker has to resolve mid-expression.
+private struct HubTitle: View {
+    let width: CGFloat
+
+    var body: some View {
+        // The die stands for the app as a whole rather than for any one
+        // game, so the hub is the one screen that should carry it — and the
+        // one with room for the artwork and the wordmark both.
+        //
+        // This is NOT the iOS home-screen icon: there is no asset catalog
+        // here, so that is set in Swift Playgrounds' project settings.
+        VStack(spacing: 6) {
+            GameIconView(id: "app")
+                // Proportional, like the tiles, so the mark keeps its weight
+                // against them on a phone and on an iPad alike.
+                .frame(width: HubLayout.headerMark(forWidth: width),
+                       height: HubLayout.headerMark(forWidth: width))
+
+            ScriptText("Rolls", size: 52)
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.5), radius: 4, y: 2)
         }
-        .padding(10)
     }
 }
 
@@ -193,35 +235,16 @@ private struct GameTile: View {
     let accent: Color
     let action: () -> Void
 
-    /// Inset from the tile edge to the artwork.
-    private static let inset: CGFloat = 10
-
-    /// Space between the icon and the name.
-    private static let gap: CGFloat = 6
-
-    /// Room for the name: two lines of Stack Sans at 13pt.
-    private static let labelHeight: CGFloat = 34
-
-    /// What is left for the artwork once the name has its room.
-    ///
-    /// Everything above is a constant, so this is the whole reason the icon
-    /// is now legible: it is a stated fraction of a known square rather than
-    /// whatever a resizable image could negotiate out of a stack that had no
-    /// height to give it.
-    static func iconSide(tile: CGFloat) -> CGFloat {
-        max(40, tile - inset * 2 - labelHeight - gap)
-    }
-
     var body: some View {
         Button(action: action) {
             // The icon carries the tile and the name sits under it. The
             // tagline is dropped rather than squeezed: on a square tile at
             // phone width there is room for artwork or for a sentence, and
             // the artwork says more.
-            VStack(spacing: Self.gap) {
+            VStack(spacing: HubLayout.gap) {
                 GameIconView(id: entry.id)
-                    .frame(width: Self.iconSide(tile: side),
-                           height: Self.iconSide(tile: side))
+                    .frame(width: HubLayout.iconSide(tile: side),
+                           height: HubLayout.iconSide(tile: side))
 
                 Text(entry.displayName)
                     .font(.stackSans(13))
@@ -232,7 +255,7 @@ private struct GameTile: View {
                     // Stack Sans overhangs its advance width, so a trailing
                     // glyph can clip against a tight frame.
                     .padding(.trailing, 3)
-                    .frame(height: Self.labelHeight)
+                    .frame(height: HubLayout.labelHeight)
             }
             // The square comes from the hub's measurement of the screen, so
             // every tile in a row is identical by construction rather than

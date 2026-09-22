@@ -92,15 +92,16 @@ enum CyberWeapon: String, CaseIterable, Codable, Identifiable {
 
     /// The bundled mark for this weapon.
     ///
-    /// The Sidearm has no art of its own — it is what the Sub-Routine
-    /// leaves you holding rather than something you choose — so it
-    /// borrows the pistol's, which is what a sidearm is.
+    /// The Sidearm has one of its own. It borrowed the pistol's at first,
+    /// for want of art, and that read wrong: the rail showed the same
+    /// silhouette whether you had *chosen* the Smart Pistol or been cut
+    /// down to the Sidearm, which are opposite situations.
     var iconName: String {
         switch self {
         case .monoBlade:   return "bot-blade"
         case .smartPistol: return "bot-pistol"
         case .railRifle:   return "bot-rail"
-        case .sidearm:     return "bot-pistol"
+        case .sidearm:     return "bot-sidearm"
         }
     }
 

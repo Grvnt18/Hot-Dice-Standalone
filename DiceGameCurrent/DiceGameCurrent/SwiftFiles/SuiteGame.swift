@@ -140,8 +140,9 @@ enum GameCatalog {
         GameCatalogEntry(GeneralsGame.self) { onExit in
             AnyView(GeneralsScreen(onExit: onExit))
         },
-        GameCatalogEntry(id: "three_thousand", displayName: "Three Thousand",
-                         tagline: "Bank it or lose it."),
+        GameCatalogEntry(ThreeThousandGame.self) { onExit in
+            AnyView(ThreeThousandScreen(onExit: onExit))
+        },
         GameCatalogEntry(NauticalGame.self) { onExit in
             AnyView(NauticalScreen(onExit: onExit))
         },

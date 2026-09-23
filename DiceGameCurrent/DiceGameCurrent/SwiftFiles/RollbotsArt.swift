@@ -124,18 +124,18 @@ struct NetSeatRail: View {
     var body: some View {
         VStack(spacing: 6) {
             Text(name)
-                .font(.stackSans(10))
+                .font(.stackSans(13))
                 .foregroundStyle(colour.opacity(isActive ? 1 : 0.6))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
 
             Text("\(max(0, state.ip[seat]))")
-                .font(.stackSans(26))
+                .font(.stackSans(34))
                 .foregroundStyle(colour)
 
             Text("IP")
-                .font(.stackSans(9))
-                .foregroundStyle(NetArt.text.opacity(0.5))
+                .font(.stackSans(11))
+                .foregroundStyle(NetArt.text.opacity(0.6))
 
             // Vertical, filling from the bottom: a tall thin bar reads far
             // better in a rail than a short wide one, and draining downward
@@ -152,19 +152,34 @@ struct NetSeatRail: View {
             }
             .frame(maxHeight: .infinity)
 
-            NetIconView(name: state.activeWeapon(seat).iconName, tint: colour.opacity(0.85))
-                .frame(height: 26)
+            NetIconView(name: state.activeWeapon(seat).iconName, tint: colour.opacity(0.9))
+                .frame(height: 40)
 
             Text(state.activeWeapon(seat).displayName)
-                .font(.stackSans(9))
-                .foregroundStyle(NetArt.text.opacity(0.7))
+                .font(.stackSans(12))
+                .foregroundStyle(NetArt.text.opacity(0.8))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.6)
+
+            // The ability, which had no mark at all although the art has
+            // shipped since the icons went in. Dimmed once spent, so a rail
+            // answers "what have they still got?" without opening a menu.
+            NetIconView(name: state.ware[seat].iconName,
+                        tint: (state.wareUsed[seat] ? NetArt.text.opacity(0.28)
+                                                    : NetArt.warn))
+                .frame(height: 32)
+
+            Text(state.wareUsed[seat] ? "Spent" : state.ware[seat].displayName)
+                .font(.stackSans(10))
+                .foregroundStyle(NetArt.text.opacity(state.wareUsed[seat] ? 0.45 : 0.75))
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.6)
 
             ForEach(statusPips, id: \.self) { pip in
                 Text(pip)
-                    .font(.stackSans(8))
+                    .font(.stackSans(12))
                     .foregroundStyle(NetArt.warn)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
@@ -230,16 +245,16 @@ struct NetCard: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.stackSans(13))
+                    .font(.stackSans(16))
                     .foregroundStyle(isEnabled ? tint : NetArt.text.opacity(0.3))
                 Text(summary)
-                    .font(.stackSans(10))
+                    .font(.stackSans(12))
                     .foregroundStyle(NetArt.text.opacity(isEnabled ? 0.75 : 0.25))
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
                 if let detail {
                     Text(detail)
-                        .font(.stackSans(10))
+                        .font(.stackSans(12))
                         .foregroundStyle(NetArt.warn.opacity(isEnabled ? 0.9 : 0.3))
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
@@ -280,9 +295,9 @@ struct NetActionBar: View {
         VStack(spacing: 4) {
             if !subtitle.isEmpty {
                 Text(subtitle)
-                    .font(.stackSans(11))
-                    .foregroundStyle(NetArt.text.opacity(0.8))
-                    .lineLimit(2)
+                    .font(.stackSans(16))
+                    .foregroundStyle(NetArt.text.opacity(0.95))
+                    .lineLimit(3)
                     .minimumScaleFactor(0.7)
                     .multilineTextAlignment(.center)
             }
@@ -309,7 +324,7 @@ struct NetActionBar: View {
             action()
         } label: {
             Text(label)
-                .font(.stackSans(14))
+                .font(.stackSans(16))
                 .foregroundStyle(enabled ? (filled ? NetArt.background : tint)
                                          : NetArt.text.opacity(0.3))
                 .frame(maxWidth: .infinity)
@@ -358,7 +373,7 @@ struct NetHandoverGate: View {
                 }
 
                 Text("Hand over to")
-                    .font(.stackSans(11))
+                    .font(.stackSans(13))
                     .foregroundStyle(NetArt.text.opacity(0.6))
 
                 Text(nextName)
@@ -408,14 +423,14 @@ struct NetResultView: View {
                     .multilineTextAlignment(.center)
 
                 Text(winners.count == 1 ? "Connection terminated" : "Both decks flatlined")
-                    .font(.stackSans(11))
+                    .font(.stackSans(14))
                     .foregroundStyle(NetArt.text.opacity(0.65))
 
                 HStack(spacing: 18) {
                     ForEach([0, 1], id: \.self) { seat in
                         VStack(spacing: 2) {
                             Text(names[seat])
-                                .font(.stackSans(10))
+                                .font(.stackSans(13))
                                 .foregroundStyle(NetArt.text.opacity(0.65))
                             Text("\(max(0, state.ip[seat]))")
                                 .font(.stackSans(26))

@@ -116,6 +116,47 @@ def ev_firewall(weapon, acc):
                for r in faces for fw in range(1, 9)) / (len(faces) * 8)
 
 
+def check_visible_damage():
+    """The attacker now throws accuracy and damage together, so the defender
+    sees the damage value before choosing a reaction.
+
+    That is an information change, and information changes are where games
+    quietly break. It measures as almost nothing, for a reason rather than
+    by luck: Dodge loses P(fail) x damage and a Firewall loses
+    damage - absorb, so which is better barely depends on the damage value
+    — the comparison is nearly scale-invariant. Against the Rail nothing
+    changes at all, since no Firewall applies.
+
+    Asserted rather than remembered: if a future tuning pass makes the
+    damage roll matter to the choice, this fails and says so.
+    """
+    def loss(weapon, acc, dmg, defence):
+        sides = 6 if defence == "dodge" else 8
+        return sum(resolve(weapon, acc, dmg, defence, roll)[0]
+                   - resolve(weapon, acc, dmg, defence, roll)[1]
+                   for roll in range(1, sides + 1)) / sides
+
+    def blind(weapon, acc, defence):
+        faces = DAMAGE_SIDES[weapon]
+        return sum(loss(weapon, acc, d, defence) for d in range(1, faces + 1)) / faces
+
+    worst = 0.0
+    for weapon in ("blade", "pistol", "rail"):
+        blind_tot = seen_tot = 0.0
+        n = 0
+        for acc in range(1, 11):
+            choice = min(("dodge", "firewall"), key=lambda d: blind(weapon, acc, d))
+            for dmg in range(1, DAMAGE_SIDES[weapon] + 1):
+                blind_tot += loss(weapon, acc, dmg, choice)
+                seen_tot += min(loss(weapon, acc, dmg, "dodge"),
+                                loss(weapon, acc, dmg, "firewall"))
+                n += 1
+        gap = blind_tot / n - seen_tot / n
+        worst = max(worst, gap)
+        assert gap < 0.05, "%s: seeing the damage is worth %.3f IP" % (weapon, gap)
+    print("visible damage die: PASS (worth at most %.2f IP an exchange)" % worst)
+
+
 def best_defence(weapon, acc):
     return "dodge" if ev_dodge(weapon, acc) < ev_firewall(weapon, acc) else "firewall"
 
@@ -197,6 +238,7 @@ def match(rng, w0, w1, ware0=None, ware1=None):
 
 def main():
     swiftconst.expect("Rollbots", "Rollbots.swift", SWIFT_CONSTANTS)
+    check_visible_damage()
     check_document()
     check_edges()
 

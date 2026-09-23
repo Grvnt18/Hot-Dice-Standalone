@@ -17,6 +17,17 @@ struct RollbotsScreen: View {
 
     /// The exchange in progress.
     @State private var accuracy = 0
+
+    /// The damage die, thrown alongside the accuracy die rather than after
+    /// the defence is chosen.
+    ///
+    /// The defender therefore sees it before choosing. Measured against the
+    /// shipped resolve(), that is worth 0.02 IP an exchange to the Blade,
+    /// 0.01 to the Pistol and nothing at all to the Rail — because Dodge
+    /// loses P(fail) x damage while a Firewall loses damage - absorb, so
+    /// which is better barely depends on the damage value. Under a point
+    /// across a 16 IP match, so nothing is rebalanced for it.
+    @State private var damageRoll = 0
     @State private var defence: CyberDefence = .firewall
     @State private var defenceRoll: Int?
     @State private var usedOverclock = false
@@ -34,14 +45,20 @@ struct RollbotsScreen: View {
         case action
         /// Attacker is picking which weapon to switch to.
         case swapping
-        /// Accuracy die in the air.
-        case rollingAccuracy
-        /// Defender picks a reaction, with the accuracy already on the table.
+        /// The attacker's two dice — accuracy and damage — in the air.
+        case rollingAttack
+        /// Both dice have settled and the attacker is reading them.
+        ///
+        /// The game stops here rather than handing over the moment the dice
+        /// stop moving. A roll you did not get to look at might as well have
+        /// been made for you.
+        case readingAttack
+        /// Defender picks a reaction, with both dice already on the table.
         case defending
         /// Defence die in the air.
         case rollingDefence
-        /// Damage die in the air.
-        case rollingDamage
+        /// The defence die has settled and the defender is reading it.
+        case readingDefence
         /// Exchange resolved; waiting to hand over.
         case resolved
         /// Match decided.
@@ -58,7 +75,7 @@ struct RollbotsScreen: View {
     private var viewingSeat: Int {
         switch phase {
         case .setup:                                  return setupSeat
-        case .defending, .rollingDefence, .rollingDamage: return defender
+        case .defending, .rollingDefence, .readingDefence: return defender
         default:                                      return attacker
         }
     }
@@ -75,7 +92,10 @@ struct RollbotsScreen: View {
                 // The viewing seat is always on the left — your own numbers
                 // stay where your thumb is, the same way Boneheads keeps
                 // your own grid nearest you.
-                let railWidth = min(max(geo.size.width * 0.19, 74), 104)
+                // Wider than before: the rails now carry two marks and two
+                // labels apiece, and the old 74-104pt band squeezed the
+                // weapon name to a scale factor rather than reading it.
+                let railWidth = min(max(geo.size.width * 0.22, 92), 128)
                 let barHeight: CGFloat = phase == .setup ? 0 : 104
                 let bodyHeight = max(geo.size.height - barHeight, 0)
 
@@ -225,6 +245,10 @@ struct RollbotsScreen: View {
             session: $session,
             makeInitialDice: { [NetArt.die(sides: RollbotsRules.accuracySides, seat: 0)] },
             floorTitle: RollbotsGame.floorTitle,
+            // Brushed steel, no timber. The wooden tray is the wrong object
+            // for a duel in the net, and it was the last thing on this
+            // screen still reading as the other nine games.
+            arenaStyle: .steel,
             onSessionCreated: { newSession in
                 newSession.onRollSettled = { results in
                     settled(results)
@@ -245,7 +269,7 @@ struct RollbotsScreen: View {
                     .padding(.top, 4)
 
                 Text("Weapon")
-                    .font(.stackSans(11))
+                    .font(.stackSans(13))
                     .foregroundStyle(NetArt.text.opacity(0.6))
                 ForEach(CyberWeapon.selectable) { weapon in
                     NetCard(
@@ -258,7 +282,7 @@ struct RollbotsScreen: View {
                 }
 
                 Text("Cyberware")
-                    .font(.stackSans(11))
+                    .font(.stackSans(13))
                     .foregroundStyle(NetArt.text.opacity(0.6))
                     .padding(.top, 4)
                 ForEach(Cyberware.allCases) { ware in
@@ -367,7 +391,7 @@ struct RollbotsScreen: View {
                     .padding(.top, 4)
 
                 Text("Switching costs your turn, and any held charge.")
-                    .font(.stackSans(11))
+                    .font(.stackSans(13))
                     .foregroundStyle(NetArt.text.opacity(0.7))
 
                 ForEach(CyberWeapon.selectable) { weapon in
@@ -449,12 +473,22 @@ struct RollbotsScreen: View {
         if usedOverclock {
             // Forced to the top of the die; nothing is thrown for it.
             accuracy = RollbotsRules.overclockAccuracy
-            phase = .defending
+            // Accuracy is fixed at maximum, so only the damage die is thrown
+            // — and it is still read before the handover.
+            if throwDice(sides: [state.activeWeapon(attacker).damageSides],
+                         seat: attacker) {
+                phase = .rollingAttack
+            }
             handoverTo = defender
             return
         }
-        if throwDice(sides: RollbotsRules.accuracySides, seat: attacker) {
-            phase = .rollingAccuracy
+        // Both dice at once: the attacker sees the whole shot before it is
+        // spent, instead of learning the damage after the defender has
+        // already answered.
+        if throwDice(sides: [RollbotsRules.accuracySides,
+                             state.activeWeapon(attacker).damageSides],
+                     seat: attacker) {
+            phase = .rollingAttack
         }
     }
 
@@ -483,8 +517,8 @@ struct RollbotsScreen: View {
             // and ordering the two the other way round is the kind of race
             // that only shows up on a fast device.
             pendingVirus = true
-            if throwDice(sides: 6, seat: seat) {
-                phase = .rollingDamage
+            if throwDice(sides: [6], seat: seat) {
+                phase = .rollingAttack
             } else {
                 pendingVirus = false
                 state.wareUsed[seat] = false
@@ -519,15 +553,15 @@ struct RollbotsScreen: View {
         defence = option
         if option == .phase { state.phaseArmed[defender] = false }
         if option == .exposed {
+            // Nothing to throw: the attacker cannot be answered this turn,
+            // and their damage die is already on the table.
             defenceRoll = nil
             state.exposed[defender] = false
-            if throwDice(sides: state.activeWeapon(attacker).damageSides, seat: attacker) {
-                phase = .rollingDamage
-            }
+            resolveExchange()
             return
         }
         guard let sides = option.sides else { return }
-        if throwDice(sides: sides, seat: defender) {
+        if throwDice(sides: [sides], seat: defender) {
             phase = .rollingDefence
         }
     }
@@ -550,23 +584,30 @@ struct RollbotsScreen: View {
         }
 
         switch phase {
-        case .rollingAccuracy:
-            accuracy = value
-            phase = .defending
-            handoverTo = defender
+        case .rollingAttack:
+            // Overclock fixes the accuracy, so only read a d10 if one was
+            // actually thrown.
+            if let acc = self.value(of: RollbotsRules.accuracySides, in: results) {
+                accuracy = acc
+            }
+            damageRoll = self.value(of: state.activeWeapon(attacker).damageSides,
+                                    in: results) ?? value
+            phase = .readingAttack
         case .rollingDefence:
             defenceRoll = value
-            if throwDice(sides: state.activeWeapon(attacker).damageSides, seat: attacker) {
-                phase = .rollingDamage
-            }
-        case .rollingDamage:
-            resolveExchange(damageRoll: value)
+            phase = .readingDefence
         default:
             break
         }
     }
 
-    private func resolveExchange(damageRoll: Int) {
+    /// The attacker has read their two dice and sends the shot across.
+    private func sendAttack() {
+        phase = .defending
+        handoverTo = defender
+    }
+
+    private func resolveExchange() {
         let weapon = state.activeWeapon(attacker)
         let resolution = RollbotsRules.resolve(
             weapon: weapon,
@@ -654,11 +695,21 @@ struct RollbotsScreen: View {
     /// first would be a phase nothing could move back. Jackpot shipped
     /// that bug once already.
     @discardableResult
-    private func throwDice(sides: Int, seat: Int) -> Bool {
+    private func throwDice(sides: [Int], seat: Int) -> Bool {
         guard let session else { return false }
         session.beginTurn()
-        session.setPool([NetArt.die(sides: sides, seat: seat)])
+        session.setPool(sides.map { NetArt.die(sides: $0, seat: seat) })
         return session.roll()
+    }
+
+    /// Pulls one die out of a settled throw by its type.
+    ///
+    /// This is why the attack can throw two dice at once with no labels on
+    /// them: the d10 is always accuracy and nothing else in the game uses
+    /// one, and the other die is whatever the weapon rolls. The player
+    /// reads them the same way the code does.
+    private func value(of sides: Int, in results: [DiceTraySession.DieResult]) -> Int? {
+        results.first { $0.sides == sides }?.value
     }
 
     // MARK: Buttons
@@ -666,31 +717,45 @@ struct RollbotsScreen: View {
     private var primaryLabel: String {
         switch phase {
         case .action, .swapping: return "Choose Above"
-        case .rollingAccuracy: return "Rolling Accuracy"
+        case .rollingAttack:   return "Rolling"
+        case .readingAttack:   return "Send It"
         case .defending:       return "Choose Above"
         case .rollingDefence:  return "Rolling Defence"
-        case .rollingDamage:   return "Rolling Damage"
+        case .readingDefence:  return "Resolve"
         case .resolved:        return "Continue"
         case .finished:        return "Done"
         case .setup:           return ""
         }
     }
 
-    private var isPrimaryEnabled: Bool { phase == .resolved }
+    /// The three phases where the button is the way forward: read your
+    /// attack, read your defence, or end the exchange.
+    private var isPrimaryEnabled: Bool {
+        phase == .resolved || phase == .readingAttack || phase == .readingDefence
+    }
 
     private var barSubtitle: String {
         switch phase {
         case .action:    return "Pick a move"
         case .swapping:  return "Pick a weapon, or cancel"
-        case .defending: return "Accuracy \(accuracy) is on the table — answer it"
+        case .readingAttack:
+            return "Accuracy \(accuracy) · damage \(damageRoll) — send it when you have read them"
+        case .defending:
+            return "Accuracy \(accuracy), damage \(damageRoll) — answer it"
+        case .readingDefence:
+            return "\(defence.displayName) rolled \(defenceRoll.map(String.init) ?? "—")"
         case .resolved:  return lastLine ?? ""
         default:         return ""
         }
     }
 
     private func primaryAction() {
-        guard phase == .resolved else { return }
-        endExchange()
+        switch phase {
+        case .readingAttack:  sendAttack()
+        case .readingDefence: resolveExchange()
+        case .resolved:       endExchange()
+        default:              break
+        }
     }
 
     private func startNewMatch() {
@@ -702,6 +767,7 @@ struct RollbotsScreen: View {
         pendingWare = nil
         lastLine = nil
         accuracy = 0
+        damageRoll = 0
         defenceRoll = nil
         usedOverclock = false
         pendingVirus = false

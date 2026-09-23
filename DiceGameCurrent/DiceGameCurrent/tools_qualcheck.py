@@ -171,4 +171,32 @@ for f in SOURCES:
                           "inside a nested closure" % (os.path.relpath(f), line, name))
                     escapes += 1
 print("escaping-capture check:", "FAIL" if escapes else "PASS", "(%d captures)" % escapes)
-sys.exit(1 if bad or escapes else 0)
+
+
+# --- Half-merged files -----------------------------------------------------
+#
+# A merge can take half of a change and leave the rest, producing a file that
+# references what it no longer declares. It happened twice to GameHubView.swift
+# and nothing here saw it: the balance scan passes (braces still match), the
+# resolver above passes (it only checks Type.member), and the result went to
+# the device as three compiler errors.
+#
+# The signature is a name used in an element position but declared as a
+# function that takes arguments — main's file said `title` on its own line
+# while declaring `func title(width:)`. Zero hits across the tree when
+# correct; one hit, at the exact line, on the broken file.
+
+merged = 0
+for f in SOURCES:
+    s = strip(open(f).read())
+    needs_args = {m.group(1) for m in
+                  re.finditer(r'\bfunc\s+(\w+)\s*(?:<[^>]*>)?\s*\(\s*([^)])', s)}
+    for m in re.finditer(r'^[ \t]*([a-z]\w*)[ \t]*$', s, re.M):
+        if m.group(1) in needs_args:
+            line = s[:m.start()].count('\n') + 1
+            print("  HALF-MERGE  %s:%d  '%s' is used bare but declared with parameters"
+                  % (os.path.relpath(f), line, m.group(1)))
+            merged += 1
+print("half-merge check:", "FAIL" if merged else "PASS", "(%d)" % merged)
+
+sys.exit(1 if bad or escapes or merged else 0)

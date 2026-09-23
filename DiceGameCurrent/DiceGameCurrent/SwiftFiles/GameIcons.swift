@@ -4,11 +4,20 @@ import UIKit
 /// The bundled icon artwork: one per game for the hub, plus the weapon and
 /// Cyberware marks Rollbots uses on its cards.
 ///
-/// Loaded from loose files in `Resources/` through `Bundle.main`, the same
-/// way the fonts, the dice meshes and `pix_texture.png` already are.
-/// SwiftUI's `Image(_:)` is deliberately not used — it looks in an asset
-/// catalog, and this project has none; it is hand-assembled in Swift
-/// Playgrounds on an iPad, where every resource is a plain bundle file.
+/// Loaded through `BundleImageLoader`, the same lookup the dice texture
+/// uses — asset catalog first, then a loose file in the bundle.
+///
+/// This used to go straight to `Bundle.main.path(forResource:ofType:)` on
+/// the reasoning that "this project has no asset catalog; it is
+/// hand-assembled in Swift Playgrounds, where every resource is a plain
+/// bundle file". That was wrong, and it cost four phases of the icons
+/// never appearing: **Swift Playgrounds on iPad puts images added to a
+/// project into its asset catalog**, so `UIImage(named:)` finds them and a
+/// path lookup does not. `pix_texture.png` worked the whole time precisely
+/// because BundleImageLoader tries the catalog first.
+///
+/// Hence the delegation rather than a second copy of the lookup: one
+/// proven path used everywhere beats two that can disagree.
 enum GameIcons {
 
     /// Decoded images, kept because the hub draws ten of them at once and
@@ -17,10 +26,7 @@ enum GameIcons {
 
     static func image(named name: String) -> UIImage? {
         if let cached = cache[name] { return cached }
-        guard let path = Bundle.main.path(forResource: name, ofType: "png"),
-              let image = UIImage(contentsOfFile: path) else {
-            return nil
-        }
+        guard let image = BundleImageLoader.load(named: name) else { return nil }
         cache[name] = image
         return image
     }
@@ -37,11 +43,14 @@ enum GameIcons {
 
 // MARK: - Views
 
-/// A game's icon, or nothing at all if the file is missing.
+/// A game's icon — or, if it cannot be found, a box naming the file it
+/// wanted.
 ///
-/// Draws nothing rather than a placeholder box: the tile underneath still
-/// carries the game's name, so an absent icon degrades to the layout this
-/// screen had before the artwork existed.
+/// It used to draw nothing at all, documented as a deliberate graceful
+/// degradation. That is exactly how a loader bug hid for four phases: an
+/// absent icon looked identical to a design choice, on a device with no
+/// console to check. A missing resource now says so on screen, and says
+/// which one.
 struct GameIconView: View {
     let id: String
 
@@ -50,7 +59,28 @@ struct GameIconView: View {
             Image(uiImage: image)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
+        } else {
+            MissingIconView(filename: "icon-\(id).png")
         }
+    }
+}
+
+/// The visible stand-in for a resource that would not load.
+private struct MissingIconView: View {
+    let filename: String
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 6)
+            .strokeBorder(.white.opacity(0.55),
+                          style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+            .overlay(
+                Text(filename)
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.75))
+                    .multilineTextAlignment(.center)
+                    .minimumScaleFactor(0.5)
+                    .padding(4)
+            )
     }
 }
 

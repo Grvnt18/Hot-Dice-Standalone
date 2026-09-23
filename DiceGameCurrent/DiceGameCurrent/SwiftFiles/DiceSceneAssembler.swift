@@ -419,7 +419,11 @@ enum DiceSceneAssembler {
         let diceContainer: SCNNode
     }
 
-    private static func buildEnvironment(into sceneView: SCNView, title: String) -> Environment {
+    private static func buildEnvironment(
+        into sceneView: SCNView,
+        title: String,
+        style: ArenaStyle = .house
+    ) -> Environment {
         let scene = SCNScene()
         sceneView.scene = scene
 
@@ -451,7 +455,8 @@ enum DiceSceneAssembler {
         let floorSurfaceMaterial = DiceSceneEnvironment.addFloorSurface(
             to: scene.rootNode,
             bounds: layout.bounds,
-            floorY: floorY
+            floorY: floorY,
+            style: style
         )
 
         let floorTextMaterial = DiceSceneEnvironment.addFloorText(
@@ -467,12 +472,16 @@ enum DiceSceneAssembler {
         // regardless of roll energy. This is sized to look like a
         // reasonable dice-tray rim relative to the playfield, not to
         // survive any particular bounce height.
-        DiceSceneEnvironment.addWalls(
-            to: scene.rootNode,
-            bounds: layout.bounds,
-            floorY: floorY,
-            visualHeight: 10.4 // doubled again from 5.2 per request
-        )
+        // Visible only. The containment boundary below is built either way,
+        // so an arena with no rim still cannot lose a die.
+        if style.showsWoodenRim {
+            DiceSceneEnvironment.addWalls(
+                to: scene.rootNode,
+                bounds: layout.bounds,
+                floorY: floorY,
+                visualHeight: 10.4 // doubled again from 5.2 per request
+            )
+        }
 
         let playfieldContainer = DicePlayfieldPhysics.makeContainer(
             bounds: layout.bounds,
@@ -507,11 +516,12 @@ enum DiceSceneAssembler {
         into sceneView: SCNView,
         pool: [Die],
         d4Style: DieFaceLabels.D4LabelStyle = .topRead,
-        title: String
+        title: String,
+        style: ArenaStyle = .house
     ) -> DiceTraySession {
         AppFonts.registerIfNeeded()
 
-        let env = buildEnvironment(into: sceneView, title: title)
+        let env = buildEnvironment(into: sceneView, title: title, style: style)
 
         let lifecycle = DicePoolLifecycleController(containerNode: env.diceContainer)
         lifecycle.setupPool(
@@ -547,6 +557,7 @@ enum DiceSceneAssembler {
             d4Style: d4Style,
             applyTheme: {
                 DiceSceneEnvironment.applyTheme(
+                    style: style,
                     surfaceMaterial: env.floorSurfaceMaterial,
                     textMaterial: env.floorTextMaterial,
                     title: title

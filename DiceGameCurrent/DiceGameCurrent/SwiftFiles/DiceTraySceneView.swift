@@ -29,6 +29,11 @@ struct DiceTraySceneView: UIViewRepresentable {
     /// own, so the board no longer claims to be Rolls.
     let floorTitle: String
 
+    /// How the playfield is dressed. Defaults to the house style, so the
+    /// nine games that say nothing keep the wood and the player's table
+    /// colour exactly as before.
+    var arenaStyle: ArenaStyle = .house
+
     let onSessionCreated: (DiceTraySession) -> Void
 
     func makeUIView(context: Context) -> SCNView {
@@ -56,7 +61,8 @@ struct DiceTraySceneView: UIViewRepresentable {
             into: uiView,
             pool: makeInitialDice(),
             d4Style: d4Style,
-            title: floorTitle
+            title: floorTitle,
+            style: arenaStyle
         )
         DispatchQueue.main.async {
             session = newSession

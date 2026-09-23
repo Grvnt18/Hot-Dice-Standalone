@@ -51,6 +51,7 @@ struct GameHubView: View {
                                 }
                             }
                         }
+                        .frame(width: HubLayout.gridWidth(forWidth: geo.size.width))
                         .padding(.horizontal, HubLayout.gutter)
                     }
                     .padding(.vertical, 22)
@@ -128,34 +129,37 @@ enum HubLayout {
     /// Space between the two columns.
     static let columnGap: CGFloat = 14
 
-    /// The tile size the layout aims for, before it is fitted to the width.
-    ///
-    /// Roughly a thumb's width. Everything else follows from it: the column
-    /// count is however many of these fit, and the actual side is that
-    /// count divided back into the real width.
-    static let targetTile: CGFloat = 180
+    /// Two columns, always. Ten games, five rows, the same shape on a phone
+    /// and an iPad — the grid is a fixed arrangement rather than something
+    /// that rearranges itself under you as the window changes.
+    static let columnCount = 2
 
-    /// How many columns a given width should carry.
+    /// The largest a tile may grow to.
     ///
-    /// Two at the bottom, because one column of giant tiles is a list, not a
-    /// grid; five at the top, because past that the name under each icon
-    /// stops being readable. An iPad gets more games per screen rather than
-    /// bigger ones — which is the difference between filling a screen and
-    /// scaling to it.
-    static func columnCount(forWidth width: CGFloat) -> Int {
-        let usable = width - gutter * 2 + columnGap
-        let fits = Int(usable / (targetTile + columnGap))
-        return min(max(fits, 2), 5)
-    }
+    /// Without it, two columns on an iPad Pro give 490pt tiles and about a
+    /// row and a half per screen, which turns a ten-game grid into a lot of
+    /// scrolling. Past roughly this size a bigger square stops adding
+    /// legibility and just adds distance between the games.
+    static let maxTile: CGFloat = 300
 
     /// The square each tile occupies, for a given width.
     ///
     /// The floor matters: a GeometryReader reports a width of zero on its
     /// first pass, and a tile of zero is how the icons vanished before.
     static func tileSide(forWidth width: CGFloat) -> CGFloat {
-        let count = CGFloat(columnCount(forWidth: width))
-        let available = width - gutter * 2 - columnGap * (count - 1)
-        return max(120, available / count)
+        let available = width - gutter * 2 - columnGap * CGFloat(columnCount - 1)
+        return min(maxTile, max(120, available / CGFloat(columnCount)))
+    }
+
+    /// How wide the two columns plus their gap actually come to.
+    ///
+    /// Once the tile hits `maxTile` the grid stops growing with the screen,
+    /// so on an iPad it is narrower than the space available. Giving the
+    /// grid this exact width lets the VStack around it do the centring,
+    /// rather than leaving two fixed columns hanging against one edge.
+    static func gridWidth(forWidth width: CGFloat) -> CGFloat {
+        let tile = tileSide(forWidth: width)
+        return tile * CGFloat(columnCount) + columnGap * CGFloat(columnCount - 1)
     }
 
     /// Fixed rather than flexible now that the side is known: a fixed column
@@ -163,7 +167,7 @@ enum HubLayout {
     /// the old layout negotiating a size neither side had an opinion about.
     static func columns(forWidth width: CGFloat) -> [GridItem] {
         Array(repeating: GridItem(.fixed(tileSide(forWidth: width)), spacing: columnGap),
-              count: columnCount(forWidth: width))
+              count: columnCount)
     }
 
     /// Inset from a tile's edge to its artwork.

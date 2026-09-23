@@ -5,6 +5,40 @@ import UIKit
 /// surface. Without this, physically-based die materials render solid
 /// black (no light), and the invisible physics floor leaves dice
 /// appearing to hover over nothing.
+/// How a game's playfield is dressed.
+///
+/// Every game but one takes `.house`: the faceted surface in whatever
+/// colour the player chose in Settings, inside the wooden rim. Rollbots is
+/// a neon arena and the timber was never right for it — a dice tray on a
+/// table is the wrong object for a duel in the net.
+///
+/// An opt-in rather than a per-game branch inside the assembler, so adding
+/// this costs the other nine games nothing: they pass no style and get
+/// exactly what they had.
+struct ArenaStyle {
+
+    /// The base colour the faceted floor texture is generated from. Nil
+    /// follows the player's table colour, which is what the house style is.
+    var surfaceOverride: UIColor?
+
+    /// Whether to build the visible wooden rim.
+    ///
+    /// Only the *visible* timber. The physics container in
+    /// DicePlayfieldPhysics is separate and always built, so turning this
+    /// off changes what you see and never what can escape — the two were
+    /// decoupled when the walls were written, which is what makes this
+    /// safe.
+    var showsWoodenRim: Bool
+
+    static let house = ArenaStyle(surfaceOverride: nil, showsWoodenRim: true)
+
+    /// Rollbots: brushed steel, no rim.
+    static let steel = ArenaStyle(surfaceOverride: UIColor(hex: "#3A424C"),
+                                  showsWoodenRim: false)
+
+    var surfaceColor: UIColor { surfaceOverride ?? AppTheme.shared.floorBaseColor }
+}
+
 enum DiceSceneEnvironment {
 
     /// Adds a soft ambient fill plus one rectangular area light, positioned
@@ -88,7 +122,8 @@ enum DiceSceneEnvironment {
     static func addFloorSurface(
         to rootNode: SCNNode,
         bounds: (x: ClosedRange<Float>, z: ClosedRange<Float>),
-        floorY: Float
+        floorY: Float,
+        style: ArenaStyle = .house
     ) -> SCNMaterial {
         let width = bounds.x.upperBound - bounds.x.lowerBound
         let depth = bounds.z.upperBound - bounds.z.lowerBound
@@ -103,7 +138,7 @@ enum DiceSceneEnvironment {
         // depth-write and render-order juggling those two layers needed.
         let plane = SCNPlane(width: CGFloat(width), height: CGFloat(depth))
         let material = SCNMaterial()
-        material.diffuse.contents = facetedSurfaceTexture(baseColor: AppTheme.shared.floorBaseColor)
+        material.diffuse.contents = facetedSurfaceTexture(baseColor: style.surfaceColor)
         material.diffuse.wrapS = .clamp
         material.diffuse.wrapT = .clamp
         // .lambert, not .physicallyBased: pure diffuse shading with no
@@ -186,11 +221,12 @@ enum DiceSceneEnvironment {
     /// assembled. Call this after the player changes the color in Settings
     /// so an in-progress game updates live instead of only on next launch.
     static func applyTheme(
+        style: ArenaStyle = .house,
         surfaceMaterial: SCNMaterial,
         textMaterial: SCNMaterial,
         title: String
     ) {
-        surfaceMaterial.diffuse.contents = facetedSurfaceTexture(baseColor: AppTheme.shared.floorBaseColor)
+        surfaceMaterial.diffuse.contents = facetedSurfaceTexture(baseColor: style.surfaceColor)
         textMaterial.diffuse.contents = renderScriptText(title, pointSize: 220, isDark: AppTheme.shared.rollsTextIsDark)
     }
 

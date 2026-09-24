@@ -38,6 +38,11 @@ PANEL_TEXT = "#FFFFFF"
 CELL = "#E9E9E9"
 RIM = "#6B4E31"          # the small wooden border
 
+# The board's lettering. Aguafina Script is the app's display face; this
+# preview can only approximate it with a cursive fallback, so the shapes
+# here are indicative and the real test is the device.
+BOARD_FONT = "Aguafina Script, cursive"
+
 # --- geometry, all fractions of the square -------------------------------
 RIM_WIDTH = 0.028        # the wooden border, deliberately thin
 
@@ -106,7 +111,7 @@ def diamond_at(centre, half, fill, extra=""):
                  (cx, cy + half_y), (cx - half, cy)], fill, extra)
 
 
-def build(innings=9):
+def build(innings=9, overlay=None):
     """The whole field. `innings` decides how many columns the grid shows."""
     out = ['<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" '
            'viewBox="0 0 %d %d">' % (WIDTH, HEIGHT, WIDTH, HEIGHT)]
@@ -168,11 +173,13 @@ def build(innings=9):
         out.append('<ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="%s"/>'
                    % (px(x), py(ON_DECK_Y), px(ON_DECK_R), px(ON_DECK_R), DIRT))
         out.append('<text x="%.1f" y="%.1f" fill="%s" font-size="%.0f" '
-                   'font-family="sans-serif" text-anchor="middle" '
+                   'font-family="Aguafina Script, cursive" text-anchor="middle" '
                    'opacity="0.9">%s</text>'
                    % (px(x), py(ON_DECK_Y) + px(0.100), LINE, px(0.026), label))
 
     out.extend(scoreboard(innings))
+    if overlay:
+        out.extend(cards(overlay))
 
     # The wooden rim last, so it frames everything. Thin on purpose.
     out.append('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" '
@@ -183,6 +190,71 @@ def build(innings=9):
 
     out.append("</svg>")
     return "\n".join(out)
+
+
+# --- the selection overlay ------------------------------------------------
+#
+# Both choices — three pitching styles, three swings — are three cards over
+# a scrim, with the board still legible behind them. That matters most for
+# the swing: the batter is reading outs and runners while deciding.
+SCRIM = "#0B1A10"
+SCRIM_OPACITY = 0.62
+CARD_H = 0.500           # fraction of HEIGHT — "roughly 50% of the board"
+CARD_GAP = 0.020         # fraction of WIDTH, between cards
+CARD_MARGIN = 0.035      # fraction of WIDTH, at the outer edges
+CARD_FILL = "#F3EFE3"
+CARD_EDGE = "#2E2A22"
+
+STYLE_CARDS = [
+    ("Power Pitcher", "Mostly fastballs", "Patient hitters sit on it"),
+    ("Crafty", "Mostly changeups", "Contact hitters wait"),
+    ("Breaking Ball", "Mostly sliders", "Power hitters guess it"),
+]
+SWING_CARDS = [
+    ("Patient Swing", "d8", "Sits on the Fastball"),
+    ("Contact Swing", "d10", "Sits on the Changeup"),
+    ("Power Swing", "d12", "Sits on the Slider"),
+]
+
+
+def cards(which):
+    """Three cards over a scrim, centred vertically on the board."""
+    entries = STYLE_CARDS if which == "styles" else SWING_CARDS
+    out = ['<rect width="%d" height="%d" fill="%s" opacity="%.2f"/>'
+           % (WIDTH, HEIGHT, SCRIM, SCRIM_OPACITY)]
+
+    usable = 1.0 - CARD_MARGIN * 2 - CARD_GAP * 2
+    card_w = usable / 3
+    top = (1.0 - CARD_H) / 2
+
+    title = "Pick your pitching style" if which == "styles" else "Pick your swing"
+    out.append('<text x="%.1f" y="%.1f" fill="#FFFFFF" font-size="%.0f" '
+               'font-family="Aguafina Script, cursive" text-anchor="middle">%s</text>'
+               % (px(0.5), py(top) - px(0.045), px(0.055), title))
+
+    for index, (name, line, note) in enumerate(entries):
+        x = CARD_MARGIN + index * (card_w + CARD_GAP)
+        out.append('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="%.1f" '
+                   'fill="%s" stroke="%s" stroke-width="2"/>'
+                   % (px(x), py(top), px(card_w), py(CARD_H), px(0.022),
+                      CARD_FILL, CARD_EDGE))
+        centre_x = px(x + card_w / 2)
+        out.append('<text x="%.1f" y="%.1f" fill="%s" font-size="%.0f" '
+                   'font-family="Aguafina Script, cursive" text-anchor="middle">%s</text>'
+                   % (centre_x, py(top) + px(0.075), CARD_EDGE, px(0.042), name))
+        out.append('<text x="%.1f" y="%.1f" fill="%s" font-size="%.0f" '
+                   'font-family="Aguafina Script, cursive" text-anchor="middle" '
+                   'opacity="0.8">%s</text>'
+                   % (centre_x, py(top) + px(0.135), CARD_EDGE, px(0.034), line))
+        out.append('<text x="%.1f" y="%.1f" fill="%s" font-size="%.0f" '
+                   'font-family="Aguafina Script, cursive" text-anchor="middle" '
+                   'opacity="0.65">%s</text>'
+                   % (centre_x, py(top + CARD_H) - px(0.040), CARD_EDGE,
+                      px(0.026), note))
+
+    # The cards must fit the width, with the gutters they were given.
+    assert CARD_MARGIN * 2 + card_w * 3 + CARD_GAP * 2 <= 1.0 + 1e-9
+    return out
 
 
 def board_metrics():
@@ -226,19 +298,19 @@ def scoreboard(innings):
     cell_w = (w - label_w - 0.012) / innings
 
     out.append('<text x="%.1f" y="%.1f" fill="%s" font-size="%.0f" '
-               'font-family="sans-serif" text-anchor="middle">INNING</text>'
+               'font-family="Aguafina Script, cursive" text-anchor="middle">INNING</text>'
                % (px(x + w / 2), py(y + 0.023), PANEL_TEXT, px(0.028)))
 
     for index in range(innings):
         out.append('<text x="%.1f" y="%.1f" fill="%s" font-size="%.0f" '
-                   'font-family="sans-serif" text-anchor="middle">%d</text>'
+                   'font-family="Aguafina Script, cursive" text-anchor="middle">%d</text>'
                    % (px(grid_x + cell_w * (index + 0.5)),
                       py(grid_top) - px(0.008), PANEL_TEXT, px(0.024), index + 1))
 
     for row, name in enumerate(("V", "H")):
         top = grid_top + row * ROW_H
         out.append('<text x="%.1f" y="%.1f" fill="%s" font-size="%.0f" '
-                   'font-family="sans-serif">%s</text>'
+                   'font-family="Aguafina Script, cursive">%s</text>'
                    % (px(x + 0.014), py(top + ROW_H * 0.74), PANEL_TEXT,
                       px(0.028), name))
         for index in range(innings):
@@ -251,7 +323,7 @@ def scoreboard(innings):
     # at a glance mid-turn, so the pips are large and well clear of the grid.
     centre = py(outs_top + OUTS_H / 2)
     out.append('<text x="%.1f" y="%.1f" fill="%s" font-size="%.0f" '
-               'font-family="sans-serif" dominant-baseline="middle">OUTS</text>'
+               'font-family="Aguafina Script, cursive" dominant-baseline="middle">OUTS</text>'
                % (px(x + 0.014), centre, PANEL_TEXT, px(0.030)))
     for index in range(3):
         out.append('<circle cx="%.1f" cy="%.1f" r="%.1f" fill="none" '
@@ -264,6 +336,8 @@ def scoreboard(innings):
 if __name__ == "__main__":
     import sys
     innings = int(sys.argv[1]) if len(sys.argv) > 1 else 9
-    open(OUT, "w").write(build(innings))
-    print("wrote %s (%dx%d, %d innings)"
-          % (os.path.relpath(OUT), WIDTH, HEIGHT, innings))
+    overlay = sys.argv[2] if len(sys.argv) > 2 else None
+    open(OUT, "w").write(build(innings, overlay))
+    print("wrote %s (%dx%d, %d innings%s)"
+          % (os.path.relpath(OUT), WIDTH, HEIGHT, innings,
+             ", %s overlay" % overlay if overlay else ""))

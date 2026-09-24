@@ -63,7 +63,19 @@ ON_DECK_X = (0.150, 0.850)
 # Narrowed from 56% of the width to 42% and the total column dropped: it is
 # flat surface the dice come to rest on, and the less of the board it covers
 # the better the roll reads.
-BOARD = (0.050, 0.030, 0.420, 0.150)     # x, y, w, h
+BOARD_X, BOARD_Y, BOARD_W = 0.050, 0.030, 0.420
+
+# The panel's height is DERIVED from what it contains, not declared. The
+# first version fixed it at 0.150 and positioned the grid rows downward from
+# the top while positioning the outs row upward from the bottom — two origins
+# growing toward each other, which met and overlapped by 9.5px. One origin
+# makes that impossible.
+BOARD_PAD = 0.014        # fractions of HEIGHT
+HEAD_H = 0.030           # the word INNING plus the column numbers
+GRID_GAP = 0.024         # head to first row
+ROW_H = 0.034            # one of the two team rows
+OUTS_GAP = 0.016         # last row to the outs row
+OUTS_H = 0.040           # the outs row's own band, generous on purpose
 
 
 def px(value):
@@ -173,13 +185,38 @@ def build(innings=9):
     return "\n".join(out)
 
 
+def board_metrics():
+    """Every vertical position on the panel, from one origin downward.
+
+    Returned together so the drawing cannot invent a second origin: the
+    outs row is placed relative to where the grid actually ended, and the
+    panel's height is whatever contains both.
+    """
+    grid_top = BOARD_Y + HEAD_H + GRID_GAP
+    rows_bottom = grid_top + 2 * ROW_H
+    outs_top = rows_bottom + OUTS_GAP
+    height = (outs_top + OUTS_H + BOARD_PAD) - BOARD_Y
+
+    # The bug this replaces, asserted so it cannot come back: the outs row
+    # must start below the last team row, and everything must sit inside
+    # the panel.
+    assert outs_top >= rows_bottom, (
+        "outs row starts %.4f above the grid's last row" % (rows_bottom - outs_top))
+    assert outs_top + OUTS_H <= BOARD_Y + height + 1e-9, "outs row overflows the panel"
+
+    return grid_top, rows_bottom, outs_top, height
+
+
 def scoreboard(innings):
     """Inning-by-inning runs and the outs row, top left, drawn into the field.
 
     Only as many columns as the match has. Nine empty boxes in a three-inning
     game reads as an unfinished game rather than a short one.
     """
-    x, y, w, h = BOARD
+    x, w = BOARD_X, BOARD_W
+    y = BOARD_Y
+    grid_top, rows_bottom, outs_top, h = board_metrics()
+
     out = ['<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="%.1f" '
            'fill="%s" opacity="0.9"/>'
            % (px(x), py(y), px(w), py(h), px(0.014), PANEL)]
@@ -187,40 +224,40 @@ def scoreboard(innings):
     label_w = 0.050
     grid_x = x + label_w
     cell_w = (w - label_w - 0.012) / innings
-    head_h = 0.030                      # fractions of HEIGHT
-    row_h = 0.034
 
     out.append('<text x="%.1f" y="%.1f" fill="%s" font-size="%.0f" '
                'font-family="sans-serif" text-anchor="middle">INNING</text>'
-               % (px(x + w / 2), py(y + 0.024), PANEL_TEXT, px(0.028)))
+               % (px(x + w / 2), py(y + 0.023), PANEL_TEXT, px(0.028)))
 
     for index in range(innings):
         out.append('<text x="%.1f" y="%.1f" fill="%s" font-size="%.0f" '
                    'font-family="sans-serif" text-anchor="middle">%d</text>'
                    % (px(grid_x + cell_w * (index + 0.5)),
-                      py(y + head_h + 0.020), PANEL_TEXT, px(0.024), index + 1))
+                      py(grid_top) - px(0.008), PANEL_TEXT, px(0.024), index + 1))
 
     for row, name in enumerate(("V", "H")):
-        top = y + head_h + 0.026 + row * row_h
+        top = grid_top + row * ROW_H
         out.append('<text x="%.1f" y="%.1f" fill="%s" font-size="%.0f" '
                    'font-family="sans-serif">%s</text>'
-                   % (px(x + 0.014), py(top + row_h * 0.74), PANEL_TEXT,
+                   % (px(x + 0.014), py(top + ROW_H * 0.74), PANEL_TEXT,
                       px(0.028), name))
         for index in range(innings):
             out.append('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" '
                        'fill="%s" stroke="%s" stroke-width="1"/>'
                        % (px(grid_x + cell_w * index), py(top),
-                          px(cell_w), py(row_h * 0.84), CELL, PANEL))
+                          px(cell_w), py(ROW_H * 0.84), CELL, PANEL))
 
-    outs_top = y + h - 0.040
+    # The outs row gets its own band. It is the one thing on this panel read
+    # at a glance mid-turn, so the pips are large and well clear of the grid.
+    centre = py(outs_top + OUTS_H / 2)
     out.append('<text x="%.1f" y="%.1f" fill="%s" font-size="%.0f" '
-               'font-family="sans-serif">OUTS</text>'
-               % (px(x + 0.014), py(outs_top) + px(0.026), PANEL_TEXT, px(0.028)))
+               'font-family="sans-serif" dominant-baseline="middle">OUTS</text>'
+               % (px(x + 0.014), centre, PANEL_TEXT, px(0.030)))
     for index in range(3):
         out.append('<circle cx="%.1f" cy="%.1f" r="%.1f" fill="none" '
-                   'stroke="%s" stroke-width="2"/>'
-                   % (px(x + 0.150 + index * 0.058), py(outs_top) + px(0.018),
-                      px(0.018), PANEL_TEXT))
+                   'stroke="%s" stroke-width="2.5"/>'
+                   % (px(x + 0.175 + index * 0.072), centre, px(0.024),
+                      PANEL_TEXT))
     return out
 
 

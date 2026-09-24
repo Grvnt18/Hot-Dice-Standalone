@@ -22,11 +22,12 @@ struct BaseballDiceScreen: View {
     @State private var match = TurnMatch.localTwoPlayer()
     @State private var state = BaseballDiceState(innings: 6)
 
-    /// Which die in the pool is the pitcher's, for this at-bat.
+    /// Which dice in the pool are the pitcher's, for this at-bat.
     ///
-    /// The batter can throw two dice of the same kind the pitcher throws,
-    /// so neither position nor sides identifies it. See `throwDice`.
-    @State private var pitcherDieID: UUID?
+    /// The batter can throw dice of the same kind the pitcher throws, so
+    /// neither position nor sides identifies them, and the Fastball's
+    /// unfavoured pair throws two. See `throwDice`.
+    @State private var pitcherDieIDs: Set<UUID> = []
     @State private var session: DiceTraySession?
     @State private var showingSettings = false
     @ObservedObject private var theme = AppTheme.shared
@@ -342,10 +343,12 @@ struct BaseballDiceScreen: View {
         var pool = (0..<matchup.batterDice).map { _ in
             BaseballArt.die(sides: matchup.batterSides, isBatter: true)
         }
-        let pitcherDie = BaseballArt.die(sides: matchup.pitcherSides, isBatter: false)
-        pool.append(pitcherDie)
+        let pitcherDice = (0..<matchup.pitcherDice).map { _ in
+            BaseballArt.die(sides: matchup.pitcherSides, isBatter: false)
+        }
+        pool.append(contentsOf: pitcherDice)
 
-        // The pitcher's die is remembered by ID, not by where it sits.
+        // The pitcher's dice are remembered by ID, not by where they sit.
         //
         // This used to be read as `results.last`, on the stated contract
         // that results come back in the pool's order — and the pool was
@@ -353,8 +356,9 @@ struct BaseballDiceScreen: View {
         // at-bat (two batter dice and the pitcher's d4) that read a
         // batter's die two thirds of the time. The shuffle is fixed at
         // source, in DicePoolLifecycleController; this is the belt to its
-        // braces. An ID cannot be reordered.
-        pitcherDieID = pitcherDie.id
+        // braces. An ID cannot be reordered, and a set of them does not
+        // care that the Fastball now throws two.
+        pitcherDieIDs = Set(pitcherDice.map(\.id))
 
         session.beginTurn()
         session.setPool(pool)
@@ -367,22 +371,25 @@ struct BaseballDiceScreen: View {
 
         // Taken by ID, not by position and not by sides: two matchups throw
         // the same number of sides on both sides of the at-bat, so picking
-        // by sides would read the wrong die, and picking by position
+        // by sides would read the wrong dice, and picking by position
         // depends on an ordering this screen does not own.
-        guard let id = pitcherDieID,
-              let pitcherRoll = results.first(where: { $0.id == id })?.value
-        else { return }
-        let batterRolls = results.filter { $0.id != id }.map(\.value)
-        guard batterRolls.count == matchup.batterDice else { return }
+        let pitcherRolls = results.filter { pitcherDieIDs.contains($0.id) }
+            .map(\.value)
+        let batterRolls = results.filter { !pitcherDieIDs.contains($0.id) }
+            .map(\.value)
+        guard pitcherRolls.count == matchup.pitcherDice,
+              batterRolls.count == matchup.batterDice else { return }
 
         let bat = BaseballDiceRules.atBat(pitch: pitch, swing: swing,
                                           batterRolls: batterRolls,
-                                          pitcherRoll: pitcherRoll)
+                                          pitcherRolls: pitcherRolls)
         lastAtBat = bat
 
         var diamond = state.diamond
+        // bat.pitcherRoll, not a local: it is the KEPT die, so the double
+        // play's even/odd test reads the same number the differential did.
         let effect = BaseballDiceRules.advance(&diamond, result: bat.result,
-                                               pitcherRoll: pitcherRoll,
+                                               pitcherRoll: bat.pitcherRoll,
                                                outs: state.outs)
         state.diamond = diamond
         // state.score, not state.runs[batter] += — the total and the line

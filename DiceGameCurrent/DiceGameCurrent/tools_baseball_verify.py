@@ -34,18 +34,24 @@ SWING_SIDES = {"patient": 8, "contact": 10, "power": 12}
 BEATS = {"fastball": "power", "changeup": "patient", "slider": "contact"}
 LOSES_TO = {"fastball": "patient", "changeup": "contact", "slider": "power"}
 
-# The unfavoured pairings are not derived: the chart gives each its own dice.
-UNFAVORED = {"fastball": (12, 12), "changeup": (8, 10), "slider": (10, 12)}
+# The unfavoured pairings are not derived: the chart gives each its own dice,
+# as (batter sides, pitcher sides, pitcher dice).
+#
+# The Fastball throws TWO, keeping the highest. d12 against d12 was a coin
+# flip rather than a punishment, so the Fastball did not beat the Power Swing
+# it is supposed to beat — see check_rock_paper_scissors and check_spread.
+UNFAVORED = {"fastball": (12, 12, 2), "changeup": (8, 10, 1),
+             "slider": (10, 12, 1)}
 
 
 def matchup(pitch, swing):
-    """(kind, batter sides, batter dice, pitcher sides)."""
+    """(kind, batter sides, batter dice, pitcher sides, pitcher dice)."""
     if LOSES_TO[pitch] == swing:
-        return "favored", SWING_SIDES[swing], 2, 4
+        return "favored", SWING_SIDES[swing], 2, 4, 1
     if BEATS[pitch] == swing:
-        batter, pitcher = UNFAVORED[pitch]
-        return "unfavored", batter, 1, pitcher
-    return "neutral", SWING_SIDES[swing], 1, 8
+        batter, pitcher, pitcher_dice = UNFAVORED[pitch]
+        return "unfavored", batter, 1, pitcher, pitcher_dice
+    return "neutral", SWING_SIDES[swing], 1, 8, 1
 
 
 def result(diff):
@@ -67,9 +73,10 @@ def result(diff):
 
 
 def at_bat(pitch, swing, rng):
-    kind, sides, count, pitcher_sides = matchup(pitch, swing)
+    kind, sides, count, pitcher_sides, pitcher_count = matchup(pitch, swing)
     rolls = [rng.randint(1, sides) for _ in range(count)]
-    pitcher = rng.randint(1, pitcher_sides)
+    # The pitcher keeps his highest too, the same way the batter's two work.
+    pitcher = max(rng.randint(1, pitcher_sides) for _ in range(pitcher_count))
     jackpot = count > 1 and all(r == sides for r in rolls)
     outcome = "homeRun" if jackpot else result(max(rolls) - pitcher)
     return outcome, pitcher
@@ -128,14 +135,16 @@ def _force(bases):
 
 def distribution(pitch, swing):
     """Exact outcome probabilities — enumerated, not sampled."""
-    kind, sides, count, pitcher_sides = matchup(pitch, swing)
+    kind, sides, count, pitcher_sides, pitcher_count = matchup(pitch, swing)
     tally = {}
     for rolls in product(range(1, sides + 1), repeat=count):
         jackpot = count > 1 and all(r == sides for r in rolls)
-        for pitcher in range(1, pitcher_sides + 1):
-            outcome = "homeRun" if jackpot else result(max(rolls) - pitcher)
+        for pitches in product(range(1, pitcher_sides + 1),
+                               repeat=pitcher_count):
+            outcome = ("homeRun" if jackpot
+                       else result(max(rolls) - max(pitches)))
             tally[outcome] = tally.get(outcome, 0) + 1
-    total = sides ** count * pitcher_sides
+    total = sides ** count * pitcher_sides ** pitcher_count
     return kind, {k: v / total for k, v in tally.items()}
 
 
@@ -169,7 +178,7 @@ def check_jackpot():
     It is the only way Fastball-versus-Patient reaches the seats at all: that
     pairing's differential tops out at 8 - 1 = +7, a Deep Out.
     """
-    kind, sides, count, _ = matchup("fastball", "patient")
+    kind, sides, count, _, _ = matchup("fastball", "patient")
     assert (kind, sides, count) == ("favored", 8, 2)
     assert result(8 - 1) == "deepOut"
     rng = random.Random(0)
@@ -283,7 +292,12 @@ def play_game(innings, batter_knows_pitch, rng):
 
 def check_length_and_balance():
     """The three lengths, and that batting first is worth nothing."""
-    expected = {3: (3.0, 31), 6: (5.7, 60), 9: (8.5, 89)}
+    # Re-measured after the Fastball's unfavoured pair gained its second
+    # pitcher die. Scoring falls about 7% — 8.5 runs a side to 7.9 over
+    # nine — which is the price of the Fastball actually punishing the
+    # Power Swing, and it lands the game closer to a real one rather than
+    # further from it.
+    expected = {3: (2.8, 31), 6: (5.3, 59), 9: (7.9, 88)}
     for innings in LENGTHS:
         rng = random.Random(innings)
         totals = [0, 0]
@@ -357,6 +371,98 @@ def check_styles():
     print("pitch styles: PASS (each answered by one swing, spread %.3f)" % spread)
 
 
+def solve_zero_sum(M, steps=200):
+    """Row minimises, column maximises. Brute force over the simplex.
+
+    Exact enough at this grid: the mixes below are asserted to a few points,
+    and a finer sweep moves them by less than one.
+    """
+    best_row = best_col = None
+    for a in range(steps + 1):
+        for b in range(steps + 1 - a):
+            mix = (a / steps, b / steps, (steps - a - b) / steps)
+            v = max(sum(mix[i] * M[i][j] for i in range(3)) for j in range(3))
+            if best_row is None or v < best_row[0]:
+                best_row = (v, mix)
+            w = min(sum(mix[j] * M[i][j] for j in range(3)) for i in range(3))
+            if best_col is None or w > best_col[0]:
+                best_col = (w, mix)
+    return best_row[0], best_row[1], best_col[1]
+
+
+def check_unfavored_matches_swift():
+    """The unfavoured dice in this port must be the ones the Swift throws.
+
+    Every figure below rests on UNFAVORED, and it is a hand-copied table —
+    so on its own it proves the Python matches the measurements, not that
+    the game does. Found the hard way: reverting `pitcherDice: 2` in the
+    Swift left every check here passing at 2, cheerfully and wrongly.
+
+    Same principle as tools_swiftconst.expect, which cannot be used
+    directly because these are constructor arguments rather than
+    `static let`s.
+    """
+    import re
+    text = swiftconst.source("BaseballDice.swift")
+    pattern = (r'case \.(\w+):\s*return Matchup\(kind: \.unfavored,\s*'
+               r'batterSides: (\d+),\s*batterDice: (\d+),\s*'
+               r'pitcherSides: (\d+)(?:,\s*pitcherDice: (\d+))?\)')
+    found = {}
+    for m in re.finditer(pattern, text):
+        found[m.group(1)] = (int(m.group(2)), int(m.group(4)),
+                             int(m.group(5)) if m.group(5) else 1)
+    assert set(found) == set(UNFAVORED), \
+        "read %s out of the Swift, this port has %s" % (sorted(found),
+                                                        sorted(UNFAVORED))
+    for pitch, dice in sorted(UNFAVORED.items()):
+        assert found[pitch] == dice, \
+            "%s unfavoured: the Swift throws %s, this port uses %s" % (
+                pitch, found[pitch], dice)
+    print("unfavoured dice: PASS (%d pairs read out of the Swift)" % len(found))
+
+
+def check_balance():
+    """Neither side may have a choice that is simply better than the others.
+
+    This is the property the game is FOR: three styles and three swings that
+    are all worth playing. It was not true as shipped. Fastball against a
+    Power Swing measured +0.002 — the Fastball did not punish the swing it
+    is supposed to beat, only declined to reward it — so Power was the safe
+    pick at 43% of the batter's mix, and Breaking Ball, the style Power
+    answers, was worth playing 15% of the time.
+
+    Giving that one pair a second pitcher die closed the cycle. The bounds
+    below are what that produced, with room for tuning but not for the old
+    behaviour: the shipped-as-was numbers were a 0.048 swing spread and a
+    34-point mix gap, and both fail here.
+    """
+    styles = list(STYLES)
+    M = [[sum(w / 100 * run_value(p, swing) for p, w in STYLES[st].items())
+          for swing in SWINGS] for st in styles]
+
+    value, pitcher_mix, batter_mix = solve_zero_sum(M)
+
+    # Against an opponent mixing evenly, no choice may stand out.
+    swing_spread = (max(sum(M[i][j] for i in range(3)) / 3 for j in range(3))
+                    - min(sum(M[i][j] for i in range(3)) / 3 for j in range(3)))
+    style_spread = (max(sum(M[i][j] for j in range(3)) / 3 for i in range(3))
+                    - min(sum(M[i][j] for j in range(3)) / 3 for i in range(3)))
+    assert swing_spread < 0.020, \
+        "the swings differ by %.3f — one of them is the safe pick" % swing_spread
+    assert style_spread < 0.020, \
+        "the styles differ by %.3f — one of them is the safe pick" % style_spread
+
+    # And each side's equilibrium must be a real mix, not a near-pure one.
+    gap = max(max(pitcher_mix) - min(pitcher_mix),
+              max(batter_mix) - min(batter_mix))
+    assert gap < 0.18, \
+        "the widest equilibrium mix gap is %.0f points — a choice is being " \
+        "avoided" % (100 * gap)
+
+    print("balance: PASS (swings %.3f, styles %.3f, widest mix gap %.0f pts, "
+          "worth %+.3f runs)" % (swing_spread, style_spread, 100 * gap, value))
+
+
 def check_hidden_pitch_matters():
     """The exploit the shipped game exists to avoid.
 
@@ -383,7 +489,9 @@ def main():
     check_favored_never_strikes_out()
     check_jackpot()
     check_edge_cases()
+    check_unfavored_matches_swift()
     check_rock_paper_scissors()
+    check_balance()
     check_styles()
     check_length_and_balance()
     check_hidden_pitch_matters()

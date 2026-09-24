@@ -9,28 +9,42 @@ import Foundation
 ///
 /// The heart of it is a rock-paper-scissors between three pitches and three
 /// swings, and it measures as a real one: no dominant strategy, and a mixed
-/// equilibrium of Patient 28% / Contact 28% / Power 43% for the batter
-/// against Fastball 40% / Changeup 37% / Slider 23% for the pitcher, worth
-/// 0.121 runs an at-bat. Run value per at-bat, batter's gain:
+/// equilibrium of Patient 36% / Contact 26% / Power 38% for the batter
+/// against Fastball 35% / Changeup 34% / Slider 31% for the pitcher, worth
+/// 0.105 runs an at-bat. Run value per at-bat, batter's gain:
 ///
 ///              Patient  Contact   Power
-///   Fastball    +0.382   +0.044  +0.002
+///   Fastball    +0.382   +0.044  -0.110
 ///   Changeup    -0.068   +0.319  +0.117
 ///   Slider      -0.018   -0.061  +0.330
 ///
 /// Each pitch beats one swing, loses to another and ties the third, which is
 /// what makes guessing worth doing.
+///
+/// That bottom-right corner used to read +0.002, and it was the one number
+/// in the table that did not work: the Fastball did not punish the Power
+/// Swing, it merely failed to reward it. So Power was the safe pick at 43%
+/// of the mix and Breaking Ball, which Power answers, was played 15% — the
+/// cycle was open. Giving the Fastball's unfavoured pair a second pitcher
+/// die closed it: across the three swings the spread of run value fell from
+/// 0.048 to 0.011, and the widest gap in either side's equilibrium mix from
+/// 34 points to 12.
 enum BaseballDiceRules {
 
     static let outsPerHalfInning = 3
 
     /// The three match lengths, and what they cost in at-bats.
     ///
-    /// Measured over 30,000 games apiece at equilibrium play:
+    /// Measured at equilibrium play:
     ///
-    ///   3 innings   3.0-3.0 runs    31 at-bats   extras in 23.0%
-    ///   6 innings   5.7-5.7 runs    60 at-bats   extras in 13.7%
-    ///   9 innings   8.5-8.5 runs    89 at-bats   extras in 10.8%
+    ///   3 innings   2.8-2.8 runs    31 at-bats
+    ///   6 innings   5.3-5.3 runs    59 at-bats
+    ///   9 innings   7.9-7.9 runs    87 at-bats
+    ///
+    /// About 7% below the figures this shipped with, which is the price of
+    /// the Fastball actually beating the Power Swing (see the note on the
+    /// run-value table above). It moves the game toward a real score line
+    /// rather than away from one.
     ///
     /// Batting first is worth nothing measurable — 49.5% to 50.6% across all
     /// three lengths — so unlike Generals this needs no ordering fix.
@@ -119,13 +133,15 @@ enum Swing: String, CaseIterable, Codable, Identifiable {
 /// batter chose per at-bat. That breaks the game: the dice reveal the
 /// matchup — 2d8 against a d4 looks nothing like d12 against d12 — so from
 /// the second batter on the batter knows the pitch and takes the favoured
-/// swing every time. Measured, that is 30.6 runs a game against 8.5.
+/// swing every time. Measured, that is 30.6 runs a game against 8.5 — the
+/// figures behind this were taken before the Fastball's second pitcher die
+/// and the ratio is what matters here, not the absolute.
 ///
 /// So a style is a *mix*, not a pitch. The pitcher picks one for the
 /// half-inning and the app draws the actual pitch from it each at-bat, which
 /// keeps one hidden decision per half-inning while making the individual
-/// pitch unknowable. Measured over 20,000 games: 8.4 runs blind, and 14.6 as
-/// an upper bound if the batter somehow read the style perfectly — against
+/// pitch unknowable. Measured: 7.8 runs blind, and 14.3 as an
+/// upper bound if the batter somehow read the style perfectly — against
 /// the 3.6x gap the fixed pitch produced. The ceiling is not reachable in
 /// play anyway, since the style is hidden and resets every half-inning.
 ///
@@ -216,6 +232,10 @@ struct Matchup: Equatable {
 
     let pitcherSides: Int
 
+    /// How many the pitcher throws. Two means keep the highest, the same
+    /// way the batter's two work.
+    var pitcherDice: Int = 1
+
     var keepsHighest: Bool { batterDice > 1 }
 }
 
@@ -239,8 +259,28 @@ extension BaseballDiceRules {
         }
         if pitch.beats == swing {
             switch pitch {
+            // The Fastball's unfavoured pair gets the pitcher a SECOND d12.
+            //
+            // d12 against d12 was a coin flip rather than a punishment —
+            // worth +0.002 runs to the batter, so the Fastball did not
+            // actually beat the Power Swing it is supposed to beat. That
+            // made Power the safe swing at 44% of the equilibrium mix and
+            // left Breaking Ball, which Power answers, played only 15%.
+            //
+            // Measured over every outcome: the swing spread falls from
+            // 0.048 to 0.011 and the widest equilibrium mix gap from 34
+            // points to 12 (pitcher 37/30/33, batter 36/26/38). It also
+            // pulls this pair's extra-base hits into line with the other
+            // two unfavoured pairs — 4.9%/4.2% doubles and triples down to
+            // 2.8%/2.1% against their ~3.8%/~2.5% — which is what the
+            // target table asks for and where the whole overshoot was.
+            //
+            // Giving all three unfavoured pairs a second die was tried
+            // first and is the wrong change: it moves the swing spread the
+            // wrong way, to 0.052, and costs 32% of all scoring.
             case .fastball: return Matchup(kind: .unfavored, batterSides: 12,
-                                           batterDice: 1, pitcherSides: 12)
+                                           batterDice: 1, pitcherSides: 12,
+                                           pitcherDice: 2)
             case .changeup: return Matchup(kind: .unfavored, batterSides: 8,
                                            batterDice: 1, pitcherSides: 10)
             case .slider:   return Matchup(kind: .unfavored, batterSides: 10,
@@ -317,13 +357,20 @@ extension BaseballDiceRules {
         let swing: Swing
         let matchup: Matchup
         let batterRolls: [Int]
-        let pitcherRoll: Int
+        let pitcherRolls: [Int]
         let result: AtBatResult
 
         /// True when a favoured swing rolled its die's maximum on both dice.
         let isJackpot: Bool
 
         var batterRoll: Int { batterRolls.max() ?? 0 }
+
+        /// The pitcher's kept die — the highest, when there is more than
+        /// one. Everything downstream reads this rather than the array,
+        /// including the double play's even/odd test, so a second pitcher
+        /// die changes what is rolled and not how it is read.
+        var pitcherRoll: Int { pitcherRolls.max() ?? 0 }
+
         var differential: Int { batterRoll - pitcherRoll }
     }
 
@@ -334,9 +381,10 @@ extension BaseballDiceRules {
     /// only way a Fastball-versus-Patient at-bat can leave the park at all,
     /// since that pairing's differential tops out at +7.
     static func atBat(pitch: Pitch, swing: Swing,
-                      batterRolls: [Int], pitcherRoll: Int) -> AtBat {
+                      batterRolls: [Int], pitcherRolls: [Int]) -> AtBat {
         let matchup = matchup(pitch: pitch, swing: swing)
         let best = batterRolls.max() ?? 0
+        let kept = pitcherRolls.max() ?? 0
         let jackpot = matchup.keepsHighest
             && batterRolls.count == matchup.batterDice
             && batterRolls.allSatisfy { $0 == matchup.batterSides }
@@ -345,8 +393,8 @@ extension BaseballDiceRules {
             swing: swing,
             matchup: matchup,
             batterRolls: batterRolls,
-            pitcherRoll: pitcherRoll,
-            result: jackpot ? .homeRun : result(differential: best - pitcherRoll),
+            pitcherRolls: pitcherRolls,
+            result: jackpot ? .homeRun : result(differential: best - kept),
             isJackpot: jackpot
         )
     }

@@ -204,7 +204,7 @@ enum BaseballDiceGame: SuiteGame {
         ),
         GameRuleSection(
             title: "Swinging",
-            body: "The batter picks a swing without seeing the pitch. Patient beats the Fastball, Contact beats the Changeup, Power beats the Slider — and each loses to the pitch it cannot handle. Guess right and you roll two dice and keep the best against the pitcher's d4."
+            body: "The batter picks a swing without seeing the pitch. Patient beats the Fastball, Contact beats the Changeup, Power beats the Slider — and each loses to the pitch it cannot handle. Guess right and you roll two dice and keep the best against the pitcher's d4. Guess wrong and the pitcher has the better die — and against a Fastball he throws two of them and keeps the best."
         ),
         GameRuleSection(
             title: "The Result",

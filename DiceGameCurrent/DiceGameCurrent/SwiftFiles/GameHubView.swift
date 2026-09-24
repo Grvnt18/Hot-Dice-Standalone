@@ -45,6 +45,14 @@ struct GameHubView: View {
                                 GameTile(entry: entry,
                                          side: HubLayout.tileSide(forWidth: geo.size.width)) {
                                     SoundEngine.shared.play(.buttonTap)
+                                    // The scope is entered HERE, before the
+                                    // cover presents, not in the game's own
+                                    // onAppear: the scene reads
+                                    // AppTheme.floorBaseColor while it is
+                                    // being assembled, so a scope entered
+                                    // after the view exists would build the
+                                    // floor in the previous game's colour.
+                                    GameScope.enter(entry.id)
                                     openGame = entry
                                 }
                             }
@@ -69,6 +77,10 @@ struct GameHubView: View {
         // own back control via onExit.
         .fullScreenCover(item: $openGame) { entry in
             entry.makeView({ openGame = nil })
+                // Back to the hub's own settings on the way out. One place
+                // rather than eleven, so a game added later is covered
+                // without remembering to do anything.
+                .onDisappear { GameScope.leave() }
         }
         .sheet(isPresented: $showingSettings) {
             // No game, so no rules and no How to Play button. Showing some

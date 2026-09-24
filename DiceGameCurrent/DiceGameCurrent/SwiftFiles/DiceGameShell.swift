@@ -257,6 +257,11 @@ struct DiceRollButton: View {
     let subtitle: String
     let action: () -> Void
 
+    /// Observed so the button repaints the moment the colour changes in
+    /// Settings, rather than on the next time the screen happens to
+    /// rebuild — the sheet is open over this button while you pick.
+    @ObservedObject private var theme = AppTheme.shared
+
     var body: some View {
         VStack(spacing: 2) {
             Button(action: action) {
@@ -267,6 +272,10 @@ struct DiceRollButton: View {
             }
             .buttonStyle(.borderedProminent)
             .buttonBorderShape(.roundedRectangle(radius: ControlShape.cornerRadius))
+            // .borderedProminent fills with the TINT, which defaults to the
+            // system blue — the one control in every game that ignored the
+            // chosen table colour, and the largest one on screen.
+            .tint(theme.accentColor)
             .disabled(!isEnabled)
 
             if !subtitle.isEmpty {

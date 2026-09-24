@@ -31,14 +31,14 @@ final class SoundEngine: ObservableObject {
 
     @Published var musicEnabled: Bool {
         didSet {
-            defaults.set(musicEnabled, forKey: Keys.musicEnabled)
+            GameScope.set(musicEnabled, Keys.musicEnabled)
             musicEnabled ? resumeMusic() : pauseMusic()
         }
     }
 
     @Published var musicVolume: Double {
         didSet {
-            defaults.set(musicVolume, forKey: Keys.musicVolume)
+            GameScope.set(musicVolume, Keys.musicVolume)
             musicPlayer?.volume = Float(musicVolume)
         }
     }
@@ -86,15 +86,43 @@ final class SoundEngine: ObservableObject {
             Keys.sfxVolume: 0.8,
             Keys.selectedTrack: -1
         ])
-        musicEnabled = defaults.bool(forKey: Keys.musicEnabled)
-        musicVolume  = defaults.double(forKey: Keys.musicVolume)
+        // Music is per game, via GameScope; sound effects are not. The
+        // effects are the dice themselves — the same dice in every game —
+        // so a per-game volume for them would be a setting nobody wants to
+        // keep in eleven places.
+        musicEnabled = GameScope.bool(Keys.musicEnabled)
+        musicVolume  = GameScope.double(Keys.musicVolume)
         sfxEnabled   = defaults.bool(forKey: Keys.sfxEnabled)
         sfxVolume    = defaults.double(forKey: Keys.sfxVolume)
-        let stored = defaults.integer(forKey: Keys.selectedTrack)
-        selectedTrackIndex = (stored >= 0 && stored < Self.tracks.count) ? stored : nil
+        selectedTrackIndex = Self.storedTrack()
 
         configureSession()
         preload()
+    }
+
+    /// Re-reads the music settings for whichever game is now in force.
+    ///
+    /// Assigning `selectedTrackIndex` restarts playback through its own
+    /// `didSet`, which is exactly right here: entering a game with its own
+    /// track should change the music then, not two minutes later when the
+    /// current one happens to end. The guards mean nothing restarts when a
+    /// game's music matches what is already playing.
+    ///
+    /// Only `GameScope` calls this.
+    func reloadForScope() {
+        let enabled = GameScope.bool(Keys.musicEnabled)
+        if enabled != musicEnabled { musicEnabled = enabled }
+
+        let volume = GameScope.double(Keys.musicVolume)
+        if volume != musicVolume { musicVolume = volume }
+
+        let track = Self.storedTrack()
+        if track != selectedTrackIndex { selectedTrackIndex = track }
+    }
+
+    private static func storedTrack() -> Int? {
+        let stored = GameScope.int(Keys.selectedTrack)
+        return (stored >= 0 && stored < tracks.count) ? stored : nil
     }
 
     /// .playback with mixWithOthers.
@@ -216,7 +244,7 @@ final class SoundEngine: ObservableObject {
     /// nil = shuffle through everything; otherwise lock to one track.
     @Published var selectedTrackIndex: Int? {
         didSet {
-            defaults.set(selectedTrackIndex ?? -1, forKey: Keys.selectedTrack)
+            GameScope.set(selectedTrackIndex ?? -1, Keys.selectedTrack)
             // Switch immediately rather than waiting for the current track
             // to end — a selection that takes two minutes to take effect
             // reads as broken.

@@ -76,15 +76,26 @@ final class DicePoolLifecycleController {
             includeOversizedDie: styleAsRolls,
             d4Style: d4Style
         )
+        // The POSITIONS are shuffled, not the dice.
+        //
+        // This was `dice.shuffled()`, which gave the same spawn variety and
+        // cost the pool's ORDER — and `DiceTraySession.finishRoll` reports
+        // results "in the pool's own order", a contract a game that reads a
+        // die by position depends on. Baseball Dice puts the pitcher's die
+        // last and takes `results.last`; against a shuffled pool that was a
+        // batter's die two thirds of the time on a favoured at-bat, so the
+        // batter was measured against himself.
+        //
+        // Shuffling which slot each die spawns in achieves what the shuffle
+        // was for — a die type does not always start from the same place —
+        // without touching the order anything downstream reads.
         let positions = DiceSpawnPattern.positions(
             count: dice.count,
             bounds: playAreaBounds,
             baseHeight: restHeight
-        )
+        ).shuffled()
 
-        let shuffledDice = dice.shuffled()
-
-        liveDice = shuffledDice.enumerated().compactMap { index, die in
+        liveDice = dice.enumerated().compactMap { index, die in
             guard let node = nodesByID[die.id] else { return nil }
             node.position = positions[index]
             // Every die used to spawn in the exact same default

@@ -69,17 +69,36 @@ final class AppTheme: ObservableObject {
 
     private let defaults = UserDefaults.standard
 
+    /// Written through `GameScope`, so a colour chosen inside a game stays
+    /// that game's. See `reloadForScope()`.
     @Published var colorwayIndex: Int {
         didSet {
             guard Self.swatches.indices.contains(colorwayIndex) else { return }
-            defaults.set(colorwayIndex, forKey: Keys.colorwayIndex)
+            GameScope.set(colorwayIndex, Keys.colorwayIndex)
         }
     }
 
     private init() {
         defaults.register(defaults: [Keys.colorwayIndex: 0])
-        let stored = defaults.integer(forKey: Keys.colorwayIndex)
-        colorwayIndex = Self.swatches.indices.contains(stored) ? stored : 0
+        colorwayIndex = Self.storedIndex()
+    }
+
+    /// Re-reads the colour for whichever game is now in force.
+    ///
+    /// Assigning `colorwayIndex` re-fires its own `didSet`, which writes
+    /// the value straight back to the scope it was just read from — a
+    /// no-op, and the reason this does not need to suppress it.
+    ///
+    /// Only `GameScope` calls this. It is not private because that type is
+    /// what owns the decision of whose settings apply.
+    func reloadForScope() {
+        let wanted = Self.storedIndex()
+        if wanted != colorwayIndex { colorwayIndex = wanted }
+    }
+
+    private static func storedIndex() -> Int {
+        let stored = GameScope.int(Keys.colorwayIndex)
+        return swatches.indices.contains(stored) ? stored : 0
     }
 
     private var currentHex: String { Self.swatches[colorwayIndex].hex }

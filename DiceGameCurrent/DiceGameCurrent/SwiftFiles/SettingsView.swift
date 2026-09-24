@@ -37,6 +37,18 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showingHowToPlay = false
 
+    /// Says whose settings these are.
+    ///
+    /// The colour and the music are kept per game, so without this a player
+    /// who sets a table colour in one game and finds another unchanged has
+    /// every reason to read it as a bug rather than as the feature.
+    @ViewBuilder private var scopeNote: some View {
+        if let gameName {
+            Text("Saved for \(gameName). Each game keeps its own.")
+                .font(.stackSans(11))
+        }
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -83,6 +95,8 @@ struct SettingsView: View {
                     .disabled(!sound.musicEnabled)
                 } header: {
                     Text("Music").font(.stackSans(12))
+                } footer: {
+                    scopeNote
                 }
 
                 Section {
@@ -109,8 +123,11 @@ struct SettingsView: View {
                 } header: {
                     Text("Table Color").font(.stackSans(12))
                 } footer: {
-                    Text("Changes the playing surface and this menu's own accent color.")
-                        .font(.stackSans(11))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Changes the playing surface and this menu's own accent color.")
+                        scopeNote
+                    }
+                    .font(.stackSans(11))
                 }
 
                 if !rules.isEmpty {
@@ -142,6 +159,13 @@ struct SettingsView: View {
                         .font(.stackSans(15))
                         .buttonStyle(.borderedProminent)
                         .buttonBorderShape(.roundedRectangle(radius: ControlShape.cornerRadius))
+                        // Tinted HERE, not only on the Form below. Toolbar
+                        // content is hoisted into the navigation bar, which
+                        // sits outside the Form's view tree — so the
+                        // container's .tint never reached this button and
+                        // it stayed system blue while everything under it
+                        // followed the chosen colour.
+                        .tint(theme.accentColor)
                 }
             }
             .sheet(isPresented: $showingHowToPlay) {
@@ -276,6 +300,13 @@ private struct HowToPlayView: View {
                         .font(.stackSans(15))
                         .buttonStyle(.borderedProminent)
                         .buttonBorderShape(.roundedRectangle(radius: ControlShape.cornerRadius))
+                        // Tinted HERE, not only on the Form below. Toolbar
+                        // content is hoisted into the navigation bar, which
+                        // sits outside the Form's view tree — so the
+                        // container's .tint never reached this button and
+                        // it stayed system blue while everything under it
+                        // followed the chosen colour.
+                        .tint(theme.accentColor)
                 }
             }
         }

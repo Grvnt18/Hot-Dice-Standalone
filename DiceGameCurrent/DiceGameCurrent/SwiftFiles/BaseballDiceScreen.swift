@@ -21,6 +21,12 @@ struct BaseballDiceScreen: View {
 
     @State private var match = TurnMatch.localTwoPlayer()
     @State private var state = BaseballDiceState(innings: 6)
+
+    /// Which die in the pool is the pitcher's, for this at-bat.
+    ///
+    /// The batter can throw two dice of the same kind the pitcher throws,
+    /// so neither position nor sides identifies it. See `throwDice`.
+    @State private var pitcherDieID: UUID?
     @State private var session: DiceTraySession?
     @State private var showingSettings = false
     @ObservedObject private var theme = AppTheme.shared
@@ -336,7 +342,20 @@ struct BaseballDiceScreen: View {
         var pool = (0..<matchup.batterDice).map { _ in
             BaseballArt.die(sides: matchup.batterSides, isBatter: true)
         }
-        pool.append(BaseballArt.die(sides: matchup.pitcherSides, isBatter: false))
+        let pitcherDie = BaseballArt.die(sides: matchup.pitcherSides, isBatter: false)
+        pool.append(pitcherDie)
+
+        // The pitcher's die is remembered by ID, not by where it sits.
+        //
+        // This used to be read as `results.last`, on the stated contract
+        // that results come back in the pool's order — and the pool was
+        // being shuffled on its way into the scene, so on a favoured
+        // at-bat (two batter dice and the pitcher's d4) that read a
+        // batter's die two thirds of the time. The shuffle is fixed at
+        // source, in DicePoolLifecycleController; this is the belt to its
+        // braces. An ID cannot be reordered.
+        pitcherDieID = pitcherDie.id
+
         session.beginTurn()
         session.setPool(pool)
         return session.roll()
@@ -346,11 +365,14 @@ struct BaseballDiceScreen: View {
         guard phase == .rolling, let pitch, let swing else { return }
         let matchup = BaseballDiceRules.matchup(pitch: pitch, swing: swing)
 
-        // The pitcher's die is last in the pool, so it is taken by position
-        // rather than by sides: two matchups throw the same die on both
-        // sides, and picking by sides would read the wrong one.
-        guard let pitcherRoll = results.last?.value else { return }
-        let batterRolls = Array(results.dropLast().map(\.value))
+        // Taken by ID, not by position and not by sides: two matchups throw
+        // the same number of sides on both sides of the at-bat, so picking
+        // by sides would read the wrong die, and picking by position
+        // depends on an ordering this screen does not own.
+        guard let id = pitcherDieID,
+              let pitcherRoll = results.first(where: { $0.id == id })?.value
+        else { return }
+        let batterRolls = results.filter { $0.id != id }.map(\.value)
         guard batterRolls.count == matchup.batterDice else { return }
 
         let bat = BaseballDiceRules.atBat(pitch: pitch, swing: swing,

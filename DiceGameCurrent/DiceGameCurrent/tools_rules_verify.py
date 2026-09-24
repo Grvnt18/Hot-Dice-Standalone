@@ -6,13 +6,14 @@ connection. Where a number could be interpolated from its constant it now
 is, and this asserts the rest.
 
 Run it after touching any rules array or any tuning constant."""
+import os
 import re
 import sys
 
 # Paths and the constant parser both come from tools_swiftconst, which
 # anchors them to the script's own directory. This used to open
 # "SwiftFiles/..." relatively, so it only worked from the project root.
-from tools_swiftconst import source, constant  # noqa: F401
+from tools_swiftconst import source, constant, SWIFT  # noqa: F401
 
 
 def rules_blob(text):
@@ -30,6 +31,62 @@ def check(label, condition, detail=""):
 
 
 check.failed = False
+
+
+# Wording that was renamed, and what replaced it. Every entry here was once
+# shown to a player and must not be any more.
+#
+# This exists because the rules arrays were only half the problem. Phase 6
+# renamed four games and Freighter.Yacht.Dinghy's three qualifiers; the
+# rules followed, the summaries followed, and one scoreboard subtitle kept
+# saying "Ship, Captain, Crew" for four phases — because nothing read the
+# runtime strings back. The checks above test the rules text against the
+# constants; this tests EVERY user-facing string against the renames.
+RETIRED = [
+    (r"Ship, Captain, Crew", "Freighter, Yacht, Dinghy"),
+    (r"\bFarkle", "Busted"),
+    (r"\bChasing 6\b", "Jackpot"),
+    (r"\bCyberDie\b", "Rollbots"),
+    (r"\bRoyal Path\b", "Royal UR"),
+    (r"\bNautical\b", "Freighter.Yacht.Dinghy"),
+    (r"\bPIG\b", "HOG"),
+]
+
+# A string literal that stays on one line. Crossing newlines would swallow
+# the code between an empty string and the next quote, which is how the
+# first draft of this scan reported nonsense.
+_LITERAL = re.compile(r'"((?:[^"\\\n]|\\.)*)"')
+
+
+def _user_facing_strings(text):
+    """Every string literal, with comments removed first.
+
+    Comments are stripped because they legitimately discuss the old names —
+    several explain why a rename happened. Only what ships to the screen is
+    in scope.
+    """
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    text = re.sub(r"///[^\n]*", "", text)
+    text = re.sub(r"(?<!:)//[^\n]*", "", text)
+    return [(m.group(1), text[: m.start()].count("\n") + 1)
+            for m in _LITERAL.finditer(text)]
+
+
+def check_retired_wording():
+    """No retired name may survive in anything a player can read."""
+    hits = []
+    for filename in sorted(os.listdir(SWIFT)):
+        if not filename.endswith(".swift"):
+            continue
+        for literal, line in _user_facing_strings(source(filename)):
+            for pattern, replacement in RETIRED:
+                if re.search(pattern, literal):
+                    hits.append((filename, line, literal, replacement))
+    for filename, line, literal, replacement in hits:
+        print("  %-34s FAILED  %s:%d" % ("retired wording", filename, line))
+        print("      %r — should read %s" % (literal, replacement))
+    check("no retired wording on screen", not hits,
+          "%d string(s) still show a renamed term" % len(hits))
 
 
 def main():
@@ -81,6 +138,8 @@ def main():
 
     generals = source("Generals.swift")
     check("Generals rules say twelve", "twelve categories" in rules_blob(generals))
+
+    check_retired_wording()
 
     if check.failed:
         print("rules text: FAILED")

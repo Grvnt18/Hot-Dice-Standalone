@@ -160,7 +160,12 @@ struct FreighterYachtDinghyScreen: View {
         switch phase {
         case .ready:   return "\(match.activeDisplayName) to roll"
         case .rolling: return "Rolling…"
-        case .decide:  return "\(match.activeDisplayName) — Ship, Captain, Crew"
+        // Built from qualifierNames rather than spelling them out. This
+        // line said "Ship, Captain, Crew" for four phases after the rename,
+        // because a hardcoded list has nothing tying it to the game.
+        case .decide:
+            return "\(match.activeDisplayName) — "
+                + FreighterYachtDinghyRules.qualifierNames.joined(separator: ", ")
         default:       return nil
         }
     }

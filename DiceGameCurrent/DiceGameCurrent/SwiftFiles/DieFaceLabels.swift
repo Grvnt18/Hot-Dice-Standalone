@@ -568,25 +568,29 @@ enum DieFaceLabels {
             // Measure at a reference size, then scale the font so the word
             // spans ~86% of the plane width — keeps it large but clear of
             // the face edges.
+            //
+            // Measured as INK on both passes, via AppFonts.inkBounds. The
+            // fit used to be computed from `size(withAttributes:)`, the
+            // typographic advance, which does not include the S's terminal
+            // swash — so "86% of the width" was 86% of a measurement that
+            // understated the word, and the tail ran past the margin it
+            // was supposed to keep.
             let reference: CGFloat = 200
-            guard let refFont = UIFont(name: AppFonts.aguafinaScriptPostScriptName, size: reference) else {
-                return
-            }
-            let refWidth = text.size(withAttributes: [.font: refFont]).width
+            let refInk = AppFonts.inkBounds(of: text, font: AppFonts.scriptFont(reference))
             let targetWidth = size.width * 0.86
-            let fittedSize = reference * (targetWidth / max(refWidth, 1))
+            let fittedSize = reference * (targetWidth / max(refInk.width, 1))
 
-            guard let font = UIFont(name: AppFonts.aguafinaScriptPostScriptName, size: fittedSize) else {
-                return
-            }
+            let font = AppFonts.scriptFont(fittedSize)
             let attrs: [NSAttributedString.Key: Any] = [
                 .font: font,
                 .foregroundColor: UIColor(hex: colorway.numberHex)
             ]
-            let textSize = text.size(withAttributes: attrs)
+            // Centred on the ink and drawn at -origin, so what is centred
+            // is what you can see rather than what the metrics claim.
+            let ink = AppFonts.inkBounds(of: text, font: font)
             text.draw(at: CGPoint(
-                x: (size.width - textSize.width) / 2,
-                y: (size.height - textSize.height) / 2
+                x: (size.width - ink.width) / 2 - ink.origin.x,
+                y: (size.height - ink.height) / 2 - ink.origin.y
             ), withAttributes: attrs)
         }
     }

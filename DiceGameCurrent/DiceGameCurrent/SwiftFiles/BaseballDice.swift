@@ -480,6 +480,14 @@ struct BaseballDiceState: Codable, Equatable {
     var diamond = Diamond()
     var runs: [Int] = [0, 0]
 
+    /// Runs by seat, by inning — the line score the board draws.
+    ///
+    /// `runs` is the two totals, which a grid of inning boxes has nothing
+    /// to put in; this is what fills them. Extras append a column, so it
+    /// is as long as the game turned out to be rather than as long as it
+    /// was scheduled for.
+    var lineScore: [[Int]] = [[], []]
+
     /// Whose turn it is to bat. The other seat pitches.
     var battingSeat: Int { isTopHalf ? 0 : 1 }
     var pitchingSeat: Int { isTopHalf ? 1 : 0 }
@@ -493,12 +501,40 @@ struct BaseballDiceState: Codable, Equatable {
 
     init(innings: Int) {
         self.innings = innings
+        lineScore = [Array(repeating: 0, count: innings),
+                     Array(repeating: 0, count: innings)]
+    }
+
+    /// Credits runs to the side at bat, in both places they are kept.
+    ///
+    /// One mutator rather than two assignments at the call site: the total
+    /// and the line score are the same runs counted twice, and the way
+    /// they drift apart is one of them being updated and the other not.
+    mutating func score(_ count: Int) {
+        guard count > 0 else { return }
+        runs[battingSeat] += count
+        extendLineScore()
+        lineScore[battingSeat][inning - 1] += count
+    }
+
+    /// Grows both rows to cover the inning being played.
+    ///
+    /// Extras run past `innings`, and a half-inning can score before
+    /// `endHalfInning` has had a chance to make room for it.
+    private mutating func extendLineScore() {
+        while lineScore[0].count < inning {
+            lineScore[0].append(0)
+            lineScore[1].append(0)
+        }
     }
 
     /// Ends the half-inning and hands the bat over.
     mutating func endHalfInning() {
         outs = 0
         diamond.clear()
+        // A half-inning that scored nothing still needs its zero, or the
+        // board would show a blank box where a 0 belongs.
+        extendLineScore()
         if isTopHalf {
             isTopHalf = false
         } else {

@@ -24,7 +24,7 @@ struct ArenaStyle {
     /// and the line score all live on it.
     enum Surface {
         case faceted
-        case baseballField(innings: Int)
+        case baseballField
     }
 
     var surface: Surface = .faceted
@@ -49,8 +49,8 @@ struct ArenaStyle {
                                   showsWoodenRim: false)
 
     /// Baseball Dice: the pitch itself, inside a thin wooden rim.
-    static func ballpark(innings: Int) -> ArenaStyle {
-        ArenaStyle(surface: .baseballField(innings: innings),
+    static func ballpark() -> ArenaStyle {
+        ArenaStyle(surface: .baseballField,
                    surfaceOverride: nil,
                    showsWoodenRim: true)
     }
@@ -256,28 +256,17 @@ enum DiceSceneEnvironment {
         // (see addFloorText's own comment): it produced an SCNPlane with
         // height=0, degenerate geometry created mid-assembly. A wrong-
         // looking font is a much smaller problem than that.
-        let font = UIFont(name: AppFonts.aguafinaScriptPostScriptName, size: pointSize)
-            ?? UIFont.italicSystemFont(ofSize: pointSize)
+        let font = AppFonts.scriptFont(pointSize)
         let attrs: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: isDark ? UIColor.black : UIColor.white
         ]
         // Measured as INK, not as advance — this is what was clipping the
-        // last letter. `size(withAttributes:)` returns the typographic
-        // advance width, and a script face's final swash overhangs its own
-        // advance by design, so the glyph extends past the canvas however
-        // much padding is added around it. `.usesDeviceMetrics` asks for
-        // the actual drawn bounds instead, including that overhang and any
-        // negative left bearing, and drawing at -origin puts every inked
-        // pixel inside the canvas.
-        let unbounded = CGSize(width: CGFloat.greatestFiniteMagnitude,
-                               height: CGFloat.greatestFiniteMagnitude)
-        let ink = (text as NSString).boundingRect(
-            with: unbounded,
-            options: [.usesLineFragmentOrigin, .usesDeviceMetrics],
-            attributes: attrs,
-            context: nil
-        )
+        // last letter, and `AppFonts.inkBounds` is now that measurement in
+        // one place rather than three. Drawing at -origin is the other
+        // half of it: the origin is usually negative, and ignoring it
+        // clips the leading stroke instead of the trailing one.
+        let ink = AppFonts.inkBounds(of: text, font: font)
         // A little air beyond the ink, so the wordmark is not flush to the
         // texture's edge where filtering could nibble at it.
         let padding: CGFloat = pointSize * 0.12
@@ -308,10 +297,12 @@ enum DiceSceneEnvironment {
         switch style.surface {
         case .faceted:
             return facetedSurfaceTexture(baseColor: style.surfaceColor)
-        case .baseballField(let innings):
-            // Portrait, matching the composition the preview settled.
-            return BaseballField.render(size: CGSize(width: 820, height: 1100),
-                                        innings: innings)
+        case .baseballField:
+            // Portrait, matching the composition the preview settled. The
+            // scoreboard is NOT part of this: it changes during the game
+            // and this texture is built once, so it is its own plane (see
+            // BaseballScoreboard).
+            return BaseballField.render(size: CGSize(width: 820, height: 1100))
         }
     }
 

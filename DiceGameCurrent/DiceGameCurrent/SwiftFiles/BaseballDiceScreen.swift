@@ -73,7 +73,7 @@ struct BaseballDiceScreen: View {
                             session: $session,
                             makeInitialDice: { [BaseballArt.die(sides: 8, isBatter: true)] },
                             floorTitle: "",
-                            arenaStyle: .ballpark(innings: state.innings),
+                            arenaStyle: .ballpark(),
                             onSessionCreated: { newSession in
                                 newSession.onRollSettled = { results in
                                     settled(results)
@@ -87,7 +87,12 @@ struct BaseballDiceScreen: View {
                                     bounds: newSession.playAreaBounds,
                                     floorY: 0
                                 )
-                                refreshColumns(newSession)
+                                BaseballScoreboard.install(
+                                    in: newSession.scene,
+                                    bounds: newSession.playAreaBounds,
+                                    floorY: 0
+                                )
+                                refreshField(newSession)
                             }
                         )
                         .background(Color.black)
@@ -147,12 +152,14 @@ struct BaseballDiceScreen: View {
         }
     }
 
-    /// Repaints and re-hides the posts for the diamond as it now stands.
+    /// Repaints everything on the pitch that carries state: the posts for
+    /// the diamond as it now stands, and the scoreboard.
     ///
     /// Called after every at-bat and every half-inning, because both change
-    /// who is on base and which side is batting.
-    private func refreshColumns(_ target: DiceTraySession? = nil) {
+    /// who is on base, which side is batting, and what the board says.
+    private func refreshField(_ target: DiceTraySession? = nil) {
         guard let live = target ?? session else { return }
+        BaseballScoreboard.update(in: live.scene, state: state)
         BaseballColumns.update(
             in: live.scene,
             diamond: state.diamond,
@@ -168,8 +175,7 @@ struct BaseballDiceScreen: View {
         ZStack {
             Color.black.opacity(0.9).ignoresSafeArea()
             VStack(spacing: 14) {
-                Text("How long a game?")
-                    .font(.aguafina(46))
+                ScriptText("How long a game?", size: 46)
                     .textCase(nil)
                     .foregroundStyle(.white)
 
@@ -177,6 +183,11 @@ struct BaseballDiceScreen: View {
                     Button {
                         SoundEngine.shared.play(.buttonTap)
                         state = BaseballDiceState(innings: innings)
+                        // The board's column count comes from the state, so
+                        // it has to be repainted the moment the state says
+                        // something different — otherwise it keeps the
+                        // previous match's grid until the first at-bat ends.
+                        refreshField()
                         phase = .pickingStyle
                     } label: {
                         VStack(spacing: 2) {
@@ -225,15 +236,12 @@ struct BaseballDiceScreen: View {
                 Color(hex: "#0B1A10").opacity(0.62).ignoresSafeArea()
 
                 VStack(spacing: 12) {
-                    Text(choosingStyle
-                         ? "\(names[pitcher]) — pick your pitching style"
-                         : "\(names[batter]) — pick your swing")
-                        .font(.aguafina(34))
+                    ScriptText(choosingStyle
+                               ? "\(names[pitcher]) — pick your pitching style"
+                               : "\(names[batter]) — pick your swing",
+                               size: 34, lineLimit: 2, minimumScaleFactor: 0.6)
                         .textCase(nil)
                         .foregroundStyle(.white)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.6)
 
                     HStack(spacing: 10) {
                         if choosingStyle {
@@ -264,12 +272,8 @@ struct BaseballDiceScreen: View {
             action()
         } label: {
             VStack(spacing: 8) {
-                Text(title)
-                    .font(.aguafina(28))
+                ScriptText(title, size: 28, lineLimit: 2, minimumScaleFactor: 0.6)
                     .textCase(nil)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.6)
                 Text(detail)
                     .font(.stackSans(11))
                     .multilineTextAlignment(.center)
@@ -305,13 +309,9 @@ struct BaseballDiceScreen: View {
                         .font(.stackSans(15))
                         .foregroundStyle(.white.opacity(0.9))
                 }
-                Text(line)
-                    .font(.aguafina(38))
+                ScriptText(line, size: 38, lineLimit: 2, minimumScaleFactor: 0.6)
                     .textCase(nil)
                     .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.6)
             }
             .padding(16)
             .frame(maxWidth: .infinity)
@@ -363,10 +363,13 @@ struct BaseballDiceScreen: View {
                                                pitcherRoll: pitcherRoll,
                                                outs: state.outs)
         state.diamond = diamond
-        state.runs[batter] += effect.runs
+        // state.score, not state.runs[batter] += — the total and the line
+        // score the board draws are the same runs, and one mutator is what
+        // stops them disagreeing.
+        state.score(effect.runs)
         state.outs += effect.outs
         mirrorScores()
-        refreshColumns()
+        refreshField()
         lastLine = line(for: bat, effect: effect)
         phase = .reading
     }
@@ -412,7 +415,7 @@ struct BaseballDiceScreen: View {
         }
 
         state.endHalfInning()
-        refreshColumns()
+        refreshField()
         if isMatchOver() {
             match.finish(lowestScoreWins: BaseballDiceGame.lowestScoreWins)
             phase = .finished

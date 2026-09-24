@@ -29,6 +29,11 @@ enum BaseballField {
     static let panelText = UIColor(hex: "#FFFFFF")
     static let cell = UIColor(hex: "#E9E9E9")
 
+    /// The inning being played, and a recorded out. Both are read at a
+    /// glance mid-turn, so both are warm against the panel's greys.
+    static let live = UIColor(hex: "#F3D9A4")
+    static let out = UIColor(hex: "#D9463E")
+
     // MARK: Geometry
 
     static let home = CGPoint(x: 0.500, y: 0.800)
@@ -87,11 +92,13 @@ enum BaseballField {
 
     // MARK: Drawing
 
-    /// Renders the field at `size`, with `innings` columns on the scoreboard.
+    /// Renders the pitch at `size`.
     ///
-    /// Only as many columns as the match has: nine empty boxes in a
-    /// three-inning game reads as an unfinished game rather than a short one.
-    static func render(size: CGSize, innings: Int) -> UIImage {
+    /// No innings parameter: the scoreboard left this texture (see the note
+    /// where it used to be drawn), and the grass does not care how long the
+    /// game is. `renderScoreboard` draws only as many columns as the match
+    /// has, which is where that rule now lives.
+    static func render(size: CGSize) -> UIImage {
         let renderer = UIGraphicsImageRenderer(size: size)
         return renderer.image { context in
             let cg = context.cgContext
@@ -165,7 +172,46 @@ enum BaseballField {
                      size: px(0.026), colour: chalk.withAlphaComponent(0.9))
             }
 
-            drawScoreboard(in: cg, size: size, innings: innings)
+            // The scoreboard is NOT drawn here. It has to change as runs
+            // and outs come in, and this texture is rendered once from the
+            // innings count alone — which is exactly why the board showed
+            // an empty grid and three empty circles for a whole game.
+            // `renderScoreboard` draws it onto its own plane instead, and
+            // `BaseballScoreboard` repaints that after every at-bat.
+        }
+    }
+
+    /// The scoreboard panel on its own, with the game's live state in it.
+    ///
+    /// Separate from `render` so it can be repainted cheaply: this is
+    /// roughly 345x210 against the pitch's 820x1100, so a repaint per
+    /// at-bat costs a fraction of re-rendering the floor — and the floor's
+    /// material is owned by the scene assembler and not reachable from the
+    /// screen anyway.
+    ///
+    /// `size` is the panel's own canvas, but every constant in this file is
+    /// a fraction of the FIELD, so the drawing scales by the field size it
+    /// was cut from and offsets by the panel's own corner. That way one set
+    /// of constants describes both, and the panel cannot drift from the
+    /// place on the pitch it is painted over.
+    static func renderScoreboard(size: CGSize,
+                                 innings: Int,
+                                 lineScore: [[Int]],
+                                 outs: Int,
+                                 currentInning: Int) -> UIImage {
+        let metrics = boardMetrics
+        let fieldSize = CGSize(width: size.width / boardW,
+                               height: size.height / metrics.height)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { context in
+            let cg = context.cgContext
+            // Move the field's origin so the panel's own corner lands at
+            // (0, 0) of this canvas.
+            cg.translateBy(x: -boardX * fieldSize.width,
+                           y: -boardY * fieldSize.height)
+            drawScoreboard(in: cg, size: fieldSize, innings: innings,
+                           lineScore: lineScore, outs: outs,
+                           currentInning: currentInning)
         }
     }
 
@@ -208,11 +254,26 @@ enum BaseballField {
         return path
     }
 
-    private static func drawScoreboard(in cg: CGContext, size: CGSize, innings: Int) {
+    /// The panel, with the game in it.
+    ///
+    /// Runs go in the inning boxes, the inning being played is marked, and
+    /// the outs pips are FILLED rather than outlined. None of that was
+    /// drawn before: the grid and the circles were painted empty and
+    /// nothing ever filled them, so the board showed the inning numbers
+    /// and no game.
+    private static func drawScoreboard(in cg: CGContext, size: CGSize,
+                                       innings: Int,
+                                       lineScore: [[Int]],
+                                       outs: Int,
+                                       currentInning: Int) {
         let w = size.width
         let h = size.height
         func px(_ value: CGFloat) -> CGFloat { value * w }
         func py(_ value: CGFloat) -> CGFloat { value * h }
+
+        // Extras add columns. Drawing only the scheduled count would hide
+        // the innings that decided the game.
+        let columns = max(innings, lineScore.map(\.count).max() ?? innings)
 
         let metrics = boardMetrics
         let panelRect = CGRect(x: px(boardX), y: py(boardY),
@@ -222,13 +283,13 @@ enum BaseballField {
 
         let labelW: CGFloat = 0.050
         let gridX = boardX + labelW
-        let cellW = (boardW - labelW - 0.012) / CGFloat(innings)
+        let cellW = (boardW - labelW - 0.012) / CGFloat(columns)
 
         draw("INNING", centredAt: CGPoint(x: px(boardX + boardW / 2),
                                           y: py(boardY + 0.023)),
              size: px(0.028), colour: panelText)
 
-        for index in 0..<innings {
+        for index in 0..<columns {
             draw("\(index + 1)",
                  centredAt: CGPoint(x: px(gridX + cellW * (CGFloat(index) + 0.5)),
                                     y: py(metrics.gridTop) - px(0.008)),
@@ -240,28 +301,44 @@ enum BaseballField {
             draw(name, at: CGPoint(x: px(boardX + 0.014),
                                    y: py(top + rowHeight * 0.74)),
                  size: px(0.028), colour: panelText)
-            for index in 0..<innings {
+            for index in 0..<columns {
                 let box = CGRect(x: px(gridX + cellW * CGFloat(index)), y: py(top),
                                  width: px(cellW), height: py(rowHeight * 0.84))
-                cell.setFill()
+                // The inning being played is tinted, so a glance says where
+                // the game is without counting boxes.
+                (index + 1 == currentInning ? live : cell).setFill()
                 cg.fill(box)
                 panel.setStroke()
                 cg.setLineWidth(1)
                 cg.stroke(box)
+
+                // A box is blank until that half-inning has been played —
+                // an unplayed inning and a scoreless one are different
+                // things, and a 0 everywhere would read as the latter.
+                guard row < lineScore.count, index < lineScore[row].count else { continue }
+                draw("\(lineScore[row][index])",
+                     centredAt: CGPoint(x: box.midX, y: box.midY),
+                     size: px(0.026), colour: panel)
             }
         }
 
         // The outs row gets its own band: it is the one thing on this panel
-        // read at a glance mid-turn.
+        // read at a glance mid-turn, which is why its pips are filled
+        // rather than left as outlines to be counted.
         let centreY = py(metrics.outsTop + outsHeight / 2)
         draw("OUTS", at: CGPoint(x: px(boardX + 0.014), y: centreY + px(0.012)),
              size: px(0.030), colour: panelText)
-        panelText.setStroke()
-        cg.setLineWidth(2.5)
         for index in 0..<3 {
             let centre = CGPoint(x: px(boardX + 0.175 + CGFloat(index) * 0.072),
                                  y: centreY)
-            cg.strokeEllipse(in: circle(at: centre, radius: px(0.024)))
+            let pip = circle(at: centre, radius: px(0.024))
+            if index < outs {
+                out.setFill()
+                cg.fillEllipse(in: pip)
+            }
+            panelText.setStroke()
+            cg.setLineWidth(2.5)
+            cg.strokeEllipse(in: pip)
         }
     }
 
@@ -269,32 +346,33 @@ enum BaseballField {
 
     /// Everything on the board is Aguafina, the app's display face.
     ///
-    /// Falls back rather than trapping: a wrong-looking font is a far smaller
-    /// problem than a crash inside a texture render, which is the same call
-    /// `renderScriptText` makes for the same reason.
-    private static func font(_ size: CGFloat) -> UIFont {
-        UIFont(name: AppFonts.aguafinaScriptPostScriptName, size: size)
-            ?? UIFont.italicSystemFont(ofSize: size)
-    }
-
+    /// Through `AppFonts.scriptFont`, which is the only way this file can
+    /// reach it — and which falls back rather than trapping, since a
+    /// wrong-looking font is a far smaller problem than a crash inside a
+    /// texture render.
+    ///
+    /// Both draws below measure with `AppFonts.inkBounds` and offset by
+    /// `-origin`. They used `size(withAttributes:)` — the advance — which
+    /// on a script face both mis-centres the text and lets its final
+    /// swash run past where the measurement said it ended.
     private static func draw(_ text: String, at origin: CGPoint,
                              size: CGFloat, colour: UIColor) {
-        let attrs: [NSAttributedString.Key: Any] = [
-            .font: font(size), .foregroundColor: colour
-        ]
-        (text as NSString).draw(at: origin, withAttributes: attrs)
+        let font = AppFonts.scriptFont(size)
+        let ink = AppFonts.inkBounds(of: text, font: font)
+        (text as NSString).draw(
+            at: CGPoint(x: origin.x - ink.origin.x, y: origin.y - ink.origin.y),
+            withAttributes: [.font: font, .foregroundColor: colour]
+        )
     }
 
     private static func draw(_ text: String, centredAt centre: CGPoint,
                              size: CGFloat, colour: UIColor) {
-        let attrs: [NSAttributedString.Key: Any] = [
-            .font: font(size), .foregroundColor: colour
-        ]
-        let measured = (text as NSString).size(withAttributes: attrs)
+        let font = AppFonts.scriptFont(size)
+        let ink = AppFonts.inkBounds(of: text, font: font)
         (text as NSString).draw(
-            at: CGPoint(x: centre.x - measured.width / 2,
-                        y: centre.y - measured.height / 2),
-            withAttributes: attrs
+            at: CGPoint(x: centre.x - ink.width / 2 - ink.origin.x,
+                        y: centre.y - ink.height / 2 - ink.origin.y),
+            withAttributes: [.font: font, .foregroundColor: colour]
         )
     }
 }

@@ -390,30 +390,6 @@ struct TurnCompleteOverlay: View {
     /// reward rather than something that fires on every result.
     private var showsFireworks: Bool { score <= 3 }
 
-    /// `caption`, with trailing whitespace appended before it's ever handed
-    /// to a Text view.
-    ///
-    /// This is the same fix DiceSceneEnvironment.renderScriptText already
-    /// applies to the floor's "ROLLS" text, for the same reason: Aguafina
-    /// Script's swashes extend past their own glyph's advance width, and
-    /// SwiftUI's Text (like Core Text generally) lays out and can clip
-    /// based on advance width, not actual rendered ink — so the true LAST
-    /// character's flourish (the "!" in "luck!", the "d" in "Good", the
-    /// "t" in "Great") can render partially outside the box Text computed
-    /// for the string, and gets cut there. Switching stackSans/aguafina to
-    /// the `relativeTo:` font overload (see AppFonts.swift) fixed a
-    /// related but distinct clipping bug — minimumScaleFactor's interaction
-    /// with a fixed-size custom font — and was NOT enough on its own for
-    /// this one, since this is a metrics limitation of the font itself, not
-    /// a font-API choice: no Font.custom variant reserves room for ink a
-    /// glyph's own advance width doesn't claim. The extra trailing space
-    /// gives Core Text that missing room directly, the same way
-    /// renderScriptText's own generous canvas padding does for the
-    /// UIKit-rendered floor text.
-    private var captionForDisplay: String? {
-        caption.map { $0 + "  " }
-    }
-
     var body: some View {
         ZStack {
             // Dims everything underneath by ~75% (leaves ~25% visible)
@@ -427,23 +403,27 @@ struct TurnCompleteOverlay: View {
             }
 
             VStack(spacing: 4) {
-                if let captionForDisplay {
-                    Text(captionForDisplay)
-                        // Aguafina, and NOT uppercased — the screen-wide
-                        // .textCase(.uppercase) would otherwise flatten the
-                        // script's lowercase forms, which is most of what
-                        // gives it its character.
-                        .font(.aguafina(score >= 20 ? 46 : 68))
+                if let caption {
+                    // ScriptText rather than a Text with its own font: it
+                    // reserves the room Aguafina's swashes need, which this
+                    // site used to do by appending two literal spaces to
+                    // the string. That worked at one point size and is the
+                    // sort of thing a new screen never remembers to copy.
+                    //
+                    // NOT uppercased — the screen-wide .textCase(.uppercase)
+                    // would flatten the script's lowercase forms, which is
+                    // most of what gives it its character.
+                    ScriptText(caption,
+                               size: score >= 20 ? 46 : 68,
+                               lineLimit: 2,
+                               minimumScaleFactor: 0.4)
                         .textCase(nil)
-                        .multilineTextAlignment(.center)
-                        .minimumScaleFactor(0.4)
-                        .lineLimit(2)
                         .foregroundStyle(.white)
                         .padding(.horizontal, 28)
                 }
 
-                // Trailing spaces, same reasoning as captionForDisplay
-                // above — stackSans is a plain sans face with much less
+                // Trailing spaces, same reasoning as the caption above
+                // — stackSans is a plain sans face with much less
                 // overhang than Aguafina's script swashes, but the
                 // minimumScaleFactor(0.05) here is far more extreme, so
                 // the same class of advance-width-vs-ink-extent gap is

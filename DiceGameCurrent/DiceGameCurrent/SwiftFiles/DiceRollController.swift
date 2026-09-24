@@ -333,12 +333,26 @@ final class DiceRollController: NSObject, SCNSceneRendererDelegate {
     private var maxDurationForThisRoll: TimeInterval = SettleTuning.minRollDuration
 
     /// Time budget scales linearly from minRollDuration (1 die) up to
-    /// maxRollDuration (15 dice, or however many are in the pool at once).
+    /// maxRollDuration (15 dice, or however many are in the pool at once),
+    /// then takes the same small-pool boost the throw itself does.
+    ///
+    /// The boost is not optional here. `DiceRollImpulse` throws a pool of
+    /// four or fewer up to twice as hard, and a die thrown twice as hard
+    /// needs roughly 1.9 more bounce cycles to lose that energy off the
+    /// 0.7-restitution walls. Without the same multiplier on the budget, a
+    /// one-die roll would hit its 1.0s cap mid-air and be force-settled —
+    /// faster dice that look worse, which is the opposite of the ask. The
+    /// two therefore read one function rather than two constants.
+    ///
+    ///     dice   1      2      3      4      5+
+    ///     before 1.00s  1.21s  1.42s  1.63s  unchanged
+    ///     after  2.00s  2.12s  2.13s  2.04s  unchanged
     private func timeBudget(forDiceCount count: Int) -> TimeInterval {
         let clampedCount = max(1, min(count, SettleTuning.maxDiceInPool))
         let progress = Double(clampedCount - 1) / Double(SettleTuning.maxDiceInPool - 1)
-        return SettleTuning.minRollDuration
+        let base = SettleTuning.minRollDuration
             + progress * (SettleTuning.maxRollDuration - SettleTuning.minRollDuration)
+        return base * DiceRollImpulse.smallPoolBoost(forDiceCount: count)
     }
 
     /// Start a roll for the given (dieID, physicsNode) pairs. Each node must

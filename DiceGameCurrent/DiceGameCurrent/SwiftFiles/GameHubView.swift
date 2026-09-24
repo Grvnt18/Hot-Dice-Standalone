@@ -4,12 +4,11 @@ import SwiftUI
 /// the games themselves use.
 ///
 /// This is now the app's root (see `DiceGameApp`), replacing the hardcoded
-/// `DiceGameScreen()`. All ten games are playable, so every tile opens
+/// `DiceGameScreen()`. All eleven games are playable, so every tile opens
 /// something — the greyed-out "soon" state the grid carried while the
 /// suite was being built has been removed rather than left unreachable.
 struct GameHubView: View {
 
-    @ObservedObject private var theme = AppTheme.shared
     @State private var showingSettings = false
     @State private var openGame: GameCatalogEntry?
 
@@ -44,8 +43,7 @@ struct GameHubView: View {
                                   spacing: HubLayout.columnGap) {
                             ForEach(GameCatalog.all) { entry in
                                 GameTile(entry: entry,
-                                         side: HubLayout.tileSide(forWidth: geo.size.width),
-                                         accent: theme.accentColor) {
+                                         side: HubLayout.tileSide(forWidth: geo.size.width)) {
                                     SoundEngine.shared.play(.buttonTap)
                                     openGame = entry
                                 }
@@ -236,7 +234,6 @@ private struct GameTile: View {
     /// The square this tile fills, measured by the hub rather than inferred.
     let side: CGFloat
 
-    let accent: Color
     let action: () -> Void
 
     var body: some View {
@@ -265,10 +262,19 @@ private struct GameTile: View {
             // every tile in a row is identical by construction rather than
             // by agreement.
             .frame(width: side, height: side)
-            .background(
-                RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                    .fill(accent.opacity(0.92))
-            )
+            // The tile is an outline on the timber, not a slab of colour.
+            //
+            // It used to be filled with the accent swatch at 0.92, which
+            // read as a grey plate behind the artwork rather than as the
+            // artwork's own shape. The icons are black line work on
+            // transparency, so the plate was the whole of what showed
+            // behind them; without it they sit on the wood, which most of
+            // the palette's deep navies and near-blacks separated them
+            // from less well than the timber does.
+            //
+            // The border and the shadow stay: they are what still says
+            // "this square is a thing you tap".
+            .contentShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
             .overlay(
                 RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
                     .stroke(.black.opacity(0.35), lineWidth: 1)

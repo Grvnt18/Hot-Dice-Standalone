@@ -23,11 +23,38 @@ enum DiceRollImpulse {
     private static let minTorqueMagnitude: Float = 1.8
     private static let maxTorqueMagnitude: Float = 4.2
 
+    /// How much harder a small pool is thrown.
+    ///
+    /// A single die gets the same kick as a pool of fifteen, but with
+    /// nothing to collide with it just slides and stops — the throw reads
+    /// as limp. So pools of four or fewer are scaled up: +25% at four
+    /// rising to +100% at one.
+    ///
+    ///     dice   1      2      3      4      5+
+    ///     scale  2.00x  1.75x  1.50x  1.25x  1.00x
+    ///
+    /// `DiceRollController.timeBudget(forDiceCount:)` applies the SAME
+    /// number to the roll's time budget. That is not decoration: a one-die
+    /// roll is force-settled at 1.0s today, and throwing it twice as hard
+    /// without extending that would end every small roll in an abrupt
+    /// freeze. Energy decays geometrically off the walls (restitution
+    /// 0.7), so doubling the launch speed costs about ln(2)/ln(1/0.7) —
+    /// roughly 1.9 — extra bounce cycles before the settle threshold. One
+    /// function, read by both, so the throw and the time it is given can
+    /// never disagree about how hard it was thrown.
+    static func smallPoolBoost(forDiceCount count: Int) -> Double {
+        guard count >= 1, count <= 4 else { return 1.0 }
+        return 1.0 + 0.25 * Double(5 - count)
+    }
+
     /// Call this for exactly the same dice being handed to
     /// DiceRollController.startRoll, right alongside that call. Un-freezes
     /// any die left kinematic from a previous settle, then tosses it with
     /// a random push and spin.
     static func launch(dice: [(id: UUID, node: SCNNode, sides: Int)]) {
+        let boost = Float(smallPoolBoost(forDiceCount: dice.count))
+        let upwardBoost = sqrt(boost)
+
         for die in dice {
             let node = die.node
 
@@ -37,8 +64,13 @@ enum DiceRollImpulse {
             body.angularVelocity = SCNVector4(0, 1, 0, 0)
 
             let direction = randomHorizontalDirection()
-            let linearMagnitude = Float.random(in: minLinearImpulse...maxLinearImpulse)
-            let upward = Float.random(in: minUpwardImpulse...maxUpwardImpulse)
+            let linearMagnitude = Float.random(in: minLinearImpulse...maxLinearImpulse) * boost
+            // Upward takes the SQUARE ROOT of the boost, for the same
+            // reason the 3x motion increase above gave it only 1.8x: peak
+            // height goes as v²/2g, so doubling it would send a die four
+            // times higher. The square root makes the vertical excursion
+            // grow in step with the boost rather than with its square.
+            let upward = Float.random(in: minUpwardImpulse...maxUpwardImpulse) * upwardBoost
 
             let impulse = SCNVector3(
                 direction.x * linearMagnitude,
@@ -48,7 +80,7 @@ enum DiceRollImpulse {
             body.applyForce(impulse, asImpulse: true)
 
             let axis = randomTumbleAxis()
-            let torqueMagnitude = Float.random(in: minTorqueMagnitude...maxTorqueMagnitude)
+            let torqueMagnitude = Float.random(in: minTorqueMagnitude...maxTorqueMagnitude) * boost
             let torque = SCNVector4(axis.x, axis.y, axis.z, torqueMagnitude)
             body.applyTorque(torque, asImpulse: true)
         }

@@ -161,6 +161,9 @@ enum GameCatalog {
         GameCatalogEntry(RollbotsGame.self) { onExit in
             AnyView(RollbotsScreen(onExit: onExit))
         },
+        GameCatalogEntry(BaseballDiceGame.self) { onExit in
+            AnyView(BaseballDiceScreen(onExit: onExit))
+        },
         GameCatalogEntry(BoneheadsGame.self) { onExit in
             AnyView(BoneheadsScreen(onExit: onExit))
         }
@@ -171,6 +174,46 @@ enum GameCatalog {
 
 /// Rolls' entry in the suite. The game itself is unchanged — this only
 /// declares what the hub and rules sheet need to know about it.
+/// Baseball Dice.
+///
+/// The id is `baseball_dice` and the artwork is `icon-baseball_dice.png` —
+/// GameIcons derives the filename from the id, so the two cannot drift.
+enum BaseballDiceGame: SuiteGame {
+    static let id = "baseball_dice"
+    static let displayName = "Baseball Dice"
+    static let tagline = "Guess the pitch. Take the extra base."
+
+    /// The floor is the ballpark itself, so it carries no wordmark.
+    static let floorTitle = ""
+
+    static let rules: [GameRuleSection] = [
+        GameRuleSection(
+            title: "The Game",
+            body: "Pick a match length first — 3 innings is short, 6 medium, 9 extra long. Three outs to a half-inning, and the side batting last has the advantage it does in real baseball."
+        ),
+        GameRuleSection(
+            title: "Pitching",
+            body: "At the start of each half-inning the pitcher picks a style and keeps it hidden: Power Pitcher leans on the fastball, Crafty on the changeup, Breaking Ball on the slider. The app throws the actual pitch from that mix every at-bat, so even the pitcher does not know exactly what is coming."
+        ),
+        GameRuleSection(
+            title: "Swinging",
+            body: "The batter picks a swing without seeing the pitch. Patient beats the Fastball, Contact beats the Changeup, Power beats the Slider — and each loses to the pitch it cannot handle. Guess right and you roll two dice and keep the best against the pitcher's d4."
+        ),
+        GameRuleSection(
+            title: "The Result",
+            body: "Subtract the pitcher's roll from the batter's. -5 or worse is a strikeout, -4 to +1 a field out, +2 a walk, +3 to +4 a single, +5 a double, +6 a triple, +7 to +9 caught at the wall, and +10 or better a home run."
+        ),
+        GameRuleSection(
+            title: "Worth Knowing",
+            body: "A favoured swing can never strike out — the worst gap it can produce is -3. Rolling your die's maximum on both dice of a favoured swing is an automatic home run whatever the table says. A deep out still scores a runner from third, and a field out with a runner on first is a double play when the pitcher's roll is even."
+        ),
+        GameRuleSection(
+            title: "Winning",
+            body: "Most runs when the innings run out. A tie plays extra innings, in pairs, until someone leads at the end of one."
+        )
+    ]
+}
+
 enum RollsGame: SuiteGame {
     static let id = RollsGameState.gameID
     static let displayName = "Rolls"

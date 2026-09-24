@@ -17,6 +17,18 @@ import UIKit
 /// exactly what they had.
 struct ArenaStyle {
 
+    /// What the floor is made of.
+    ///
+    /// Faceted for nine games and Rollbots; Baseball Dice draws an actual
+    /// pitch instead, because its board IS the game — the runners, the outs
+    /// and the line score all live on it.
+    enum Surface {
+        case faceted
+        case baseballField(innings: Int)
+    }
+
+    var surface: Surface = .faceted
+
     /// The base colour the faceted floor texture is generated from. Nil
     /// follows the player's table colour, which is what the house style is.
     var surfaceOverride: UIColor?
@@ -35,6 +47,13 @@ struct ArenaStyle {
     /// Rollbots: brushed steel, no rim.
     static let steel = ArenaStyle(surfaceOverride: UIColor(hex: "#3A424C"),
                                   showsWoodenRim: false)
+
+    /// Baseball Dice: the pitch itself, inside a thin wooden rim.
+    static func ballpark(innings: Int) -> ArenaStyle {
+        ArenaStyle(surface: .baseballField(innings: innings),
+                   surfaceOverride: nil,
+                   showsWoodenRim: true)
+    }
 
     var surfaceColor: UIColor { surfaceOverride ?? AppTheme.shared.floorBaseColor }
 }
@@ -138,7 +157,7 @@ enum DiceSceneEnvironment {
         // depth-write and render-order juggling those two layers needed.
         let plane = SCNPlane(width: CGFloat(width), height: CGFloat(depth))
         let material = SCNMaterial()
-        material.diffuse.contents = facetedSurfaceTexture(baseColor: style.surfaceColor)
+        material.diffuse.contents = surfaceTexture(for: style)
         material.diffuse.wrapS = .clamp
         material.diffuse.wrapT = .clamp
         // .lambert, not .physicallyBased: pure diffuse shading with no
@@ -226,7 +245,7 @@ enum DiceSceneEnvironment {
         textMaterial: SCNMaterial,
         title: String
     ) {
-        surfaceMaterial.diffuse.contents = facetedSurfaceTexture(baseColor: style.surfaceColor)
+        surfaceMaterial.diffuse.contents = surfaceTexture(for: style)
         textMaterial.diffuse.contents = renderScriptText(title, pointSize: 220, isDark: AppTheme.shared.rollsTextIsDark)
     }
 
@@ -277,6 +296,22 @@ enum DiceSceneEnvironment {
                 at: CGPoint(x: padding - ink.origin.x, y: padding - ink.origin.y),
                 withAttributes: attrs
             )
+        }
+    }
+
+    /// The floor image a style asks for.
+    ///
+    /// One function so the two callers — building the scene and re-applying
+    /// the theme when the player changes table colour — cannot disagree
+    /// about what a style draws.
+    private static func surfaceTexture(for style: ArenaStyle) -> UIImage {
+        switch style.surface {
+        case .faceted:
+            return facetedSurfaceTexture(baseColor: style.surfaceColor)
+        case .baseballField(let innings):
+            // Portrait, matching the composition the preview settled.
+            return BaseballField.render(size: CGSize(width: 820, height: 1100),
+                                        innings: innings)
         }
     }
 

@@ -20,9 +20,18 @@ would otherwise have to tell us:
     a row and a half of enormous squares
   * no tile is so large that a phone shows fewer than four games at once
 
+It also guards one thing that is not arithmetic at all: the tile has no
+filled background any more, and a `Button` hit-tests the content it
+actually draws. Without an explicit `contentShape` the tap target would
+shrink to the artwork and the label, and a tap in a tile's blank margin
+would fall through to the scroll view — a grid whose whole job is being
+tapped, quietly getting harder to tap. That cannot be seen in a
+screenshot, so it is asserted here instead.
+
 Same spirit as tools_spawn_verify.py: prove the numbers, rather than
 eyeball the screen and hope.
 """
+import re
 import sys
 
 from tools_swiftconst import source, constant
@@ -93,11 +102,36 @@ def main():
         print("  iPhone 15 shows fewer than two rows of tiles")
         failed = True
 
+    failed |= check_tile_painting(text)
+
     if failed:
         print("hub layout: FAILED")
         sys.exit(1)
     print("hub layout: PASS (%d widths, icon never below %d%% of its tile)"
           % (len(WIDTHS), round(MIN_ICON_SHARE * 100)))
+
+
+def check_tile_painting(text):
+    """The tile is an outline you can still tap anywhere inside."""
+    tile = text.split("private struct GameTile")[-1]
+    problems = []
+
+    if re.search(r'\.background\(\s*\n?\s*RoundedRectangle', tile):
+        problems.append("the filled plate is back behind the icons")
+    if not re.search(
+            r'\.contentShape\(RoundedRectangle\(cornerRadius: '
+            r'ControlShape\.cornerRadius\)\)', tile):
+        problems.append("no contentShape — taps in a tile's margin will miss")
+    if not re.search(r'\.stroke\(\.black\.opacity\([\d.]+\), lineWidth:', tile):
+        problems.append("the tile lost its outline, so nothing marks its edge")
+
+    for line in problems:
+        print("  %-20s %s" % ("tile painting", line))
+    if problems:
+        return True
+    print("  %-20s ok (no fill, outline kept, whole square tappable)"
+          % "tile painting")
+    return False
 
 
 if __name__ == "__main__":

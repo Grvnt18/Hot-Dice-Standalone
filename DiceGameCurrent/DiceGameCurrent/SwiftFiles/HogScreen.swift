@@ -53,6 +53,7 @@ struct HogScreen: View {
                         session: $session,
                         makeInitialDice: { HogRules.makeDice() },
                         floorTitle: HogGame.floorTitle,
+                        arenaStyle: .house(motif: HogGame.floorMotif),
                         onSessionCreated: { newSession in
                             newSession.onRollSettled = { results in
                                 applyRoll(results)

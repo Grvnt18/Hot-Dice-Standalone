@@ -108,24 +108,36 @@ enum BaseballField {
             func py(_ value: CGFloat) -> CGFloat { value * h }
             func point(_ p: CGPoint) -> CGPoint { CGPoint(x: px(p.x), y: py(p.y)) }
 
-            grass.setFill()
-            cg.fill(CGRect(origin: .zero, size: size))
+            // The turf and the dirt are FACETED, not flat.
+            //
+            // Every other playfield in the suite is a low-poly surface, and
+            // a pitch painted in two flat colours read as a different app.
+            // The layout is untouched — the same diamond, the same circles,
+            // the same measurements — and only what fills them changes.
+            let turf = faceted(grass, size: size, seed: 771001)
+            let clay = faceted(dirt, size: size, seed: 771002)
+
+            turf.draw(in: CGRect(origin: .zero, size: size))
 
             // Infield skin: a dirt disc around the mound with the grass
             // infield laid back over it, which is how the real shape is made.
-            dirt.setFill()
-            cg.fillEllipse(in: circle(at: point(mound), radius: px(skinRadius)))
-            grass.setFill()
-            cg.addPath(diamondPath(centre: mound, half: 0.190, in: size))
-            cg.fillPath()
+            fill(cg, with: clay, size: size) {
+                $0.addEllipse(in: circle(at: point(mound), radius: px(skinRadius)))
+            }
+            fill(cg, with: turf, size: size) {
+                $0.addPath(diamondPath(centre: mound, half: 0.190, in: size))
+            }
 
-            // Base paths, stroked along the diamond's edges.
-            dirt.setStroke()
-            cg.setLineWidth(px(pathWidth))
-            cg.setLineJoin(.round)
-            let bases = [home, first, second, third].map(point)
-            cg.addLines(between: bases + [bases[0]])
-            cg.strokePath()
+            // Base paths, stroked along the diamond's edges — clipped to the
+            // stroke rather than stroked flat, so the facets run through the
+            // basepath the way they do through the skin around it.
+            fill(cg, with: clay, size: size) { ctx in
+                let bases = [home, first, second, third].map(point)
+                ctx.addLines(between: bases + [bases[0]])
+                ctx.setLineWidth(px(pathWidth))
+                ctx.setLineJoin(.round)
+                ctx.replacePathWithStrokedPath()
+            }
 
             // Foul lines, running out past the corners.
             chalk.setStroke()
@@ -137,13 +149,15 @@ enum BaseballField {
             cg.strokePath()
 
             // Mound, its rubber, and the plate circle.
-            dirt.setFill()
-            cg.fillEllipse(in: circle(at: point(mound), radius: px(moundRadius)))
+            fill(cg, with: clay, size: size) {
+                $0.addEllipse(in: circle(at: point(mound), radius: px(moundRadius)))
+            }
             chalk.setFill()
             cg.fill(CGRect(x: px(mound.x - 0.030), y: py(mound.y) - px(0.006),
                            width: px(0.060), height: px(0.012)))
-            dirt.setFill()
-            cg.fillEllipse(in: circle(at: point(home), radius: px(homeCircleRadius)))
+            fill(cg, with: clay, size: size) {
+                $0.addEllipse(in: circle(at: point(home), radius: px(homeCircleRadius)))
+            }
 
             // Batter's boxes.
             chalk.setStroke()
@@ -164,9 +178,10 @@ enum BaseballField {
 
             // On-deck circles, which double as the two runner pools.
             for (index, x) in onDeckX.enumerated() {
-                dirt.setFill()
-                cg.fillEllipse(in: circle(at: CGPoint(x: px(x), y: py(onDeckY)),
-                                          radius: px(onDeckRadius)))
+                fill(cg, with: clay, size: size) {
+                    $0.addEllipse(in: circle(at: CGPoint(x: px(x), y: py(onDeckY)),
+                                             radius: px(onDeckRadius)))
+                }
                 draw(index == 0 ? "VISITORS" : "HOME",
                      centredAt: CGPoint(x: px(x), y: py(onDeckY) + px(0.082)),
                      size: px(0.026), colour: chalk.withAlphaComponent(0.9))
@@ -216,6 +231,50 @@ enum BaseballField {
     }
 
     // MARK: Pieces
+
+    /// A faceted texture the size of the field, in one of its own colours.
+    ///
+    /// Through `LowPolyTextures.facetedSurface`, the same generator every
+    /// other playfield uses, so the pitch is made of the same material as
+    /// the rest of the suite rather than merely resembling it. Portrait, so
+    /// the cell counts follow the canvas and the triangles stay roughly
+    /// equilateral instead of stretching into slivers.
+    private static func faceted(_ colour: UIColor, size: CGSize,
+                                seed: UInt64) -> UIImage {
+        let columns = 22
+        let rows = Int((CGFloat(columns) * size.height / size.width).rounded())
+        return LowPolyTextures.facetedSurface(
+            baseColor: colour,
+            variation: 0.085,
+            columns: columns,
+            rows: rows,
+            pixelSize: size.width,
+            pixelHeight: size.height,
+            seed: seed
+        )
+    }
+
+    /// Fills whatever `region` adds to the context with a texture.
+    ///
+    /// Clipping and drawing the whole image rather than using a pattern
+    /// fill: a pattern tiles from the context's origin at its own size, so
+    /// two regions filled with the same pattern show the same facets in the
+    /// same places. Clipping one continuous image means the dirt under the
+    /// mound and the dirt at first base are different parts of one surface,
+    /// which is what stops the repetition reading as wallpaper.
+    private static func fill(_ cg: CGContext, with texture: UIImage,
+                             size: CGSize, region: (CGContext) -> Void) {
+        cg.saveGState()
+        region(cg)
+        cg.clip()
+        // UIImage.draw rather than CGContext.draw: a renderer's context is
+        // already flipped for UIKit drawing, so the CG call would place the
+        // texture upside down. Invisible on noise, wrong all the same, and
+        // the sort of thing that only shows up once something directional
+        // is drawn into one of these.
+        texture.draw(in: CGRect(origin: .zero, size: size))
+        cg.restoreGState()
+    }
 
     private static func circle(at centre: CGPoint, radius: CGFloat) -> CGRect {
         CGRect(x: centre.x - radius, y: centre.y - radius,

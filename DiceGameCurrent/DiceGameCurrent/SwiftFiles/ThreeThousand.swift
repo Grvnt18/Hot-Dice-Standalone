@@ -117,6 +117,7 @@ extension ThreeThousandRules {
 // MARK: - Suite entry
 
 enum ThreeThousandGame: SuiteGame {
+    static let floorMotif = FloorMotif.circles
     static let id = "three_thousand"
     static let displayName = "Three Thousand"
     static let tagline = "Bank it or lose it."

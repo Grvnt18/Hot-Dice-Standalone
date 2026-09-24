@@ -149,6 +149,7 @@ extension FreighterYachtDinghyRules {
 // MARK: - Suite entry
 
 enum FreighterYachtDinghyGame: SuiteGame {
+    static let floorMotif = FloorMotif.waves
     static let id = "fyd"
     static let displayName = "Freighter.Yacht.Dinghy"
     static let tagline = "Freighter, yacht, dinghy. Best of three."

@@ -12,6 +12,13 @@ you see is what the floor texture will be.
 Everything is expressed as a fraction of the square texture, origin top
 left, because the playfield is square and the Swift draws into a square
 CGContext.
+
+
+Note: the Swift fills the turf and the dirt with FACETED textures, the
+same low-poly surface every other playfield uses; this preview draws them
+flat. That is deliberate — what is being checked here is the COMPOSITION,
+and flat fills show the layout more clearly than noise does. The constants
+are what tools_baseball_field_verify.py compares, and they are unaffected.
 """
 import os
 

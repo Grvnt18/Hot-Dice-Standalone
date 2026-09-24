@@ -33,10 +33,16 @@ enum LowPolyTextures {
         // score bar, so facets stay roughly equilateral instead of being
         // stretched into slivers when the image is scaled to fit.
         pixelHeight: CGFloat? = nil,
-        seed: UInt64 = 12345
+        seed: UInt64 = 12345,
+        // A shape carried by the facets themselves — see FloorMotif. It
+        // raises the grid resolution, because a numeral or a face needs
+        // more than 16 cells a side to be legible.
+        motif: FloorMotif = .none
     ) -> UIImage {
         let h = pixelHeight ?? pixelSize
-        let key = "\(baseColor)-\(variation)-\(columns)x\(rows)-\(pixelSize)x\(h)-\(seed)"
+        let columns = motif.grid ?? columns
+        let rows = motif.grid ?? rows
+        let key = "\(baseColor)-\(variation)-\(columns)x\(rows)-\(pixelSize)x\(h)-\(seed)-\(motif.rawValue)"
         if let cached = cache[key] { return cached }
 
         let size = CGSize(width: pixelSize, height: h)
@@ -48,6 +54,10 @@ enum LowPolyTextures {
         // — a floor that re-randomizes its facets on every new game would
         // be distracting rather than characterful.
         var rng = SeededGenerator(seed: seed)
+
+        // Built once, not per facet: `FloorMotif.shapes` constructs every
+        // UIBezierPath it returns, and a 30x30 grid asks 1,800 times.
+        let shapes = MotifShapes(motif: motif)
 
         let cellW = pixelSize / CGFloat(columns)
         let cellH = h / CGFloat(rows)
@@ -74,8 +84,21 @@ enum LowPolyTextures {
                         ? [[tl, tr, bl], [tr, br, bl]]
                         : [[tl, tr, br], [tl, br, bl]]
 
+                    // Resolved once per cell rather than per triangle: the
+                    // shapes are the same either way, and building them is
+                    // the only part of this loop that is not arithmetic.
                     for tri in triangles {
-                        let delta = (CGFloat(rng.nextUnit()) * 2 - 1) * variation
+                        var delta = (CGFloat(rng.nextUnit()) * 2 - 1) * variation
+                        // The motif is a tonal STEP on the facet, not a
+                        // shape drawn over it — which is what keeps it in
+                        // the low-poly style rather than on top of it.
+                        if motif != .none {
+                            let centre = CGPoint(
+                                x: (tri[0].x + tri[1].x + tri[2].x) / 3 / pixelSize,
+                                y: (tri[0].y + tri[1].y + tri[2].y) / 3 / h
+                            )
+                            delta += shapes.lift(at: centre)
+                        }
                         // .set() sets BOTH fill and stroke. Using
                         // .setFill() alone left the stroke at its default
                         // black, so the seam-closing stroke below outlined
@@ -193,5 +216,27 @@ enum LowPolyTextures {
         var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         guard color.getHue(&h, saturation: &s, brightness: &b, alpha: &a) else { return color }
         return UIColor(hue: h, saturation: s, brightness: max(0, min(1, b + delta)), alpha: a)
+    }
+}
+
+/// A motif's shapes, built once and asked many times.
+///
+/// `FloorMotif.shapes` constructs every `UIBezierPath` it returns, and the
+/// facet loop asks 1,800 times per texture. Holding them costs one small
+/// array and turns that into 1,800 hit tests instead of 1,800 rebuilds.
+private struct MotifShapes {
+    private let shapes: [FloorMotif.Shape]
+
+    init(motif: FloorMotif) {
+        shapes = motif.shapes
+    }
+
+    /// Later shapes win, so detail sits on the mass it belongs to.
+    func lift(at point: CGPoint) -> CGFloat {
+        var value: CGFloat = 0
+        for shape in shapes where shape.path.contains(point) {
+            value = shape.lift
+        }
+        return value
     }
 }

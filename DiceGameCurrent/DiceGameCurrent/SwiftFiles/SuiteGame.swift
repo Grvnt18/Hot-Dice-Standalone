@@ -45,6 +45,9 @@ protocol SuiteGame {
     /// "Jackpot" and defeats "Freighter.Yacht.Dinghy".
     static var floorTitle: String { get }
 
+    /// The shape this game's floor facets carry. See `FloorMotif`.
+    static var floorMotif: FloorMotif { get }
+
     /// Whether a turn can be sent to someone else.
     ///
     /// False only for Free Roll, which is a solo sandbox with no opponent
@@ -59,6 +62,10 @@ extension SuiteGame {
     // states what makes it unusual.
     static var maxPlayers: Int { 2 }
     static var floorTitle: String { displayName }
+
+    /// No mark unless a game asks for one, so a game added later is not
+    /// obliged to have art before it can ship.
+    static var floorMotif: FloorMotif { .none }
     static var lowestScoreWins: Bool { false }
     static var isSendable: Bool { true }
 }

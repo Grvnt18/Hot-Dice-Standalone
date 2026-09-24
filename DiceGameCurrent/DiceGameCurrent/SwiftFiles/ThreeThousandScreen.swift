@@ -67,6 +67,7 @@ struct ThreeThousandScreen: View {
                         session: $session,
                         makeInitialDice: { ThreeThousandRules.makeDice() },
                         floorTitle: ThreeThousandGame.floorTitle,
+                        arenaStyle: .house(motif: ThreeThousandGame.floorMotif),
                         onSessionCreated: { newSession in
                             newSession.onRollSettled = { results in
                                 applyRoll(results)

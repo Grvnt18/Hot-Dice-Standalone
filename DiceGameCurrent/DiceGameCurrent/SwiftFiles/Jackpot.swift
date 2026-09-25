@@ -164,9 +164,12 @@ extension JackpotRules {
     /// Colours come from a shuffled palette rather than being fixed per die
     /// type, so the five are always easy to tell apart on the table.
     static func makeDice() -> [Die] {
-        var colorways = DiePalette.colorways.shuffled()
-        return dieSides.compactMap { sides in
-            guard !colorways.isEmpty else { return nil }
+        // Refilled rather than exhausted — see FreeRollPool.makeDice for
+        // the bug this shape caused there. Five dice against 15 colourways
+        // is safe today; it was safe in Free Roll too, until the cap moved.
+        var colorways: [DieColorway] = []
+        return dieSides.map { sides in
+            if colorways.isEmpty { colorways = DiePalette.colorways.shuffled() }
             return Die(sides: sides, colorway: colorways.removeLast())
         }
     }

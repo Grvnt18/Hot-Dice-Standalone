@@ -12,7 +12,11 @@ import UIKit
 /// vertex-colored mesh, and looks the same from the fixed top-down camera.
 enum LowPolyTextures {
 
-    private static var cache: [String: UIImage] = [:]
+    /// Bounded, because the key multiplies: 24 table colours times eight
+    /// floor motifs is 192 entries at 1 MiB each, and nothing evicted. The
+    /// working set is far smaller now that `GameScope` gives each game one
+    /// colour, so a cap of 16 is generous and holds the ceiling at 16 MiB.
+    private static var cache = BoundedImageCache(limit: 16)
 
     /// A grid of triangles, each filled with a slightly different shade of
     /// `baseColor` — the classic "low poly field" look from the reference
@@ -43,7 +47,7 @@ enum LowPolyTextures {
         let columns = motif.grid ?? columns
         let rows = motif.grid ?? rows
         let key = "\(baseColor)-\(variation)-\(columns)x\(rows)-\(pixelSize)x\(h)-\(seed)-\(motif.rawValue)"
-        if let cached = cache[key] { return cached }
+        if let cached = cache.value(key) { return cached }
 
         let size = CGSize(width: pixelSize, height: h)
         let format = UIGraphicsImageRendererFormat()
@@ -124,7 +128,7 @@ enum LowPolyTextures {
             }
         }
 
-        cache[key] = image
+        cache.insert(image, for: key)
         return image
     }
 
@@ -150,7 +154,7 @@ enum LowPolyTextures {
         seed: UInt64 = 4242
     ) -> UIImage {
         let key = "wood-\(baseColor)-\(planks)x\(shardsPerPlank)-\(pixelSize)x\(pixelHeight)-\(seed)"
-        if let cached = cache[key] { return cached }
+        if let cached = cache.value(key) { return cached }
 
         let size = CGSize(width: pixelSize, height: pixelHeight)
         let format = UIGraphicsImageRendererFormat()
@@ -204,7 +208,7 @@ enum LowPolyTextures {
                 seam.stroke()
             }
         }
-        cache[key] = image
+        cache.insert(image, for: key)
         return image
     }
 
@@ -238,5 +242,56 @@ private struct MotifShapes {
             value = shape.lift
         }
         return value
+    }
+}
+
+/// A texture cache that cannot grow without limit.
+///
+/// Every generated-image cache in this app was a plain dictionary that only
+/// ever grew. Individually none of them looked expensive; together their
+/// ceiling was about 286 MiB, because the keys multiply — colours times
+/// motifs, colourways times numerals — and nothing ever evicted.
+///
+/// `DieMaterialFactory` hit this first and documents it at its
+/// `grainTextureCache`: "the cache had no eviction and 15 colorways x 8
+/// grain variants means it grows toward 120 entries at 1 MB each". The
+/// best answer is to take the multiplying dimension out of the key, which
+/// is what that file did and what `DieFaceLabels` now does too. This is the
+/// backstop for what is left.
+///
+/// Oldest-first rather than least-recently-used: the cost of a miss is one
+/// Core Graphics render of a texture that is already only built when a
+/// scene is assembled, so the bookkeeping an LRU needs would cost more
+/// than it saves.
+struct BoundedImageCache {
+    private var images: [String: UIImage] = [:]
+    private var order: [String] = []
+    private let limit: Int
+
+    init(limit: Int) {
+        self.limit = max(1, limit)
+    }
+
+    func value(_ key: String) -> UIImage? { images[key] }
+
+    mutating func insert(_ image: UIImage, for key: String) {
+        guard images[key] == nil else { return }
+        images[key] = image
+        order.append(key)
+
+        while order.count > limit {
+            // The evicted image is NOT necessarily freed: a material still
+            // showing it holds its own reference, which is correct — this
+            // caps what is held on the cache's behalf, not what is on
+            // screen.
+            images.removeValue(forKey: order.removeFirst())
+        }
+    }
+
+    mutating func image(_ key: String, _ build: () -> UIImage) -> UIImage {
+        if let hit = value(key) { return hit }
+        let image = build()
+        insert(image, for: key)
+        return image
     }
 }

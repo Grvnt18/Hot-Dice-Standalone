@@ -46,9 +46,15 @@ enum RoyalUrRules {
 
     /// Five d4, each read as a single pip.
     static func makeDice() -> [Die] {
-        var colorways = DiePalette.colorways.shuffled()
-        return (0..<diceCount).compactMap { _ in
-            guard !colorways.isEmpty else { return nil }
+        // The palette is refilled rather than exhausted. This asked for a
+        // die and got nil once the shuffled colourways ran out, which is
+        // the pattern that silently dropped five dice from a twenty-die
+        // Free Roll pool. Safe here at 5 against 15 colourways — but safe
+        // by a margin nobody was watching, which was equally true of Free
+        // Roll while its cap was 10.
+        var colorways: [DieColorway] = []
+        return (0..<diceCount).map { _ in
+            if colorways.isEmpty { colorways = DiePalette.colorways.shuffled() }
             return Die(sides: 4, colorway: colorways.removeLast())
         }
     }

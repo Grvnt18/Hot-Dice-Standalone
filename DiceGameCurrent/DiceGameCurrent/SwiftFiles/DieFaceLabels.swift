@@ -150,7 +150,6 @@ enum DieFaceLabels {
             // sitting on the die) is consistent with this same class of
             // issue — the geometry/plane itself renders, but the diffuse
             // image assignment doesn't reliably stick.
-            let material = SCNMaterial()
             // On a d10/d12/d20, 6 and 9 are indistinguishable once the die
             // lands at an arbitrary angle — the standard tabletop-dice
             // convention is to underline them so orientation is
@@ -159,26 +158,10 @@ enum DieFaceLabels {
             // they're left clean.
             let needsUnderline = (sides == 10 || sides == 12 || sides == 20) && (number == 6 || number == 9)
             let isRollsFace = (number == rollsFaceNumber)
-            material.diffuse.contents = isRollsFace
-                ? rollsWordmarkImage(colorway: colorway)
-                : labelImage(
-                    number: number,
-                    colorway: colorway,
-                    underlined: needsUnderline
-                )
-            material.isDoubleSided = true
-            // Unlit — keeps the label crisp and legible regardless of
-            // scene lighting/angle, same reasoning as the old roll badge.
-            material.lightingModel = .constant
-            // Labels don't write depth: they're thin planes floating a
-            // hair off the surface, and letting them occlude subsequent
-            // geometry causes visible halos around the numerals where
-            // the body behind them gets depth-rejected. They still READ
-            // depth, so a label on the far side of the die is correctly
-            // hidden by the body.
-            material.writesToDepthBuffer = false
-            material.readsFromDepthBuffer = true
-            plane.materials = [material]
+            let image = isRollsFace
+                ? rollsWordmarkImage()
+                : labelImage(number: number, underlined: needsUnderline)
+            plane.materials = [artworkMaterial(image: image, colorway: colorway)]
 
             let labelNode = SCNNode(geometry: plane)
             labelNode.name = "faceLabel"
@@ -390,17 +373,10 @@ enum DieFaceLabels {
                 let image: UIImage
                 switch style {
                 case .topRead:
-                    image = labelImage(
-                        number: d4VertexNumbers[vertexIndex],
-                        colorway: colorway,
-                        underlined: false
-                    )
+                    image = labelImage(number: d4VertexNumbers[vertexIndex],
+                                       underlined: false)
                 case .faceNumbers:
-                    image = labelImage(
-                        number: faceIndex + 1,
-                        colorway: colorway,
-                        underlined: false
-                    )
+                    image = labelImage(number: faceIndex + 1, underlined: false)
                 case .markedTips:
                     // An unmarked vertex gets nothing at all, which is what
                     // makes the die readable at a glance: count the pips
@@ -408,18 +384,13 @@ enum DieFaceLabels {
                     guard d4MarkedVertexNumbers.contains(d4VertexNumbers[vertexIndex]) else {
                         continue
                     }
-                    image = pipImage(colorway: colorway)
+                    image = pipImage()
                 }
 
                 let plane = SCNPlane(width: d4TopReadLabelSize, height: d4TopReadLabelSize)
 
-                let material = SCNMaterial()
-                material.diffuse.contents = image
-                material.isDoubleSided = true
-                material.lightingModel = .constant
-                material.writesToDepthBuffer = false
-                material.readsFromDepthBuffer = true
-                plane.materials = [material]
+                plane.materials = [artworkMaterial(image: image,
+                                                   colorway: colorway)]
 
                 let labelNode = SCNNode(geometry: plane)
                 labelNode.name = "faceLabel"
@@ -496,19 +467,14 @@ enum DieFaceLabels {
     /// vs-unmarked odds on any roll, instead of reading a 1-4 numeral).
     static func addD4CornerMarks(to node: SCNNode, colorway: DieColorway) {
         let distance = d4VertexLocalDistance * surfaceLiftFactor
-        let markImage = cornerMarkImage(colorway: colorway)
+        let markImage = cornerMarkImage()
 
         for (index, direction) in d4VertexDirections.enumerated() {
             guard d4MarkedVertexIndices.contains(index) else { continue }
 
             let plane = SCNPlane(width: d4CornerMarkSize, height: d4CornerMarkSize)
-            let material = SCNMaterial()
-            material.diffuse.contents = markImage
-            material.isDoubleSided = true
-            material.lightingModel = .constant
-            material.writesToDepthBuffer = false
-            material.readsFromDepthBuffer = true
-            plane.materials = [material]
+            plane.materials = [artworkMaterial(image: markImage,
+                                               colorway: colorway)]
 
             let markNode = SCNNode(geometry: plane)
             markNode.name = "cornerMark"
@@ -563,27 +529,77 @@ enum DieFaceLabels {
     /// dice's faces from scratch — 160 images for a pool of d20s, on the
     /// main thread, per tap.
     ///
-    /// Keyed on everything the drawing depends on and nothing else, so two
-    /// dice sharing a colourway share their images too.
-    private static var imageCache: [String: UIImage] = [:]
+    /// **The colour is not part of the key**, because it is not part of the
+    /// image: the artwork is drawn in white and tinted through the
+    /// material's `multiply` channel (see `artworkMaterial`). That is what
+    /// keeps this cache small enough to leave alone.
+    ///
+    ///     keyed on colour   15 colourways x 20 numbers, + pips,
+    ///                       marks and wordmarks       ~94 MiB
+    ///     keyed on shape    20 numbers + 2 underlined
+    ///                       + pip + mark + wordmark    ~6 MiB
+    ///
+    /// Six megabytes for the whole app, however many dice in however many
+    /// colours across however long a session — where the colour-keyed
+    /// version grew all session and never gave anything back.
+    ///
+    /// `DieMaterialFactory` made exactly this move for the die bodies and
+    /// documents why at its `grainTextureCache`: a texture that bakes in a
+    /// colour multiplies the cache by the number of colours.
+    ///
+    /// Bounded anyway, on the principle that an unbounded cache is a leak
+    /// with good manners — the cap is far above the ~25 entries this can
+    /// now hold, so it never evicts in practice and would only matter if
+    /// the colour ever came back into the key.
+    private static var imageCache = BoundedImageCache(limit: 64)
 
     private static func cached(_ key: String,
                                _ build: () -> UIImage) -> UIImage {
-        if let hit = imageCache[key] { return hit }
-        let image = build()
-        imageCache[key] = image
-        return image
+        imageCache.image(key, build)
+    }
+
+    /// The material every piece of face artwork uses.
+    ///
+    /// **The colour lives here, not in the image.** The artwork is drawn in
+    /// white and tinted through `multiply`, which is what lets one image
+    /// serve every colourway — see `imageCache` for the arithmetic. It is
+    /// also the same move `DieMaterialFactory` documents making for the die
+    /// bodies, for the same reason: a texture that bakes in a colour
+    /// multiplies the cache by the number of colours.
+    ///
+    /// Built as one material and assigned as a whole array rather than
+    /// mutated through `firstMaterial?`, which is the fix for an earlier
+    /// bug where the diffuse image did not reliably stick.
+    private static func artworkMaterial(image: UIImage,
+                                        colorway: DieColorway) -> SCNMaterial {
+        let material = SCNMaterial()
+        material.diffuse.contents = image
+        // White x colour = colour, and the glyph's alpha is untouched, so
+        // the transparent surround stays transparent.
+        material.multiply.contents = UIColor(hex: colorway.numberHex)
+        material.isDoubleSided = true
+        // Unlit — keeps the label crisp and legible regardless of scene
+        // lighting or angle.
+        material.lightingModel = .constant
+        // Labels don't write depth: they are thin planes floating a hair
+        // off the surface, and letting them occlude subsequent geometry
+        // causes visible halos where the body behind them gets
+        // depth-rejected. They still READ depth, so a label on the far side
+        // of the die is correctly hidden by the body.
+        material.writesToDepthBuffer = false
+        material.readsFromDepthBuffer = true
+        return material
     }
 
     /// A single filled circle, centered on a transparent background — the
     /// "marked" corner's decoration. Deliberately not a numeral or any
     /// other symbol: the whole point of this variant is a binary marked/
     /// unmarked read, not a value to identify.
-    private static func cornerMarkImage(colorway: DieColorway) -> UIImage {
-        cached("mark-\(colorway.numberHex)") { drawCornerMark(colorway: colorway) }
+    private static func cornerMarkImage() -> UIImage {
+        cached("mark") { drawCornerMark() }
     }
 
-    private static func drawCornerMark(colorway: DieColorway) -> UIImage {
+    private static func drawCornerMark() -> UIImage {
         let size = CGSize(width: labelCanvas, height: labelCanvas)
         let format = UIGraphicsImageRendererFormat()
         format.opaque = false
@@ -596,7 +612,7 @@ enum DieFaceLabels {
             // same visual role as the padding around a numeral.
             let inset = size.width * 0.18
             let circleRect = CGRect(origin: .zero, size: size).insetBy(dx: inset, dy: inset)
-            UIColor(hex: colorway.numberHex).setFill()
+            UIColor.white.setFill()
             UIBezierPath(ovalIn: circleRect).fill()
         }
     }
@@ -605,11 +621,11 @@ enum DieFaceLabels {
     /// plane a numeral would occupy. Uses aspect-aware scaling rather than
     /// a fixed point size: "ROLLS" is far wider than a single digit, so a
     /// numeral-sized font would overflow the plane's width badly.
-    private static func rollsWordmarkImage(colorway: DieColorway) -> UIImage {
-        cached("rolls-\(colorway.numberHex)") { drawRollsWordmark(colorway: colorway) }
+    private static func rollsWordmarkImage() -> UIImage {
+        cached("rolls") { drawRollsWordmark() }
     }
 
-    private static func drawRollsWordmark(colorway: DieColorway) -> UIImage {
+    private static func drawRollsWordmark() -> UIImage {
         let size = CGSize(width: labelCanvas, height: labelCanvas)
         let format = UIGraphicsImageRendererFormat()
         format.opaque = false
@@ -638,7 +654,7 @@ enum DieFaceLabels {
             let font = AppFonts.scriptFont(fittedSize)
             let attrs: [NSAttributedString.Key: Any] = [
                 .font: font,
-                .foregroundColor: UIColor(hex: colorway.numberHex)
+                .foregroundColor: UIColor.white
             ]
             // Centred on the ink and drawn at -origin, so what is centred
             // is what you can see rather than what the metrics claim.
@@ -655,11 +671,11 @@ enum DieFaceLabels {
     /// Same canvas and same colour as a numeral so a marked die sits in
     /// the set beside the numbered ones — a dot where a digit would be,
     /// not a different kind of die.
-    private static func pipImage(colorway: DieColorway) -> UIImage {
-        cached("pip-\(colorway.numberHex)") { drawPip(colorway: colorway) }
+    private static func pipImage() -> UIImage {
+        cached("pip") { drawPip() }
     }
 
-    private static func drawPip(colorway: DieColorway) -> UIImage {
+    private static func drawPip() -> UIImage {
         let size = CGSize(width: labelCanvas, height: labelCanvas)
         let format = UIGraphicsImageRendererFormat()
         format.opaque = false
@@ -677,20 +693,18 @@ enum DieFaceLabels {
                 width: diameter,
                 height: diameter
             )
-            UIColor(hex: colorway.numberHex).setFill()
+            UIColor.white.setFill()
             context.cgContext.fillEllipse(in: rect)
         }
     }
 
-    private static func labelImage(number: Int, colorway: DieColorway,
-                                   underlined: Bool) -> UIImage {
-        cached("n\(number)-\(colorway.numberHex)-\(underlined)") {
-            drawLabel(number: number, colorway: colorway, underlined: underlined)
+    private static func labelImage(number: Int, underlined: Bool) -> UIImage {
+        cached("n\(number)-\(underlined)") {
+            drawLabel(number: number, underlined: underlined)
         }
     }
 
-    private static func drawLabel(number: Int, colorway: DieColorway,
-                                  underlined: Bool) -> UIImage {
+    private static func drawLabel(number: Int, underlined: Bool) -> UIImage {
         // Canvas resolution raised significantly (128 -> 512, now 256 —
         // see labelCanvas for why it came back down) and kept as
         // Stack Sans per your correction — my previous switch to a bold
@@ -736,7 +750,7 @@ enum DieFaceLabels {
                 // by a canvas change is a glyph that no longer fits.
                 .font: UIFont(name: AppFonts.stackSansPostScriptName, size: glyphPointSize)
                     ?? UIFont.systemFont(ofSize: glyphPointSize, weight: .bold),
-                .foregroundColor: UIColor(hex: colorway.numberHex)
+                .foregroundColor: UIColor.white
             ]
             let textSize = text.size(withAttributes: attrs)
             let origin = CGPoint(
@@ -762,7 +776,7 @@ enum DieFaceLabels {
                 width: barWidth,
                 height: barHeight
             )
-            UIColor(hex: colorway.numberHex).setFill()
+            UIColor.white.setFill()
             UIBezierPath(roundedRect: bar, cornerRadius: barHeight / 2).fill()
         }
     }

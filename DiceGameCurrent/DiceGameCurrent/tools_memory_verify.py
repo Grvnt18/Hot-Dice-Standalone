@@ -24,9 +24,30 @@ import sys
 
 from tools_swiftconst import constant, source
 
-# The worst pool the app can be asked for: FreeRollPool.maxDice, all d20.
+HERE = os.path.dirname(os.path.abspath(__file__))
+
 FACES = {4: 4, 6: 6, 8: 8, 10: 10, 12: 12, 20: 20}
 BYTES_PER_PIXEL = 4
+
+# Every game's pool, as (label, how many dice, the sides of each).
+#
+# Read from each game's own makeDice, and kept here because they are not
+# all constants — Rolls deals twelve d6 plus one each of d8, d10 and d12,
+# and Free Roll's worst case is its cap in the largest die it offers. The
+# counts that ARE constants are checked against the Swift below.
+POOLS = [
+    ("Free Roll (worst)", "FreeRoll.swift", "maxDice", None, [20] * 20),
+    ("Rolls", None, None, 15, [6] * 12 + [8, 10, 12]),
+    ("Jackpot", "Jackpot.swift", None, 5, [4, 6, 8, 12, 20]),
+    ("Three Thousand", "ThreeThousand.swift", "diceCount", 6, [6] * 6),
+    ("Generals", "Generals.swift", "diceCount", 5, [6] * 5),
+    ("F.Y.D.", "FreighterYachtDinghy.swift", "diceCount", 5, [6] * 5),
+    ("Royal UR", "RoyalUrRules.swift", "diceCount", 5, [4] * 5),
+    ("Baseball Dice", None, None, 3, [12, 12, 12]),
+    ("Rollbots", None, None, 2, [10, 12]),
+    ("HOG", None, None, 1, [6]),
+    ("Boneheads", None, None, 1, [6]),
+]
 
 # What a pool of labels may cost. Not a device limit — a budget with room
 # under one, chosen so the worst case stays well inside what an app can
@@ -47,16 +68,64 @@ def main():
 
     print("  %-26s %d px  (%.2f MiB a face)" % ("label canvas", canvas, per_face))
 
-    worst = max_dice * FACES[20] * per_face
-    print("  %-26s %d d20 -> %.0f MiB" % ("worst pool", max_dice, worst))
-    for n in (4, 8, 12, max_dice):
-        print("      %2d d20  %6.0f MiB" % (n, n * FACES[20] * per_face))
-
     failed = []
-    if worst > BUDGET_MIB:
-        failed.append("a full pool of d20 costs %.0f MiB of face images, over "
-                      "the %.0f MiB budget — this is what killed Free Roll at "
-                      "eight dice" % (worst, BUDGET_MIB))
+
+    # --- every game's pool -------------------------------------------
+    # The per-game column is what a pool would cost if every face needed
+    # its own image — which is what it DID cost before the colour left the
+    # cache key. It stays as the budget the cache is measured against, not
+    # as the figure the app now pays: with the colour out of the key, every
+    # game shares one set of numerals and the real total is the ceiling
+    # printed below.
+    print("  %-22s %5s %6s %10s" % ("game", "dice", "faces", "uncached"))
+    for label, swift_file, const, expected, sides in POOLS:
+        if swift_file and const:
+            actual = constant(source(swift_file), const)
+            if expected is not None and actual != expected:
+                failed.append("%s: this table says %d dice, %s says %d"
+                              % (label, expected, swift_file, actual))
+            count = actual
+        else:
+            count = expected
+        faces = sum(sides)
+        cost = faces * per_face
+        flag = ""
+        if cost > BUDGET_MIB:
+            flag = "  OVER BUDGET"
+            failed.append("%s costs %.0f MiB of face images, over the %.0f "
+                          "MiB budget" % (label, cost, BUDGET_MIB))
+        print("  %-22s %5d %6d %7.1f MiB%s" % (label, count, faces, cost, flag))
+
+    # --- the ceilings, which are what a session actually accumulates --
+    #
+    # No single game is expensive. The caches were, because their keys
+    # multiplied and nothing evicted: colourways times numerals, table
+    # colours times floor motifs.
+    # The KEYS, specifically — `colorway.numberHex` still appears in this
+    # file, as the tint `artworkMaterial` applies, and that is the point.
+    for key in re.findall(r'cached\("([^"]*)"\)', labels):
+        if "colorway" in key:
+            failed.append('the colourway is back in a face-image cache key '
+                          '("%s") — that multiplies the cache by 15 and is '
+                          "what artworkMaterial's multiply channel exists to "
+                          "avoid" % key)
+    if "material.multiply.contents" not in labels:
+        failed.append("face artwork is no longer tinted through multiply, so "
+                      "every colourway needs its own copy of every numeral")
+
+    for name, cap_file in (("DieFaceLabels.swift", "DieFaceLabels.swift"),
+                           ("LowPolyTextures.swift", "LowPolyTextures.swift")):
+        if "BoundedImageCache(" not in source(cap_file):
+            failed.append("%s caches without a bound" % name)
+
+    caps = re.findall(r'BoundedImageCache\(limit: (\d+)\)',
+                      source("DieFaceLabels.swift") + source("LowPolyTextures.swift"))
+    assert caps, "no BoundedImageCache limits found"
+    label_ceiling = int(caps[0]) * per_face
+    print("  %-22s labels <= %s entries (%.1f MiB), textures <= %s (%.0f MiB)"
+          % ("ceilings", caps[0], label_ceiling, caps[-1], int(caps[-1]) * 1.0))
+    print("  %-22s ~25 images for every die in every game, in every colour"
+          % "in practice")
 
     # Cached, because setupPool rebuilds the lot on every pool change.
     if "private static var imageCache" not in labels:
@@ -64,8 +133,7 @@ def main():
                       "every + and - tap in Free Roll re-renders the pool")
     for builder in ("drawLabel", "drawPip", "drawCornerMark",
                     "drawRollsWordmark"):
-        if not re.search(r'cached\("[^"]*"[^)]*\)\s*\{[^}]*%s' % builder,
-                         labels, re.S):
+        if not re.search(r'cached\("[^"]*"\)\s*\{\s*%s' % builder, labels):
             failed.append("%s is not reached through the cache" % builder)
 
     # A full pool must BE full. Free Roll drew from 15 colourways and
@@ -77,6 +145,16 @@ def main():
                       "pool past the colourway count silently loses dice")
     if "colorways = DiePalette.colorways.shuffled()" not in free_roll:
         failed.append("makeDice does not refill the palette")
+
+    # No game's makeDice may return fewer dice than it was asked for.
+    for name in sorted(os.listdir(os.path.join(HERE, "SwiftFiles"))):
+        if not name.endswith(".swift"):
+            continue
+        body = strip_comments(source(name))
+        if "func makeDice()" not in body:
+            continue
+        if re.search(r'guard !colorways\.isEmpty else \{ return nil \}', body):
+            failed.append("%s drops dice when the palette runs out" % name)
 
     # And the spawn pattern must have a slot for every one of them.
     spawn = source("DiceSpawnPattern.swift")

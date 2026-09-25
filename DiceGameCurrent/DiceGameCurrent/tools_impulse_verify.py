@@ -38,6 +38,15 @@ def boost(count):
     return 1.0 + 0.25 * (5 - count)
 
 
+def launch_boost(count, motion):
+    """What `launch` actually multiplies linear and torque by.
+
+    The small-pool boost AND the global one — the throw doubled for every
+    game, and a small pool is still thrown harder than a full one on top
+    of that."""
+    return boost(count) * motion
+
+
 def time_budget(count, min_d, max_d, max_pool):
     """The Swift `timeBudget(forDiceCount:)`, ported."""
     clamped = max(1, min(count, max_pool))
@@ -77,6 +86,11 @@ def main():
     if not failed:
         print("  %-30s ok (1 die 2.00x, 4 dice 1.25x, 5+ unchanged)"
               % "small-pool multiplier")
+        print("  %-30s ok (every game x%.2f, worst launch x%.2f)"
+              % ("global throw",
+                 swift_float(impulse, "motionBoost"),
+                 max(launch_boost(n, swift_float(impulse, "motionBoost"))
+                     for n in (1, 2, 3, 4))))
 
     # --- 2. The launch actually applies it. ---------------------------
     for label, pattern in (
@@ -88,6 +102,15 @@ def main():
             failed.append("launch() does not boost %s" % label)
     if not re.search(r'let upwardBoost = sqrt\(boost\)', impulse):
         failed.append("upward no longer takes the square root of the boost")
+
+    # The global doubling rides in the same `boost`, which is what gives
+    # upward its square root for free. If it is ever applied separately to
+    # the linear impulse alone, upward would take the full 2x and peak
+    # height would go up FOUR times, into a ceiling the dice already hit.
+    if not re.search(r'smallPoolBoost\(forDiceCount: dice\.count\)\)\s*\* motionBoost',
+                     impulse):
+        failed.append("launch does not fold motionBoost into the same boost "
+                      "upward takes the square root of")
     if not failed:
         print("  %-30s ok (linear and torque full, upward sqrt)"
               % "launch applies it")
@@ -105,24 +128,29 @@ def main():
     max_d = constant(controller, "maxRollDuration")
     max_pool = constant(controller, "maxDiceInPool")
 
+    # The band moved with the doubled throw: a die thrown twice as hard
+    # needs ~1.9 more bounce cycles to lose the energy, and a budget left
+    # at the old 2.1s would force-settle it mid-bounce. Held to 3.0s at
+    # the top, because "compensate" is not "let a one-die roll run for
+    # five seconds".
     for count in (1, 2, 3, 4):
         after = time_budget(count, min_d, max_d, max_pool)
-        if not 1.9 <= after <= 2.3:
-            failed.append("%d dice: budget %.2fs is outside 1.9-2.3s"
+        if not 2.5 <= after <= 3.0:
+            failed.append("%d dice: budget %.2fs is outside 2.5-3.0s"
                           % (count, after))
     for count in (5, 10, 20):
         before = (min_d + (min(count, max_pool) - 1) / float(max_pool - 1)
                   * (max_d - min_d))
         after = time_budget(count, min_d, max_d, max_pool)
         if abs(before - after) > 1e-9:
-            failed.append("%d dice: budget moved %.2f -> %.2f; 5+ must not"
-                          % (count, before, after))
+            failed.append("%d dice: the small-pool boost reached a pool of "
+                          "%d (%.2f -> %.2f); it must not" % (count, count, before, after))
     if failed:
         for line in failed:
             print("  %-30s FAILED  %s" % ("impulse", line))
         sys.exit("impulse: FAILED (%d problem(s))" % len(failed))
 
-    print("  %-30s ok (small pools %.2f-%.2fs, 5+ untouched)"
+    print("  %-30s ok (small pools %.2f-%.2fs, no small-pool boost past 4)"
           % ("time budget",
              min(time_budget(n, min_d, max_d, max_pool) for n in (1, 2, 3, 4)),
              max(time_budget(n, min_d, max_d, max_pool) for n in (1, 2, 3, 4))))
@@ -133,7 +161,8 @@ def main():
     # move further than it is thick in one step and the sweep misses it.
     max_linear = swift_float(impulse, "maxLinearImpulse")
     max_upward = swift_float(impulse, "maxUpwardImpulse")
-    top = max(boost(n) for n in (1, 2, 3, 4))
+    motion = swift_float(impulse, "motionBoost")
+    top = max(launch_boost(n, motion) for n in (1, 2, 3, 4))
 
     m = re.search(r'physicsWorld\.timeStep = 1\.0 / (\d+(?:\.\d+)?)', physics)
     assert m, "no timeStep in %s" % PHYSICS

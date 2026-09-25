@@ -171,6 +171,10 @@ enum FreighterYachtDinghyGame: SuiteGame {
 
     static let rules: [GameRuleSection] = [
         GameRuleSection(
+            title: "At a Glance",
+            body: "Three rounds, highest total. Four rolls of five dice a turn to claim a Freighter (6), then a Yacht (5), then a Dinghy (4) — strictly in that order. The two dice left over are your Cargo and their total is your score. Miss any of the three and the round scores nothing."
+        ),
+        GameRuleSection(
             title: "Your Turn",
             body: "You get four rolls of five dice. You are looking for a Freighter (6), a Yacht (5) and a Dinghy (4) — in that order."
         ),

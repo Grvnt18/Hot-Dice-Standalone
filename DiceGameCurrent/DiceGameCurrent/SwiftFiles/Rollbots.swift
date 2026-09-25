@@ -413,6 +413,10 @@ enum RollbotsGame: SuiteGame {
 
     static let rules: [GameRuleSection] = [
         GameRuleSection(
+            title: "At a Glance",
+            body: "Two netrunners at \(RollbotsRules.startingIP) Integrity Points; take theirs to zero. Attacking throws a d10 for accuracy and the weapon's damage die together. The defender sees both before choosing: Dodge a d6, beating the accuracy outright for nothing, or Firewall a d8 subtracted from the damage, with a natural 8 stopping everything."
+        ),
+        GameRuleSection(
             title: "The Duel",
             body: "Two netrunners, \(RollbotsRules.startingIP) Integrity Points each. Take your opponent to zero. The second runner starts one point up, because striking first is worth about four percent."
         ),

@@ -152,8 +152,8 @@ enum BoneheadsGame: SuiteGame {
 
     static let rules: [GameRuleSection] = [
         GameRuleSection(
-            title: "In Thirty Seconds",
-            body: "Roll a die, pick one of your three columns. Stack matching numbers to multiply them. Drop a number opposite theirs to destroy it. Fill all nine slots to end the game on the spot."
+            title: "At a Glance",
+            body: "Roll one die, place it in one of your three columns, pass. Matching numbers in a column multiply — two 5's are 20, three are 45. Placing a die destroys every die of that number in your opponent's column of the same letter. There are nine slots each, and the moment either player fills their ninth the game ends and the highest total wins."
         ),
         GameRuleSection(
             title: "Your Turn",

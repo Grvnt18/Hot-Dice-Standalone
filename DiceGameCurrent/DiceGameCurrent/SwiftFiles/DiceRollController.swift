@@ -16,7 +16,12 @@ private enum SettleTuning {
 
     /// Every roll takes at least this long, regardless of dice count,
     /// so a 1-die roll doesn't feel like an instant, cheap snap.
-    static let minRollDuration: TimeInterval = 1.0
+    /// Raised from 1.0 with DiceRollImpulse.motionBoost: a die thrown
+    /// twice as hard needs about 1.9 more bounce cycles off the
+    /// 0.7-restitution walls before it is still enough to settle, and a
+    /// budget left behind would force-settle it mid-bounce — faster dice
+    /// that look worse, which is the opposite of the ask.
+    static let minRollDuration: TimeInterval = 1.4
     /// Hard ceiling — no roll is allowed to run longer than this, no matter
     /// how many dice or how physics behaves. Raised from 3.5 to 5.0
     /// alongside this round's 2.5-3.5x motion increase: with real
@@ -28,7 +33,13 @@ private enum SettleTuning {
     /// permanently, since a forced settle doesn't wait for clean
     /// separation. This is a likely real contributor to "dice settling on
     /// top of one another."
-    static let maxRollDuration: TimeInterval = 5.0
+    ///
+    /// Raised 5.0 -> 6.0 with the doubled throw, deliberately by less than
+    /// the throw grew: this is a CAP, not a duration. Nearly every roll
+    /// ends on the still-frame detector well inside it, so the cap only
+    /// decides how long the rare stubborn pile is given before it is
+    /// separated and settled by force.
+    static let maxRollDuration: TimeInterval = 6.0
     /// Dice count at which we hit the max duration ceiling.
     /// Raised with Free Roll's ceiling: this scales the roll's time
     /// budget, so leaving it at 15 would have given a 20-die throw the
@@ -574,6 +585,10 @@ final class DiceRollController: NSObject, SCNSceneRendererDelegate {
         let baseForce: Float = 18.0
         let speedCeiling: Float = 3.0 // above this speed, gentle-phase repulsion is fully off
 
+        // Kept at 3.5 while the cap moved to 6.0: a pile that has not
+        // come apart in three and a half seconds is not going to, and
+        // starting later would only shorten the window the separation
+        // force has to work in.
         let escalationStart: TimeInterval = 3.5
         let escalationEnd: TimeInterval = SettleTuning.maxRollDuration // 5.0 — by the hard cap, force is at its strongest
         let isEscalating = elapsed >= escalationStart

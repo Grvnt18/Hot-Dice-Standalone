@@ -242,6 +242,10 @@ enum GeneralsGame: SuiteGame {
 
     static let rules: [GameRuleSection] = [
         GameRuleSection(
+            title: "At a Glance",
+            body: "One shared card of twelve categories, claimed once each by whoever takes it first, six claims apiece. Roll five dice up to three times, keeping what you want between rolls, then claim a category for whatever your hand pays there. Nothing qualifies? You must still claim one, for zero. Highest total wins."
+        ),
+        GameRuleSection(
             title: "One Card, Two Players",
             body: "There are twelve categories and a single shared scorecard. Each category can be claimed once, by whoever takes it first — so the whole game is twelve turns, six each."
         ),
@@ -251,7 +255,7 @@ enum GeneralsGame: SuiteGame {
         ),
         GameRuleSection(
             title: "The Categories",
-            body: "Ones through Sixes score the sum of that number. Set of 3 and Set of 4 score all five dice. Packed House (three and a pair) is 25, Small Joker (four in a row) 30, Large Joker (five in a row) 40, and Set of 5 is 50."
+            body: "Ones through Sixes score the sum of that number and nothing else. Set of 3 needs three dice on the same face and Set of 4 needs four, and both score all five dice added up. Packed House is three of one and a pair of another, for 25. Small Joker is four consecutive faces — 1-2-3-4, 2-3-4-5 or 3-4-5-6 — for 30. Large Joker is five consecutive, 1-2-3-4-5 or 2-3-4-5-6, for 40. Set of 5 is all five on the same face, for 50."
         ),
         GameRuleSection(
             title: "Zeroing",

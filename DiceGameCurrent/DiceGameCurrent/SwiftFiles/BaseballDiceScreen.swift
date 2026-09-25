@@ -241,77 +241,89 @@ struct BaseballDiceScreen: View {
 
     // MARK: The card overlay
 
-    /// Three cards over a light scrim, centred and sized so the field stays
-    /// legible behind them — the batter is reading outs and runners while
-    /// deciding, and the pitcher is reading the score.
+    /// Three cards over a light scrim, stacked down the screen so each one
+    /// gets the full width.
     ///
-    /// They used to be half the board's height on an opaque stock over a
-    /// 0.62 scrim, which covered the game.
+    /// They were three across at a third of the width each, which is why
+    /// the mark and the lettering could not grow: on a 393pt phone a third
+    /// is 120pt whatever the type size says, and `minimumScaleFactor`
+    /// quietly shrank the name back down to fit. A column gives every card
+    /// the whole width, so the mark and the name are genuinely twice what
+    /// they were, and the field still reads through all three.
     private var cardOverlay: some View {
         GeometryReader { geo in
             let cardHeight = min(geo.size.height * BaseballCardLayout.heightFraction,
                                  BaseballCardLayout.maxHeight)
-            let rowWidth = min(geo.size.width - BaseballCardLayout.margin * 2,
-                               BaseballCardLayout.maxRowWidth)
+            let cardWidth = min(geo.size.width - BaseballCardLayout.margin * 2,
+                                BaseballCardLayout.maxCardWidth)
             let choosingStyle = phase == .pickingStyle
 
             ZStack {
                 Color(hex: "#0B1A10").opacity(BaseballCardLayout.scrimOpacity)
                     .ignoresSafeArea()
 
-                VStack(spacing: 12) {
+                VStack(spacing: BaseballCardLayout.gap) {
                     ScriptText(choosingStyle
                                ? "\(names[pitcher]) — pick your pitching style"
                                : "\(names[batter]) — pick your swing",
-                               size: 28, lineLimit: 2, minimumScaleFactor: 0.6)
+                               size: BaseballCardLayout.headlineSize,
+                               lineLimit: 2, minimumScaleFactor: 0.6)
                         .textCase(nil)
                         .foregroundStyle(.white)
+                        .padding(.bottom, 4)
 
-                    HStack(spacing: BaseballCardLayout.gap) {
-                        if choosingStyle {
-                            ForEach(PitchStyle.allCases) { option in
-                                card(option.displayName, option.tagline,
-                                     icon: option.iconName,
-                                     isSelected: styles[pitcher] == option,
-                                     height: cardHeight) { styles[pitcher] = option }
-                            }
-                        } else {
-                            ForEach(Swing.allCases) { option in
-                                card(option.displayName, option.tagline,
-                                     icon: option.iconName,
-                                     isSelected: swing == option,
-                                     height: cardHeight) { swing = option }
-                            }
+                    if choosingStyle {
+                        ForEach(PitchStyle.allCases) { option in
+                            card(option.displayName, option.tagline,
+                                 icon: option.iconName,
+                                 isSelected: styles[pitcher] == option,
+                                 width: cardWidth,
+                                 height: cardHeight) { styles[pitcher] = option }
+                        }
+                    } else {
+                        ForEach(Swing.allCases) { option in
+                            card(option.displayName, option.tagline,
+                                 icon: option.iconName,
+                                 isSelected: swing == option,
+                                 width: cardWidth,
+                                 height: cardHeight) { swing = option }
                         }
                     }
-                    .frame(width: rowWidth)
                 }
             }
         }
     }
 
+    /// One card: the mark on the left, the name and the line it needs on
+    /// the right. Laid out along the long axis, which is what a full-width
+    /// card has and a column of three narrow ones did not.
     private func card(_ title: String, _ detail: String,
-                      icon: String, isSelected: Bool, height: CGFloat,
+                      icon: String, isSelected: Bool,
+                      width: CGFloat, height: CGFloat,
                       action: @escaping () -> Void) -> some View {
         Button {
             SoundEngine.shared.play(.buttonTap)
             action()
         } label: {
-            VStack(spacing: 6) {
+            HStack(spacing: BaseballCardLayout.padding) {
                 NetIconView(name: icon, tint: Color(hex: "#2E2A22"))
-                    .frame(height: height * BaseballCardLayout.iconFraction)
-                ScriptText(title, size: 20, lineLimit: 2, minimumScaleFactor: 0.5)
-                    .textCase(nil)
-                Text(detail)
-                    .font(.stackSans(9))
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
+                    .frame(width: height * BaseballCardLayout.iconFraction,
+                           height: height * BaseballCardLayout.iconFraction)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    ScriptText(title, size: BaseballCardLayout.titleSize,
+                               lineLimit: 2, minimumScaleFactor: 0.6)
+                        .textCase(nil)
+                    Text(detail)
+                        .font(.stackSans(BaseballCardLayout.detailSize))
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .foregroundStyle(Color(hex: "#2E2A22"))
-            .padding(8)
-            .frame(maxWidth: .infinity)
-            .frame(height: height)
+            .padding(BaseballCardLayout.padding)
+            .frame(width: width, height: height)
             .background(
                 RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
                     .fill(Color(hex: "#F3EFE3").opacity(BaseballCardLayout.cardOpacity))
@@ -612,20 +624,36 @@ enum BaseballArt {
 /// moment a player is deciding against them.
 enum BaseballCardLayout {
 
-    /// Card height as a fraction of the playfield, capped so a tall phone
-    /// does not grow them back.
-    static let heightFraction: CGFloat = 0.34
-    static let maxHeight: CGFloat = 230
+    /// One card's height as a fraction of the playfield, capped so a tall
+    /// phone does not turn three cards into three billboards.
+    ///
+    /// Three of these plus the headline is what the overlay costs — about
+    /// 60% of the board at the cap, which is what the previous three-across
+    /// row cost as well. The card itself is roughly twice the area, because
+    /// it now spans the width rather than a third of it.
+    static let heightFraction: CGFloat = 0.17
+    static let maxHeight: CGFloat = 150
 
-    /// The row is centred and narrower than the screen, so the field shows
-    /// down both sides as well as above and below.
-    static let maxRowWidth: CGFloat = 330
-    static let margin: CGFloat = 24
-    static let gap: CGFloat = 8
+    /// Full width less a margin, capped so an iPad does not stretch a card
+    /// to a line of text nobody can scan.
+    static let maxCardWidth: CGFloat = 560
+    static let margin: CGFloat = 14
 
-    /// How much of a card the mark takes. The rest is the name and the line
-    /// under it.
-    static let iconFraction: CGFloat = 0.42
+    /// Between the cards, and under the headline.
+    static let gap: CGFloat = 12
+
+    /// The mark, as a fraction of the card's height — square, so it takes
+    /// the same from both. At the 150pt cap that is a 105pt mark against
+    /// the 88pt the three-across cards could manage.
+    static let iconFraction: CGFloat = 0.7
+
+    /// The lettering. These are real sizes now rather than sizes a
+    /// `minimumScaleFactor` immediately undoes: a full-width card has room
+    /// for "Power Pitcher" at 40 without scaling it back.
+    static let titleSize: CGFloat = 40
+    static let detailSize: CGFloat = 15
+    static let headlineSize: CGFloat = 34
+    static let padding: CGFloat = 14
 
     /// The card stock's opacity — 0.7, so the field reads through it while
     /// the ink on top stays legible. Lower it and the dark lettering starts

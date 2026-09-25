@@ -130,6 +130,10 @@ enum ThreeThousandGame: SuiteGame {
 
     static let rules: [GameRuleSection] = [
         GameRuleSection(
+            title: "At a Glance",
+            body: "First to bank 3,000 — and your opponent gets one last turn to beat it. Roll six dice, set aside at least one scoring die, then roll on or bank. A roll with nothing scoring in it is a Bust and the turn's points are gone. Set all six aside and you roll all six again with the total intact."
+        ),
+        GameRuleSection(
             title: "Your Turn",
             body: "Roll all six dice. Tap the dice that score to set them aside — you must set aside at least one, and every die you take has to be part of a scoring combination. Then roll what is left, or bank."
         ),

@@ -23,6 +23,36 @@ enum DiceRollImpulse {
     private static let minTorqueMagnitude: Float = 1.8
     private static let maxTorqueMagnitude: Float = 4.2
 
+    /// This round's ask: **twice the throw, in every game.**
+    ///
+    /// Applied on top of the small-pool boost rather than baked into the
+    /// six constants above, so the two reasons a throw is hard stay
+    /// separable — and so one line reverts it.
+    ///
+    /// Linear and torque take the full doubling. **Upward gets its square
+    /// root**, which is not a hedge but the same arithmetic the 3x motion
+    /// increase above already ran: peak height goes as v²/2g, so a full 2x
+    /// upward would send a die FOUR times higher, into a ceiling collider
+    /// it already reaches today. `launch` gets this for free, since
+    /// `upwardBoost` is already `sqrt(boost)`.
+    ///
+    /// Two things had to move with it, both computed rather than assumed:
+    ///
+    /// - **The walls doubled in thickness** (`DiePhysicsFactory`, 1.0 to
+    ///   2.0). A collider is only safe up to `thickness / timeStep` units
+    ///   per second; at 72 u/s — the doubled maximum, boosted again for a
+    ///   single die — a 1.0-thick wall's 120 u/s limit left a 1.7x margin,
+    ///   under the 2x this project holds itself to. The thickness is
+    ///   entirely behind the wood and pushed outward, so nothing visible
+    ///   or playable changes.
+    /// - **The roll's time budget** (`DiceRollController`), since energy
+    ///   decays geometrically off 0.7-restitution walls and a die thrown
+    ///   twice as hard needs about ln(2)/ln(1/0.7) — 1.9 — more bounce
+    ///   cycles to lose it. Raised by enough to absorb that and no more:
+    ///   the budget is a CAP, and most rolls settle on the still-frame
+    ///   detector well before it.
+    static let motionBoost: Float = 2.0
+
     /// How much harder a small pool is thrown.
     ///
     /// A single die gets the same kick as a pool of fifteen, but with
@@ -52,7 +82,7 @@ enum DiceRollImpulse {
     /// any die left kinematic from a previous settle, then tosses it with
     /// a random push and spin.
     static func launch(dice: [(id: UUID, node: SCNNode, sides: Int)]) {
-        let boost = Float(smallPoolBoost(forDiceCount: dice.count))
+        let boost = Float(smallPoolBoost(forDiceCount: dice.count)) * motionBoost
         let upwardBoost = sqrt(boost)
 
         for die in dice {

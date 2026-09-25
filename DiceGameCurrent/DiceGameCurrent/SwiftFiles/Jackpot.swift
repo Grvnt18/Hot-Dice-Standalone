@@ -185,6 +185,10 @@ enum JackpotGame: SuiteGame {
 
     static let rules: [GameRuleSection] = [
         GameRuleSection(
+            title: "At a Glance",
+            body: "Highest total over five rounds — or a Jackpot, which wins on the spot. Roll a d4, d6, d8, d12 and d20 together and read seven numbers: the d4's three exposed faces plus the top of the other four. Any number appearing more than once scores itself times how often it appears, a d20 of 13 or more adds its own value, and no sets at all with a d20 of 12 or less is the Jackpot."
+        ),
+        GameRuleSection(
             title: "Your Turn",
             body: "Roll all five dice together. Read the three exposed faces of the d4 — every number except the one against the table — plus the top face of the d6, d8, d12 and d20. Seven numbers in all."
         ),

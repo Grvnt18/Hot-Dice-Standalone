@@ -1,0 +1,272 @@
+ROLLS — THE SPOKEN SCRIPT
+Every line of text the app says, where it says it, and what makes it appear.
+Taken from the shipped code, not from memory. Plain text, for copy and paste.
+
+===============================================================================
+0. THE SHARED CHROME — the same in all eleven games
+===============================================================================
+
+THE ROLL BUTTON (the big one at the bottom)
+  Its label is the phase of the turn. Every game uses the same four states:
+
+  "Roll"        The dice are on the table and it is your turn to throw.
+  "Rolling"     Shown while the dice are in the air. The button is disabled;
+                the word is there so the button does not look broken.
+  "Pass"        The turn is over and scored. Tapping hands the device on.
+  "Done"        The match is over. Tapping opens the result screen.
+
+  Rolls and Free Roll differ, because they are not turn games:
+  "Begin"       Rolls only, before the first throw of a turn.
+  "Finish"      Rolls only, once every remaining die is selected — confirming
+                banks them all and ends the turn.
+  "(3 dice selected)"  Under the button in Rolls, once at least one die is
+                selected and not all of them are. Singular reads "(1 die
+                selected)".
+
+THE HANDOVER GATE (full screen, black over the wood)
+  Appears the moment a turn ends in any two-player game.
+  Line 1  The turn summary — see each game below. Absent on the first turn.
+  Line 2  "Pass to Ada"      — the name of whoever is up next.
+  Line 3  Both players' names and scores.
+  Button  "I'm Ready"        — tapping it starts the next turn and is what
+                               stops the next player seeing the last one's
+                               screen.
+
+THE RESULT SCREEN
+  Appears when the match is decided.
+  Headline  "Ada Wins"   or  "Draw"
+  Reason    One line saying why, where the game has one (a Jackpot, a System
+            Draw, a target reached).
+  Buttons   "Play Again"  and  "Back to Games"
+
+THE TURN-COMPLETE CAPTION (Rolls only)
+  Appears over the tray the moment the last die is banked, keyed to the score,
+  because Rolls is golf-scored and low is good:
+    0        "Perfect"
+    1–3      "Excellent"
+    4–5      "Great"
+    6–10     "Good"
+    11–19    (nothing — the band is deliberately silent)
+    20+      "You're going to need some luck!"
+
+SETTINGS (the gear, top right of every game)
+  "Settings", "Music", "Music Volume", "Sound Effects", "Effects Volume",
+  "Table Color", "Done".
+  "Saved for Hog. Each game keeps its own."   under the colour picker inside a
+                                               game.
+  "The same in every game."                   the same line when the music
+                                               scope is set to app-wide.
+  "Music Scope" (hub only), with the footer changing as it is flipped:
+      "Each game remembers its own track and volume."
+      "One track and volume across every game."
+  "How to Play"              inside a game — opens that game's guide.
+  "How to Play — Every Game" on the hub — opens the bubble cluster, one
+                             bubble per game, each opening that game's guide.
+  "Pick a game to read its rules."  under the cluster's title.
+
+THE HUB
+  "Rolls"  — the wordmark under the app's die mark. Each tile shows only the
+  game's name under its artwork. If a resource is missing, a banner names the
+  file rather than failing silently.
+
+===============================================================================
+1. ROLLS
+===============================================================================
+Intro         None. The fifteen dice are on the table when the screen opens.
+Button        "Begin" → "Roll" → "Finish"
+Under it      "(n dice selected)" while a partial selection is held.
+Scoreboard    The running score, and each banked die's cost.
+End of turn   The praise caption above, then the handover gate.
+
+===============================================================================
+2. BASEBALL DICE
+===============================================================================
+INTRO (the first screen, before anything else)
+  "How long a game?"
+  "3 Innings"   with "Short — about 30 at-bats"
+  "6 Innings"   with "Medium — about 60 at-bats"
+  "9 Innings"   with "Extra long — about 90 at-bats"
+  Chosen once. There is no way back to it without starting a new match.
+
+THE STYLE CARDS  (appear at the start of each half-inning, pitcher holding)
+  Headline  "Ada — pick your pitching style"
+  Cards     "Power Pitcher"  "Mostly fastballs · patient hitters sit on it"
+            "Crafty"         "Mostly changeups · contact hitters wait"
+            "Breaking Ball"  "Mostly sliders · power hitters guess it"
+  Button    "Pick a Style" until one is chosen, then "Hide It" — which covers
+            the choice before the device changes hands.
+  Warning   "Bo must not see this" — on screen while the style is chosen.
+
+THE SWING CARDS  (appear at every at-bat, batter holding)
+  Headline  "Bo — pick your swing"
+  Cards     "Patient Swing"  "d8 · sits on the Fastball"
+            "Contact Swing"  "d10 · sits on the Changeup"
+            "Power Swing"    "d12 · sits on the Slider"
+  Button    "Pick a Swing" until one is chosen, then "Swing" — which throws
+            both sides' dice together.
+
+READING THE THROW (appears the moment the dice settle)
+  Line 1  "Fastball vs Power Swing  −"   the pitch, the swing, and whether the
+          matchup was favoured (+), even (=) or unfavoured (−).
+  Line 2  "9 − 4 = +5"                   batter's roll, pitcher's roll, gap.
+  Line 3  the result, one of:
+            "Strikeout."
+            "Field out."
+            "Double play. Two down."        (field out, runner on first,
+                                             pitcher's roll even)
+            "Walk."  /  "Walk, forced in."  (the second when it forces a run)
+            "Single — 1 in."   the result's name and the runs it drove in;
+                               the same shape for a double or a triple
+            "Sacrifice fly — a run scores."
+            "Caught at the wall."
+            "Caught at the wall — third out, the run does not count."
+            "Home run!"  /  "Home run — 3 score!"
+            "Double max — it is gone!"      (both of a favoured swing's dice
+                                             on their maximum: automatic)
+  Button  "Next Batter"
+  Strip   "1 out · 2 on · 3-2"  — outs, runners and the score, always visible.
+
+===============================================================================
+3. JACKPOT
+===============================================================================
+Intro         None.
+Button        "Roll" → "Rolling…" → "Pass"
+Subtitle      "Ada to roll"
+Summary       "Ada rolled a set of three 4's and a 17 booster."
+              "Ada scored nothing."
+              "Ada hit the Jackpot!"   — which also ends the match, after the
+                                         opponent's answering round.
+
+===============================================================================
+4. HOG
+===============================================================================
+Intro         None.
+Button        "Roll" → "Rolling…" → "Roll Again" → "Pass"
+Second button "Hold 14"      — the number is what holding banks right now.
+              "Hold & Win"   — when banking would reach 75 and end it.
+Subtitle      "Hold and you're on 61 — 14 to go"
+              "Hold now and it's over"
+Summary       "Ada banked 23."
+              "Ada rolled a 1 and lost the lot."
+              "Ada banked nothing."
+
+===============================================================================
+5. GENERALS
+===============================================================================
+Intro         None.
+Button        "Roll" → "Rolling…" → "Roll Again" → "Pass"
+Subtitle      "No rolls left — claim a category"
+              "Every die kept — claim a category"
+              "6 categories left"
+Scorecard     Title "Scorecard" when looking, "Claim a Category" when claiming.
+              Each cell shows the category, and either what your hand would
+              pay there or "Ada · 25" once it is claimed.
+              Button "Back" when looking, "Not Yet" when claiming.
+Summary       "Ada took Large Joker for 40."
+              "Ada zeroed Small Joker — and burned it."
+
+===============================================================================
+6. THREE THOUSAND
+===============================================================================
+Intro         None.
+Button        "Roll" → "Rolling…" → "Pass"
+Second button "Bank 850"   — the number is the turn total including what is
+                             set aside right now.
+Subtitle      "Taking 250, 3 dice left"
+              "All six — roll again for 1,150"     (hot dice)
+              "That die doesn't score — untap it"  (an illegal selection)
+Header        "Ada — last turn"  once someone has passed 3,000.
+Summary       "Ada banked 950."
+              "Ada busted and lost 700."
+              "Ada busted on the first roll."
+
+===============================================================================
+7. FREIGHTER.YACHT.DINGHY
+===============================================================================
+Intro         None.
+Button        "Roll" → "Rolling…" → "Pass"
+Second button "Reroll Cargo"  — only with rolls left, and it throws both
+                                cargo dice or neither.
+Subtitle      "Looking for a Freighter — 3 rolls left"
+              "Cargo 9 — 1 roll left"
+Summary       "Ada put to sea with 9 cargo."
+              "Ada sailed short of a Dinghy — 0."
+              "Ada never found a Freighter — 0."
+
+===============================================================================
+8. ROYAL UR
+===============================================================================
+Intro         None.
+Button        "Roll" → "Rolling…" → "Moving" → "Pass"
+Subtitle      "Rolled 3 — 2 pieces can move"
+              "Rolled 0 — nowhere to go. One of yours goes back 4."
+              "Tap the ringed square to move, or pick another piece"
+              "Tap the ringed square to send it back, or pick another"
+Header        "Ada — 1 waiting, 1 home"
+Summary       "Ada moved to square 12."
+              "Ada landed on a rosette and rolls again."
+              "Ada brought a piece home."
+
+===============================================================================
+9. ROLLBOTS
+===============================================================================
+INTRO (setup, each runner in turn)
+  "Ada — choose your loadout"
+  "Weapon"     then the three weapon cards, each with its die and its trick.
+  "Cyberware"  then the four ability cards, each with its cost.
+  "Choose Above"  → "Lock In"  once both are picked.
+  "Begin The Duel"
+
+ATTACKING
+  Header    "Ada — your move"        with "Pick a move"
+  Buttons   "Attack"  "Charge"  "Swap Loadout"  "Activate Quantum Phase"
+  Swapping  "Ada — switch weapon", "Pick a weapon, or cancel",
+            "Switching costs your turn, and any held charge.", "Cancel"
+  After the throw:
+            "Mono-Blade · accuracy 8"
+            "Accuracy 8 · damage 6 — send it when you have read them"
+            Button "Send It"  — nothing is sent until the attacker has read
+            their own roll.
+
+DEFENDING
+  Header    "Bo — incoming"
+  Line      "Accuracy 8, damage 6 — answer it"
+  Cards     "Dodge"     and its d6
+            "Firewall"  "Roll a d8 and subtract it from the damage. A natural
+                        8 stops everything."
+  Button    "Rolling Defence" → "Resolve"  — the defender reads their own roll
+            before it is applied, the same as the attacker.
+
+RESOLUTION (one line, after Resolve)
+  "Dodged it entirely."
+  "The Firewall swallowed it."
+  "Hard Lockdown — the whole shot absorbed."
+  "Bo took 6."      /  "Critical — Bo took 11."
+  "Phased clean through — and hit back for 3."
+  "The Overclock left you wide open. You take this one in full."
+  Result    "Ada Wins", or "Draw" with "System Draw" as the reason.
+
+===============================================================================
+10. BONEHEADS
+===============================================================================
+Intro         None.
+Button        "Roll" → "Rolling…" → "Pass"
+Subtitle      "Pick a Column"
+Header        "Ada — 4 slots left"
+Summary       "Ada dropped a 5 into column B."
+              "Ada smashed 2 5's out of Bo's column B."
+
+===============================================================================
+11. FREE ROLL
+===============================================================================
+Intro         An empty table and the dice picker: "d4 d6 d8 d10 d12 d20" with
+              + and − on each, and a running "7 / 20".
+Button        "Roll"
+              "Add some dice first"  — the subtitle when the table is empty.
+              "Roll to total"        — with Totals on and nothing thrown yet.
+Toggle        "Totals"
+Buttons       "Clear"
+Readout       "3d6 · 11"  per die type, and the throw's own total, only when
+              Totals is on.
+There is no handover, no summary and no result screen: Free Roll has no
+opponent and nothing to end.

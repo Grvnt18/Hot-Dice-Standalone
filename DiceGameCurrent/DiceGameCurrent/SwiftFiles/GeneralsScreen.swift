@@ -333,21 +333,50 @@ struct GeneralsCardView: View {
                 // what a scorecard is. It used to be twelve coloured
                 // rectangles floating on a scrim, which read as a row of
                 // buttons rather than as a card being filled in.
-                ScrollView {
-                    LazyVGrid(columns: columns, spacing: 8) {
+                //
+                // The sheet now FILLS whatever it is given: the cells were
+                // a fixed 62pt in a ScrollView, so on a phone the card
+                // needed scrolling to see all twelve and on an iPad it was
+                // a small sheet adrift in the middle of the screen. Six
+                // rows of two, sized from the height available, with a
+                // floor so a short screen falls back to scrolling rather
+                // than to cells too small to read.
+                GeometryReader { geo in
+                    let cell = GeneralsCardLayout.cellHeight(forHeight: geo.size.height)
+                    let sheet = LazyVGrid(columns: columns,
+                                          spacing: GeneralsCardLayout.spacing) {
                         ForEach(GeneralsCategory.allCases) { category in
-                            box(category)
+                            box(category, height: cell)
                         }
                     }
-                    .padding(14)
-                    .background(
-                        Image(uiImage: LowPolyTextures.paperSurface())
-                            .resizable()
-                            .clipShape(RoundedRectangle(
-                                cornerRadius: ControlShape.cornerRadius))
-                    )
-                    .elevated(.resting)
-                    .padding(.horizontal, 12)
+                        .padding(GeneralsCardLayout.sheetPadding)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            Image(uiImage: LowPolyTextures.paperSurface())
+                                .resizable()
+                                .clipShape(RoundedRectangle(
+                                    cornerRadius: ControlShape.cornerRadius))
+                        )
+                        .elevated(.resting)
+                        .padding(.horizontal, 12)
+
+                    if GeneralsCardLayout.fits(in: geo.size.height) {
+                        // Centred, because a GeometryReader pins its child
+                        // to the top left — and on an iPad, where the cell
+                        // height is capped, the sheet is shorter than the
+                        // space and would otherwise sit against the top.
+                        VStack(spacing: 0) {
+                            Spacer(minLength: 0)
+                            sheet
+                            Spacer(minLength: 0)
+                        }
+                    } else {
+                        // Too short for twelve legible cells — a phone in
+                        // landscape, mostly. The sheet keeps its minimum
+                        // and the card scrolls, which is what it did
+                        // everywhere before this.
+                        ScrollView { sheet }
+                    }
                 }
 
                 Button {
@@ -380,7 +409,7 @@ struct GeneralsCardView: View {
         return theme.accentColor.opacity(claimable ? 0.30 : 0.14)
     }
 
-    private func box(_ category: GeneralsCategory) -> some View {
+    private func box(_ category: GeneralsCategory, height: CGFloat) -> some View {
         let claim = card.claim(for: category)
         let isOpen = claim == nil
         let wouldScore = hand.map { category.score(for: $0) }
@@ -391,31 +420,31 @@ struct GeneralsCardView: View {
         } label: {
             VStack(spacing: 2) {
                 Text(category.displayName)
-                    .font(.stackSans(12))
+                    .font(.stackSans(GeneralsCardLayout.nameSize(forCell: height)))
                     .foregroundStyle(GeneralsPaper.ink.opacity(isOpen ? 0.95 : 0.5))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
 
                 if let claim {
                     Text("\(match.displayName(for: claim.participant)) · \(claim.points)")
-                        .font(.stackSans(11))
+                        .font(.stackSans(GeneralsCardLayout.detailSize(forCell: height)))
                         .foregroundStyle(GeneralsPaper.ink.opacity(0.62))
                 } else if let wouldScore {
                     // A zero is shown as a zero rather than hidden: taking
                     // one is a legal, and sometimes correct, move.
                     Text("\(wouldScore)")
-                        .font(.stackSans(20))
+                        .font(.stackSans(GeneralsCardLayout.scoreSize(forCell: height)))
                         .foregroundStyle(GeneralsPaper.ink.opacity(wouldScore > 0 ? 1 : 0.45))
                 } else {
                     Text(category.detail)
-                        .font(.stackSans(10))
+                        .font(.stackSans(GeneralsCardLayout.detailSize(forCell: height)))
                         .foregroundStyle(GeneralsPaper.ink.opacity(0.58))
                         .lineLimit(2)
                         .minimumScaleFactor(0.7)
                 }
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 62)
+            .frame(height: height)
             .padding(.horizontal, 6)
             // A cell is PRINTED on the sheet: a wash and a rule, no
             // shadow of its own. Giving each cell depth is what made
@@ -446,4 +475,54 @@ struct GeneralsCardView: View {
 /// has been careful not to acquire colours it does not need.
 enum GeneralsPaper {
     static let ink = Color(hex: "#2E2A22")
+}
+
+/// How big the scorecard is, given the screen it is on.
+///
+/// The card is twelve categories in six rows of two, and that shape does
+/// not change with the device — so rather than scrolling a fixed sheet, the
+/// cells take whatever height is going and the lettering follows them. A
+/// scorecard is a sheet of paper on a table; it should be as big as the
+/// table.
+enum GeneralsCardLayout {
+
+    static let rows = 6
+    static let spacing: CGFloat = 8
+    static let sheetPadding: CGFloat = 14
+
+    /// Below this a cell cannot hold a name and a figure legibly, so the
+    /// card scrolls instead of shrinking further.
+    static let minCellHeight: CGFloat = 62
+
+    /// And above this it stops being a scorecard and becomes a menu.
+    static let maxCellHeight: CGFloat = 132
+
+    /// What the sheet costs around the cells: its own padding, the gaps
+    /// between the rows, and the shadow's breathing room.
+    static let chrome: CGFloat = sheetPadding * 2 + spacing * CGFloat(rows - 1)
+
+    static func cellHeight(forHeight available: CGFloat) -> CGFloat {
+        let raw = (available - chrome) / CGFloat(rows)
+        return min(maxCellHeight, max(minCellHeight, raw))
+    }
+
+    /// Whether twelve cells at their floor fit without scrolling.
+    static func fits(in available: CGFloat) -> Bool {
+        available >= minCellHeight * CGFloat(rows) + chrome
+    }
+
+    // The lettering scales with the cell rather than being fixed, so a
+    // bigger card is actually easier to read rather than the same text
+    // marooned in more paper.
+    static func nameSize(forCell height: CGFloat) -> CGFloat {
+        min(20, max(12, height * 0.19))
+    }
+
+    static func scoreSize(forCell height: CGFloat) -> CGFloat {
+        min(34, max(20, height * 0.32))
+    }
+
+    static func detailSize(forCell height: CGFloat) -> CGFloat {
+        min(16, max(10, height * 0.16))
+    }
 }

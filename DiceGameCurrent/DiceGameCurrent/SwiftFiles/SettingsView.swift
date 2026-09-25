@@ -163,19 +163,22 @@ struct SettingsView: View {
                     .font(.stackSans(11))
                 }
 
-                if !rules.isEmpty {
-                    Section {
-                        Button {
-                            showingHowToPlay = true
-                        } label: {
-                            Text("How to Play")
-                                .font(.stackSans(15))
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
+                // Inside a game this opens that game's guide. On the hub
+                // there is no game to explain, so it opens the whole set
+                // as a cluster of bubbles — which is the one place a
+                // player browsing the suite can read the rules of a game
+                // before deciding to play it.
+                Section {
+                    Button {
+                        showingHowToPlay = true
+                    } label: {
+                        Text(rules.isEmpty ? "How to Play — Every Game" : "How to Play")
+                            .font(.stackSans(15))
+                            .frame(maxWidth: .infinity)
                     }
-                    .listRowBackground(Color.clear)
+                    .buttonStyle(.borderedProminent)
                 }
+                .listRowBackground(Color.clear)
             }
             .tint(theme.accentColor)
             .navigationBarTitleDisplayMode(.inline)
@@ -207,7 +210,11 @@ struct SettingsView: View {
                 }
             }
             .sheet(isPresented: $showingHowToPlay) {
-                HowToPlayView(gameName: gameName, tagline: tagline, sections: rules)
+                if rules.isEmpty {
+                    GuideBubbleCluster()
+                } else {
+                    HowToPlayView(gameName: gameName, tagline: tagline, sections: rules)
+                }
             }
         }
     }
@@ -289,7 +296,7 @@ private extension AppTheme.Swatch {
 ///
 /// Theme is observed only so this sheet's own Done button matches the same
 /// accent color and shape as everything else.
-private struct HowToPlayView: View {
+struct HowToPlayView: View {
     let gameName: String?
     let tagline: String?
     let sections: [GameRuleSection]

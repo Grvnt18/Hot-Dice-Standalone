@@ -459,12 +459,16 @@ enum RoyalUrGame: SuiteGame {
 
     static let rules: [GameRuleSection] = [
         GameRuleSection(
+            title: "At a Glance",
+            body: "First to bring two of three pieces home. Roll five four-sided dice and count the marked points showing — nought to five squares, two or three most of the time. Land on an opponent's piece to send it back to the start, land on a rosette to roll again, and roll nothing at all and one of your own pieces goes back four."
+        ),
+        GameRuleSection(
             title: "The Race",
             body: "Three pieces each, and the first player to bring two of them home wins. Your route runs sixteen squares: out along your own row, up the middle past the bridge, around the far block, and out."
         ),
         GameRuleSection(
             title: "The Dice",
-            body: "Roll five four-sided dice. Two of each die's four points are marked — count the marked points sticking up and that is how far you move, anywhere from nothing to five squares. Two or three, most of the time."
+            body: "Roll five four-sided dice. Two of each die's four points are marked — count the marked points sticking up and that is how far you move, anywhere from nothing to five squares. Half the points are marked, so the count lands on 2 or 3 about five rolls in eight: 0 and 5 come up one roll in 32 each, 1 and 4 five rolls in 32, and 2 and 3 ten rolls in 32."
         ),
         GameRuleSection(
             title: "Moving",

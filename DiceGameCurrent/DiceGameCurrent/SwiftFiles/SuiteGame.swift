@@ -117,6 +117,13 @@ struct GameCatalogEntry: Identifiable {
 
     let tagline: String
 
+    /// The game's own How to Play text.
+    ///
+    /// Carried here so the hub can offer every guide without opening a
+    /// game — the bubble cluster in `GuideBubbleCluster` is built from
+    /// these, and a game whose rules are empty would open a blank sheet.
+    let rules: [GameRuleSection]
+
     /// Builds the game's root view, given the action that returns to the
     /// hub.
     ///
@@ -131,12 +138,14 @@ struct GameCatalogEntry: Identifiable {
         displayName: String,
         tileName: String,
         tagline: String,
+        rules: [GameRuleSection] = [],
         makeView: @escaping (@escaping () -> Void) -> AnyView
     ) {
         self.id = id
         self.displayName = displayName
         self.tileName = tileName
         self.tagline = tagline
+        self.rules = rules
         self.makeView = makeView
     }
 
@@ -151,6 +160,7 @@ struct GameCatalogEntry: Identifiable {
             displayName: G.displayName,
             tileName: G.tileName,
             tagline: G.tagline,
+            rules: G.rules,
             makeView: makeView
         )
     }
@@ -215,6 +225,10 @@ enum BaseballDiceGame: SuiteGame {
 
     static let rules: [GameRuleSection] = [
         GameRuleSection(
+            title: "At a Glance",
+            body: "Most runs over 3, 6 or 9 innings, three outs a half-inning. The pitcher picks a hidden style and the batter a hidden swing; the guess decides whose dice are better, and the batter's roll minus the pitcher's roll decides what happened. Every swing beats one pitch and loses to one."
+        ),
+        GameRuleSection(
             title: "The Game",
             body: "Pick a match length first — 3 innings is short, 6 medium, 9 extra long. Three outs to a half-inning, and the side batting last has the advantage it does in real baseball."
         ),
@@ -225,6 +239,10 @@ enum BaseballDiceGame: SuiteGame {
         GameRuleSection(
             title: "Swinging",
             body: "The batter picks a swing without seeing the pitch. Patient beats the Fastball, Contact beats the Changeup, Power beats the Slider — and each loses to the pitch it cannot handle. Guess right and you roll two dice and keep the best against the pitcher's d4. Guess wrong and the pitcher has the better die — and against a Fastball he throws two of them and keeps the best."
+        ),
+        GameRuleSection(
+            title: "The Dice",
+            body: "Favoured: the batter throws two of their own die and keeps the highest against the pitcher's d4. Even: one of the batter's die against a d8. Unfavoured: a Fastball beaten by a Power Swing is one d12 against the pitcher's two, keeping the highest; a Changeup that fools a Patient Swing is a d8 against a d10; a Slider that ties up a Contact Swing is a d10 against a d12."
         ),
         GameRuleSection(
             title: "The Result",
@@ -258,6 +276,10 @@ enum RollsGame: SuiteGame {
     /// every game showed Rolls' rules.
     static let rules: [GameRuleSection] = [
         GameRuleSection(
+            title: "At a Glance",
+            body: "Lowest score wins. Fifteen dice — twelve d6, one d8, one d10, one d12. Roll them all, bank at least one die, re-roll the rest, and keep going until every die is banked. A die's highest face costs nothing; every step below it costs a point; a 1 costs the die's full number of sides."
+        ),
+        GameRuleSection(
             title: "The Pool",
             body: "You start with 15 dice: twelve 6-sided, one 8-sided, one 10-sided, and one 12-sided."
         ),
@@ -267,7 +289,7 @@ enum RollsGame: SuiteGame {
         ),
         GameRuleSection(
             title: "Scoring",
-            body: "Lower is better. Banking a die scores it against its own best face: its highest number scores 0, and every face below that costs one point per step down — except a 1, which always costs the die's full number of sides, its worst possible result."
+            body: "Lower is better. Banking a die scores it against its own best face: its highest number scores 0, and every face below that costs one point per step down — except a 1, which always costs the die's full number of sides, its worst possible result. So a 1 costs 6 on a d6, 8 on a d8, 10 on a d10 and 12 on a d12, and those four are the worst results in the game."
         ),
         GameRuleSection(
             title: "Banking",

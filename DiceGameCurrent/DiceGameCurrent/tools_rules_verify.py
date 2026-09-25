@@ -139,6 +139,50 @@ def main():
     generals = source("Generals.swift")
     check("Generals rules say twelve", "twelve categories" in rules_blob(generals))
 
+    # --- Every bubble opens something. -------------------------------
+    #
+    # The hub's How to Play is a cluster of bubbles built from
+    # GameCatalog, one per game, each opening that game's own rules. A
+    # game whose rules array is empty would give a bubble that opens a
+    # blank sheet — and since the rules live in eleven different files,
+    # that is exactly the kind of gap nobody notices until a player taps
+    # it.
+    catalog = source("SuiteGame.swift")
+    check("the catalogue carries each game's rules",
+          "rules: G.rules" in catalog,
+          "GameCatalogEntry no longer takes rules from the game")
+
+    empty = []
+    for filename in sorted(os.listdir(SWIFT)):
+        if not filename.endswith(".swift"):
+            continue
+        text = source(filename)
+        for match in re.finditer(
+                r'static let (?:id|displayName) = "', text):
+            pass
+        if "static let rules: [GameRuleSection] = [" not in text:
+            continue
+        body = text.split("static let rules: [GameRuleSection] = [", 1)[1]
+        if not re.search(r'GameRuleSection\(', body.split("\n    ]", 1)[0]):
+            empty.append(filename)
+    check("no game ships an empty guide", not empty, ", ".join(empty))
+
+    # Every game in the hub says the same thing first, so a player opening
+    # any guide from the cluster gets the shape of the game before the
+    # detail of it.
+    missing = []
+    for filename in sorted(os.listdir(SWIFT)):
+        if not filename.endswith(".swift"):
+            continue
+        text = source(filename)
+        if "static let rules: [GameRuleSection] = [" not in text:
+            continue
+        for block in text.split("static let rules: [GameRuleSection] = [")[1:]:
+            if 'title: "At a Glance"' not in block.split("\n    ]", 1)[0]:
+                missing.append(filename)
+    check("every guide opens with At a Glance", not missing,
+          ", ".join(sorted(set(missing))))
+
     check_retired_wording()
 
     if check.failed:

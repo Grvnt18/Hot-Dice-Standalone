@@ -139,7 +139,15 @@ enum DicePlayfieldPhysics {
         // Each wall is pushed OUTWARD by half its thickness so the inner
         // face still sits exactly on the bounds — thickening in place
         // would have silently shrunk the play area by 0.5 per side.
-        let wallThickness: Float = 1.0
+        //
+        // Doubled again, 1.0 -> 2.0, when the throw doubled
+        // (DiceRollImpulse.motionBoost). The worst horizontal speed the
+        // game can now produce is 72 u/s — an 18.0 impulse doubled, and
+        // boosted again for a single-die pool — against a 1.0-thick
+        // wall's 120 u/s limit. That is a 1.7x margin, and this project
+        // holds colliders to 2x; at 2.0 thick the limit is 240 u/s and
+        // the margin is 3.3x.
+        let wallThickness: Float = 2.0
         // Offset outward so the collider's INNER face lands exactly on the
         // visible rim's inner face, not on the nominal bounds. The
         // thickness is a tunneling-safety requirement (see above) and is

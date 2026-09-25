@@ -115,6 +115,10 @@ enum FreeRollGame: SuiteGame {
 
     static let rules: [GameRuleSection] = [
         GameRuleSection(
+            title: "At a Glance",
+            body: "A table and nothing else: no score, no turns, no way to lose. Pick any mix of d4, d6, d8, d10, d12 and d20, roll as often as you like, and switch Totals on if you want the throw added up."
+        ),
+        GameRuleSection(
             title: "The Dice",
             body: "Pick up to \(FreeRollPool.maxDice) dice in any combination using the + and - controls: d4, d6, d8, d10, d12, d20. Clear empties the table."
         ),

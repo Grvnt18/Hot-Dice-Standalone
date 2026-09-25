@@ -145,7 +145,8 @@ extension TurnMatch {
     ///
     /// Takes the direction explicitly rather than assuming: Rolls is
     /// golf-scored and the rest are not, which is exactly the assumption
-    /// `TurnCompleteOverlay` baked in and got wrong for six of eight games.
+    /// `TurnCompleteOverlay` baked in and got wrong for every game but
+    /// Rolls.
     mutating func finish(lowestScoreWins: Bool) {
         guard !participants.isEmpty else { return }
         let totals = participants.map { score(for: $0) }

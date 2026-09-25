@@ -247,7 +247,7 @@ struct RollbotsScreen: View {
             floorTitle: RollbotsGame.floorTitle,
             // Brushed steel, no timber. The wooden tray is the wrong object
             // for a duel in the net, and it was the last thing on this
-            // screen still reading as the other nine games.
+            // screen still reading as every other game.
             arenaStyle: .steel,
             onSessionCreated: { newSession in
                 newSession.onRollSettled = { results in

@@ -261,7 +261,21 @@ enum DiceSceneEnvironment {
         textMaterial.diffuse.contents = renderScriptText(title, pointSize: 220, isDark: AppTheme.shared.rollsTextIsDark)
     }
 
-    private static func renderScriptText(_ text: String, pointSize: CGFloat, isDark: Bool) -> UIImage {
+    /// Rendered floor titles, kept because `applyTheme` rebuilds this on
+    /// every colour change and there are only ever a handful of them — one
+    /// per game name, times light and dark.
+    private static var scriptTextCache: [String: UIImage] = [:]
+
+    private static func renderScriptText(_ text: String, pointSize: CGFloat,
+                                         isDark: Bool) -> UIImage {
+        let key = "\(text)-\(pointSize)-\(isDark)"
+        if let hit = scriptTextCache[key] { return hit }
+        let image = drawScriptText(text, pointSize: pointSize, isDark: isDark)
+        scriptTextCache[key] = image
+        return image
+    }
+
+    private static func drawScriptText(_ text: String, pointSize: CGFloat, isDark: Bool) -> UIImage {
         // Falls back to a system font rather than returning a zero-size
         // image if the custom font somehow still isn't available —
         // zero-size directly caused the "gameplay area not rendering" bug

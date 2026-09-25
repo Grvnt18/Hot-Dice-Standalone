@@ -528,12 +528,63 @@ enum DieFaceLabels {
         }
     }
 
+    // MARK: Face artwork
+
+    /// The source canvas every face image is drawn at.
+    ///
+    /// **This number is a memory budget, not only a resolution.** Each face
+    /// of each die carries its own image, so a pool costs
+    /// `faces x canvas^2 x 4` bytes before SceneKit's own GPU copy. At the
+    /// 512 this used, a d20 was 20 MiB on its own and a Free Roll pool of
+    /// eight was 160 MiB — which is what made Free Roll die at around eight
+    /// dice rather than at its stated cap of twenty.
+    ///
+    ///     canvas   one d20   eight d20
+    ///        512    20 MiB     160 MiB
+    ///        256     5 MiB      40 MiB
+    ///
+    /// 256 is still well above what a face occupies on screen: a die is
+    /// roughly 100-200pt on a phone, so the label is oversampled either
+    /// way. It was raised from 128 to 512 because Stack Sans ExtraLight's
+    /// thin strokes did not survive minification from 128 — 256 keeps
+    /// double that detail while cutting the cost fourfold.
+    static let labelCanvas: CGFloat = 256
+
+    /// The numeral's point size, as the fraction of the canvas it has
+    /// always been (340 of 512).
+    private static var glyphPointSize: CGFloat { labelCanvas * 340 / 512 }
+
+    /// Rendered face images, kept because they are rebuilt far more often
+    /// than they change.
+    ///
+    /// `DicePoolLifecycleController.setupPool` tears the pool down and
+    /// builds it again, and Free Roll calls that on **every + and - tap**.
+    /// Without this, adding the eighth die to a pool re-rendered all eight
+    /// dice's faces from scratch — 160 images for a pool of d20s, on the
+    /// main thread, per tap.
+    ///
+    /// Keyed on everything the drawing depends on and nothing else, so two
+    /// dice sharing a colourway share their images too.
+    private static var imageCache: [String: UIImage] = [:]
+
+    private static func cached(_ key: String,
+                               _ build: () -> UIImage) -> UIImage {
+        if let hit = imageCache[key] { return hit }
+        let image = build()
+        imageCache[key] = image
+        return image
+    }
+
     /// A single filled circle, centered on a transparent background — the
     /// "marked" corner's decoration. Deliberately not a numeral or any
     /// other symbol: the whole point of this variant is a binary marked/
     /// unmarked read, not a value to identify.
     private static func cornerMarkImage(colorway: DieColorway) -> UIImage {
-        let size = CGSize(width: 512, height: 512)
+        cached("mark-\(colorway.numberHex)") { drawCornerMark(colorway: colorway) }
+    }
+
+    private static func drawCornerMark(colorway: DieColorway) -> UIImage {
+        let size = CGSize(width: labelCanvas, height: labelCanvas)
         let format = UIGraphicsImageRendererFormat()
         format.opaque = false
         let renderer = UIGraphicsImageRenderer(size: size, format: format)
@@ -555,7 +606,11 @@ enum DieFaceLabels {
     /// a fixed point size: "ROLLS" is far wider than a single digit, so a
     /// numeral-sized font would overflow the plane's width badly.
     private static func rollsWordmarkImage(colorway: DieColorway) -> UIImage {
-        let size = CGSize(width: 512, height: 512)
+        cached("rolls-\(colorway.numberHex)") { drawRollsWordmark(colorway: colorway) }
+    }
+
+    private static func drawRollsWordmark(colorway: DieColorway) -> UIImage {
+        let size = CGSize(width: labelCanvas, height: labelCanvas)
         let format = UIGraphicsImageRendererFormat()
         format.opaque = false
         let renderer = UIGraphicsImageRenderer(size: size, format: format)
@@ -601,7 +656,11 @@ enum DieFaceLabels {
     /// the set beside the numbered ones — a dot where a digit would be,
     /// not a different kind of die.
     private static func pipImage(colorway: DieColorway) -> UIImage {
-        let size = CGSize(width: 512, height: 512)
+        cached("pip-\(colorway.numberHex)") { drawPip(colorway: colorway) }
+    }
+
+    private static func drawPip(colorway: DieColorway) -> UIImage {
+        let size = CGSize(width: labelCanvas, height: labelCanvas)
         let format = UIGraphicsImageRendererFormat()
         format.opaque = false
         let renderer = UIGraphicsImageRenderer(size: size, format: format)
@@ -623,8 +682,17 @@ enum DieFaceLabels {
         }
     }
 
-    private static func labelImage(number: Int, colorway: DieColorway, underlined: Bool) -> UIImage {
-        // Canvas resolution raised significantly (128 -> 512) and kept as
+    private static func labelImage(number: Int, colorway: DieColorway,
+                                   underlined: Bool) -> UIImage {
+        cached("n\(number)-\(colorway.numberHex)-\(underlined)") {
+            drawLabel(number: number, colorway: colorway, underlined: underlined)
+        }
+    }
+
+    private static func drawLabel(number: Int, colorway: DieColorway,
+                                  underlined: Bool) -> UIImage {
+        // Canvas resolution raised significantly (128 -> 512, now 256 —
+        // see labelCanvas for why it came back down) and kept as
         // Stack Sans per your correction — my previous switch to a bold
         // system font was the wrong fix for the wrong reason. The size
         // request was aesthetic, not a workaround, and abandoning the
@@ -638,7 +706,7 @@ enum DieFaceLabels {
         // strokes clearly before any minification happens, which should
         // let them survive shrinking onto even d12's small labels while
         // staying genuinely Stack Sans throughout.
-        let size = CGSize(width: 512, height: 512)
+        let size = CGSize(width: labelCanvas, height: labelCanvas)
         // Explicit format with opaque = false — UIGraphicsImageRenderer's
         // default format can be opaque depending on context, which would
         // silently discard the transparent background this relies on
@@ -663,7 +731,11 @@ enum DieFaceLabels {
             // this is about resolution/fidelity, not making the glyph
             // relatively bigger within its own canvas.
             let attrs: [NSAttributedString.Key: Any] = [
-                .font: UIFont(name: AppFonts.stackSansPostScriptName, size: 340) ?? UIFont.systemFont(ofSize: 340, weight: .bold),
+                // Derived from the canvas rather than restated: the two
+                // moved together once already, and a font size left behind
+                // by a canvas change is a glyph that no longer fits.
+                .font: UIFont(name: AppFonts.stackSansPostScriptName, size: glyphPointSize)
+                    ?? UIFont.systemFont(ofSize: glyphPointSize, weight: .bold),
                 .foregroundColor: UIColor(hex: colorway.numberHex)
             ]
             let textSize = text.size(withAttributes: attrs)

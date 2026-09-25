@@ -139,9 +139,10 @@ enum HubLayout {
     /// Space between the two columns.
     static let columnGap: CGFloat = 14
 
-    /// Two columns, always. Ten games, five rows, the same shape on a phone
-    /// and an iPad — the grid is a fixed arrangement rather than something
-    /// that rearranges itself under you as the window changes.
+    /// Two columns, always — the same shape on a phone and an iPad, a
+    /// fixed arrangement rather than something that rearranges itself under
+    /// you as the window changes. Eleven games is six rows, the last of
+    /// them half full.
     static let columnCount = 2
 
     /// The largest a tile may grow to.

@@ -210,7 +210,7 @@ struct HandoverGate: View {
 ///
 /// Replaces `TurnCompleteOverlay` for suite games. That overlay's praise
 /// bands are explicitly golf-scored for Rolls ("Lower is better… bands run
-/// from 0 up"), which is wrong for six of the eight games, so rather than
+/// from 0 up"), which is wrong for every game but Rolls, so rather than
 /// generalise a Rolls-shaped thing this reads the winner off `TurnMatch`
 /// and says who won. Rolls keeps its own overlay untouched.
 struct MatchResultView: View {

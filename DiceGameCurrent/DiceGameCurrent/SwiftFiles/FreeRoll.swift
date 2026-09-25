@@ -3,13 +3,9 @@ import Foundation
 /// The dice the player has chosen for a Free Roll session.
 ///
 /// A sandbox, not a game: no scoring, no banking, no turn structure. Pick up
-/// to 10 dice in any combination and throw them as often as you like.
+/// to `maxDice` in any combination and throw them as often as you like.
 struct FreeRollPool: Equatable {
 
-    /// Ten is the cap the design settled on, and it is also comfortably
-    /// inside what the spawn pattern lays out cleanly —
-    /// `DiceSpawnPattern` fills rows of 5, 4, 3, 2, 1, so 10 dice occupy
-    /// the first three rows with room to spare.
     /// Twenty, matching the spawn pattern's slot count exactly — see
     /// DiceSpawnPattern.rowCounts, which was extended to hold them
     /// without overlap.
@@ -65,10 +61,20 @@ struct FreeRollPool: Equatable {
     ///
     /// Colourways come from a shuffled `DiePalette` rather than being
     /// assigned by die type, so two d6 in the same pool are still visually
-    /// distinct. With a cap of 10 against 15 colourways, every die in a
-    /// pool is guaranteed a different colour.
+    /// distinct.
+    ///
+    /// **The palette is refilled rather than exhausted.** There are 15
+    /// colourways and the cap is 20, so the last five dice used to hit a
+    /// `guard !colorways.isEmpty else { break }` and simply not be created
+    /// — a pool of 20 put 15 dice on the table, with no error and nothing
+    /// to see but a count that did not match. That guard was written when
+    /// the cap was 10 and was correct then; the cap moved and it did not.
+    ///
+    /// Refilling means a 16th die repeats a colour, which is the right
+    /// trade: two dice sharing a shade is a cosmetic compromise, five dice
+    /// missing is a broken pool.
     func makeDice() -> [Die] {
-        var colorways = DiePalette.colorways.shuffled()
+        var colorways: [DieColorway] = []
         var dice: [Die] = []
         dice.reserveCapacity(total)
 
@@ -78,9 +84,9 @@ struct FreeRollPool: Equatable {
         // no visible reason.
         for sides in counts.keys.sorted() {
             for _ in 0..<(counts[sides] ?? 0) {
-                // The guard is belt-and-braces: 10 dice can never exhaust
-                // 15 colourways, but popping an empty array would trap.
-                guard !colorways.isEmpty else { break }
+                if colorways.isEmpty {
+                    colorways = DiePalette.colorways.shuffled()
+                }
                 dice.append(Die(sides: sides, colorway: colorways.removeLast()))
             }
         }

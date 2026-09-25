@@ -126,6 +126,23 @@ READING THE THROW (appears the moment the dice settle)
   Button  "Next Batter"
   Strip   "1 out · 2 on · 3-2"  — outs, runners and the score, always visible.
 
+WHAT IT SOUNDS LIKE
+  The intro sting plays twice a match and no more: with the very first
+  throw, and once on the result screen.
+  Every at-bat sounds the moment the dice settle, because until then
+  nobody knows what happened:
+      Strikeout    swing, then the catcher's mitt 0.25s later
+      Field out    swing, the bat at 0.12s, the glove 0.45s after that
+      Deep out     swing, the bat at 0.12s, the glove 1.2s after that —
+                   the long gap is what says the ball was in the air
+      Walk         the mitt alone. Ball four is the one at-bat with no
+                   swing in it
+      Single,
+      double,
+      triple, HR   swing, then the bat. Nothing catches it.
+  Seven bat cracks, six glove catches and four swings, each played round
+  robin so the same one never comes up twice in a row.
+
 ===============================================================================
 3. JACKPOT
 ===============================================================================
@@ -245,6 +262,15 @@ RESOLUTION (one line, after Resolve)
   "Phased clean through — and hit back for 3."
   "The Overclock left you wide open. You take this one in full."
   Result    "Ada Wins", or "Draw" with "System Draw" as the reason.
+
+WHAT IT SOUNDS LIKE
+  The weapon fires when the attack dice are THROWN — the dice are the
+  shot. Mono-Blade, Smart Pistol and Rail Rifle each have their own, with
+  eight pistol shots, three blade swings and three cannon blasts played
+  round robin. The Sidearm borrows the pistol, quieter.
+  Each Cyberware ability has a sound of its own, played the moment it is
+  activated — including the Corrosive Virus, whose d6 is thrown a moment
+  later to see whether it turns on you.
 
 ===============================================================================
 10. BONEHEADS

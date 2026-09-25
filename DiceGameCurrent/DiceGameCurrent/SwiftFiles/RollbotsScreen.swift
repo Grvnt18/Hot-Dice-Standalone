@@ -201,6 +201,8 @@ struct RollbotsScreen: View {
         .onAppear {
             AppFonts.registerIfNeeded()
             SoundEngine.shared.startMusic()
+            // Decoded when the duel opens rather than on the first shot.
+            RollbotsAudio.preload()
         }
     }
 
@@ -477,6 +479,7 @@ struct RollbotsScreen: View {
             // — and it is still read before the handover.
             if throwDice(sides: [state.activeWeapon(attacker).damageSides],
                          seat: attacker) {
+                RollbotsAudio.fire(state.activeWeapon(attacker))
                 phase = .rollingAttack
             }
             handoverTo = defender
@@ -488,6 +491,9 @@ struct RollbotsScreen: View {
         if throwDice(sides: [RollbotsRules.accuracySides,
                              state.activeWeapon(attacker).damageSides],
                      seat: attacker) {
+            // The dice ARE the shot, so the weapon sounds when they are
+            // thrown rather than when the defender answers a turn later.
+            RollbotsAudio.fire(state.activeWeapon(attacker))
             phase = .rollingAttack
         }
     }
@@ -496,6 +502,10 @@ struct RollbotsScreen: View {
         let seat = attacker
         let ware = state.ware[seat]
         state.wareUsed[seat] = true
+        // Each ability has its own sound, and it plays on activation —
+        // including the Virus, whose d6 is thrown a moment later to see
+        // whether it turns on you.
+        RollbotsAudio.activate(ware)
 
         switch ware {
         case .neuralOverclock:

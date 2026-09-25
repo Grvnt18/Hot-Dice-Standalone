@@ -43,6 +43,13 @@ struct BaseballDiceScreen: View {
     /// replayed match produces the same pitches, like every roll in the suite.
     @State private var generator = SeededGenerator(seed: SeededGenerator.newSeed())
 
+    /// The intro sting plays twice in a match and no more: with the very
+    /// first throw, and once on the result screen. Two flags rather than
+    /// one, because the second is a different moment and a match can end
+    /// on an inning that had no first throw of its own.
+    @State private var introHasPlayed = false
+    @State private var outroHasPlayed = false
+
     private enum Phase {
         /// Choosing 3, 6 or 9 innings. Before anything else.
         case setup
@@ -156,6 +163,9 @@ struct BaseballDiceScreen: View {
         .onAppear {
             AppFonts.registerIfNeeded()
             SoundEngine.shared.startMusic()
+            // Decoded when the game opens, so the first swing of a match
+            // is not also the first file read.
+            BaseballAudio.preload()
         }
         // Nine screens had this and Baseball did not, which is why its
         // floor kept the old colour until something else rebuilt the
@@ -418,6 +428,11 @@ struct BaseballDiceScreen: View {
                                           pitcherRolls: pitcherRolls)
         lastAtBat = bat
 
+        // The whole sequence goes here rather than at the throw: the dice
+        // ARE the pitch and the swing, so until they settle there is no
+        // way to know whether this was a hit, a catch or a ball four.
+        BaseballAudio.play(bat.result)
+
         var diamond = state.diamond
         // bat.pitcherRoll, not a local: it is the KEPT die, so the double
         // play's even/odd test reads the same number the differential did.
@@ -484,6 +499,10 @@ struct BaseballDiceScreen: View {
         if isMatchOver() {
             match.finish(lowestScoreWins: BaseballDiceGame.lowestScoreWins)
             phase = .finished
+            if !outroHasPlayed {
+                outroHasPlayed = true
+                BaseballAudio.playIntro()
+            }
             return
         }
 
@@ -513,6 +532,10 @@ struct BaseballDiceScreen: View {
         lastAtBat = nil
         lastLine = nil
         generator = SeededGenerator(seed: SeededGenerator.newSeed())
+        // A new match gets its intro back — it is the first throw of THAT
+        // match the sting belongs to.
+        introHasPlayed = false
+        outroHasPlayed = false
         phase = .setup
     }
 
@@ -559,7 +582,14 @@ struct BaseballDiceScreen: View {
             match.activeIndex = state.battingSeat
             phase = .handover
         case .swinging:
-            if throwDice() { phase = .rolling }
+            if throwDice() {
+                // With the VERY FIRST throw of the match, and never again.
+                if !introHasPlayed {
+                    introHasPlayed = true
+                    BaseballAudio.playIntro()
+                }
+                phase = .rolling
+            }
         case .reading:
             endAtBat()
         default:

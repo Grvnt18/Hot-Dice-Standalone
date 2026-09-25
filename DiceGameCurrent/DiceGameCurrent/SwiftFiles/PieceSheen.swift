@@ -69,6 +69,25 @@ enum PieceSheen {
                               y: litFromTop ? rect.maxY : rect.minY)
         )
     }
+
+    /// The bevel: a bright inner edge on the lit side, dark on the far one.
+    ///
+    /// What the rounded corner of a real die does to the light, and the
+    /// second half of reading as solid from an orthographic top-down
+    /// camera — which shows no sides at all, so the edge is the only place
+    /// the form can show.
+    static var bevel: LinearGradient {
+        LinearGradient(
+            stops: [
+                .init(color: .white.opacity(highlight * 1.6), location: 0.0),
+                .init(color: .white.opacity(0), location: 0.35),
+                .init(color: .black.opacity(0), location: 0.65),
+                .init(color: .black.opacity(shade * 1.4), location: 1.0)
+            ],
+            startPoint: litFromTop ? .top : .bottom,
+            endPoint: litFromTop ? .bottom : .top
+        )
+    }
 }
 
 extension View {
@@ -79,5 +98,20 @@ extension View {
     /// shape rather than assuming one.
     func pieceSheen<S: Shape>(_ shape: S) -> some View {
         overlay(shape.fill(PieceSheen.gradient))
+    }
+
+    /// The full treatment: lit face, bevelled edge, and a cast shadow.
+    ///
+    /// This is what makes a drawn die and a rolled one read as the same
+    /// object. The tray's camera is orthographic and top-down, so a die in
+    /// play shows only its top face — the shading across it, the bevel at
+    /// its edge and the shadow it throws are the entirety of what says it
+    /// is solid, and a flat piece with none of them is a sticker.
+    func pieceSolid<S: Shape>(_ shape: S,
+                              elevation: Elevation = .piece,
+                              lineWidth: CGFloat = 2) -> some View {
+        pieceSheen(shape)
+            .overlay(shape.strokeBorder(PieceSheen.bevel, lineWidth: lineWidth))
+            .elevated(elevation)
     }
 }

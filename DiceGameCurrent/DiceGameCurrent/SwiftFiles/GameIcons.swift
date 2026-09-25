@@ -84,13 +84,15 @@ private struct MissingIconView: View {
     }
 }
 
-/// A Rollbots weapon or ability mark, tinted.
+/// A bundled mark, tinted — Rollbots' weapons and abilities, and Baseball
+/// Dice's pitching styles and swings.
 ///
-/// The source art is greyscale line work on transparency, which would be
-/// half invisible on the arena's near-black panels. Rendering it as a
-/// template takes the silhouette from the alpha channel and fills it with
-/// the tint instead, so a mark reads at the same strength as the text
-/// beside it.
+/// The source art is black line work on transparency, which would be half
+/// invisible on the arena's near-black panels. Rendering it as a template
+/// takes the silhouette from the alpha channel and fills it with the tint
+/// instead, so a mark reads at the same strength as the text beside it —
+/// and lets Baseball Dice draw the same art in its card ink rather than in
+/// flat black.
 struct NetIconView: View {
     let name: String
     let tint: Color

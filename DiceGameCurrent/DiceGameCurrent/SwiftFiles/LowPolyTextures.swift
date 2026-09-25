@@ -132,6 +132,119 @@ enum LowPolyTextures {
         return image
     }
 
+    /// Low-poly paper: aged off-white stock, faceted like everything else.
+    ///
+    /// A third generator beside `facetedSurface` and `woodSurface`, and it
+    /// exists for the same reason wood does — the field generator is wrong
+    /// for it. Wood needed direction; paper needs the opposite: almost no
+    /// variation at all, because a sheet is flat and facets that read as
+    /// terrain read as a stained wall.
+    ///
+    /// **Paper in the low-poly language, not photographic fibre.** Three
+    /// passes, each doing one job:
+    ///
+    ///  1. Fine facets at very low variation — the tooth of the stock.
+    ///  2. A coarser pass at low opacity — the uneven mottling that makes
+    ///     a sheet look aged rather than new.
+    ///  3. A darkening toward the edges, so a sheet has a soft border
+    ///     instead of stopping dead. That is the "old" of old paper, done
+    ///     with tone rather than with torn edges or foxing, which would
+    ///     compete with whatever is printed on it.
+    static func paperSurface(
+        baseColor: UIColor = UIColor(hex: "#E9DFC6"),
+        variation: CGFloat = 0.035,
+        mottle: CGFloat = 0.055,
+        edgeShade: CGFloat = 0.20,
+        columns: Int = 26,
+        pixelSize: CGFloat = 512,
+        pixelHeight: CGFloat? = nil,
+        seed: UInt64 = 30712
+    ) -> UIImage {
+        let h = pixelHeight ?? pixelSize
+        let key = "paper-\(baseColor)-\(variation)-\(mottle)-\(edgeShade)"
+            + "-\(columns)-\(pixelSize)x\(h)-\(seed)"
+        if let cached = cache.value(key) { return cached }
+
+        let size = CGSize(width: pixelSize, height: h)
+        let format = UIGraphicsImageRendererFormat()
+        format.opaque = true
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
+
+        let rows = max(1, Int((CGFloat(columns) * h / pixelSize).rounded()))
+        let image = renderer.image { _ in
+            // 1 and 2: the fine tooth, with coarse mottling laid over it.
+            facets(size: size, base: baseColor,
+                   columns: columns, rows: rows,
+                   variation: variation, seed: seed)
+            facets(size: size, base: baseColor,
+                   columns: max(2, columns / 5), rows: max(2, rows / 5),
+                   variation: mottle, seed: seed &+ 1, alpha: 0.5)
+
+            // 3: the edges, drawn as a band of increasingly dark frames
+            // rather than a gradient — a gradient is a photographic tool
+            // and would be the one smooth thing on a faceted surface.
+            let steps = 14
+            let inset = min(size.width, size.height) * 0.10 / CGFloat(steps)
+            for step in 0..<steps {
+                let fraction = 1 - CGFloat(step) / CGFloat(steps)
+                UIColor.black.withAlphaComponent(edgeShade * fraction * 0.16).setStroke()
+                let rect = CGRect(origin: .zero, size: size)
+                    .insetBy(dx: inset * CGFloat(step), dy: inset * CGFloat(step))
+                let path = UIBezierPath(rect: rect)
+                path.lineWidth = inset * 2
+                path.stroke()
+            }
+        }
+
+        cache.insert(image, for: key)
+        return image
+    }
+
+    /// One pass of flat-shaded triangles, shared by the paper's tooth and
+    /// its mottling.
+    ///
+    /// Split out rather than copied because the two passes differ only in
+    /// cell size, variation and opacity — and a second hand-written facet
+    /// loop is a second place for the diagonal-alternation trick to drift.
+    private static func facets(size: CGSize, base: UIColor,
+                               columns: Int, rows: Int,
+                               variation: CGFloat, seed: UInt64,
+                               alpha: CGFloat = 1) {
+        var rng = SeededGenerator(seed: seed)
+        let cellW = size.width / CGFloat(columns)
+        let cellH = size.height / CGFloat(rows)
+
+        for row in 0..<rows {
+            for col in 0..<columns {
+                let x = CGFloat(col) * cellW
+                let y = CGFloat(row) * cellH
+                let tl = CGPoint(x: x, y: y)
+                let tr = CGPoint(x: x + cellW, y: y)
+                let bl = CGPoint(x: x, y: y + cellH)
+                let br = CGPoint(x: x + cellW, y: y + cellH)
+                let flip = (row + col) % 2 == 0
+                let triangles: [[CGPoint]] = flip
+                    ? [[tl, tr, bl], [tr, br, bl]]
+                    : [[tl, tr, br], [tl, br, bl]]
+
+                for tri in triangles {
+                    let delta = (CGFloat(rng.nextUnit()) * 2 - 1) * variation
+                    shade(base, by: delta).withAlphaComponent(alpha).set()
+                    let path = UIBezierPath()
+                    path.move(to: tri[0])
+                    path.addLine(to: tri[1])
+                    path.addLine(to: tri[2])
+                    path.close()
+                    // Same overdraw as facetedSurface: adjacent fills leave
+                    // hairline seams from antialiasing otherwise.
+                    path.lineWidth = 1
+                    path.fill()
+                    path.stroke()
+                }
+            }
+        }
+    }
+
     /// Low-poly wood: horizontal plank bands, each split into long
     /// shallow triangles running WITH the grain.
     ///

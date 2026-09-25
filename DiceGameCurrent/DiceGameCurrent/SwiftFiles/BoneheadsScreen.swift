@@ -32,8 +32,6 @@ struct PipFace: View {
             ZStack(alignment: .topLeading) {
                 RoundedRectangle(cornerRadius: side * 0.18)
                     .fill(tint)
-                RoundedRectangle(cornerRadius: side * 0.18)
-                    .stroke(Color.black.opacity(0.35), lineWidth: 1)
 
                 ForEach(0..<9, id: \.self) { index in
                     if inked.contains(index) {
@@ -48,12 +46,16 @@ struct PipFace: View {
                 }
             }
             .frame(width: side, height: side)
-            // Lit like the dice in the tray above it, which is the whole
-            // point: this game's board IS dice, and a flat one beside a
-            // rolling one reads as a sticker beside an object. Over the
-            // pips rather than under them — the highlight is on the die's
-            // surface, and the pips are in it.
-            .pieceSheen(RoundedRectangle(cornerRadius: side * 0.18))
+            // Lit, bevelled and casting a shadow — the three things that
+            // make a die read as solid under the tray's orthographic
+            // top-down camera, which shows no sides at all. This game's
+            // board IS dice, so a flat one beside a rolling one is the
+            // most visible mismatch in the suite.
+            //
+            // Over the pips rather than under them: the highlight is on
+            // the die's surface and the pips are in it.
+            .pieceSolid(RoundedRectangle(cornerRadius: side * 0.18),
+                        lineWidth: max(1, side * 0.045))
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }

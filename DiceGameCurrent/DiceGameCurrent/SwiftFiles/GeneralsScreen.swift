@@ -329,13 +329,25 @@ struct GeneralsCardView: View {
                 ScriptText(hand == nil ? "Scorecard" : "Claim a Category", size: 40)
                     .foregroundStyle(.white)
 
+                // One sheet, with twelve cells printed on it — which is
+                // what a scorecard is. It used to be twelve coloured
+                // rectangles floating on a scrim, which read as a row of
+                // buttons rather than as a card being filled in.
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 8) {
                         ForEach(GeneralsCategory.allCases) { category in
                             box(category)
                         }
                     }
-                    .padding(.horizontal, 14)
+                    .padding(14)
+                    .background(
+                        Image(uiImage: LowPolyTextures.paperSurface())
+                            .resizable()
+                            .clipShape(RoundedRectangle(
+                                cornerRadius: ControlShape.cornerRadius))
+                    )
+                    .elevated(.resting)
+                    .padding(.horizontal, 12)
                 }
 
                 Button {
@@ -358,6 +370,16 @@ struct GeneralsCardView: View {
         .textCase(.uppercase)
     }
 
+    /// What tints a cell.
+    ///
+    /// The accent keeps its job — "this one is yours to take" — but as a
+    /// wash on the paper rather than a fill under white text. A claimed
+    /// cell goes a shade darker, the way a filled-in box does.
+    private func cellWash(isOpen: Bool, claimable: Bool) -> Color {
+        guard isOpen else { return GeneralsPaper.ink.opacity(0.12) }
+        return theme.accentColor.opacity(claimable ? 0.30 : 0.14)
+    }
+
     private func box(_ category: GeneralsCategory) -> some View {
         let claim = card.claim(for: category)
         let isOpen = claim == nil
@@ -370,24 +392,24 @@ struct GeneralsCardView: View {
             VStack(spacing: 2) {
                 Text(category.displayName)
                     .font(.stackSans(12))
-                    .foregroundStyle(.white.opacity(isOpen ? 0.95 : 0.55))
+                    .foregroundStyle(GeneralsPaper.ink.opacity(isOpen ? 0.95 : 0.5))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
 
                 if let claim {
                     Text("\(match.displayName(for: claim.participant)) · \(claim.points)")
                         .font(.stackSans(11))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(GeneralsPaper.ink.opacity(0.62))
                 } else if let wouldScore {
                     // A zero is shown as a zero rather than hidden: taking
                     // one is a legal, and sometimes correct, move.
                     Text("\(wouldScore)")
                         .font(.stackSans(20))
-                        .foregroundStyle(.white.opacity(wouldScore > 0 ? 1 : 0.5))
+                        .foregroundStyle(GeneralsPaper.ink.opacity(wouldScore > 0 ? 1 : 0.45))
                 } else {
                     Text(category.detail)
                         .font(.stackSans(10))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(GeneralsPaper.ink.opacity(0.58))
                         .lineLimit(2)
                         .minimumScaleFactor(0.7)
                 }
@@ -395,15 +417,33 @@ struct GeneralsCardView: View {
             .frame(maxWidth: .infinity)
             .frame(height: 62)
             .padding(.horizontal, 6)
+            // A cell is PRINTED on the sheet: a wash and a rule, no
+            // shadow of its own. Giving each cell depth is what made
+            // twelve of them look like buttons — print has no depth, and
+            // the sheet underneath already carries it.
             .background(
-                RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                    .fill(isOpen ? theme.accentColor.opacity(hand == nil ? 0.5 : 0.85) : Color.black.opacity(0.4))
+                RoundedRectangle(cornerRadius: ControlShape.cornerRadius * 0.5)
+                    .fill(cellWash(isOpen: isOpen, claimable: hand != nil))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                    .stroke(.black.opacity(0.35), lineWidth: 1)
+                RoundedRectangle(cornerRadius: ControlShape.cornerRadius * 0.5)
+                    .stroke(GeneralsPaper.ink.opacity(isOpen ? 0.45 : 0.25), lineWidth: 1)
             )
         }
         .disabled(!isOpen || hand == nil)
     }
+}
+
+// MARK: - The scorecard's material
+
+/// The ink the scorecard is printed in.
+///
+/// File scope rather than a static on the view, following `HubLayout` and
+/// `PlayfieldLayout`, which is the shape the hub was rebuilt into after its
+/// statics-on-a-View version would not build.
+///
+/// Reused from Baseball Dice's cards rather than a second dark — the suite
+/// has been careful not to acquire colours it does not need.
+enum GeneralsPaper {
+    static let ink = Color(hex: "#2E2A22")
 }

@@ -241,69 +241,80 @@ struct BaseballDiceScreen: View {
 
     // MARK: The card overlay
 
-    /// Three cards over a scrim, half the board's height, with the field
-    /// still legible behind them — which matters most for the swing, since
-    /// the batter is reading outs and runners while deciding.
+    /// Three cards over a light scrim, centred and sized so the field stays
+    /// legible behind them — the batter is reading outs and runners while
+    /// deciding, and the pitcher is reading the score.
+    ///
+    /// They used to be half the board's height on an opaque stock over a
+    /// 0.62 scrim, which covered the game.
     private var cardOverlay: some View {
         GeometryReader { geo in
-            let cardHeight = geo.size.height * 0.5
+            let cardHeight = min(geo.size.height * BaseballCardLayout.heightFraction,
+                                 BaseballCardLayout.maxHeight)
+            let rowWidth = min(geo.size.width - BaseballCardLayout.margin * 2,
+                               BaseballCardLayout.maxRowWidth)
             let choosingStyle = phase == .pickingStyle
 
             ZStack {
-                Color(hex: "#0B1A10").opacity(0.62).ignoresSafeArea()
+                Color(hex: "#0B1A10").opacity(BaseballCardLayout.scrimOpacity)
+                    .ignoresSafeArea()
 
                 VStack(spacing: 12) {
                     ScriptText(choosingStyle
                                ? "\(names[pitcher]) — pick your pitching style"
                                : "\(names[batter]) — pick your swing",
-                               size: 34, lineLimit: 2, minimumScaleFactor: 0.6)
+                               size: 28, lineLimit: 2, minimumScaleFactor: 0.6)
                         .textCase(nil)
                         .foregroundStyle(.white)
 
-                    HStack(spacing: 10) {
+                    HStack(spacing: BaseballCardLayout.gap) {
                         if choosingStyle {
                             ForEach(PitchStyle.allCases) { option in
                                 card(option.displayName, option.tagline,
+                                     icon: option.iconName,
                                      isSelected: styles[pitcher] == option,
                                      height: cardHeight) { styles[pitcher] = option }
                             }
                         } else {
                             ForEach(Swing.allCases) { option in
                                 card(option.displayName, option.tagline,
+                                     icon: option.iconName,
                                      isSelected: swing == option,
                                      height: cardHeight) { swing = option }
                             }
                         }
                     }
-                    .padding(.horizontal, 14)
+                    .frame(width: rowWidth)
                 }
             }
         }
     }
 
     private func card(_ title: String, _ detail: String,
-                      isSelected: Bool, height: CGFloat,
+                      icon: String, isSelected: Bool, height: CGFloat,
                       action: @escaping () -> Void) -> some View {
         Button {
             SoundEngine.shared.play(.buttonTap)
             action()
         } label: {
-            VStack(spacing: 8) {
-                ScriptText(title, size: 28, lineLimit: 2, minimumScaleFactor: 0.6)
+            VStack(spacing: 6) {
+                NetIconView(name: icon, tint: Color(hex: "#2E2A22"))
+                    .frame(height: height * BaseballCardLayout.iconFraction)
+                ScriptText(title, size: 20, lineLimit: 2, minimumScaleFactor: 0.5)
                     .textCase(nil)
                 Text(detail)
-                    .font(.stackSans(11))
+                    .font(.stackSans(9))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
             }
             .foregroundStyle(Color(hex: "#2E2A22"))
-            .padding(12)
+            .padding(8)
             .frame(maxWidth: .infinity)
             .frame(height: height)
             .background(
                 RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                    .fill(Color(hex: "#F3EFE3"))
+                    .fill(Color(hex: "#F3EFE3").opacity(BaseballCardLayout.cardOpacity))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
@@ -586,4 +597,41 @@ enum BaseballArt {
             )
         )
     }
+}
+
+// MARK: - The selection cards' geometry
+
+/// One place for the size and weight of the pitching-style and swing cards.
+///
+/// File scope rather than statics on the view, following `PlayfieldLayout`
+/// and `HubLayout`, which is the shape the hub was rebuilt into after its
+/// statics-on-a-View version would not build.
+///
+/// The cards used to be half the board's height on opaque stock over a 0.62
+/// scrim, which hid the outs, the runners and the score at exactly the
+/// moment a player is deciding against them.
+enum BaseballCardLayout {
+
+    /// Card height as a fraction of the playfield, capped so a tall phone
+    /// does not grow them back.
+    static let heightFraction: CGFloat = 0.34
+    static let maxHeight: CGFloat = 230
+
+    /// The row is centred and narrower than the screen, so the field shows
+    /// down both sides as well as above and below.
+    static let maxRowWidth: CGFloat = 330
+    static let margin: CGFloat = 24
+    static let gap: CGFloat = 8
+
+    /// How much of a card the mark takes. The rest is the name and the line
+    /// under it.
+    static let iconFraction: CGFloat = 0.42
+
+    /// The card stock's opacity — 0.7, so the field reads through it while
+    /// the ink on top stays legible. Lower it and the dark lettering starts
+    /// to fight the grass behind it; this is the one constant to move.
+    static let cardOpacity: Double = 0.7
+
+    /// Enough to separate the cards from the field without covering it.
+    static let scrimOpacity: Double = 0.28
 }

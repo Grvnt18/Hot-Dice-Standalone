@@ -109,6 +109,19 @@ enum Swing: String, CaseIterable, Codable, Identifiable {
         }
     }
 
+    /// The bundled mark for this swing, shown on the selection card.
+    ///
+    /// Named for the case rather than carried as a second string per site,
+    /// the way `CyberWeapon.iconName` already does it — so
+    /// `tools_icons_verify.py` can harvest the names straight out of here.
+    var iconName: String {
+        switch self {
+        case .patient: return "bb-patient"
+        case .contact: return "bb-contact"
+        case .power:   return "bb-power"
+        }
+    }
+
     /// The die this swing rolls when the matchup is not unfavoured.
     var sides: Int {
         switch self {
@@ -157,6 +170,18 @@ enum PitchStyle: String, CaseIterable, Codable, Identifiable {
         case .powerPitcher: return "Power Pitcher"
         case .crafty:       return "Crafty"
         case .breakingBall: return "Breaking Ball"
+        }
+    }
+
+    /// The bundled mark for this style, shown on the selection card.
+    ///
+    /// A style is a mix rather than a pitch, so it takes the mark of the
+    /// pitch it throws most: the 60% entry in `weights`.
+    var iconName: String {
+        switch self {
+        case .powerPitcher: return "bb-fastball"
+        case .crafty:       return "bb-changeup"
+        case .breakingBall: return "bb-slider"
         }
     }
 

@@ -265,7 +265,7 @@ private struct HubTitle: View {
 
             ScriptText("Rolls", size: 52)
                 .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.5), radius: 4, y: 2)
+                .elevated(.lifted)
         }
     }
 }

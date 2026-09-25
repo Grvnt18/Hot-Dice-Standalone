@@ -520,8 +520,12 @@ extension RoyalUrArt {
             x: center.x - radius, y: center.y - radius,
             width: radius * 2, height: radius * 2
         )
-        context.fill(Path(ellipseIn: body.insetBy(dx: -radius * 0.12, dy: -radius * 0.12)),
-                     with: .color(.black.opacity(0.25)))
+        // Cast, not concentric. This was a slightly larger ellipse centred
+        // on the piece, which is a glow — a shadow falls AWAY from the
+        // light, and Elevation is where that direction and depth are
+        // stated for the whole app.
+        context.fill(Path(ellipseIn: body.offsetBy(dx: 0, dy: Elevation.piece.dy)),
+                     with: .color(Elevation.piece.color))
         context.fill(Path(ellipseIn: body), with: .color(seatColor(seat)))
         // The same sheen the placed dice carry, so a piece on this board
         // and a die on the tray read as the same material. See PieceSheen.

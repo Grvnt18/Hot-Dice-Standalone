@@ -51,8 +51,12 @@ def main():
     print("  %-30s %s" % (APP_ICON, "ok" if app_ok else "MISSING"))
     failed |= not app_ok
 
-    # The Rollbots weapon and ability marks.
-    marks = sorted(set(re.findall(r'return "(bot-[a-z]+)"', source("Rollbots.swift"))))
+    # The Rollbots weapon and ability marks, and Baseball Dice's pitching
+    # style and swing marks. Both are named in Swift as plain strings on an
+    # enum, so both are harvested the same way rather than restated here.
+    marks = sorted(set(re.findall(r'return "(bot-[a-z]+)"', source("Rollbots.swift")))
+                   | set(re.findall(r'return "(bb-[a-z]+)"',
+                                    source("BaseballDice.swift"))))
     for mark in marks:
         name = mark + ".png"
         ok = os.path.exists(RES + name)
@@ -63,7 +67,7 @@ def main():
     wanted = ({"icon-%s.png" % i for i in ids}
               | {m + ".png" for m in marks}
               | {APP_ICON})
-    shipped = {f for f in os.listdir(RES) if f.startswith(("icon-", "bot-"))}
+    shipped = {f for f in os.listdir(RES) if f.startswith(("icon-", "bot-", "bb-"))}
     for extra in sorted(shipped - wanted):
         print("  %-30s shipped but unused" % extra)
 

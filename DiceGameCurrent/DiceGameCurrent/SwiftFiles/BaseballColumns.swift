@@ -71,9 +71,18 @@ enum BaseballColumns {
                                bounds: (x: ClosedRange<Float>, z: ClosedRange<Float>),
                                floorY: Float) -> SCNNode {
         let cylinder = SCNCylinder(radius: radius, height: height)
-        let material = SCNMaterial()
-        material.lightingModel = .lambert     // matches the low-poly surfaces
-        cylinder.materials = [material]
+        // THREE materials, not one: SCNCylinder takes side, top and bottom
+        // in that order, and giving them one shade is what made a post read
+        // as a flat disc.
+        //
+        // The camera looks straight down, so the top cap is nearly all you
+        // see of a post and the sides appear only as a rim around it. One
+        // colour across both leaves nothing for the eye to read as height.
+        // A lit top over darker sides is the whole of what says "this
+        // stands up" from directly above — the same trick the faceted
+        // floors use, where the shape comes from tone rather than from
+        // geometry the camera cannot see.
+        cylinder.materials = [sideMaterial(), topMaterial(), sideMaterial()]
 
         let node = SCNNode(geometry: cylinder)
         node.name = name
@@ -88,6 +97,30 @@ enum BaseballColumns {
         node.physicsBody = body
         return node
     }
+
+    /// The post's curved side: the base colour, darkened.
+    private static func sideMaterial() -> SCNMaterial {
+        let material = SCNMaterial()
+        material.lightingModel = .lambert     // matches the low-poly surfaces
+        return material
+    }
+
+    /// The post's top cap: the base colour, lifted.
+    ///
+    /// Named apart from the side so `update` can tint the two differently
+    /// without either call site having to remember which slot is which.
+    private static func topMaterial() -> SCNMaterial {
+        let material = SCNMaterial()
+        material.lightingModel = .lambert
+        return material
+    }
+
+    /// How far the cap is lifted and the side dropped from the base colour.
+    ///
+    /// Enough to read as a lit top on a shaded post, not so much that a
+    /// post stops looking like one object.
+    private static let capLift: CGFloat = 0.30
+    private static let sideDrop: CGFloat = 0.28
 
     /// Maps a field fraction onto the playfield.
     ///
@@ -114,6 +147,21 @@ enum BaseballColumns {
     /// other side's are black. A team's pool holds whatever is not on base,
     /// so three posts between the diamond and the pool at all times — the
     /// runners are conserved, which is what makes the board readable.
+    /// Tints a post: a lit cap over darker sides.
+    ///
+    /// Walks the material array rather than `firstMaterial`, which would
+    /// paint the side and leave the cap — the slot order is side, top,
+    /// bottom.
+    private static func paint(_ node: SCNNode?, colour: UIColor) {
+        guard let materials = node?.geometry?.materials, materials.count >= 3 else {
+            node?.geometry?.firstMaterial?.diffuse.contents = colour
+            return
+        }
+        materials[0].diffuse.contents = colour.darkened(by: sideDrop)
+        materials[1].diffuse.contents = colour.lightened(by: capLift)
+        materials[2].diffuse.contents = colour.darkened(by: sideDrop)
+    }
+
     static func update(in scene: SCNScene,
                        diamond: Diamond,
                        battingSeat: Int,
@@ -125,7 +173,7 @@ enum BaseballColumns {
         for (index, occupied) in diamond.occupied.enumerated() {
             let node = container.childNode(withName: "base\(index)", recursively: false)
             node?.isHidden = !occupied
-            node?.geometry?.firstMaterial?.diffuse.contents = battingColour
+            paint(node, colour: battingColour)
         }
 
         let onBase = diamond.runnerCount
@@ -137,7 +185,7 @@ enum BaseballColumns {
                 let node = container.childNode(withName: "pool\(seat)_\(slot)",
                                                recursively: false)
                 node?.isHidden = slot >= standing
-                node?.geometry?.firstMaterial?.diffuse.contents = colour
+                paint(node, colour: colour)
             }
         }
     }

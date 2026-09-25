@@ -40,12 +40,23 @@ enum AppFonts {
     /// bundle context in a way that caused a real, hard-to-diagnose
     /// launch crash. Safe to call more than once; only the first call
     /// does anything.
+    /// The font files this app expects in its bundle.
+    ///
+    /// Stated once and read by both the registration below and
+    /// `BundleCheck`, which reports what is missing — two lists of the
+    /// same filenames would drift, and the drift would be a check that
+    /// looks for a file nobody ships any more.
+    static let bundledFontResources = [
+        "StackSansNotch-VariableFont_wght", "AguafinaScript-Regular"
+    ]
+
     static func registerIfNeeded() {
         guard !didRegister else { return }
         didRegister = true
 
-        register(resourceName: "StackSansNotch-VariableFont_wght", extension: "ttf")
-        register(resourceName: "AguafinaScript-Regular", extension: "ttf")
+        for resource in bundledFontResources {
+            register(resourceName: resource, extension: "ttf")
+        }
     }
 
     // MARK: Script text, for UIKit drawing

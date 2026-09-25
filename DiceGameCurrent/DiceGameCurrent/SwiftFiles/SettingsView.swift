@@ -42,12 +42,21 @@ struct SettingsView: View {
     /// The colour and the music are kept per game, so without this a player
     /// who sets a table colour in one game and finds another unchanged has
     /// every reason to read it as a bug rather than as the feature.
-    @ViewBuilder private var scopeNote: some View {
+    @ViewBuilder private func scopeNote(perGame: Bool) -> some View {
         if let gameName {
-            Text("Saved for \(gameName). Each game keeps its own.")
+            Text(perGame
+                 ? "Saved for \(gameName). Each game keeps its own."
+                 : "The same in every game.")
                 .font(.stackSans(11))
         }
     }
+
+    /// Whether music follows the game or the app.
+    ///
+    /// Mirrored into `@State` because `GameScope.musicIsPerGame` is a
+    /// UserDefaults-backed static, which publishes nothing — without this
+    /// the toggle would not move when tapped.
+    @State private var musicPerGame = GameScope.musicIsPerGame
 
     var body: some View {
         NavigationStack {
@@ -96,7 +105,28 @@ struct SettingsView: View {
                 } header: {
                     Text("Music").font(.stackSans(12))
                 } footer: {
-                    scopeNote
+                    scopeNote(perGame: musicPerGame)
+                }
+
+                // The hub only. Inside a game this would be a control that
+                // changes what every OTHER game does, which is exactly the
+                // kind of setting people cannot find again afterwards.
+                if gameName == nil {
+                    Section {
+                        Toggle("Music Per Game", isOn: $musicPerGame)
+                            .font(.stackSans(15))
+                            .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
+                            .onChange(of: musicPerGame) { _, now in
+                                GameScope.musicIsPerGame = now
+                            }
+                    } header: {
+                        Text("Music Scope").font(.stackSans(12))
+                    } footer: {
+                        Text(musicPerGame
+                             ? "Each game remembers its own track and volume."
+                             : "One track and volume across every game.")
+                            .font(.stackSans(11))
+                    }
                 }
 
                 Section {
@@ -125,7 +155,10 @@ struct SettingsView: View {
                 } footer: {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Changes the playing surface and this menu's own accent color.")
-                        scopeNote
+                        // Always per game, whatever the music is set to —
+                        // a floor is part of a game's look in a way a
+                        // backing track is not.
+                        scopeNote(perGame: true)
                     }
                     .font(.stackSans(11))
                 }
@@ -158,7 +191,12 @@ struct SettingsView: View {
                     Button("Done") { dismiss() }
                         .font(.stackSans(15))
                         .buttonStyle(.borderedProminent)
-                        .buttonBorderShape(.roundedRectangle(radius: ControlShape.cornerRadius))
+                        // The same radius as the volume toggles' track
+                        // (RoundedSquareToggleStyle, ControlShapes.swift),
+                        // so the two shapes match rather than merely
+                        // resembling each other.
+                        .buttonBorderShape(
+                            .roundedRectangle(radius: ControlShape.cornerRadius * 0.6))
                         // Tinted HERE, not only on the Form below. Toolbar
                         // content is hoisted into the navigation bar, which
                         // sits outside the Form's view tree — so the
@@ -299,7 +337,12 @@ private struct HowToPlayView: View {
                     Button("Done") { dismiss() }
                         .font(.stackSans(15))
                         .buttonStyle(.borderedProminent)
-                        .buttonBorderShape(.roundedRectangle(radius: ControlShape.cornerRadius))
+                        // The same radius as the volume toggles' track
+                        // (RoundedSquareToggleStyle, ControlShapes.swift),
+                        // so the two shapes match rather than merely
+                        // resembling each other.
+                        .buttonBorderShape(
+                            .roundedRectangle(radius: ControlShape.cornerRadius * 0.6))
                         // Tinted HERE, not only on the Form below. Toolbar
                         // content is hoisted into the navigation bar, which
                         // sits outside the Form's view tree — so the

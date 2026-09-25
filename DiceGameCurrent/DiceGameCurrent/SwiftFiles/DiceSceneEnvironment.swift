@@ -329,7 +329,12 @@ enum DiceSceneEnvironment {
             // scoreboard is NOT part of this: it changes during the game
             // and this texture is built once, so it is its own plane (see
             // BaseballScoreboard).
-            return BaseballField.render(size: CGSize(width: 820, height: 1100))
+            //
+            // The turf takes the table colour, so the pitch answers the
+            // picker like every other floor. Only the turf — see
+            // BaseballField.grass.
+            return BaseballField.render(size: CGSize(width: 820, height: 1100),
+                                        turf: style.surfaceColor)
         }
     }
 

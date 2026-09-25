@@ -33,6 +33,8 @@ CASES = {
     "waves": "waves",
     "bones": "bones",
     "circuitry": "circuitry",
+    "crowns": "crowns",
+    "diceShapes": "diceShapes",
 }
 
 # game -> (motif case, the file its conformance lives in)
@@ -44,6 +46,8 @@ GAMES = {
     "FreighterYachtDinghyGame": ("waves", "FreighterYachtDinghy.swift"),
     "BoneheadsGame": ("bones", "Boneheads.swift"),
     "RollbotsGame": ("circuitry", "Rollbots.swift"),
+    "RoyalUrGame": ("crowns", "RoyalUrScreen.swift"),
+    "FreeRollGame": ("diceShapes", "FreeRoll.swift"),
 }
 
 
@@ -66,6 +70,32 @@ def swift_case_body(text, case):
     rest = text[start + 10:]
     ends = [m.start() for m in re.finditer(r'\n        case \.|\n        \}', rest)]
     return rest[:min(ends)] if ends else rest
+
+
+def python_function(src, name):
+    """One `def name(...)` body, to the next line at column zero.
+
+    Not `\ndef `: module-level constants sit between the functions, and
+    swallowing them made a builder look like it carried geometry it does
+    not.
+    """
+    start = src.index("def %s(" % name)
+    out = []
+    for i, line in enumerate(src[start:].splitlines()):
+        if i and line and not line[0].isspace():
+            break
+        out.append(line)
+    return "\n".join(out)
+
+
+def swift_function(text, name):
+    """One `func name(` body, to the next func at the same indent."""
+    start = text.index("func %s(" % name)
+    rest = text[start + 5:]
+    end = rest.find("\n    private func ")
+    if end < 0:
+        end = rest.find("\n    func ")
+    return rest[:end] if end >= 0 else rest
 
 
 def main():
@@ -110,10 +140,34 @@ def main():
             failed.append("%s: geometry differs — preview only %s, Swift only %s"
                           % (name, sorted(set(only_py))[:6],
                              sorted(set(only_sw))[:6]))
+    # --- 2b. The tiled builders, which the case arms no longer hold ----
+    #
+    # A tiled motif's arm is one line — `tiled(columns:rows:inset:cell:)` —
+    # and all its geometry lives in the cell builder. Comparing only the
+    # arms would have checked almost nothing once the repeated motifs
+    # landed, which is exactly the kind of hole that makes a green check
+    # worthless.
+    BUILDERS = {
+        "seven_glyph": "sevenGlyph",
+        "crown": "crown",
+        "die_face": "dieShape",
+        "bone_tile": "boneTile",
+        "circuit_tile": "circuitTile",
+        "tiled": "tiled",
+    }
+    for py_name, swift_name in sorted(BUILDERS.items()):
+        want = sorted(numbers(python_function(src, py_name)))
+        got = sorted(numbers(swift_function(text, swift_name)))
+        if want != got:
+            failed.append("%s/%s: geometry differs — preview %s, Swift %s"
+                          % (py_name, swift_name, want, got))
+
     if not failed:
-        print("  %-26s ok (%d literals matched)"
-              % ("geometry", sum(len(numbers(swift_case_body(text, c)))
-                                 for c in CASES.values())))
+        total = (sum(len(numbers(swift_case_body(text, c))) for c in CASES.values())
+                 + sum(len(numbers(swift_function(text, b)))
+                       for b in BUILDERS.values()))
+        print("  %-26s ok (%d literals matched, arms and builders)"
+              % ("geometry", total))
 
     # --- 3. The wiring, which is what rots as games are added. --------
     for game, (case, filename) in sorted(GAMES.items()):

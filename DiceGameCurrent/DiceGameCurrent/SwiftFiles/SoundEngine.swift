@@ -31,14 +31,14 @@ final class SoundEngine: ObservableObject {
 
     @Published var musicEnabled: Bool {
         didSet {
-            GameScope.set(musicEnabled, Keys.musicEnabled)
+            GameScope.setMusic(musicEnabled, Keys.musicEnabled)
             musicEnabled ? resumeMusic() : pauseMusic()
         }
     }
 
     @Published var musicVolume: Double {
         didSet {
-            GameScope.set(musicVolume, Keys.musicVolume)
+            GameScope.setMusic(musicVolume, Keys.musicVolume)
             musicPlayer?.volume = Float(musicVolume)
         }
     }
@@ -90,8 +90,8 @@ final class SoundEngine: ObservableObject {
         // effects are the dice themselves — the same dice in every game —
         // so a per-game volume for them would be a setting nobody wants to
         // keep in eleven places.
-        musicEnabled = GameScope.bool(Keys.musicEnabled)
-        musicVolume  = GameScope.double(Keys.musicVolume)
+        musicEnabled = GameScope.musicBool(Keys.musicEnabled)
+        musicVolume  = GameScope.musicDouble(Keys.musicVolume)
         sfxEnabled   = defaults.bool(forKey: Keys.sfxEnabled)
         sfxVolume    = defaults.double(forKey: Keys.sfxVolume)
         selectedTrackIndex = Self.storedTrack()
@@ -110,10 +110,10 @@ final class SoundEngine: ObservableObject {
     ///
     /// Only `GameScope` calls this.
     func reloadForScope() {
-        let enabled = GameScope.bool(Keys.musicEnabled)
+        let enabled = GameScope.musicBool(Keys.musicEnabled)
         if enabled != musicEnabled { musicEnabled = enabled }
 
-        let volume = GameScope.double(Keys.musicVolume)
+        let volume = GameScope.musicDouble(Keys.musicVolume)
         if volume != musicVolume { musicVolume = volume }
 
         let track = Self.storedTrack()
@@ -121,7 +121,7 @@ final class SoundEngine: ObservableObject {
     }
 
     private static func storedTrack() -> Int? {
-        let stored = GameScope.int(Keys.selectedTrack)
+        let stored = GameScope.musicInt(Keys.selectedTrack)
         return (stored >= 0 && stored < tracks.count) ? stored : nil
     }
 
@@ -244,7 +244,7 @@ final class SoundEngine: ObservableObject {
     /// nil = shuffle through everything; otherwise lock to one track.
     @Published var selectedTrackIndex: Int? {
         didSet {
-            GameScope.set(selectedTrackIndex ?? -1, Keys.selectedTrack)
+            GameScope.setMusic(selectedTrackIndex ?? -1, Keys.selectedTrack)
             // Switch immediately rather than waiting for the current track
             // to end — a selection that takes two minutes to take effect
             // reads as broken.

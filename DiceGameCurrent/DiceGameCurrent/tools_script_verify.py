@@ -90,11 +90,19 @@ def main():
     #
     # Only files that actually draw script text are in scope: a plain sans
     # face has little overhang and `size(withAttributes:)` is fine there.
+    # Only the renderers that SIZE A CANVAS from their text.
+    #
+    # That is the distinction, and getting it wrong cost a release:
+    # BaseballField was switched to ink on this rule and every label on the
+    # scoreboard moved. Ink measurement answers "how big must the canvas be
+    # so nothing is cut off"; it does not answer "where does this go inside
+    # a canvas somebody else sized", which wants the typographic box so
+    # that rows line up with each other.
+    #
     # Scoped to the FUNCTION, not the file: DieFaceLabels draws Stack Sans
     # numerals a few functions away from the script wordmark, and a plain
     # sans face has little enough overhang that its advance is fine.
-    drawers = ["DiceSceneEnvironment.swift", "BaseballField.swift",
-               "DieFaceLabels.swift"]
+    drawers = ["DiceSceneEnvironment.swift", "DieFaceLabels.swift"]
     checked = 0
     for name in drawers:
         code = strip_comments(source(name))

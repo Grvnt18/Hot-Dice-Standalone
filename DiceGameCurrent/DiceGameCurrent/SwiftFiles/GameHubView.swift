@@ -39,6 +39,20 @@ struct GameHubView: View {
                     VStack(spacing: 18) {
                         HubTitle(width: geo.size.width)
 
+                        // Says what is absent rather than letting four
+                        // separate features fail quietly — see BundleCheck.
+                        if let missing = BundleCheck.summary {
+                            Text(missing)
+                                .font(.stackSans(12))
+                                .multilineTextAlignment(.center)
+                                .foregroundStyle(.white)
+                                .padding(10)
+                                .background(Color(hex: "#7A1F1F").opacity(0.92),
+                                            in: RoundedRectangle(
+                                                cornerRadius: ControlShape.cornerRadius))
+                                .padding(.horizontal, HubLayout.gutter)
+                        }
+
                         LazyVGrid(columns: HubLayout.columns(forWidth: geo.size.width),
                                   spacing: HubLayout.columnGap) {
                             ForEach(GameCatalog.all) { entry in

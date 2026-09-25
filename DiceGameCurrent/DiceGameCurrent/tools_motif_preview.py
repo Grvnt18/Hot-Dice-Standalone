@@ -89,20 +89,102 @@ def trace(x0, y0, x1, y1, w, lift):
                  (x0 + w / 2, max(y0, y1)), (x0 - w / 2, max(y0, y1))], lift)
 
 
+
+def tiled(builder, columns, rows, lift, inset):
+    """Stamps one shape across the floor on a grid.
+
+    Three motifs were a single mark in the middle with bare field around
+    it. A rolling area is looked at as a whole, so a mark that occupies
+    only its centre reads as an object dropped on the floor rather than as
+    a surface. `builder(cx, cy, size, lift)` returns the shapes for one
+    cell; this places it in every cell.
+
+    Odd rows are offset half a cell — a plain grid reads as wallpaper,
+    and the stagger is what makes it read as a field.
+    """
+    out = []
+    cw, ch = 1.0 / columns, 1.0 / rows
+    size = min(cw, ch) * (1.0 - inset)
+    for row in range(rows):
+        for col in range(columns):
+            shift = (cw / 2) if row % 2 else 0.0
+            cx = (col + 0.5) * cw + shift
+            cy = (row + 0.5) * ch
+            if cx > 1.0 + cw / 4:
+                continue
+            out += builder(cx, cy, size, lift)
+    return out
+
+
+def seven_glyph(cx, cy, size, lift):
+    """A numeral 7, sized to `size` and centred on (cx, cy)."""
+    pts = [(0.26, 0.20), (0.76, 0.20), (0.76, 0.32), (0.55, 0.82),
+           (0.40, 0.82), (0.60, 0.33), (0.26, 0.33)]
+    bar = [(0.38, 0.52), (0.64, 0.52), (0.62, 0.59), (0.36, 0.59)]
+    def place(p):
+        return [(cx + (x - 0.5) * size, cy + (y - 0.5) * size) for x, y in p]
+    return [poly(place(pts), lift), poly(place(bar), lift)]
+
+
+def crown(cx, cy, size, lift):
+    """Three points over a band, with a jewel on each point."""
+    s = size
+    body = [(-0.42, 0.12), (-0.30, -0.34), (-0.14, 0.00), (0.0, -0.42),
+            (0.14, 0.00), (0.30, -0.34), (0.42, 0.12),
+            (0.34, 0.34), (-0.34, 0.34)]
+    out = [poly([(cx + x * s, cy + y * s) for x, y in body], lift)]
+    for x, y in ((-0.30, -0.36), (0.0, -0.44), (0.30, -0.36)):
+        out.append(circle(cx + x * s, cy + y * s, 0.075 * s, lift))
+    # The band, a shade deeper so the crown does not read as one blob.
+    out.append(poly([(cx - 0.36 * s, cy + 0.16 * s), (cx + 0.36 * s, cy + 0.16 * s),
+                     (cx + 0.34 * s, cy + 0.30 * s), (cx - 0.34 * s, cy + 0.30 * s)],
+                    DEEP * 0.55))
+    return out
+
+
+def die_face(cx, cy, size, lift):
+    """Alternating d6 and d4 silhouettes — a square and a triangle.
+
+    Free Roll is the sandbox that holds every die in the app, so its floor
+    is dice. Two shapes rather than six: at this facet size a pentagon and
+    a hexagon are the same blob and pips are a facet across, while a square
+    beside a triangle is unmistakable. Which one a cell gets is fixed by
+    its position, so the floor is stable rather than re-rolled each launch.
+    """
+    r = size * 0.42
+    if (int(cx * 97) + int(cy * 61)) % 2 == 0:
+        return [poly([(cx - r, cy - r), (cx + r, cy - r),
+                      (cx + r, cy + r), (cx - r, cy + r)], lift)]
+    h = r * 1.15
+    return [poly([(cx, cy - h), (cx + h * 0.92, cy + h * 0.62),
+                  (cx - h * 0.92, cy + h * 0.62)], lift)]
+
+
+def bone_tile(cx, cy, size, lift):
+    angle = 0.6 if (int(cx * 53) + int(cy * 31)) % 2 else -0.6
+    return bone(cx, cy, size * 0.78, size * 0.17, angle, lift)
+
+
+def circuit_tile(cx, cy, size, lift):
+    """An L of trace with a pad at its corner, turned by position."""
+    s = size * 0.5
+    turn = (int(cx * 71) + int(cy * 43)) % 4
+    dx = 1 if turn in (0, 3) else -1
+    dy = 1 if turn in (0, 1) else -1
+    w = size * 0.13
+    return [trace(cx - dx * s, cy, cx, cy, w, lift),
+            trace(cx, cy, cx, cy + dy * s, w, lift),
+            circle(cx, cy, size * 0.15, lift),
+            circle(cx - dx * s, cy, size * 0.10, lift)]
+
+
 LIFT = 0.30
 DEEP = -0.26
 
 
 def motif(name):
     if name == "seven":
-        # One closed numeral, drawn as a polygon so the facets can carry it.
-        return [poly([(0.26, 0.20), (0.76, 0.20), (0.76, 0.32),
-                      (0.55, 0.82), (0.40, 0.82), (0.60, 0.33),
-                      (0.26, 0.33)], LIFT),
-                # The European crossbar, which also stops the diagonal
-                # reading as a "1" at facet resolution.
-                poly([(0.38, 0.52), (0.64, 0.52), (0.62, 0.59),
-                      (0.36, 0.59)], LIFT)]
+        return tiled(seven_glyph, 2, 3, LIFT, inset=0.14)
 
     if name == "pig":
         # Built to read like icon-hog.png: big upright ears, a broad head,
@@ -141,32 +223,35 @@ def motif(name):
                 for y in (0.18, 0.42, 0.66, 0.90)]
 
     if name == "bones":
-        out = []
-        for cx, cy, ln, th, ang in ((0.30, 0.26, 0.34, 0.075, 0.5),
-                                    (0.72, 0.34, 0.30, 0.068, -0.7),
-                                    (0.26, 0.70, 0.30, 0.068, -0.45),
-                                    (0.68, 0.76, 0.34, 0.075, 0.6)):
-            out += bone(cx, cy, ln, th, ang, LIFT)
-        return out
+        return tiled(bone_tile, 2, 3, LIFT, inset=0.06)
 
     if name == "circuitry":
-        w = 0.040
-        out = []
-        for x0, y0, x1, y1 in ((0.12, 0.22, 0.62, 0.22), (0.62, 0.22, 0.62, 0.50),
-                               (0.62, 0.50, 0.88, 0.50), (0.24, 0.22, 0.24, 0.74),
-                               (0.24, 0.74, 0.54, 0.74), (0.54, 0.74, 0.54, 0.90),
-                               (0.40, 0.38, 0.88, 0.38), (0.76, 0.62, 0.76, 0.90),
-                               (0.12, 0.54, 0.40, 0.54), (0.40, 0.54, 0.40, 0.38)):
-            out.append(trace(x0, y0, x1, y1, w, LIFT))
-        for px, py in ((0.62, 0.22), (0.62, 0.50), (0.24, 0.74), (0.54, 0.74),
-                       (0.40, 0.38), (0.40, 0.54), (0.76, 0.62), (0.88, 0.50)):
-            out.append(circle(px, py, 0.048, LIFT))
-        return out
+        return tiled(circuit_tile, 3, 4, LIFT, inset=0.04)
+
+    if name == "crowns":
+        return tiled(crown, 2, 3, LIFT, inset=0.12)
+
+    if name == "diceShapes":
+        return tiled(die_face, 3, 4, LIFT, inset=0.0)
 
     return []
 
 
-NAMES = ["seven", "pig", "stars", "circles", "waves", "bones", "circuitry"]
+NAMES = ["seven", "pig", "stars", "circles", "waves", "bones",
+         "circuitry", "crowns", "diceShapes"]
+
+# Facets per side, per motif.
+#
+# A tiled mark is a fraction of the size of a centred one, and below about
+# eight facets across a shape stops being that shape — the first tiled
+# sevens read as arrows. The repeated motifs therefore get a finer grid;
+# the four that stayed centred keep the 30 they were approved at.
+GRIDS = {"seven": 52, "bones": 44, "circuitry": 44,
+         "crowns": 52, "diceShapes": 44}
+
+
+def motif_grid(name):
+    return GRIDS.get(name, GRID)
 
 
 # --- containment ----------------------------------------------------------
@@ -223,9 +308,10 @@ class Rng:
         return self.next() / float(1 << 64)
 
 
-def facets(name, grid=GRID, seed=20260101, variation=0.10):
+def facets(name, grid=None, seed=20260101, variation=0.10):
     """Every triangle, as (points, shade delta). Mirrors the Swift loop."""
     shapes = motif(name)
+    grid = grid or motif_grid(name)
     rng = Rng(seed)
     cell = 1.0 / grid
     out = []

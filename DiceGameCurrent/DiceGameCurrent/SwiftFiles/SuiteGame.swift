@@ -141,11 +141,11 @@ enum GameCatalog {
     /// Hub order. Rolls and Free Roll open; the rest render as "Soon"
     /// tiles until each is built, in the order listed here.
     static let all: [GameCatalogEntry] = [
+        GameCatalogEntry(BaseballDiceGame.self) { onExit in
+            AnyView(BaseballDiceScreen(onExit: onExit))
+        },
         GameCatalogEntry(RollsGame.self) { onExit in
             AnyView(DiceGameScreen(onExit: onExit))
-        },
-        GameCatalogEntry(FreeRollGame.self) { onExit in
-            AnyView(FreeRollScreen(onExit: onExit))
         },
         GameCatalogEntry(JackpotGame.self) { onExit in
             AnyView(JackpotScreen(onExit: onExit))
@@ -168,11 +168,11 @@ enum GameCatalog {
         GameCatalogEntry(RollbotsGame.self) { onExit in
             AnyView(RollbotsScreen(onExit: onExit))
         },
-        GameCatalogEntry(BaseballDiceGame.self) { onExit in
-            AnyView(BaseballDiceScreen(onExit: onExit))
-        },
         GameCatalogEntry(BoneheadsGame.self) { onExit in
             AnyView(BoneheadsScreen(onExit: onExit))
+        },
+        GameCatalogEntry(FreeRollGame.self) { onExit in
+            AnyView(FreeRollScreen(onExit: onExit))
         }
     ]
 }

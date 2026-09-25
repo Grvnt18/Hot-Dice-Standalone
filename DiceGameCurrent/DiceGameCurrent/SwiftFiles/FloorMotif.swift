@@ -27,6 +27,8 @@ enum FloorMotif: String {
     case waves          // Freighter.Yacht.Dinghy
     case bones          // Boneheads
     case circuitry      // Rollbots
+    case crowns         // Royal UR
+    case diceShapes     // Free Roll
 
     /// One shape and the tonal step it applies.
     struct Shape {
@@ -43,12 +45,22 @@ enum FloorMotif: String {
 
     /// Facets per side.
     ///
-    /// The house floor is 16, which is too coarse to hold a numeral or a
-    /// face — at that size a "7" is four triangles and a guess. A motif
-    /// floor is 30, so 1,800 triangles carry the shape. Generated once and
-    /// cached, so the extra cost is paid on the first roll of a game and
-    /// never again.
-    var grid: Int? { self == .none ? nil : 30 }
+    /// The house floor is 16, too coarse to hold a numeral or a face — at
+    /// that size a "7" is four triangles and a guess. A centred motif gets
+    /// 30, so 1,800 triangles carry the shape.
+    ///
+    /// **A repeated motif needs more**, because each mark is a fraction of
+    /// the size: the first tiled sevens were seven facets across and read
+    /// as arrows. Generated once and cached, so the extra cost is paid on
+    /// the first roll of a game and never again.
+    var grid: Int? {
+        switch self {
+        case .none:                                   return nil
+        case .seven, .crowns:                         return 52
+        case .bones, .circuitry, .diceShapes:         return 44
+        case .pigFace, .stars, .circles, .waves:      return 30
+        }
+    }
 
     // MARK: The shapes
 
@@ -58,17 +70,7 @@ enum FloorMotif: String {
             return []
 
         case .seven:
-            // One closed numeral, plus the European crossbar — which is
-            // not decoration: without it the diagonal reads as a 1 at
-            // facet resolution.
-            return [
-                Shape(path: polygon([(0.26, 0.20), (0.76, 0.20), (0.76, 0.32),
-                                     (0.55, 0.82), (0.40, 0.82), (0.60, 0.33),
-                                     (0.26, 0.33)]), lift: Self.lift),
-                Shape(path: polygon([(0.38, 0.52), (0.64, 0.52),
-                                     (0.62, 0.59), (0.36, 0.59)]),
-                      lift: Self.lift)
-            ]
+            return tiled(columns: 2, rows: 3, inset: 0.14, cell: sevenGlyph)
 
         case .pigFace:
             // Built to read like icon-hog.png: big upright ears, a broad
@@ -116,28 +118,141 @@ enum FloorMotif: String {
             }
 
         case .bones:
-            return [(0.30, 0.26, 0.34, 0.075, 0.5),
-                    (0.72, 0.34, 0.30, 0.068, -0.7),
-                    (0.26, 0.70, 0.30, 0.068, -0.45),
-                    (0.68, 0.76, 0.34, 0.075, 0.6)]
-                .flatMap { bone(cx: $0.0, cy: $0.1, length: $0.2,
-                                thickness: $0.3, angle: $0.4) }
+            return tiled(columns: 2, rows: 3, inset: 0.06, cell: boneTile)
 
         case .circuitry:
-            let width: CGFloat = 0.040
-            var out = [(0.12, 0.22, 0.62, 0.22), (0.62, 0.22, 0.62, 0.50),
-                       (0.62, 0.50, 0.88, 0.50), (0.24, 0.22, 0.24, 0.74),
-                       (0.24, 0.74, 0.54, 0.74), (0.54, 0.74, 0.54, 0.90),
-                       (0.40, 0.38, 0.88, 0.38), (0.76, 0.62, 0.76, 0.90),
-                       (0.12, 0.54, 0.40, 0.54), (0.40, 0.54, 0.40, 0.38)]
-                .map { Shape(path: trace($0.0, $0.1, $0.2, $0.3, width),
-                             lift: Self.lift) }
-            out += [(0.62, 0.22), (0.62, 0.50), (0.24, 0.74), (0.54, 0.74),
-                    (0.40, 0.38), (0.40, 0.54), (0.76, 0.62), (0.88, 0.50)]
-                .map { Shape(path: circle($0.0, $0.1, 0.048),
-                             lift: Self.lift) }
-            return out
+            return tiled(columns: 3, rows: 4, inset: 0.04, cell: circuitTile)
+
+        case .crowns:
+            return tiled(columns: 2, rows: 3, inset: 0.12, cell: crown)
+
+        case .diceShapes:
+            return tiled(columns: 3, rows: 4, inset: 0.0, cell: dieShape)
         }
+    }
+
+    // MARK: Tiling
+
+    /// Stamps one shape across the floor on a staggered grid.
+    ///
+    /// Three motifs were a single mark in the middle with bare field
+    /// around it. A rolling area is looked at as a whole, so a mark that
+    /// occupies only its centre reads as an object dropped on the floor
+    /// rather than as a surface.
+    ///
+    /// Odd rows are offset half a cell: a plain grid reads as wallpaper,
+    /// and the stagger is what makes it read as a field.
+    private func tiled(columns: Int, rows: Int, inset: CGFloat,
+                       cell: (CGFloat, CGFloat, CGFloat) -> [Shape]) -> [Shape] {
+        let cw = 1.0 / CGFloat(columns)
+        let ch = 1.0 / CGFloat(rows)
+        let size = min(cw, ch) * (1.0 - inset)
+        var out: [Shape] = []
+        for row in 0..<rows {
+            for col in 0..<columns {
+                let shift: CGFloat = row % 2 == 1 ? cw / 2 : 0.0
+                let cx = (CGFloat(col) + 0.5) * cw + shift
+                guard cx <= 1.0 + cw / 4 else { continue }
+                out += cell(cx, (CGFloat(row) + 0.5) * ch, size)
+            }
+        }
+        return out
+    }
+
+    /// A stable choice from a cell's position.
+    ///
+    /// No RNG: the floor must look the same every launch, and this gets
+    /// that without threading a seed through every builder.
+    private func pick(_ cx: CGFloat, _ cy: CGFloat, _ count: Int) -> Int {
+        (Int(cx * 97) + Int(cy * 61)) % count
+    }
+
+    /// A numeral 7, sized and centred on a cell.
+    private func sevenGlyph(_ cx: CGFloat, _ cy: CGFloat,
+                            _ size: CGFloat) -> [Shape] {
+        func place(_ points: [(CGFloat, CGFloat)]) -> [(CGFloat, CGFloat)] {
+            points.map { (cx + ($0.0 - 0.5) * size, cy + ($0.1 - 0.5) * size) }
+        }
+        return [
+            Shape(path: polygon(place([(0.26, 0.20), (0.76, 0.20), (0.76, 0.32),
+                                       (0.55, 0.82), (0.40, 0.82), (0.60, 0.33),
+                                       (0.26, 0.33)])), lift: Self.lift),
+            // The European crossbar, which is not decoration: without it
+            // the diagonal reads as a 1 at facet resolution.
+            Shape(path: polygon(place([(0.38, 0.52), (0.64, 0.52),
+                                       (0.62, 0.59), (0.36, 0.59)])),
+                  lift: Self.lift)
+        ]
+    }
+
+    /// Three points over a band, with a jewel on each point.
+    private func crown(_ cx: CGFloat, _ cy: CGFloat,
+                       _ size: CGFloat) -> [Shape] {
+        let body: [(CGFloat, CGFloat)] = [
+            (-0.42, 0.12), (-0.30, -0.34), (-0.14, 0.00), (0.0, -0.42),
+            (0.14, 0.00), (0.30, -0.34), (0.42, 0.12), (0.34, 0.34),
+            (-0.34, 0.34)
+        ]
+        var out = [Shape(path: polygon(body.map { (cx + $0.0 * size,
+                                                   cy + $0.1 * size) }),
+                         lift: Self.lift)]
+        let jewels: [(CGFloat, CGFloat)] = [(-0.30, -0.36), (0.0, -0.44),
+                                            (0.30, -0.36)]
+        for jewel in jewels {
+            out.append(Shape(path: circle(cx + jewel.0 * size,
+                                          cy + jewel.1 * size, 0.075 * size),
+                             lift: Self.lift))
+        }
+        // The band, a shade deeper so the crown is not one blob.
+        out.append(Shape(path: polygon([(cx - 0.36 * size, cy + 0.16 * size),
+                                        (cx + 0.36 * size, cy + 0.16 * size),
+                                        (cx + 0.34 * size, cy + 0.30 * size),
+                                        (cx - 0.34 * size, cy + 0.30 * size)]),
+                         lift: Self.deep * 0.55))
+        return out
+    }
+
+    /// Alternating d6 and d4 silhouettes — a square and a triangle.
+    ///
+    /// Two shapes rather than six: at this facet size a pentagon and a
+    /// hexagon are the same blob and pips are a facet across, while a
+    /// square beside a triangle is unmistakable.
+    private func dieShape(_ cx: CGFloat, _ cy: CGFloat,
+                          _ size: CGFloat) -> [Shape] {
+        let r = size * 0.42
+        if pick(cx, cy, 2) == 0 {
+            return [Shape(path: polygon([(cx - r, cy - r), (cx + r, cy - r),
+                                         (cx + r, cy + r), (cx - r, cy + r)]),
+                          lift: Self.lift)]
+        }
+        let h = r * 1.15
+        return [Shape(path: polygon([(cx, cy - h),
+                                     (cx + h * 0.92, cy + h * 0.62),
+                                     (cx - h * 0.92, cy + h * 0.62)]),
+                      lift: Self.lift)]
+    }
+
+    private func boneTile(_ cx: CGFloat, _ cy: CGFloat,
+                          _ size: CGFloat) -> [Shape] {
+        let angle: CGFloat = pick(cx, cy, 2) == 1 ? 0.6 : -0.6
+        return bone(cx: cx, cy: cy, length: size * 0.78,
+                    thickness: size * 0.17, angle: angle)
+    }
+
+    /// An L of trace with a pad at its corner, turned by position.
+    private func circuitTile(_ cx: CGFloat, _ cy: CGFloat,
+                             _ size: CGFloat) -> [Shape] {
+        let s = size * 0.5
+        let turn = pick(cx, cy, 4)
+        let dx: CGFloat = (turn == 0 || turn == 3) ? 1 : -1
+        let dy: CGFloat = (turn == 0 || turn == 1) ? 1 : -1
+        let w = size * 0.13
+        return [
+            Shape(path: trace(cx - dx * s, cy, cx, cy, w), lift: Self.lift),
+            Shape(path: trace(cx, cy, cx, cy + dy * s, w), lift: Self.lift),
+            Shape(path: circle(cx, cy, size * 0.15), lift: Self.lift),
+            Shape(path: circle(cx - dx * s, cy, size * 0.10), lift: Self.lift)
+        ]
     }
 
     // MARK: Builders

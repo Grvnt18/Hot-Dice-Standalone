@@ -21,6 +21,13 @@ enum BaseballField {
 
     // MARK: Palette
 
+    /// The turf's default, used when nothing else is supplied.
+    ///
+    /// The pitch is the one floor in the suite the colour picker could not
+    /// touch, because this surface ignored `ArenaStyle.surfaceColor`
+    /// entirely. It follows the picker now — but only the TURF. The dirt,
+    /// the chalk, the bases and the panel keep their own colours: a blue
+    /// infield stops reading as a ballpark, and the ask was the green.
     static let grass = UIColor(hex: "#7BA07E")
     static let dirt = UIColor(hex: "#C9B18A")
     static let chalk = UIColor(hex: "#FFFFFF")
@@ -98,7 +105,7 @@ enum BaseballField {
     /// where it used to be drawn), and the grass does not care how long the
     /// game is. `renderScoreboard` draws only as many columns as the match
     /// has, which is where that rule now lives.
-    static func render(size: CGSize) -> UIImage {
+    static func render(size: CGSize, turf: UIColor = grass) -> UIImage {
         let renderer = UIGraphicsImageRenderer(size: size)
         return renderer.image { context in
             let cg = context.cgContext
@@ -114,17 +121,17 @@ enum BaseballField {
             // a pitch painted in two flat colours read as a different app.
             // The layout is untouched — the same diamond, the same circles,
             // the same measurements — and only what fills them changes.
-            let turf = faceted(grass, size: size, seed: 771001)
+            let turfTexture = faceted(turf, size: size, seed: 771001)
             let clay = faceted(dirt, size: size, seed: 771002)
 
-            turf.draw(in: CGRect(origin: .zero, size: size))
+            turfTexture.draw(in: CGRect(origin: .zero, size: size))
 
             // Infield skin: a dirt disc around the mound with the grass
             // infield laid back over it, which is how the real shape is made.
             fill(cg, with: clay, size: size) {
                 $0.addEllipse(in: circle(at: point(mound), radius: px(skinRadius)))
             }
-            fill(cg, with: turf, size: size) {
+            fill(cg, with: turfTexture, size: size) {
                 $0.addPath(diamondPath(centre: mound, half: 0.190, in: size))
             }
 
@@ -348,17 +355,28 @@ enum BaseballField {
                                           y: py(boardY + 0.023)),
              size: px(0.028), colour: panelText)
 
+        // Centred in the gap ABOVE the grid rather than straddling its top
+        // edge. The old placement hung the numerals half over the first
+        // row's boxes, which read as numbers that had slipped out of their
+        // spots — and did so before the boxes had anything in them to
+        // compare against.
+        let headerY = py(metrics.gridTop - gridGap / 2)
         for index in 0..<columns {
             draw("\(index + 1)",
                  centredAt: CGPoint(x: px(gridX + cellW * (CGFloat(index) + 0.5)),
-                                    y: py(metrics.gridTop) - px(0.008)),
+                                    y: headerY),
                  size: px(0.024), colour: panelText)
         }
 
         for (row, name) in ["V", "H"].enumerated() {
             let top = metrics.gridTop + CGFloat(row) * rowHeight
-            draw(name, at: CGPoint(x: px(boardX + 0.014),
-                                   y: py(top + rowHeight * 0.74)),
+            // Centred on the row's own boxes, in the gutter to their left.
+            // It was drawn at a hand-tuned baseline offset, which put the
+            // letter below the row it labels — `draw(at:)` takes the text's
+            // TOP-left, not its baseline.
+            draw(name,
+                 centredAt: CGPoint(x: px(boardX + labelW / 2),
+                                    y: py(top + rowHeight * 0.42)),
                  size: px(0.028), colour: panelText)
             for index in 0..<columns {
                 let box = CGRect(x: px(gridX + cellW * CGFloat(index)), y: py(top),
@@ -385,7 +403,11 @@ enum BaseballField {
         // read at a glance mid-turn, which is why its pips are filled
         // rather than left as outlines to be counted.
         let centreY = py(metrics.outsTop + outsHeight / 2)
-        draw("OUTS", at: CGPoint(x: px(boardX + 0.014), y: centreY + px(0.012)),
+        // Centred on the pips' own line, in the space to their left, for
+        // the same reason as the row labels: it was placed by a baseline
+        // nudge and sat below the counter it names.
+        draw("OUTS",
+             centredAt: CGPoint(x: px(boardX + 0.094), y: centreY),
              size: px(0.030), colour: panelText)
         for index in 0..<3 {
             let centre = CGPoint(x: px(boardX + 0.175 + CGFloat(index) * 0.072),
@@ -403,35 +425,43 @@ enum BaseballField {
 
     // MARK: Lettering
 
-    /// Everything on the board is Aguafina, the app's display face.
+    /// Everything on the board is Aguafina, through `AppFonts.scriptFont`
+    /// — the only way this file can reach the face, and one that falls
+    /// back rather than trapping, since a wrong-looking font is a far
+    /// smaller problem than a crash inside a texture render.
     ///
-    /// Through `AppFonts.scriptFont`, which is the only way this file can
-    /// reach it — and which falls back rather than trapping, since a
-    /// wrong-looking font is a far smaller problem than a crash inside a
-    /// texture render.
+    /// **These position by the ADVANCE, not by the ink, and that is
+    /// deliberate.**
     ///
-    /// Both draws below measure with `AppFonts.inkBounds` and offset by
-    /// `-origin`. They used `size(withAttributes:)` — the advance — which
-    /// on a script face both mis-centres the text and lets its final
-    /// swash run past where the measurement said it ended.
+    /// Ink metrics are for sizing a canvas. `renderScriptText` and the
+    /// ROLLS die face both derive their canvas from the text, so a swash
+    /// drawn past its advance would be cut off and ink is the only correct
+    /// measurement there. This file is the opposite case: the canvas is
+    /// the panel, nothing clips, and an overhang simply draws.
+    ///
+    /// Positioning inside a fixed canvas wants the typographic box,
+    /// because that is what lines rows up with one another. Ink extent
+    /// varies per glyph — centring "1" and "10" on their ink puts them in
+    /// visibly different places inside identical boxes, which is exactly
+    /// what went wrong when these were switched to ink.
     private static func draw(_ text: String, at origin: CGPoint,
                              size: CGFloat, colour: UIColor) {
-        let font = AppFonts.scriptFont(size)
-        let ink = AppFonts.inkBounds(of: text, font: font)
-        (text as NSString).draw(
-            at: CGPoint(x: origin.x - ink.origin.x, y: origin.y - ink.origin.y),
-            withAttributes: [.font: font, .foregroundColor: colour]
-        )
+        (text as NSString).draw(at: origin, withAttributes: attributes(size, colour))
     }
 
     private static func draw(_ text: String, centredAt centre: CGPoint,
                              size: CGFloat, colour: UIColor) {
-        let font = AppFonts.scriptFont(size)
-        let ink = AppFonts.inkBounds(of: text, font: font)
+        let attrs = attributes(size, colour)
+        let measured = (text as NSString).size(withAttributes: attrs)
         (text as NSString).draw(
-            at: CGPoint(x: centre.x - ink.width / 2 - ink.origin.x,
-                        y: centre.y - ink.height / 2 - ink.origin.y),
-            withAttributes: [.font: font, .foregroundColor: colour]
+            at: CGPoint(x: centre.x - measured.width / 2,
+                        y: centre.y - measured.height / 2),
+            withAttributes: attrs
         )
+    }
+
+    private static func attributes(_ size: CGFloat,
+                                   _ colour: UIColor) -> [NSAttributedString.Key: Any] {
+        [.font: AppFonts.scriptFont(size), .foregroundColor: colour]
     }
 }

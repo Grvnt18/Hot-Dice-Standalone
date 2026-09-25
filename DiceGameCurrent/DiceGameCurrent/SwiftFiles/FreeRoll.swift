@@ -97,6 +97,7 @@ struct FreeRollPool: Equatable {
 // MARK: - Suite entry
 
 enum FreeRollGame: SuiteGame {
+    static let floorMotif = FloorMotif.diceShapes
     static let id = "freeroll"
     static let displayName = "Free Roll"
     static let tagline = "Up to \(FreeRollPool.maxDice) dice. No score. Just roll."

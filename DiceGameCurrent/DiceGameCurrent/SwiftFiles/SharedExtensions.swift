@@ -38,6 +38,26 @@ extension UIColor {
         return UIColor(hue: h, saturation: s, brightness: b * (1 - fraction), alpha: a)
     }
 
+    /// The counterpart to `darkened`, raising brightness toward full.
+    ///
+    /// Also in HSB, and for the same reason: blending toward white in RGB
+    /// washes the hue out, so a lit cap would read as a grey disc rather
+    /// than as a brighter version of the post it sits on.
+    ///
+    /// A fully-bright colour has no headroom left, so saturation gives way
+    /// instead — which is what a lit surface does anyway.
+    func lightened(by fraction: CGFloat) -> UIColor {
+        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        guard getHue(&h, saturation: &s, brightness: &b, alpha: &a) else { return self }
+        let headroom = 1 - b
+        let raised = b + headroom * fraction
+        let spent = max(0, fraction - headroom)
+        return UIColor(hue: h,
+                       saturation: s * (1 - spent),
+                       brightness: min(1, raised),
+                       alpha: a)
+    }
+
     /// Standard (ITU-R BT.601) relative luminance, used to decide whether
     /// light or dark text/UI elements read better against this color.
     var relativeLuminance: CGFloat {

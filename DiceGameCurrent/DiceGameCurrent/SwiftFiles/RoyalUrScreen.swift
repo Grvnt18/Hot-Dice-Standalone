@@ -86,6 +86,7 @@ struct RoyalUrScreen: View {
                         makeInitialDice: { RoyalUrRules.makeDice() },
                         d4Style: .markedTips,
                         floorTitle: RoyalUrGame.floorTitle,
+                        arenaStyle: .house(motif: RoyalUrGame.floorMotif),
                         onSessionCreated: { newSession in
                             newSession.onRollSettled = { results in
                                 applyRoll(results)
@@ -451,6 +452,7 @@ struct RoyalUrScreen: View {
 // MARK: - Suite entry
 
 enum RoyalUrGame: SuiteGame {
+    static let floorMotif = FloorMotif.crowns
     static let id = "royal_ur"
     static let displayName = "Royal UR"
     static let tagline = "Race, capture, come home."

@@ -427,6 +427,14 @@ extension BaseballDiceRules {
         var isDoublePlay = false
         /// True when a deep out still brought a runner home.
         var isSacrificeFly = false
+
+        /// A deep out that ended the inning with a runner on third.
+        ///
+        /// The run does not count — the catch is the third out, which is
+        /// how real baseball scores it — but a bare "Caught at the wall"
+        /// is indistinguishable from a fault, and was read as one. The
+        /// banner uses this to say why.
+        var strandedOnThird = false
     }
 
     /// Moves the runners, and says how many scored and how many went out.
@@ -447,10 +455,14 @@ extension BaseballDiceRules {
 
         case .deepOut:
             effect.outs = 1
-            if diamond.occupied[2] && outs + 1 < outsPerHalfInning {
-                effect.runs = 1
-                effect.isSacrificeFly = true
-                diamond.occupied[2] = false
+            if diamond.occupied[2] {
+                if outs + 1 < outsPerHalfInning {
+                    effect.runs = 1
+                    effect.isSacrificeFly = true
+                    diamond.occupied[2] = false
+                } else {
+                    effect.strandedOnThird = true
+                }
             }
 
         case .fieldOut:

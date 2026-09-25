@@ -44,6 +44,7 @@ struct FreeRollScreen: View {
                     session: $session,
                     makeInitialDice: { pool.makeDice() },
                     floorTitle: FreeRollGame.floorTitle,
+                    arenaStyle: .house(motif: FreeRollGame.floorMotif),
                     onSessionCreated: { newSession in
                         newSession.onRollSettled = { results in
                             lastThrow = results

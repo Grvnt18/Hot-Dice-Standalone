@@ -157,6 +157,16 @@ struct BaseballDiceScreen: View {
             AppFonts.registerIfNeeded()
             SoundEngine.shared.startMusic()
         }
+        // Nine screens had this and Baseball did not, which is why its
+        // floor kept the old colour until something else rebuilt the
+        // scene. refreshField comes with it: the runner posts are painted
+        // from the theme too, and they were only repainted after an
+        // at-bat — so the posts changed colour on the next roll rather
+        // than when the colour was picked.
+        .onChange(of: theme.colorwayIndex) { _, _ in
+            session?.applyTheme()
+            refreshField()
+        }
     }
 
     /// Repaints everything on the pitch that carries state: the posts for
@@ -428,7 +438,10 @@ struct BaseballDiceScreen: View {
         case .walk:
             return effect.runs > 0 ? "Walk, forced in." : "Walk."
         case .strikeout: return "Strikeout."
-        case .deepOut:   return "Caught at the wall."
+        case .deepOut:
+            return effect.strandedOnThird
+                ? "Caught at the wall — third out, the run does not count."
+                : "Caught at the wall."
         case .fieldOut:  return "Field out."
         }
     }

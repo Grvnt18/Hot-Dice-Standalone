@@ -80,16 +80,6 @@ def wave(y, amplitude, cycles, thickness, lift, samples=48):
     return poly(top + bottom[::-1], lift)
 
 
-def trace(x0, y0, x1, y1, w, lift):
-    """An axis-aligned circuit trace."""
-    if abs(y1 - y0) < 1e-9:
-        return poly([(min(x0, x1), y0 - w / 2), (max(x0, x1), y0 - w / 2),
-                     (max(x0, x1), y0 + w / 2), (min(x0, x1), y0 + w / 2)], lift)
-    return poly([(x0 - w / 2, min(y0, y1)), (x0 + w / 2, min(y0, y1)),
-                 (x0 + w / 2, max(y0, y1)), (x0 - w / 2, max(y0, y1))], lift)
-
-
-
 def tiled(builder, columns, rows, lift, inset):
     """Stamps one shape across the floor on a grid.
 
@@ -174,6 +164,16 @@ def bone_tile(cx, cy, size, lift):
     return bone(cx, cy, length, thickness, angle, lift)
 
 
+def rect(x0, y0, x1, y1, lift):
+    """An axis-aligned rectangle from two corners.
+
+    Mirrors the Swift, which needed it: twenty rectangles written as four
+    arithmetic corners each is what made `circuitBoard` un-type-checkable
+    there. The shape of the two sources has to match for the verifier to
+    compare them number for number, so it lives here too."""
+    return poly([(x0, y0), (x1, y0), (x1, y1), (x0, y1)], lift)
+
+
 def segment(x0, y0, x1, y1, w, lift):
     """A trace of any angle: a quad along the line, w wide."""
     dx, dy = x1 - x0, y1 - y0
@@ -195,90 +195,101 @@ def circuit_board(lift, deep):
 
     A PCB does not route in straight radial lines, so each bundle steps
     sideways part way out and carries on — which is also what stops eight
-    bundles from looking like a sunburst."""
-    half, w, jog = 0.085, 0.026, 0.055
-    out = [poly([(0.5 - half, 0.5 - half), (0.5 + half, 0.5 - half),
-                 (0.5 + half, 0.5 + half), (0.5 - half, 0.5 + half)], lift)]
+    bundles from looking like a sunburst.
 
-    # The chip's pins, three a side, darker so the block is not one mass.
+    Split into three functions to mirror the Swift, which had to be split:
+    see `rect`."""
+    out = chip(lift, deep)
+    for k in range(8):
+        out += bundle(k, lift, deep)
+    return out
+
+
+def chip(lift, deep):
+    """The chip everything leaves from, and its pins."""
+    half = 0.085
+    out = [rect(0.5 - half, 0.5 - half, 0.5 + half, 0.5 + half, lift)]
+
+    # Three pins a side, darker so the block is not one mass.
+    outer = half + 0.030
+    inner = half - 0.004
     for i in (-1, 0, 1):
         at = i * 0.048
-        out.append(poly([(0.5 + at - 0.011, 0.5 - half - 0.030),
-                         (0.5 + at + 0.011, 0.5 - half - 0.030),
-                         (0.5 + at + 0.011, 0.5 - half + 0.004),
-                         (0.5 + at - 0.011, 0.5 - half + 0.004)], deep))
-        out.append(poly([(0.5 + at - 0.011, 0.5 + half - 0.004),
-                         (0.5 + at + 0.011, 0.5 + half - 0.004),
-                         (0.5 + at + 0.011, 0.5 + half + 0.030),
-                         (0.5 + at - 0.011, 0.5 + half + 0.030)], deep))
-        out.append(poly([(0.5 - half - 0.030, 0.5 + at - 0.011),
-                         (0.5 - half + 0.004, 0.5 + at - 0.011),
-                         (0.5 - half + 0.004, 0.5 + at + 0.011),
-                         (0.5 - half - 0.030, 0.5 + at + 0.011)], deep))
-        out.append(poly([(0.5 + half - 0.004, 0.5 + at - 0.011),
-                         (0.5 + half + 0.030, 0.5 + at - 0.011),
-                         (0.5 + half + 0.030, 0.5 + at + 0.011),
-                         (0.5 + half - 0.004, 0.5 + at + 0.011)], deep))
+        low = 0.5 + at - 0.011
+        high = 0.5 + at + 0.011
+        out.append(rect(low, 0.5 - outer, high, 0.5 - inner, deep))
+        out.append(rect(low, 0.5 + inner, high, 0.5 + outer, deep))
+        out.append(rect(0.5 - outer, low, 0.5 - inner, high, deep))
+        out.append(rect(0.5 + inner, low, 0.5 + outer, high, deep))
+    return out
 
-    for k in range(8):
-        a = k * math.pi / 4
-        ca, sa = math.cos(a), math.sin(a)
 
-        def at(radius, offset):
-            return (0.5 + radius * ca - offset * sa,
-                    0.5 + radius * sa + offset * ca)
+def bundle(k, lift, deep):
+    """One trunk: three traces to the edge, a via where they step across,
+    two branches with pads, and a block out toward the corner."""
+    w = 0.026
+    jog = 0.055
+    lane = jog * 0.62
+    a = k * math.pi / 4
+    ca, sa = math.cos(a), math.sin(a)
 
-        for lane in (-1, 0, 1):
-            off = lane * jog
-            p0 = at(0.135, off)
-            p1 = at(0.340, off)
-            p2 = at(0.340, off + jog * 0.62)
-            p3 = at(0.880, off + jog * 0.62)
-            out.append(segment(p0[0], p0[1], p1[0], p1[1], w, lift))
-            out.append(segment(p1[0], p1[1], p2[0], p2[1], w, lift))
-            out.append(segment(p2[0], p2[1], p3[0], p3[1], w, lift))
+    def at(radius, offset):
+        return (0.5 + radius * ca - offset * sa,
+                0.5 + radius * sa + offset * ca)
 
-        # A via where the middle lane turns, and a pad on each branch.
-        via = at(0.340, jog * 0.62)
-        out.append(ring(via[0], via[1], 0.044, 0.019, lift))
+    out = []
 
-        # A chord to the next bundle, so the trunks are a network rather
-        # than a sunburst: this is most of what makes the board read as
-        # connected rather than as eight separate runs.
-        nxt = a + math.pi / 4
-        c0 = at(0.620, jog * 0.62)
-        c1 = (0.5 + 0.620 * math.cos(nxt) - jog * 0.62 * math.sin(nxt),
-              0.5 + 0.620 * math.sin(nxt) + jog * 0.62 * math.cos(nxt))
-        out.append(segment(c0[0], c0[1], c1[0], c1[1], w, lift))
+    for side in (-1, 0, 1):
+        off = side * jog
+        p0 = at(0.135, off)
+        p1 = at(0.340, off)
+        p2 = at(0.340, off + lane)
+        p3 = at(0.880, off + lane)
+        out.append(segment(p0[0], p0[1], p1[0], p1[1], w, lift))
+        out.append(segment(p1[0], p1[1], p2[0], p2[1], w, lift))
+        out.append(segment(p2[0], p2[1], p3[0], p3[1], w, lift))
 
-        for radius, side in (((0.470 if k % 2 else 0.410), 1),
-                             ((0.740 if k % 2 else 0.790), -1)):
-            base = at(radius, jog * 0.62)
-            tip = at(radius, jog * 0.62 + side * 0.130)
-            out.append(segment(base[0], base[1], tip[0], tip[1], w, lift))
-            out.append(circle(tip[0], tip[1], 0.030, lift))
+    # A via where the middle lane turns.
+    via = at(0.340, lane)
+    out.append(ring(via[0], via[1], 0.044, 0.019, lift))
 
-        # A smaller block between this bundle and the next, so the space
-        # between the trunks is wired rather than bare.
-        b = a + math.pi / 8
-        bx = 0.5 + 0.560 * math.cos(b)
-        by = 0.5 + 0.560 * math.sin(b)
-        out.append(poly([(bx - 0.055, by - 0.032), (bx + 0.055, by - 0.032),
-                         (bx + 0.055, by + 0.032), (bx - 0.055, by + 0.032)],
-                        lift))
-        for i in (-1, 0, 1):
-            out.append(poly([(bx + i * 0.034 - 0.010, by - 0.046),
-                             (bx + i * 0.034 + 0.010, by - 0.046),
-                             (bx + i * 0.034 + 0.010, by - 0.028),
-                             (bx + i * 0.034 - 0.010, by - 0.028)], deep))
+    # A chord to the next bundle, so the trunks are a network rather than
+    # a sunburst: this is most of what makes the board read as connected
+    # rather than as eight separate runs.
+    nxt = a + math.pi / 4
+    c0 = at(0.620, lane)
+    c1x = 0.5 + 0.620 * math.cos(nxt) - lane * math.sin(nxt)
+    c1y = 0.5 + 0.620 * math.sin(nxt) + lane * math.cos(nxt)
+    out.append(segment(c0[0], c0[1], c1x, c1y, w, lift))
 
-        # And a pad out toward the corner, on a stub off the same angle,
-        # because the diagonals reach further than the axes do and the
-        # space past the blocks was the one part of the floor left bare.
-        sx = 0.5 + 0.830 * math.cos(b)
-        sy = 0.5 + 0.830 * math.sin(b)
-        out.append(segment(bx, by, sx, sy, w * 0.72, lift))
-        out.append(ring(sx, sy, 0.040, 0.017, lift))
+    # Two branches, at radii that alternate so eight bundles do not line
+    # up into rings.
+    near_radius = 0.470 if k % 2 else 0.410
+    far_radius = 0.740 if k % 2 else 0.790
+    for radius, side in ((near_radius, 1), (far_radius, -1)):
+        base = at(radius, lane)
+        tip = at(radius, lane + side * 0.130)
+        out.append(segment(base[0], base[1], tip[0], tip[1], w, lift))
+        out.append(circle(tip[0], tip[1], 0.030, lift))
+
+    # A smaller block between this bundle and the next, so the space
+    # between the trunks is wired rather than bare.
+    b = a + math.pi / 8
+    bx = 0.5 + 0.560 * math.cos(b)
+    by = 0.5 + 0.560 * math.sin(b)
+    out.append(rect(bx - 0.055, by - 0.032, bx + 0.055, by + 0.032, lift))
+    for i in (-1, 0, 1):
+        leg_x = bx + i * 0.034
+        out.append(rect(leg_x - 0.010, by - 0.046, leg_x + 0.010, by - 0.028,
+                        deep))
+
+    # And a pad out toward the corner, on a stub off the same angle,
+    # because the diagonals reach further than the axes do and the space
+    # past the blocks was the one part of the floor left bare.
+    sx = 0.5 + 0.830 * math.cos(b)
+    sy = 0.5 + 0.830 * math.sin(b)
+    out.append(segment(bx, by, sx, sy, w * 0.72, lift))
+    out.append(ring(sx, sy, 0.040, 0.017, lift))
     return out
 
 

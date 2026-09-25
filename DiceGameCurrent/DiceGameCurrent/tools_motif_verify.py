@@ -157,7 +157,10 @@ def main():
         "die_face": "dieShape",
         "bone_tile": "boneTile",
         "circuit_board": "circuitBoard",
+        "chip": "chip",
+        "bundle": "bundle",
         "segment": "segment",
+        "rect": "rect",
         "tiled": "tiled",
     }
     for py_name, swift_name in sorted(BUILDERS.items()):

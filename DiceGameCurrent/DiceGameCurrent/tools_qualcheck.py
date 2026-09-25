@@ -199,4 +199,57 @@ for f in SOURCES:
             merged += 1
 print("half-merge check:", "FAIL" if merged else "PASS", "(%d)" % merged)
 
-sys.exit(1 if bad or escapes or merged else 0)
+# --- 4. Calls to something nothing declares --------------------------
+#
+# Deleting a function keeps every brace balanced, so the balance scan is
+# blind to it — which is how `FloorMotif.polygon` went out with the old
+# circuit tile it happened to sit next to, taking the whole file's
+# geometry with it. Every builder still called it; nothing declared it.
+#
+# So: every lowercase name used as a call must be declared somewhere in
+# the tree, or be one of the standard names below. The list is the price
+# of the check and is meant to grow — a new standard-library call fails
+# here once and is added, which is cheaper than a file that does not
+# compile.
+KNOWN = {
+    # Swift keywords and contextual words that parse as `name(`
+    "if", "for", "in", "case", "switch", "return", "init", "private",
+    "fileprivate", "escaping",
+    # standard library and Foundation
+    "abs", "min", "max", "ceil", "floor", "round", "sqrt", "sin", "cos",
+    "tan", "atan2", "pow", "stride", "zip", "print", "precondition",
+    "assert", "fatalError", "withAnimation",
+    # simd
+    "simd_cross", "simd_dot", "simd_length", "simd_normalize",
+    "simd_quatf", "simd_slerp", "simd_float3", "simd_float3x3",
+    # UIKit and SwiftUI members reached without a receiver
+    "getRed", "getHue", "dismiss", "overlay", "shadow", "content",
+    "selector", "build", "region", "special", "decided",
+    # payload error cases, declared as `case name(...)` in their enums
+    "scoreMismatch", "unknownGame", "unsupportedVersion",
+    "valueOutOfRange", "wrongDieCount",
+}
+
+declared = set()
+for f in SOURCES:
+    text = open(f).read()
+    declared |= set(re.findall(r'func\s+(\w+)\s*[(<]', text))
+    declared |= set(re.findall(r'(?:let|var)\s+(\w+)\s*:\s*\(', text))
+    declared |= set(re.findall(r'\bcase\s+(\w+)\s*\(', text))
+
+undeclared = 0
+for f in SOURCES:
+    s = strip(open(f).read())
+    for m in re.finditer(r'(?<![\w.$])([a-z]\w*)\s*\(', s):
+        name = m.group(1)
+        if name in declared or name in KNOWN:
+            continue
+        line = s[:m.start()].count('\n') + 1
+        print("  UNDECLARED  %s:%d  '%s(' is called but nothing declares it "
+              "(add it to KNOWN if it is a standard call)"
+              % (os.path.relpath(f), line, name))
+        undeclared += 1
+print("undeclared-call check:", "FAIL" if undeclared else "PASS",
+      "(%d)" % undeclared)
+
+sys.exit(1 if bad or escapes or merged or undeclared else 0)

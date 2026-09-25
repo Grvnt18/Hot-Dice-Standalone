@@ -107,9 +107,14 @@ extension View {
     /// play shows only its top face — the shading across it, the bevel at
     /// its edge and the shadow it throws are the entirety of what says it
     /// is solid, and a flat piece with none of them is a sticker.
-    func pieceSolid<S: Shape>(_ shape: S,
-                              elevation: Elevation = .piece,
-                              lineWidth: CGFloat = 2) -> some View {
+    ///
+    /// Takes an `InsettableShape` rather than a `Shape` because the bevel is
+    /// drawn with `strokeBorder`, which only exists on the former — a plain
+    /// `stroke` straddles the edge, so half the bevel would fall outside the
+    /// die and the corner would read soft instead of turned.
+    func pieceSolid<S: InsettableShape>(_ shape: S,
+                                        elevation: Elevation = .piece,
+                                        lineWidth: CGFloat = 2) -> some View {
         pieceSheen(shape)
             .overlay(shape.strokeBorder(PieceSheen.bevel, lineWidth: lineWidth))
             .elevated(elevation)

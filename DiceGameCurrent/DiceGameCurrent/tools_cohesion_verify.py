@@ -74,6 +74,35 @@ def main():
     if not source("LowPolyTextures.swift").count("paperSurface"):
         failed.append("LowPolyTextures has no paper generator")
 
+    # --- 4. strokeBorder needs an InsettableShape. -------------------
+    #
+    # `strokeBorder` is declared on InsettableShape, not on Shape, so a
+    # helper generic over `S: Shape` that strokes its own border does not
+    # compile — "value of type 'S' has no member 'strokeBorder'", which is
+    # exactly what the device reported for `pieceSolid`. A plain `stroke`
+    # is not the fix either: it straddles the edge, so half a bevel would
+    # fall outside the die.
+    for name in names:
+        code = strip_comments(source(name))
+        for match in re.finditer(r'func\s+\w+\s*<\s*(\w+)\s*:\s*Shape\s*>', code):
+            param = match.group(1)
+            body, depth, started = "", 0, False
+            for ch in code[match.end():]:
+                if ch == "{":
+                    depth += 1
+                    started = True
+                elif ch == "}":
+                    depth -= 1
+                body += ch
+                if started and depth == 0:
+                    break
+            if "strokeBorder" in body:
+                line = code[:match.start()].count("\n") + 1
+                failed.append("%s:%d is generic over %s: Shape and calls "
+                              "strokeBorder, which only exists on "
+                              "InsettableShape — this does not compile"
+                              % (name, line, param))
+
     for line in failed:
         print("  %-26s FAILED  %s" % ("cohesion", line))
     if failed:
@@ -81,6 +110,7 @@ def main():
 
     print("  %-26s ok (direction shared, three heights)" % "one light")
     print("  %-26s ok (paper + ink, solid placements)" % "materials in use")
+    print("  %-26s ok (no strokeBorder on a bare Shape)" % "shape constraints")
     print("cohesion: PASS")
 
 

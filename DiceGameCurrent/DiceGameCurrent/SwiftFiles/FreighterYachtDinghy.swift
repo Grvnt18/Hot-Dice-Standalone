@@ -169,11 +169,23 @@ enum FreighterYachtDinghyGame: SuiteGame {
     static let tileName = "F.Y.D."
 
 
-    static let rules: [GameRuleSection] = [
+    /// The short version, shown from inside the game.
+    static let quickRules: [GameRuleSection] = [
         GameRuleSection(
-            title: "At a Glance",
-            body: "Three rounds, highest total. Four rolls of five dice a turn to claim a Freighter (6), then a Yacht (5), then a Dinghy (4) — strictly in that order. The two dice left over are your Cargo and their total is your score. Miss any of the three and the round scores nothing."
+            title: "The Goal",
+            body: "Three rounds each, highest total."
         ),
+        GameRuleSection(
+            title: "Your Turn",
+            body: "Four rolls of five dice to claim a Freighter (6), then a Yacht (5), then a Dinghy (4) — strictly in that order, and the app sets them aside for you."
+        ),
+        GameRuleSection(
+            title: "Cargo",
+            body: "The two dice left over are your Cargo and their total is your score; with rolls left you may rethrow both together. Miss any of the three and the round scores nothing."
+        )
+    ]
+
+    static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Your Turn",
             body: "You get four rolls of five dice. You are looking for a Freighter (6), a Yacht (5) and a Dinghy (4) — in that order."

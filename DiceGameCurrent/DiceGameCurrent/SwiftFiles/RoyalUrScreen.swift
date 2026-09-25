@@ -464,11 +464,23 @@ enum RoyalUrGame: SuiteGame {
     static let displayName = "Royal UR"
     static let tagline = "Race, capture, come home."
 
-    static let rules: [GameRuleSection] = [
+    /// The short version, shown from inside the game.
+    static let quickRules: [GameRuleSection] = [
         GameRuleSection(
-            title: "At a Glance",
-            body: "First to bring two of three pieces home. Roll five four-sided dice and count the marked points showing — nought to five squares, two or three most of the time. Land on an opponent's piece to send it back to the start, land on a rosette to roll again, and roll nothing at all and one of your own pieces goes back four."
+            title: "The Goal",
+            body: "Three pieces each, sixteen squares each, and the first player to bring two of them home wins."
         ),
+        GameRuleSection(
+            title: "Your Turn",
+            body: "Roll five four-sided dice and count the marked points showing — nought to five. Move one piece that far: tap it to select, tap the ringed square to commit."
+        ),
+        GameRuleSection(
+            title: "The Board",
+            body: "Land on an opponent's piece and it goes back to the start. Land on a rosette and you roll again. Roll nothing, or have nowhere to go, and one of your own pieces goes back four."
+        )
+    ]
+
+    static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "The Race",
             body: "Three pieces each, and the first player to bring two of them home wins. Your route runs sixteen squares: out along your own row, up the middle past the bridge, around the far block, and out."

@@ -47,11 +47,23 @@ enum HogGame: SuiteGame {
     static let displayName = "Hog"
     static let tagline = "Push your luck to 75."
 
-    static let rules: [GameRuleSection] = [
+    /// The short version, shown from inside the game.
+    static let quickRules: [GameRuleSection] = [
         GameRuleSection(
-            title: "At a Glance",
-            body: "First to bank 75 wins immediately. Roll one die as often as you dare, adding each face to your turn total, then hold to bank it and pass. Roll a 1 — the Hog — and the whole turn total is gone."
+            title: "The Goal",
+            body: "First to bank 75 wins immediately — there is no answering turn."
         ),
+        GameRuleSection(
+            title: "Your Turn",
+            body: "Roll one die as often as you dare, adding each face to your turn total, then hold to bank it and pass."
+        ),
+        GameRuleSection(
+            title: "The Hog",
+            body: "Roll a 1 and the whole turn total is gone. What you have already banked is safe."
+        )
+    ]
+
+    static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Your Turn",
             body: "Roll one die as many times as you dare. Every face adds to your turn total — and you keep none of it until you hold."

@@ -476,7 +476,10 @@ ACROSS EVERY GAME
   colour and How to Play. The table colour and the music are remembered PER
   GAME; the hub has a switch to make the music the same everywhere instead.
 
-  How to Play from the hub opens a cluster of bubbles, one per game, each
-  opening that game's own rules.
+  The rules come in two tiers. Inside a game, Settings > Quick Start shows
+  the short version for that game alone — the goal, the turn, and the one
+  rule that bites. From the game selection screen, Settings > How to Play
+  opens a cluster of bubbles, one per game, each opening the full guide:
+  every table and every edge case, which is what this document holds.
 
   Rolls is the only game that takes more than two players.

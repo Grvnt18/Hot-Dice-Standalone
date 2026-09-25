@@ -26,7 +26,10 @@ struct SettingsView: View {
     init<G: SuiteGame>(for game: G.Type) {
         self.gameName = G.displayName
         self.tagline = G.tagline
-        self.rules = G.rules
+        // The SHORT guide, because this sheet is opened mid-match. The
+        // full one is two taps away on the hub, where a player browsing
+        // the suite actually wants it.
+        self.rules = G.quickRules
     }
 
     /// The hub's sheet: no game open, so no rules and no How to Play.
@@ -172,7 +175,7 @@ struct SettingsView: View {
                     Button {
                         showingHowToPlay = true
                     } label: {
-                        Text(rules.isEmpty ? "How to Play — Every Game" : "How to Play")
+                        Text(rules.isEmpty ? "How to Play — Every Game" : "Quick Start")
                             .font(.stackSans(15))
                             .frame(maxWidth: .infinity)
                     }
@@ -213,7 +216,8 @@ struct SettingsView: View {
                 if rules.isEmpty {
                     GuideBubbleCluster()
                 } else {
-                    HowToPlayView(gameName: gameName, tagline: tagline, sections: rules)
+                    HowToPlayView(gameName: gameName, tagline: tagline,
+                                  sections: rules, isQuickStart: true)
                 }
             }
         }
@@ -301,6 +305,13 @@ struct HowToPlayView: View {
     let tagline: String?
     let sections: [GameRuleSection]
 
+    /// Whether this is the short guide from inside a game or the full one
+    /// from the hub. It changes the title and adds a line saying where
+    /// the rest of it is — a player who opens the quick guide looking for
+    /// the scoring table should be told it exists rather than concluding
+    /// the game has none.
+    var isQuickStart: Bool = false
+
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var theme = AppTheme.shared
 
@@ -328,6 +339,16 @@ struct HowToPlayView: View {
                         Text(section.title).font(.stackSans(12))
                     }
                 }
+
+                if isQuickStart {
+                    Section {
+                        Text("The full rules — every table, every edge case "
+                             + "— are on the game selection screen: "
+                             + "Settings, then How to Play.")
+                            .font(.stackSans(12))
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             .tint(theme.accentColor)
             .navigationBarTitleDisplayMode(.inline)
@@ -335,7 +356,8 @@ struct HowToPlayView: View {
                 ToolbarItem(placement: .principal) {
                     // Named so it is obvious which game's rules these are,
                     // now that the sheet is reachable from more than one.
-                    Text(gameName.map { "\($0) — How to Play" } ?? "How to Play")
+                    Text(gameName.map { "\($0) — \(isQuickStart ? "Quick Start" : "How to Play")" }
+                         ?? "How to Play")
                         .font(.stackSans(17))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)

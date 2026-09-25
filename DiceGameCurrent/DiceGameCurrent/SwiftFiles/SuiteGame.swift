@@ -22,8 +22,19 @@ protocol SuiteGame {
     /// One-line pitch for the tile, under the name.
     static var tagline: String { get }
 
-    /// Rules for the How to Play sheet, as titled sections.
+    /// The full guide, as titled sections — the one the hub's bubble
+    /// cluster opens.
     static var rules: [GameRuleSection] { get }
+
+    /// The short version, shown from inside the game.
+    ///
+    /// Two tiers because they answer different questions. A player who
+    /// opens Settings mid-match wants "what am I doing on this turn" in
+    /// two sections, not the differential table; a player browsing the
+    /// suite from the hub wants the whole thing. Defaults to the full
+    /// guide, so a game that has not written a short one still shows
+    /// something.
+    static var quickRules: [GameRuleSection] { get }
 
     /// Upper bound on participants. Two for everything except Rolls, which
     /// has no ceiling beyond what a group chat contains.
@@ -78,6 +89,10 @@ extension SuiteGame {
 
     /// The full name, for the ten games it fits.
     static var tileName: String { displayName }
+
+    /// A game with no short guide of its own shows the full one rather
+    /// than nothing.
+    static var quickRules: [GameRuleSection] { rules }
     static var lowestScoreWins: Bool { false }
     static var isSendable: Bool { true }
 }
@@ -220,14 +235,30 @@ enum BaseballDiceGame: SuiteGame {
     static let displayName = "Baseball Dice"
     static let tagline = "Guess the pitch. Take the extra base."
 
+    /// The short version, shown from inside the game.
+    static let quickRules: [GameRuleSection] = [
+        GameRuleSection(
+            title: "The Goal",
+            body: "Most runs over 3, 6 or 9 innings, three outs to a half-inning. The side batting second is the home side."
+        ),
+        GameRuleSection(
+            title: "Pitching",
+            body: "Pick a style and hide it: Power Pitcher throws mostly fastballs, Crafty mostly changeups, Breaking Ball mostly sliders. The app draws the actual pitch from that mix every at-bat, so nobody knows exactly what is coming."
+        ),
+        GameRuleSection(
+            title: "Batting",
+            body: "Pick a swing without seeing the pitch. Patient beats the Fastball, Contact the Changeup, Power the Slider. Guess right and you throw two of your die and keep the best against the pitcher's d4; guess wrong and the pitcher has the better die."
+        ),
+        GameRuleSection(
+            title: "Reading It",
+            body: "Your roll minus theirs. -5 or worse is a strikeout, -4 to +1 a field out, +2 a walk, +3 or +4 a single, +5 a double, +6 a triple, +7 to +9 caught at the wall, +10 or more a home run."
+        )
+    ]
+
     /// The floor is the ballpark itself, so it carries no wordmark.
     static let floorTitle = ""
 
     static let rules: [GameRuleSection] = [
-        GameRuleSection(
-            title: "At a Glance",
-            body: "Most runs over 3, 6 or 9 innings, three outs a half-inning. The pitcher picks a hidden style and the batter a hidden swing; the guess decides whose dice are better, and the batter's roll minus the pitcher's roll decides what happened. Every swing beats one pitch and loses to one."
-        ),
         GameRuleSection(
             title: "The Game",
             body: "Pick a match length first — 3 innings is short, 6 medium, 9 extra long. Three outs to a half-inning, and the side batting last has the advantage it does in real baseball."
@@ -271,14 +302,26 @@ enum RollsGame: SuiteGame {
     /// Points are penalties here — rolling a die's highest face scores 0.
     static let lowestScoreWins = true
 
+    /// The short version, shown from inside the game.
+    static let quickRules: [GameRuleSection] = [
+        GameRuleSection(
+            title: "The Goal",
+            body: "The lowest total once all fifteen dice are banked. Points are penalties here."
+        ),
+        GameRuleSection(
+            title: "Your Turn",
+            body: "Roll the pool, tap at least one settled die to bank it, then roll everything left. Repeat until nothing is loose."
+        ),
+        GameRuleSection(
+            title: "Scoring",
+            body: "A die's highest face costs nothing, every step below it costs a point, and a 1 costs the die's full number of sides — 6 on a d6, 12 on a d12."
+        )
+    ]
+
     /// Moved here verbatim from HowToPlayView, which hardcoded them. The
     /// wording was fine; it was living in the settings sheet, which meant
     /// every game showed Rolls' rules.
     static let rules: [GameRuleSection] = [
-        GameRuleSection(
-            title: "At a Glance",
-            body: "Lowest score wins. Fifteen dice — twelve d6, one d8, one d10, one d12. Roll them all, bank at least one die, re-roll the rest, and keep going until every die is banked. A die's highest face costs nothing; every step below it costs a point; a 1 costs the die's full number of sides."
-        ),
         GameRuleSection(
             title: "The Pool",
             body: "You start with 15 dice: twelve 6-sided, one 8-sided, one 10-sided, and one 12-sided."

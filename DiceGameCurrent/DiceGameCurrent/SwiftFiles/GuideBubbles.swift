@@ -43,7 +43,9 @@ struct GuideBubbleCluster: View {
 
                 ScrollView {
                     VStack(spacing: 14) {
-                        Text("Pick a game to read its rules.")
+                        Text("Pick a game for its full rules — every table "
+                             + "and every edge case. The short version is "
+                             + "in each game's own Settings.")
                             .font(.stackSans(13))
                             .foregroundStyle(.white.opacity(0.75))
                             .padding(.top, 8)
@@ -75,6 +77,9 @@ struct GuideBubbleCluster: View {
             }
         }
         .sheet(item: $opened) { entry in
+            // The FULL guide. `GameCatalogEntry.rules` is the detailed set;
+            // the short one is `quickRules`, and a game's own Settings is
+            // where that belongs.
             HowToPlayView(gameName: entry.displayName,
                           tagline: entry.tagline,
                           sections: entry.rules)

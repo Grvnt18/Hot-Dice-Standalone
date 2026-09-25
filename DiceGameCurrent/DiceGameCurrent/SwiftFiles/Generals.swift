@@ -240,11 +240,23 @@ enum GeneralsGame: SuiteGame {
     static let displayName = "Generals"
     static let tagline = "One scorecard. Claim it first."
 
-    static let rules: [GameRuleSection] = [
+    /// The short version, shown from inside the game.
+    static let quickRules: [GameRuleSection] = [
         GameRuleSection(
-            title: "At a Glance",
-            body: "One shared card of twelve categories, claimed once each by whoever takes it first, six claims apiece. Roll five dice up to three times, keeping what you want between rolls, then claim a category for whatever your hand pays there. Nothing qualifies? You must still claim one, for zero. Highest total wins."
+            title: "The Goal",
+            body: "One shared card of twelve categories, claimed once each by whoever takes it first. Six claims apiece, twelve turns in all, highest total wins."
         ),
+        GameRuleSection(
+            title: "Your Turn",
+            body: "Roll five dice, tap the ones to keep, roll the rest — three rolls — then claim one open category for whatever your hand pays there."
+        ),
+        GameRuleSection(
+            title: "Zeroing",
+            body: "If nothing qualifies you must still claim a category, for zero. It burns that category for your opponent too."
+        )
+    ]
+
+    static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "One Card, Two Players",
             body: "There are twelve categories and a single shared scorecard. Each category can be claimed once, by whoever takes it first — so the whole game is twelve turns, six each."

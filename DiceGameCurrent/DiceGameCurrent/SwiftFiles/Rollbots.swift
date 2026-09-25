@@ -411,11 +411,23 @@ enum RollbotsGame: SuiteGame {
     static let displayName = "Rollbots"
     static let tagline = "Duel in the net. Answer every shot."
 
-    static let rules: [GameRuleSection] = [
+    /// The short version, shown from inside the game.
+    static let quickRules: [GameRuleSection] = [
         GameRuleSection(
-            title: "At a Glance",
-            body: "Two netrunners at \(RollbotsRules.startingIP) Integrity Points; take theirs to zero. Attacking throws a d10 for accuracy and the weapon's damage die together. The defender sees both before choosing: Dodge a d6, beating the accuracy outright for nothing, or Firewall a d8 subtracted from the damage, with a natural 8 stopping everything."
+            title: "The Goal",
+            body: "Take your opponent from \(RollbotsRules.startingIP) Integrity Points to zero. The second runner starts one point up."
         ),
+        GameRuleSection(
+            title: "Attacking",
+            body: "Pick a weapon at setup. Attacking throws the accuracy d10 and the weapon's damage die together, and you read both before sending the shot."
+        ),
+        GameRuleSection(
+            title: "Defending",
+            body: "You see both of their numbers first. Dodge rolls a d6 — beat their accuracy outright and take nothing, tie or miss and take all of it. Firewall rolls a d8 and subtracts it, and a natural 8 stops everything."
+        )
+    ]
+
+    static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "The Duel",
             body: "Two netrunners, \(RollbotsRules.startingIP) Integrity Points each. Take your opponent to zero. The second runner starts one point up, because striking first is worth about four percent."
@@ -434,7 +446,7 @@ enum RollbotsGame: SuiteGame {
         ),
         GameRuleSection(
             title: "Cyberware",
-            body: "One ability each, once a match, and every one of them costs you something. Read the strain before you pick."
+            body: "One ability each, once a match, and every one costs you something. Neural Overclock: your next attack lands at accuracy 10 and no Firewall stops it, and the Rail fires without charging — but you cannot defend at all on their next turn. Corrosive Virus: 3 IP at the start of each of their next three turns, nine in all — but roll a d6 first, and on a 1 or 2 it turns on you. Quantum Phase: your next defence rolls a d12, and beating their accuracy takes nothing and hits back for 4 — but fail it and the attack hits you double. Emergency Sub-Routine: repairs 8 IP on the spot — and leaves you on the Sidearm for four turns."
         ),
         GameRuleSection(
             title: "Winning",

@@ -171,11 +171,23 @@ enum BoneheadsGame: SuiteGame {
     static let displayName = "Boneheads"
     static let tagline = "Stack yours. Smash theirs."
 
-    static let rules: [GameRuleSection] = [
+    /// The short version, shown from inside the game.
+    static let quickRules: [GameRuleSection] = [
         GameRuleSection(
-            title: "At a Glance",
-            body: "Roll one die, place it in one of your three columns, pass. Matching numbers in a column multiply — two 5's are 20, three are 45. Placing a die destroys every die of that number in your opponent's column of the same letter. There are nine slots each, and the moment either player fills their ninth the game ends and the highest total wins."
+            title: "The Goal",
+            body: "Three columns of three each. Fill the ninth slot and the game ends on the spot — highest total wins."
         ),
+        GameRuleSection(
+            title: "Your Turn",
+            body: "Roll one die and place it in any of your columns with room. That is the whole turn."
+        ),
+        GameRuleSection(
+            title: "Stacking and Smashing",
+            body: "Matching numbers in a column multiply: one 5 is 5, two are 20, three are 45. And placing a die destroys every die of that number in your opponent's column of the same letter."
+        )
+    ]
+
+    static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Your Turn",
             body: "You roll one die and place it in any of your columns that still has room. That is the whole turn — the only question is which column."
@@ -190,7 +202,7 @@ enum BoneheadsGame: SuiteGame {
         ),
         GameRuleSection(
             title: "Winning",
-            body: "The moment either player fills their ninth slot the game stops — there is no answering turn. Highest total wins. That rule is what keeps going first from being an advantage."
+            body: "There are nine slots a side, and the moment either player fills their ninth the game stops — there is no answering turn. Highest total wins. That rule is what keeps going first from being an advantage."
         )
     ]
 }

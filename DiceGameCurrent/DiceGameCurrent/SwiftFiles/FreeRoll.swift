@@ -113,11 +113,23 @@ enum FreeRollGame: SuiteGame {
     /// protocol honest rather than letting the two-player default stand.
     static let maxPlayers = 1
 
-    static let rules: [GameRuleSection] = [
+    /// The short version, shown from inside the game.
+    static let quickRules: [GameRuleSection] = [
         GameRuleSection(
-            title: "At a Glance",
-            body: "A table and nothing else: no score, no turns, no way to lose. Pick any mix of d4, d6, d8, d10, d12 and d20, roll as often as you like, and switch Totals on if you want the throw added up."
+            title: "The Goal",
+            body: "None. No score, no turns, no way to lose."
         ),
+        GameRuleSection(
+            title: "The Dice",
+            body: "Pick any mix of d4, d6, d8, d10, d12 and d20 with the + and - controls, up to \(FreeRollPool.maxDice) in all, and roll as often as you like."
+        ),
+        GameRuleSection(
+            title: "Totals",
+            body: "Off by default. Switch it on and every throw reports a subtotal per die type and the throw as a whole."
+        )
+    ]
+
+    static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "The Dice",
             body: "Pick up to \(FreeRollPool.maxDice) dice in any combination using the + and - controls: d4, d6, d8, d10, d12, d20. Clear empties the table."

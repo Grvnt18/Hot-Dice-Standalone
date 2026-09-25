@@ -128,11 +128,23 @@ enum ThreeThousandGame: SuiteGame {
     static let displayName = "Three Thousand"
     static let tagline = "Bank it or lose it."
 
-    static let rules: [GameRuleSection] = [
+    /// The short version, shown from inside the game.
+    static let quickRules: [GameRuleSection] = [
         GameRuleSection(
-            title: "At a Glance",
-            body: "First to bank 3,000 — and your opponent gets one last turn to beat it. Roll six dice, set aside at least one scoring die, then roll on or bank. A roll with nothing scoring in it is a Bust and the turn's points are gone. Set all six aside and you roll all six again with the total intact."
+            title: "The Goal",
+            body: "First to bank 3,000. Your opponent then gets one last turn to beat it."
         ),
+        GameRuleSection(
+            title: "Your Turn",
+            body: "Roll, set aside at least one scoring die — every die you take has to be part of a combination — then roll on or bank."
+        ),
+        GameRuleSection(
+            title: "Busted, and Hot Dice",
+            body: "A roll with nothing scoring in it ends the turn and loses everything from it. Set all six aside and you roll all six again with the total intact."
+        )
+    ]
+
+    static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Your Turn",
             body: "Roll all six dice. Tap the dice that score to set them aside — you must set aside at least one, and every die you take has to be part of a scoring combination. Then roll what is left, or bank."

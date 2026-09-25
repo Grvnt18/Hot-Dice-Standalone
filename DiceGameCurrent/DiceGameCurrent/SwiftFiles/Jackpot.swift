@@ -183,11 +183,23 @@ enum JackpotGame: SuiteGame {
     static let displayName = "Jackpot"
     static let tagline = "Five rounds, or hit the jackpot."
 
-    static let rules: [GameRuleSection] = [
+    /// The short version, shown from inside the game.
+    static let quickRules: [GameRuleSection] = [
         GameRuleSection(
-            title: "At a Glance",
-            body: "Highest total over five rounds — or a Jackpot, which wins on the spot. Roll a d4, d6, d8, d12 and d20 together and read seven numbers: the d4's three exposed faces plus the top of the other four. Any number appearing more than once scores itself times how often it appears, a d20 of 13 or more adds its own value, and no sets at all with a d20 of 12 or less is the Jackpot."
+            title: "The Goal",
+            body: "The highest total over five rounds each — or a Jackpot, which wins on the spot."
         ),
+        GameRuleSection(
+            title: "Your Turn",
+            body: "Roll all five dice and read seven numbers: the d4's three exposed faces plus the top of the d6, d8, d12 and d20."
+        ),
+        GameRuleSection(
+            title: "Scoring",
+            body: "Any number appearing more than once scores itself times how often it appears. A d20 of 13 or more adds its own value. No sets at all with a d20 of 12 or less is the Jackpot."
+        )
+    ]
+
+    static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Your Turn",
             body: "Roll all five dice together. Read the three exposed faces of the d4 — every number except the one against the table — plus the top face of the d6, d8, d12 and d20. Seven numbers in all."

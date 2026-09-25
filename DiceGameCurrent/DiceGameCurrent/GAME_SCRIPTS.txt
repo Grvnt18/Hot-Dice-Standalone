@@ -59,10 +59,16 @@ SETTINGS (the gear, top right of every game)
   "Music Scope" (hub only), with the footer changing as it is flipped:
       "Each game remembers its own track and volume."
       "One track and volume across every game."
-  "How to Play"              inside a game — opens that game's guide.
+  "Quick Start"              inside a game — opens the short guide for
+                             that game only: the goal, the turn, and the
+                             one rule that bites. It ends with a line
+                             saying where the full rules are.
   "How to Play — Every Game" on the hub — opens the bubble cluster, one
-                             bubble per game, each opening that game's guide.
-  "Pick a game to read its rules."  under the cluster's title.
+                             bubble per game, each opening that game's
+                             FULL guide.
+  "Pick a game for its full rules — every table and every edge case. The
+   short version is in each game's own Settings."   under the cluster's
+                             title.
 
 THE HUB
   "Rolls"  — the wordmark under the app's die mark. Each tile shows only the

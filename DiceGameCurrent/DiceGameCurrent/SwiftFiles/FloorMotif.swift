@@ -57,7 +57,11 @@ enum FloorMotif: String {
         switch self {
         case .none:                                   return nil
         case .seven, .crowns:                         return 52
-        case .bones, .circuitry, .diceShapes:         return 44
+        case .bones, .diceShapes:                     return 44
+        // The circuit board's traces are 0.026 wide. A facet at 44 is
+        // 0.023, so a trace would come out dotted; at 60 it is 0.017 and
+        // a trace is a comfortable one and a half facets.
+        case .circuitry:                              return 60
         case .pigFace, .stars, .circles, .waves:      return 30
         }
     }
@@ -121,7 +125,7 @@ enum FloorMotif: String {
             return tiled(columns: 2, rows: 3, inset: 0.06, cell: boneTile)
 
         case .circuitry:
-            return tiled(columns: 3, rows: 4, inset: 0.04, cell: circuitTile)
+            return circuitBoard()
 
         case .crowns:
             return tiled(columns: 2, rows: 3, inset: 0.12, cell: crown)
@@ -232,46 +236,170 @@ enum FloorMotif: String {
                       lift: Self.lift)]
     }
 
+    /// A bone, or a pair of them crossed.
+    ///
+    /// Half the cells cross, chosen from the cell's own position so the
+    /// floor is the same every launch. A field of single bones reads as
+    /// scattered sticks; the crossed pairs are what make it read as bones.
     private func boneTile(_ cx: CGFloat, _ cy: CGFloat,
                           _ size: CGFloat) -> [Shape] {
-        let angle: CGFloat = pick(cx, cy, 2) == 1 ? 0.6 : -0.6
-        return bone(cx: cx, cy: cy, length: size * 0.78,
-                    thickness: size * 0.17, angle: angle)
-    }
-
-    /// An L of trace with a pad at its corner, turned by position.
-    private func circuitTile(_ cx: CGFloat, _ cy: CGFloat,
-                             _ size: CGFloat) -> [Shape] {
-        let s = size * 0.5
-        let turn = pick(cx, cy, 4)
-        let dx: CGFloat = (turn == 0 || turn == 3) ? 1 : -1
-        let dy: CGFloat = (turn == 0 || turn == 1) ? 1 : -1
-        let w = size * 0.13
-        return [
-            Shape(path: trace(cx - dx * s, cy, cx, cy, w), lift: Self.lift),
-            Shape(path: trace(cx, cy, cx, cy + dy * s, w), lift: Self.lift),
-            Shape(path: circle(cx, cy, size * 0.15), lift: Self.lift),
-            Shape(path: circle(cx - dx * s, cy, size * 0.10), lift: Self.lift)
-        ]
-    }
-
-    // MARK: Builders
-
-    private func polygon(_ points: [(CGFloat, CGFloat)]) -> UIBezierPath {
-        let path = UIBezierPath()
-        for (index, point) in points.enumerated() {
-            let p = CGPoint(x: point.0, y: point.1)
-            index == 0 ? path.move(to: p) : path.addLine(to: p)
+        let length = size * 0.78
+        let thickness = size * 0.17
+        if (Int(cx * 6) + Int(cy * 3)) % 2 == 1 {
+            return bone(cx: cx, cy: cy, length: length,
+                        thickness: thickness, angle: 0.68)
+                + bone(cx: cx, cy: cy, length: length,
+                       thickness: thickness, angle: -0.68)
         }
-        path.close()
-        return path
+        let angle: CGFloat = (Int(cx * 47) + Int(cy * 29)) % 2 == 1 ? 0.6 : -0.6
+        return bone(cx: cx, cy: cy, length: length,
+                    thickness: thickness, angle: angle)
     }
 
-    /// A circle, spelled with one radius.
+    /// A trace of any angle: a quad along the line, `w` wide.
+    private func segment(_ x0: CGFloat, _ y0: CGFloat,
+                         _ x1: CGFloat, _ y1: CGFloat,
+                         _ w: CGFloat) -> UIBezierPath {
+        let dx = x1 - x0, dy = y1 - y0
+        let length = max(sqrt(dx * dx + dy * dy), 1.0e-9)
+        let nx = -dy / length * w / 2
+        let ny = dx / length * w / 2
+        return polygon([(x0 + nx, y0 + ny), (x1 + nx, y1 + ny),
+                        (x1 - nx, y1 - ny), (x0 - nx, y0 - ny)])
+    }
+
+    /// One board, wired from the middle out.
     ///
-    /// Not just sugar: `tools_motif_verify.py` compares the two sources
-    /// number for number, and a radius written twice on one side and once
-    /// on the other reads as drift when it is nothing of the kind.
+    /// This was a 3x4 tiling of an L with a pad on it, and tiled marks do
+    /// not connect to each other — so the floor read as scattered elbows
+    /// rather than as a circuit. It is one layout now: a chip in the
+    /// middle, eight bundles of three traces leaving it for the edges,
+    /// and branches off those into pads, vias and smaller blocks, so the
+    /// field between the trunks is wired too.
+    ///
+    /// A PCB does not route in straight radial lines, so each bundle
+    /// steps sideways part way out and carries on — which is also what
+    /// stops eight bundles from looking like a sunburst.
+    private func circuitBoard() -> [Shape] {
+        let half: CGFloat = 0.085
+        let w: CGFloat = 0.026
+        let jog: CGFloat = 0.055
+
+        var out = [Shape(path: polygon([(0.5 - half, 0.5 - half),
+                                        (0.5 + half, 0.5 - half),
+                                        (0.5 + half, 0.5 + half),
+                                        (0.5 - half, 0.5 + half)]),
+                         lift: Self.lift)]
+
+        // The chip's pins, three a side, darker so the block is not one
+        // mass.
+        for i in [-1, 0, 1] as [CGFloat] {
+            let at = i * 0.048
+            out.append(Shape(path: polygon([(0.5 + at - 0.011, 0.5 - half - 0.030),
+                                            (0.5 + at + 0.011, 0.5 - half - 0.030),
+                                            (0.5 + at + 0.011, 0.5 - half + 0.004),
+                                            (0.5 + at - 0.011, 0.5 - half + 0.004)]),
+                             lift: Self.deep))
+            out.append(Shape(path: polygon([(0.5 + at - 0.011, 0.5 + half - 0.004),
+                                            (0.5 + at + 0.011, 0.5 + half - 0.004),
+                                            (0.5 + at + 0.011, 0.5 + half + 0.030),
+                                            (0.5 + at - 0.011, 0.5 + half + 0.030)]),
+                             lift: Self.deep))
+            out.append(Shape(path: polygon([(0.5 - half - 0.030, 0.5 + at - 0.011),
+                                            (0.5 - half + 0.004, 0.5 + at - 0.011),
+                                            (0.5 - half + 0.004, 0.5 + at + 0.011),
+                                            (0.5 - half - 0.030, 0.5 + at + 0.011)]),
+                             lift: Self.deep))
+            out.append(Shape(path: polygon([(0.5 + half - 0.004, 0.5 + at - 0.011),
+                                            (0.5 + half + 0.030, 0.5 + at - 0.011),
+                                            (0.5 + half + 0.030, 0.5 + at + 0.011),
+                                            (0.5 + half - 0.004, 0.5 + at + 0.011)]),
+                             lift: Self.deep))
+        }
+
+        for k in 0..<8 {
+            let a = CGFloat(k) * .pi / 4
+            let ca = cos(a), sa = sin(a)
+
+            func at(_ radius: CGFloat, _ offset: CGFloat) -> (CGFloat, CGFloat) {
+                (0.5 + radius * ca - offset * sa,
+                 0.5 + radius * sa + offset * ca)
+            }
+
+            for lane in [-1, 0, 1] as [CGFloat] {
+                let off = lane * jog
+                let p0 = at(0.135, off)
+                let p1 = at(0.340, off)
+                let p2 = at(0.340, off + jog * 0.62)
+                let p3 = at(0.880, off + jog * 0.62)
+                out.append(Shape(path: segment(p0.0, p0.1, p1.0, p1.1, w),
+                                 lift: Self.lift))
+                out.append(Shape(path: segment(p1.0, p1.1, p2.0, p2.1, w),
+                                 lift: Self.lift))
+                out.append(Shape(path: segment(p2.0, p2.1, p3.0, p3.1, w),
+                                 lift: Self.lift))
+            }
+
+            // A via where the middle lane turns, and a pad on each branch.
+            let via = at(0.340, jog * 0.62)
+            out.append(Shape(path: ring(via.0, via.1, 0.044, 0.019),
+                             lift: Self.lift))
+
+            // A chord to the next bundle, so the trunks are a network
+            // rather than a sunburst: this is most of what makes the board
+            // read as connected rather than as eight separate runs.
+            let next = a + .pi / 4
+            let c0 = at(0.620, jog * 0.62)
+            let c1 = (0.5 + 0.620 * cos(next) - jog * 0.62 * sin(next),
+                      0.5 + 0.620 * sin(next) + jog * 0.62 * cos(next))
+            out.append(Shape(path: segment(c0.0, c0.1, c1.0, c1.1, w),
+                             lift: Self.lift))
+
+            let branches: [(CGFloat, CGFloat)] = [
+                (k % 2 == 1 ? 0.470 : 0.410, 1),
+                (k % 2 == 1 ? 0.740 : 0.790, -1)
+            ]
+            for (radius, side) in branches {
+                let base = at(radius, jog * 0.62)
+                let tip = at(radius, jog * 0.62 + side * 0.130)
+                out.append(Shape(path: segment(base.0, base.1, tip.0, tip.1, w),
+                                 lift: Self.lift))
+                out.append(Shape(path: circle(tip.0, tip.1, 0.030),
+                                 lift: Self.lift))
+            }
+
+            // A smaller block between this bundle and the next, so the
+            // space between the trunks is wired rather than bare.
+            let b = a + .pi / 8
+            let bx = 0.5 + 0.560 * cos(b)
+            let by = 0.5 + 0.560 * sin(b)
+            out.append(Shape(path: polygon([(bx - 0.055, by - 0.032),
+                                            (bx + 0.055, by - 0.032),
+                                            (bx + 0.055, by + 0.032),
+                                            (bx - 0.055, by + 0.032)]),
+                             lift: Self.lift))
+            for i in [-1, 0, 1] as [CGFloat] {
+                out.append(Shape(path: polygon([(bx + i * 0.034 - 0.010, by - 0.046),
+                                                (bx + i * 0.034 + 0.010, by - 0.046),
+                                                (bx + i * 0.034 + 0.010, by - 0.028),
+                                                (bx + i * 0.034 - 0.010, by - 0.028)]),
+                                 lift: Self.deep))
+            }
+
+            // And a pad out toward the corner, on a stub off the same
+            // angle, because the diagonals reach further than the axes do
+            // and the space past the blocks was the one part of the floor
+            // left bare.
+            let sx = 0.5 + 0.830 * cos(b)
+            let sy = 0.5 + 0.830 * sin(b)
+            out.append(Shape(path: segment(bx, by, sx, sy, w * 0.72),
+                             lift: Self.lift))
+            out.append(Shape(path: ring(sx, sy, 0.040, 0.017),
+                             lift: Self.lift))
+        }
+        return out
+    }
+
     private func circle(_ cx: CGFloat, _ cy: CGFloat,
                         _ r: CGFloat) -> UIBezierPath {
         ellipse(cx, cy, r, r)

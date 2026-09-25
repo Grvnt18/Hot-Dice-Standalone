@@ -59,7 +59,14 @@ struct RoyalUrScreen: View {
 
             GeometryReader { geo in
                 let headerHeight = geo.size.height * 0.15
-                let boardHeight = geo.size.height * 0.24
+                // The board takes a third of the screen, up from a
+                // quarter. On a tablet the layout is height-bound —
+                // `tile = min(width / 8.92, height / 3.52)` — so this is
+                // what actually makes the board bigger there: 81.5pt
+                // tiles become 92.2pt on an 11-inch iPad. The tray still
+                // keeps more height than the board at every size, which
+                // it has to: five d4s are thrown in it.
+                let boardHeight = geo.size.height * 0.34
                 let buttonHeight: CGFloat = 104
                 let trayHeight = max(geo.size.height - headerHeight - boardHeight - buttonHeight, 0)
 

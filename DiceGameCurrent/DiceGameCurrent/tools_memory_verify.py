@@ -127,6 +127,29 @@ def main():
     print("  %-22s ~25 images for every die in every game, in every colour"
           % "in practice")
 
+    # --- Boneheads' banked dice, which are rendered pictures now -------
+    #
+    # A slot asks for one every time the board draws, so they have to be
+    # cached; and the key has to stay small, because an unbounded one
+    # would be a picture per face per colour per size.
+    bones = source("BoneheadsDieImage.swift")
+    if "private static var cache" not in bones:
+        failed.append("BoneheadsDieImage does not cache, so a banked die is "
+                      "re-rendered on every draw of the board")
+    key_pixels = re.search(r'static let pixels: CGFloat = (\d+)', bones)
+    assert key_pixels, "no canvas size in BoneheadsDieImage"
+    px = int(key_pixels.group(1))
+    faces, sides = 6, 2
+    bones_mib = faces * sides * px * px * 4 / (1024.0 * 1024.0)
+    if bones_mib > 8:
+        failed.append("Boneheads' die images are %.1f MiB at %dpx, over the "
+                      "8 MiB a picture cache is worth" % (bones_mib, px))
+    print("  %-22s %d faces x %d sides at %dpx = %.1f MiB, cached for the match"
+          % ("banked dice", faces, sides, px, bones_mib))
+    if "isUnavailable" not in bones:
+        failed.append("BoneheadsDieImage retries a renderer that has already "
+                      "failed, once per slot per draw")
+
     # Cached, because setupPool rebuilds the lot on every pool change.
     if "private static var imageCache" not in labels:
         failed.append("DieFaceLabels no longer caches its face images, so "

@@ -115,14 +115,23 @@ struct RoyalUrBoardView: View {
             ZStack {
                 // The frame is the app's own timber, pushed darker so it
                 // reads as a board edge rather than as more of the header.
+                //
+                // It fills the WHOLE frame rather than just the board's
+                // own 2.53:1. The plate used to be `layout.boardSize`, so
+                // whenever the frame did not share that ratio the table
+                // colour showed through beside it — two coloured bars
+                // down the sides on a tablet, where the layout is
+                // height-bound, and a strip above and below on a phone.
+                // Timber edge to edge cannot leave one at any size, and
+                // the squares stay exactly where RoyalUrLayout puts them.
                 WoodTiledBackground()
                     .overlay(Color.black.opacity(0.22))
-                    .frame(width: layout.boardSize.width, height: layout.boardSize.height)
+                    .frame(width: geo.size.width, height: geo.size.height)
                     .clipShape(RoundedRectangle(cornerRadius: layout.tile * 0.14))
                     .overlay(
                         RoundedRectangle(cornerRadius: layout.tile * 0.14)
                             .stroke(Color.black.opacity(0.45), lineWidth: 2)
-                            .frame(width: layout.boardSize.width, height: layout.boardSize.height)
+                            .frame(width: geo.size.width, height: geo.size.height)
                     )
                     .position(x: geo.size.width / 2, y: geo.size.height / 2)
 

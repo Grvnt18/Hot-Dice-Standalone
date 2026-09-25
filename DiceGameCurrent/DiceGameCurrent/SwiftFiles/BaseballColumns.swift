@@ -19,7 +19,14 @@ enum BaseballColumns {
     static let containerName = "baseballColumns"
 
     static let radius: CGFloat = 0.26
-    static let height: CGFloat = 0.85
+
+    /// As tall as the dice that bounce off it.
+    ///
+    /// It was 0.85, against dice normalised to 1.0 (and 1.5 for the one
+    /// oversized die a round carries), so a post was the shortest solid
+    /// thing on the table. 1.15 puts it between the two, which is what
+    /// makes it read as standing up rather than lying on the floor.
+    static let height: CGFloat = 1.15
 
     /// Where a team's waiting runners stand, as offsets inside the on-deck
     /// circle. Three posts in a tight triangle: the gaps between them are far
@@ -88,7 +95,13 @@ enum BaseballColumns {
         node.name = name
         node.position = world(spot, bounds: bounds,
                               floorY: floorY + Float(height) / 2)
-        node.castsShadow = false
+        // Casts a real shadow, which is most of what says a post has
+        // height under a camera that sees almost nothing but top faces.
+        // This was false, so the posts were the only solid objects on a
+        // table where every die throws one — the key light is already
+        // `.deferred` at 0.45 alpha, so this costs nothing to turn on and
+        // puts the posts under the same light as the dice.
+        node.castsShadow = true
 
         let body = SCNPhysicsBody(type: .static,
                                   shape: SCNPhysicsShape(geometry: cylinder,
@@ -119,8 +132,11 @@ enum BaseballColumns {
     ///
     /// Enough to read as a lit top on a shaded post, not so much that a
     /// post stops looking like one object.
-    private static let capLift: CGFloat = 0.30
-    private static let sideDrop: CGFloat = 0.28
+    /// Deepened with the extra height: a taller post shows more side, so
+    /// the step between the lit cap and the shaded wall has more room to
+    /// do its job.
+    private static let capLift: CGFloat = 0.34
+    private static let sideDrop: CGFloat = 0.32
 
     /// Maps a field fraction onto the playfield.
     ///

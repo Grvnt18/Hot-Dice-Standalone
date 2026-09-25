@@ -61,6 +61,10 @@ def numbers(text):
     """
     text = re.sub(r'\$\d+\.\d+', '', text)
     text = text.replace("[-1.0, 1.0] as [CGFloat]", "")
+    # Swift tuple members — `p0.0`, `via.1`, `base.0` — read as decimals
+    # to a regex and are not geometry. A real literal never begins with a
+    # letter, so anchoring on one cannot swallow a coordinate.
+    text = re.sub(r'\b[A-Za-z_]\w*\.\d+\b', '', text)
     return [float(n) for n in re.findall(r'-?\d+\.\d+', text)]
 
 
@@ -152,7 +156,8 @@ def main():
         "crown": "crown",
         "die_face": "dieShape",
         "bone_tile": "boneTile",
-        "circuit_tile": "circuitTile",
+        "circuit_board": "circuitBoard",
+        "segment": "segment",
         "tiled": "tiled",
     }
     for py_name, swift_name in sorted(BUILDERS.items()):

@@ -14,6 +14,8 @@ turn when seat 0 happened to be the one who filled, so it was measuring
 its own bug. Done properly it is 49.5/48.4 — the same game. The rule
 stays because it is the design's and it is simpler, not because the
 numbers require it."""
+import math
+import re
 import random
 
 import tools_swiftconst as swiftconst
@@ -117,10 +119,61 @@ def play(rng, final_turn=False):
     return turns, winner, totals
 
 
+def check_banked_die_faces():
+    """Every face can be shown, including the one that would be NaN.
+
+    A banked die is rendered by turning the mesh so the rolled face points
+    up, which is a rotation taking that face's normal onto +Y. The 1 face
+    of the d6 points straight DOWN, so its normal is exactly the opposite
+    of +Y — and a from/to rotation is undefined for antiparallel vectors.
+    Left alone that is a NaN orientation and an invisible die for the most
+    common face on the board, which is why this is checked rather than
+    assumed. The normals are read out of the Swift, not restated."""
+    normals_src = swiftconst.source("DiceRollController.swift")
+    block = normals_src.split("private static let d6: [SCNVector3] = [", 1)[1]
+    block = block.split("]", 1)[0]
+    normals = [tuple(float(n) for n in row)
+               for row in re.findall(
+                   r'SCNVector3\((-?[\d.]+), (-?[\d.]+), (-?[\d.]+)\)', block)]
+    assert len(normals) == 6, normals
+
+    image_src = swiftconst.source("BoneheadsDieImage.swift")
+    assert "simd_dot(from, to) < -0.9999" in image_src, (
+        "the antiparallel case is not handled — the 1 face renders as NaN")
+
+    def cross(a, b):
+        return (a[1] * b[2] - a[2] * b[1],
+                a[2] * b[0] - a[0] * b[2],
+                a[0] * b[1] - a[1] * b[0])
+
+    def dot(a, b):
+        return sum(x * y for x, y in zip(a, b))
+
+    def rotate(q, v):
+        x, y, z, w = q
+        t = [2 * c for c in cross((x, y, z), v)]
+        c2 = cross((x, y, z), t)
+        return tuple(v[i] + w * t[i] + c2[i] for i in range(3))
+
+    up = (0.0, 1.0, 0.0)
+    for value, n in enumerate(normals, 1):
+        if dot(n, up) < -0.9999:
+            q = (1.0, 0.0, 0.0, 0.0)                    # half a turn about X
+        else:
+            axis = cross(n, up)
+            q = (*axis, 1 + dot(n, up))
+            length = math.sqrt(sum(c * c for c in q))
+            q = tuple(c / length for c in q)
+        landed = rotate(q, n)
+        assert abs(landed[1] - 1) < 1e-6, (value, landed)
+    print("  banked dice                   ok (all 6 faces land face-up)")
+
+
 def main():
     swiftconst.expect("Boneheads", "Boneheads.swift", SWIFT_CONSTANTS)
     check_scoring()
     check_strike()
+    check_banked_die_faces()
 
     rng = random.Random(20260922)
     n = 30_000

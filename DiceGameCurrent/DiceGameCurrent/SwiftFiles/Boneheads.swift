@@ -1,4 +1,4 @@
-import Foundation
+import SwiftUI
 
 /// Boneheads: fill your grid, stack your matches, and smash theirs.
 ///
@@ -39,9 +39,30 @@ enum BoneheadsRules {
     }
 
     /// A single d6, coloured to whoever is throwing it.
-    static func makeDice() -> [Die] {
-        guard let colorway = DiePalette.colorways.shuffled().first else { return [] }
-        return [Die(sides: dieSides, colorway: colorway)]
+    /// The second player's colour.
+    ///
+    /// Fixed rather than drawn from the palette, and the same tone the
+    /// opponent's grid has always been drawn in — so the die in the air,
+    /// the die banked in a column and the frame around that column are one
+    /// colour per player.
+    static let opponentBodyHex = "#D2735F"
+
+    /// A seat's dice.
+    ///
+    /// Seat 0 takes the player's chosen table colour, seat 1 the fixed
+    /// tone above. This used to be `DiePalette.colorways.shuffled().first`,
+    /// so the die you threw was a different colour every turn and matched
+    /// neither side of the board.
+    static func colorway(for seat: Int) -> DieColorway {
+        seat == 0
+            ? DieColorway(
+                bodyHex: AppTheme.swatches[AppTheme.shared.colorwayIndex].hex,
+                numberHex: "#1B1B1F")
+            : DieColorway(bodyHex: opponentBodyHex, numberHex: "#2A1712")
+    }
+
+    static func makeDice(for seat: Int = 0) -> [Die] {
+        [Die(sides: dieSides, colorway: colorway(for: seat))]
     }
 }
 

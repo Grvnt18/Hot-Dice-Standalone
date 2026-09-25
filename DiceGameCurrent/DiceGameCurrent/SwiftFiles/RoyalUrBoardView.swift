@@ -523,6 +523,9 @@ extension RoyalUrArt {
         context.fill(Path(ellipseIn: body.insetBy(dx: -radius * 0.12, dy: -radius * 0.12)),
                      with: .color(.black.opacity(0.25)))
         context.fill(Path(ellipseIn: body), with: .color(seatColor(seat)))
+        // The same sheen the placed dice carry, so a piece on this board
+        // and a die on the tray read as the same material. See PieceSheen.
+        context.fill(Path(ellipseIn: body), with: PieceSheen.shading(in: body))
         context.stroke(Path(ellipseIn: body), with: .color(.white.opacity(0.9)),
                        lineWidth: max(1, radius * 0.16))
         context.stroke(Path(ellipseIn: body.insetBy(dx: radius * 0.34, dy: radius * 0.34)),

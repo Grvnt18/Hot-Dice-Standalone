@@ -48,6 +48,12 @@ struct PipFace: View {
                 }
             }
             .frame(width: side, height: side)
+            // Lit like the dice in the tray above it, which is the whole
+            // point: this game's board IS dice, and a flat one beside a
+            // rolling one reads as a sticker beside an object. Over the
+            // pips rather than under them — the highlight is on the die's
+            // surface, and the pips are in it.
+            .pieceSheen(RoundedRectangle(cornerRadius: side * 0.18))
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }

@@ -32,6 +32,7 @@ Same spirit as tools_spawn_verify.py: prove the numbers, rather than
 eyeball the screen and hope.
 """
 import re
+import re
 import sys
 
 from tools_swiftconst import source, constant
@@ -56,24 +57,45 @@ MIN_ICON_SHARE = 0.50
 
 
 def layout(c, width):
-    """Mirror of GameHubView's geometry, from its own constants."""
+    """Mirror of GameHubView's geometry, from its own constants.
+
+    The label band is a FUNCTION of the tile now, not a constant: the name
+    is sized to span the artwork, and a band fixed for one phone width
+    starves the icon on a narrower one. That is the whole reason the icon
+    share is asserted at eight widths rather than one.
+    """
     count = c["columnCount"]
     available = width - c["gutter"] * 2 - c["columnGap"] * (count - 1)
     tile = min(c["maxTile"], max(120, available / count))
-    icon = max(40, tile - c["inset"] * 2 - c["labelHeight"] - c["gap"])
-    return count, tile, icon
+    font = min(tile * c["labelFontScale"], c["labelFontCap"])
+    label = font * c["labelLines"]
+    icon = max(40, tile - c["inset"] * 2 - label - c["gap"])
+    return count, tile, icon, font
+
+
+def label_formula(text):
+    """The three numbers in HubLayout's label sizing."""
+    scale = re.search(r'min\(tile \* (\d+\.\d+), (\d+)\)', text)
+    assert scale, "labelFont is no longer min(tile * scale, cap)"
+    lines = re.search(r'labelFont\(tile: tile\) \* (\d+\.\d+)', text)
+    assert lines, "labelHeight is no longer labelFont * lines"
+    return {"labelFontScale": float(scale.group(1)),
+            "labelFontCap": float(scale.group(2)),
+            "labelLines": float(lines.group(1))}
 
 
 def main():
     text = source(HUB)
     c = {name: constant(text, name) for name in
-         ("gutter", "columnGap", "columnCount", "maxTile",
-          "inset", "gap", "labelHeight")}
+         ("gutter", "columnGap", "columnCount", "maxTile", "inset", "gap")}
+    # The label formula's three numbers, read out of the Swift so this
+    # cannot drift from it: min(tile * scale, cap), times lines.
+    c.update(label_formula(text))
     print("hub constants: " + ", ".join("%s %g" % (k, c[k]) for k in sorted(c)))
 
     failed = False
     for label, width in WIDTHS:
-        count, tile, icon = layout(c, width)
+        count, tile, icon, font = layout(c, width)
         share = icon / tile
         spans = count * tile + c["columnGap"] * (count - 1) + c["gutter"] * 2
         notes = []
@@ -91,13 +113,14 @@ def main():
         if grid > width - c["gutter"] * 2 + 0.5:
             notes.append("GRID %.0f WIDER THAN ITS GUTTERS" % grid)
         failed |= bool(notes)
-        print("  %-20s %4dpt -> %d cols, tile %5.1f, icon %5.1f (%d%%)  %s"
-              % (label, width, count, tile, icon, round(share * 100),
+        print("  %-20s %4dpt -> %d cols, tile %5.1f, icon %5.1f (%d%%), "
+              "name %4.1fpt  %s"
+              % (label, width, count, tile, icon, round(share * 100), font,
                  "  ".join(notes) or "ok"))
 
     # A phone must show more than one row without scrolling, or the grid is
     # a list with extra steps. Four tiles is two rows of two.
-    _, tile, _ = layout(c, 393)
+    _, tile, _, _ = layout(c, 393)
     if tile * 2 > 700:
         print("  iPhone 15 shows fewer than two rows of tiles")
         failed = True
@@ -118,18 +141,25 @@ def check_tile_painting(text):
 
     if re.search(r'\.background\(\s*\n?\s*RoundedRectangle', tile):
         problems.append("the filled plate is back behind the icons")
+    if re.search(r'\.stroke\(\.black\.opacity\([\d.]+\), lineWidth:', tile):
+        problems.append("the tile's outline is back — nothing is drawn "
+                        "around a tile any more")
+    if re.search(r'\.shadow\(color:', tile):
+        problems.append("the tile's drop shadow is back")
+    # Load-bearing now rather than belt-and-braces: with no fill and no
+    # outline, a Button has nothing else to hit-test between the icon and
+    # the label, so a tap in the margin falls through to the scroll view.
     if not re.search(
             r'\.contentShape\(RoundedRectangle\(cornerRadius: '
             r'ControlShape\.cornerRadius\)\)', tile):
-        problems.append("no contentShape — taps in a tile's margin will miss")
-    if not re.search(r'\.stroke\(\.black\.opacity\([\d.]+\), lineWidth:', tile):
-        problems.append("the tile lost its outline, so nothing marks its edge")
+        problems.append("no contentShape — with no box drawn, this is the "
+                        "ONLY thing making a tile tappable")
 
     for line in problems:
         print("  %-20s %s" % ("tile painting", line))
     if problems:
         return True
-    print("  %-20s ok (no fill, outline kept, whole square tappable)"
+    print("  %-20s ok (nothing drawn, whole square tappable)"
           % "tile painting")
     return False
 

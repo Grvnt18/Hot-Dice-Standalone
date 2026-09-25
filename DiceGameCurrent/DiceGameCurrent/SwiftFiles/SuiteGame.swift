@@ -48,6 +48,15 @@ protocol SuiteGame {
     /// The shape this game's floor facets carry. See `FloorMotif`.
     static var floorMotif: FloorMotif { get }
 
+    /// The name on the hub tile, when the full one will not fit.
+    ///
+    /// Same reason `floorTitle` exists: a name set to span the artwork has
+    /// to actually fit beside it, and "Freighter.Yacht.Dinghy" has no
+    /// spaces to break on — SwiftUI cannot wrap it, so it sets as one
+    /// line half again as wide as the icon above it, at the smallest size
+    /// the tile allows.
+    static var tileName: String { get }
+
     /// Whether a turn can be sent to someone else.
     ///
     /// False only for Free Roll, which is a solo sandbox with no opponent
@@ -66,6 +75,9 @@ extension SuiteGame {
     /// No mark unless a game asks for one, so a game added later is not
     /// obliged to have art before it can ship.
     static var floorMotif: FloorMotif { .none }
+
+    /// The full name, for the ten games it fits.
+    static var tileName: String { displayName }
     static var lowestScoreWins: Bool { false }
     static var isSendable: Bool { true }
 }
@@ -98,6 +110,11 @@ struct GameRuleSection: Identifiable {
 struct GameCatalogEntry: Identifiable {
     let id: String
     let displayName: String
+
+    /// What the hub tile says — `displayName` for all but one. See
+    /// `SuiteGame.tileName`.
+    let tileName: String
+
     let tagline: String
 
     /// Builds the game's root view, given the action that returns to the
@@ -112,11 +129,13 @@ struct GameCatalogEntry: Identifiable {
     init(
         id: String,
         displayName: String,
+        tileName: String,
         tagline: String,
         makeView: @escaping (@escaping () -> Void) -> AnyView
     ) {
         self.id = id
         self.displayName = displayName
+        self.tileName = tileName
         self.tagline = tagline
         self.makeView = makeView
     }
@@ -130,6 +149,7 @@ struct GameCatalogEntry: Identifiable {
         self.init(
             id: G.id,
             displayName: G.displayName,
+            tileName: G.tileName,
             tagline: G.tagline,
             makeView: makeView
         )

@@ -201,8 +201,25 @@ enum HubLayout {
     /// Space between a tile's icon and its name.
     static let gap: CGFloat = 6
 
-    /// Room for a tile's name: two lines of Stack Sans at 13pt.
-    static let labelHeight: CGFloat = 34
+    /// The name's point size, sized so a typical name spans the artwork
+    /// above it rather than sitting under it as a caption.
+    ///
+    /// Capped, because the tile is capped: past `maxTile` a proportional
+    /// size would give an iPad a 38pt game name over a 210pt icon.
+    static func labelFont(tile: CGFloat) -> CGFloat {
+        min(tile * 0.125, 28)
+    }
+
+    /// Room for a tile's name: two lines at `labelFont`.
+    ///
+    /// Proportional rather than the fixed 34 it was, and that is not
+    /// tidiness — `iconSide` is what is left after this, so a band sized
+    /// for a 393pt phone starves the artwork on a 320pt one. At 320 the
+    /// icon keeps 51% of its tile; fixing the band at two lines of 22pt
+    /// would have taken it to 46% and failed the layout check.
+    static func labelHeight(tile: CGFloat) -> CGFloat {
+        labelFont(tile: tile) * 2.4
+    }
 
     /// The suite mark above the wordmark, bounded at both ends: big enough
     /// to read on a phone, not so big it dwarfs the grid on an iPad.
@@ -217,7 +234,7 @@ enum HubLayout {
     /// whatever a resizable image could negotiate out of a stack that had no
     /// height to give it.
     static func iconSide(tile: CGFloat) -> CGFloat {
-        max(40, tile - inset * 2 - labelHeight - gap)
+        max(40, tile - inset * 2 - labelHeight(tile: tile) - gap)
     }
 }
 
@@ -274,39 +291,37 @@ private struct GameTile: View {
                     .frame(width: HubLayout.iconSide(tile: side),
                            height: HubLayout.iconSide(tile: side))
 
-                Text(entry.displayName)
-                    .font(.stackSans(13))
+                Text(entry.tileName)
+                    .font(.stackSans(HubLayout.labelFont(tile: side)))
                     .foregroundStyle(.white)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
-                    .minimumScaleFactor(0.7)
+                    // One size across the grid, with the longest names
+                    // shrinking to fit. Scaling every name to fill its own
+                    // width instead would leave a page of tiles carrying
+                    // visibly different type sizes.
+                    .minimumScaleFactor(0.6)
                     // Stack Sans overhangs its advance width, so a trailing
                     // glyph can clip against a tight frame.
                     .padding(.trailing, 3)
-                    .frame(height: HubLayout.labelHeight)
+                    .frame(height: HubLayout.labelHeight(tile: side))
             }
             // The square comes from the hub's measurement of the screen, so
             // every tile in a row is identical by construction rather than
             // by agreement.
             .frame(width: side, height: side)
-            // The tile is an outline on the timber, not a slab of colour.
+            // Nothing is drawn around the tile at all — no fill, no
+            // outline, no shadow. The artwork and its name sit on the
+            // timber, and the grid's own spacing is what separates one
+            // game from the next.
             //
-            // It used to be filled with the accent swatch at 0.92, which
-            // read as a grey plate behind the artwork rather than as the
-            // artwork's own shape. The icons are black line work on
-            // transparency, so the plate was the whole of what showed
-            // behind them; without it they sit on the wood, which most of
-            // the palette's deep navies and near-blacks separated them
-            // from less well than the timber does.
-            //
-            // The border and the shadow stay: they are what still says
-            // "this square is a thing you tap".
+            // **contentShape is now load-bearing.** A Button hit-tests the
+            // content it draws, and with no box there is nothing else
+            // between the icon and the label for a tap to land on: without
+            // this, a tap in a tile's margin falls through to the scroll
+            // view. It was belt-and-braces when the tile had a fill; it is
+            // the whole belt now.
             .contentShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
-            .overlay(
-                RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                    .stroke(.black.opacity(0.35), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.35), radius: 3, y: 2)
         }
         .buttonStyle(.plain)
     }

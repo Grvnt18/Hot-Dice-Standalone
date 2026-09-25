@@ -164,6 +164,10 @@ enum FreighterYachtDinghyGame: SuiteGame {
     /// the playfield width would be unreadable under the dice.
     static let floorTitle = "F.Y.D."
 
+    // The one name the tile cannot set: no spaces to wrap on, so it runs
+    // as a single line well past the artwork it is meant to match.
+    static let tileName = "F.Y.D."
+
 
     static let rules: [GameRuleSection] = [
         GameRuleSection(

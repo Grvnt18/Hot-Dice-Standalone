@@ -126,14 +126,7 @@ final class LayoutReportingSCNView: SCNView {
 // image instance — a second copy generated from the same parameters would
 // tile from a different origin and show a seam.
 enum HeaderFooterWood {
-    static let image = LowPolyTextures.woodSurface(
-        baseColor: UIColor(hex: "#8B6039"),
-        planks: 5,
-        shardsPerPlank: 16,
-        pixelSize: 1024,
-        pixelHeight: 256,
-        seed: 77123
-    )
+    static let image = LowPolyTextures.pixelWood()
 }
 
 /// Tiles HeaderFooterWood.image at the same fraction of its own width that

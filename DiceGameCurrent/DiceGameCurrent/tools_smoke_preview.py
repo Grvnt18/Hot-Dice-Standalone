@@ -46,9 +46,12 @@ GAIN = 0.5
 
 WARP_A = 2.4            # how far the first warp drags the field
 WARP_B = 1.8            # and the second — this pair is what curls it
-DRIFT_A = 0.11          # per-second motion of each warp layer. Deliberately
-DRIFT_B = 0.07          # incommensurate, so the field never returns to a
-DRIFT_C = 0.05          # previous state and the loop is genuinely endless.
+DRIFT_A = 0.022         # per-second motion of each warp layer. Deliberately
+DRIFT_B = 0.014         # incommensurate, so the field never returns to a
+DRIFT_C = 0.010         # previous state and the loop is genuinely endless.
+                        # A fifth of the first pass: this sits behind dice and
+                        # wants to be calming, and anything quick enough to
+                        # notice reads as a screensaver competing with the roll.
 
 ORIGIN_X = 17.3         # the field is sampled away from (0,0) on purpose.
 ORIGIN_Y = 9.1          # sin-fract value noise degenerates at the origin —
@@ -172,12 +175,17 @@ def tone(u, v, t, px, py):
 # (Onyx) to #C9C2E0 (Pale Lavender) and a naive lighten/darken collapses to
 # four near-blacks at one end and four near-whites at the other.
 
-RAMP_SPREAD = 0.42      # brightness drop from the swatch to the darkest tone,
+RAMP_SPREAD = 0.24      # brightness drop from the swatch to the darkest tone,
                         # at the bright end of the picker
-RAMP_SPREAD_MIN = 0.20  # ...and at the dark end, where there is less room
+RAMP_SPREAD_MIN = 0.12  # ...and at the dark end, where there is less room
+                        # Measured against the references rather than guessed:
+                        # red-wave.gif's four tones span 0.20 in brightness,
+                        # #CD0000 to #FF4F4F. A wider ramp stops reading as one
+                        # material catching the light and starts reading as a
+                        # gradient — which is what the first pass did.
 RAMP_FLOOR = 0.045      # no tone may sit below this brightness
 RAMP_CEIL = 0.94        # nor above this
-RAMP_SAT_LIFT = 0.10    # brightest tone desaturates slightly, as both GIFs do
+RAMP_SAT_LIFT = 0.05    # brightest tone desaturates slightly, as both GIFs do
 RAMP_BIAS = 0.55        # spacing of the four steps. NOT even, deliberately.
                         # Sorted by luminance, red-wave.gif runs #CD0000 then
                         # #FF0000 #FF3535 #FF4F4F, and reggie.gif runs #F0243C
@@ -379,15 +387,20 @@ if __name__ == "__main__":
         SAMPLES = [("custom-" + code.lower(), code)]
 
     if "--gif" in args:
-        size, count = 192, 20
+        # delay_cs x count IS the playback duration, so the sampled time has to
+        # advance at exactly that rate or the preview misrepresents the speed.
+        # It did: t ran 0..6 over frames that play in 1.2s, five times too fast,
+        # and the motion got judged on that.
+        size, count, delay_cs = 192, 44, 8
+        span = count * delay_cs / 100.0
         for name, code in SAMPLES[:2]:
             frames, pal = [], ramp(code)
             for i in range(count):
-                rows, _ = render(code, size, i * (6.0 / count))
+                rows, _ = render(code, size, i * (span / count))
                 frames.append(rows)
                 print("  frame %2d/%d" % (i + 1, count))
             p = write_gif(os.path.join(out, "smoke-%s.gif" % name),
-                          frames, size, pal, 6)
+                          frames, size, pal, delay_cs)
             print("wrote %s" % p)
     else:
         for name, code in SAMPLES:

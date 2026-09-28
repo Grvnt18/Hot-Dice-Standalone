@@ -235,7 +235,6 @@ extension GeneralsRules {
 // MARK: - Suite entry
 
 enum GeneralsGame: SuiteGame {
-    static let floorMotif = FloorMotif.stars
     static let id = "generals"
     static let displayName = "Generals"
     static let tagline = "One scorecard. Claim it first."

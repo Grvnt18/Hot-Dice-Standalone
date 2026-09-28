@@ -6,7 +6,7 @@ is right for a renderer sizing its own canvas and wrong for one placing
 text inside a canvas somebody else sized. Reading the code did not catch
 it; a picture does immediately.
 
-This is the same reason `tools_motif_preview.py` exists, and it renders a
+This is the same reason `tools_smoke_preview.py` exists, and it renders a
 PNG for the same reason: there is no renderer in this container, and a PNG
 can at least be looked at.
 

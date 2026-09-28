@@ -238,7 +238,7 @@ struct BoneheadsScreen: View {
                         session: $session,
                         makeInitialDice: { BoneheadsRules.makeDice(for: match.activeIndex) },
                         floorTitle: BoneheadsGame.floorTitle,
-                        arenaStyle: .house(motif: BoneheadsGame.floorMotif),
+                        arenaStyle: .house,
                         onSessionCreated: { newSession in
                             newSession.onRollSettled = { results in
                                 settled(results)

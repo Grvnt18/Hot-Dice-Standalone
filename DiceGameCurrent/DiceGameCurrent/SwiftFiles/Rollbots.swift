@@ -406,7 +406,6 @@ struct RollbotsState: Codable, Equatable {
 // MARK: - Suite entry
 
 enum RollbotsGame: SuiteGame {
-    static let floorMotif = FloorMotif.circuitry
     static let id = "rollbots"
     static let displayName = "Rollbots"
     static let tagline = "Duel in the net. Answer every shot."

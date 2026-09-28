@@ -12,10 +12,11 @@ import UIKit
 /// vertex-colored mesh, and looks the same from the fixed top-down camera.
 enum LowPolyTextures {
 
-    /// Bounded, because the key multiplies: 24 table colours times eight
-    /// floor motifs is 192 entries at 1 MiB each, and nothing evicted. The
-    /// working set is far smaller now that `GameScope` gives each game one
-    /// colour, so a cap of 16 is generous and holds the ceiling at 16 MiB.
+    /// Bounded, because the key multiplies: 24 table colours times the
+    /// surfaces that ask for one, at up to 1 MiB each, and nothing evicted.
+    /// The working set is smaller again now that the tray floor is a shader
+    /// rather than a cached image, so a cap of 16 holds the ceiling at 16 MiB
+    /// with room to spare.
     private static var cache = BoundedImageCache(limit: 16)
 
     /// A grid of triangles, each filled with a slightly different shade of
@@ -37,16 +38,10 @@ enum LowPolyTextures {
         // score bar, so facets stay roughly equilateral instead of being
         // stretched into slivers when the image is scaled to fit.
         pixelHeight: CGFloat? = nil,
-        seed: UInt64 = 12345,
-        // A shape carried by the facets themselves — see FloorMotif. It
-        // raises the grid resolution, because a numeral or a face needs
-        // more than 16 cells a side to be legible.
-        motif: FloorMotif = .none
+        seed: UInt64 = 12345
     ) -> UIImage {
         let h = pixelHeight ?? pixelSize
-        let columns = motif.grid ?? columns
-        let rows = motif.grid ?? rows
-        let key = "\(baseColor)-\(variation)-\(columns)x\(rows)-\(pixelSize)x\(h)-\(seed)-\(motif.rawValue)"
+        let key = "\(baseColor)-\(variation)-\(columns)x\(rows)-\(pixelSize)x\(h)-\(seed)"
         if let cached = cache.value(key) { return cached }
 
         let size = CGSize(width: pixelSize, height: h)
@@ -58,10 +53,6 @@ enum LowPolyTextures {
         // — a floor that re-randomizes its facets on every new game would
         // be distracting rather than characterful.
         var rng = SeededGenerator(seed: seed)
-
-        // Built once, not per facet: `FloorMotif.shapes` constructs every
-        // UIBezierPath it returns, and a 30x30 grid asks 1,800 times.
-        let shapes = MotifShapes(motif: motif)
 
         let cellW = pixelSize / CGFloat(columns)
         let cellH = h / CGFloat(rows)
@@ -88,21 +79,8 @@ enum LowPolyTextures {
                         ? [[tl, tr, bl], [tr, br, bl]]
                         : [[tl, tr, br], [tl, br, bl]]
 
-                    // Resolved once per cell rather than per triangle: the
-                    // shapes are the same either way, and building them is
-                    // the only part of this loop that is not arithmetic.
                     for tri in triangles {
-                        var delta = (CGFloat(rng.nextUnit()) * 2 - 1) * variation
-                        // The motif is a tonal STEP on the facet, not a
-                        // shape drawn over it — which is what keeps it in
-                        // the low-poly style rather than on top of it.
-                        if motif != .none {
-                            let centre = CGPoint(
-                                x: (tri[0].x + tri[1].x + tri[2].x) / 3 / pixelSize,
-                                y: (tri[0].y + tri[1].y + tri[2].y) / 3 / h
-                            )
-                            delta += shapes.lift(at: centre)
-                        }
+                        let delta = (CGFloat(rng.nextUnit()) * 2 - 1) * variation
                         // .set() sets BOTH fill and stroke. Using
                         // .setFill() alone left the stroke at its default
                         // black, so the seam-closing stroke below outlined
@@ -336,45 +314,12 @@ enum LowPolyTextures {
     }
 }
 
-/// A motif's shapes, built once and asked many times.
-///
-/// `FloorMotif.shapes` constructs every `UIBezierPath` it returns, and the
-/// facet loop asks 1,800 times per texture. Holding them costs one small
-/// array and turns that into 1,800 hit tests instead of 1,800 rebuilds.
-private struct MotifShapes {
-    /// Each shape with its own bounding box, because the box is the cheap
-    /// half of the test.
-    private let shapes: [(bounds: CGRect, path: UIBezierPath, lift: CGFloat)]
-
-    init(motif: FloorMotif) {
-        shapes = motif.shapes.map { ($0.path.bounds, $0.path, $0.lift) }
-    }
-
-    /// Later shapes win, so detail sits on the mass it belongs to.
-    ///
-    /// The rectangle is checked before the path. That used to be one
-    /// `contains` per shape per facet, which was fine while a motif was a
-    /// dozen shapes on a 30-facet grid — the circuit board is 181 shapes
-    /// on a 60-facet grid, which is 1.3 million path hit-tests for one
-    /// texture. A `CGRect.contains` is a handful of comparisons and
-    /// rejects almost all of them — measured over the circuit board, the
-    /// box leaves 9.8% of the facet/shape pairs to the path — so the
-    /// expensive test runs only where a shape actually is.
-    func lift(at point: CGPoint) -> CGFloat {
-        var value: CGFloat = 0
-        for shape in shapes where shape.bounds.contains(point) {
-            if shape.path.contains(point) { value = shape.lift }
-        }
-        return value
-    }
-}
-
 /// A texture cache that cannot grow without limit.
 ///
 /// Every generated-image cache in this app was a plain dictionary that only
 /// ever grew. Individually none of them looked expensive; together their
 /// ceiling was about 286 MiB, because the keys multiply — colours times
-/// motifs, colourways times numerals — and nothing ever evicted.
+/// surfaces, colourways times numerals — and nothing ever evicted.
 ///
 /// `DieMaterialFactory` hit this first and documents it at its
 /// `grainTextureCache`: "the cache had no eviction and 15 colorways x 8

@@ -31,8 +31,7 @@ struct DiceTraySceneView: UIViewRepresentable {
 
     /// How the playfield is dressed. Defaults to the house style, so a
     /// game that says nothing keeps the wood and the player's table
-    /// colour — which is what Rolls, Free Roll and Royal UR still do. The
-    /// rest pass `.house(motif:)` for their own floor mark, Rollbots
+    /// colour — which is what every game but two now does. Rollbots passes
     /// `.steel` and Baseball Dice `.ballpark()`.
     var arenaStyle: ArenaStyle = .house
 

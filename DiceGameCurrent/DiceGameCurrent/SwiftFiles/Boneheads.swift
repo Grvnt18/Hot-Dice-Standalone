@@ -166,7 +166,6 @@ extension BoneheadsRules {
 // MARK: - Suite entry
 
 enum BoneheadsGame: SuiteGame {
-    static let floorMotif = FloorMotif.bones
     static let id = "boneheads"
     static let displayName = "Boneheads"
     static let tagline = "Stack yours. Smash theirs."

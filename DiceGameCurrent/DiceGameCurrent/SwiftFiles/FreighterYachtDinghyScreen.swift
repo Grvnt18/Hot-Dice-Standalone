@@ -56,7 +56,7 @@ struct FreighterYachtDinghyScreen: View {
                         session: $session,
                         makeInitialDice: { FreighterYachtDinghyRules.makeDice() },
                         floorTitle: FreighterYachtDinghyGame.floorTitle,
-                        arenaStyle: .house(motif: FreighterYachtDinghyGame.floorMotif),
+                        arenaStyle: .house,
                         onSessionCreated: { newSession in
                             newSession.onRollSettled = { results in
                                 applyRoll(results)

@@ -42,21 +42,11 @@ struct ArenaStyle {
     /// safe.
     var showsWoodenRim: Bool
 
-    /// The shape the floor's own facets carry. Each game has its own; see
-    /// `SuiteGame.floorMotif`, which is where a game states it.
-    var motif: FloorMotif = .none
-
     static let house = ArenaStyle(surfaceOverride: nil, showsWoodenRim: true)
-
-    /// The house floor, wearing this game's mark.
-    static func house(motif: FloorMotif) -> ArenaStyle {
-        ArenaStyle(surfaceOverride: nil, showsWoodenRim: true, motif: motif)
-    }
 
     /// Rollbots: brushed steel, no rim.
     static let steel = ArenaStyle(surfaceOverride: UIColor(hex: "#3A424C"),
-                                  showsWoodenRim: false,
-                                  motif: .circuitry)
+                                  showsWoodenRim: false)
 
     /// Baseball Dice: the pitch itself, inside a thin wooden rim.
     static func ballpark() -> ArenaStyle {
@@ -186,15 +176,13 @@ enum DiceSceneEnvironment {
         return material
     }
 
-    private static func facetedSurfaceTexture(baseColor: UIColor,
-                                              motif: FloorMotif) -> UIImage {
+    private static func facetedSurfaceTexture(baseColor: UIColor) -> UIImage {
         LowPolyTextures.facetedSurface(
             baseColor: baseColor.darkened(by: 0.25),
             variation: 0.10,
             columns: 16,
             rows: 16,
-            seed: 20260101,
-            motif: motif
+            seed: 20260101
         )
     }
 
@@ -322,8 +310,7 @@ enum DiceSceneEnvironment {
     private static func surfaceTexture(for style: ArenaStyle) -> UIImage {
         switch style.surface {
         case .faceted:
-            return facetedSurfaceTexture(baseColor: style.surfaceColor,
-                                         motif: style.motif)
+            return facetedSurfaceTexture(baseColor: style.surfaceColor)
         case .baseballField:
             // Portrait, matching the composition the preview settled. The
             // scoreboard is NOT part of this: it changes during the game

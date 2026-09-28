@@ -51,7 +51,7 @@ struct GeneralsScreen: View {
                         session: $session,
                         makeInitialDice: { GeneralsRules.makeDice() },
                         floorTitle: GeneralsGame.floorTitle,
-                        arenaStyle: .house(motif: GeneralsGame.floorMotif),
+                        arenaStyle: .house,
                         onSessionCreated: { newSession in
                             newSession.onRollSettled = { results in
                                 applyRoll(results)

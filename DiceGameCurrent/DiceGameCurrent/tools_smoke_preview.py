@@ -67,18 +67,31 @@ CONTRAST = 2.90         # pushes the field toward its extremes before posterisin
 LEVELS = 4              # four tones. Not negotiable — it is the brief.
 DITHER = 0.70           # strength of the Bayer offset, in quantisation steps
 
-# The classic ordered 8x8, lifted verbatim from the Darkbringer shader's own
-# comment so there is one canonical source for it rather than two derivations.
-BAYER = [
-    [0, 32, 8, 40, 2, 34, 10, 42],
-    [48, 16, 56, 24, 50, 18, 58, 26],
-    [12, 44, 4, 36, 14, 46, 6, 38],
-    [60, 28, 52, 20, 62, 30, 54, 22],
-    [3, 35, 11, 43, 1, 33, 9, 41],
-    [51, 19, 59, 27, 49, 17, 57, 25],
-    [15, 47, 7, 39, 13, 45, 5, 37],
-    [63, 31, 55, 23, 61, 29, 53, 21],
-]
+# The ordered 8x8, built arithmetically rather than stored.
+#
+# The Darkbringer shader carries the matrix as a literal — 0, 32, 8, 40, ... —
+# and so did this, until the Swift side needed it. A file-scope constant array
+# is the least portable thing you can put in a SceneKit shader modifier, which
+# is translated rather than compiled as written, so the recursive form is used
+# on both sides instead: no array, no bit twiddling, just arithmetic.
+#
+# This is not an approximation of the literal matrix. Checked cell by cell,
+# `bayer8(x, y)` equals `LITERAL[y][x] / 64` exactly, to 0.0 — same ordering,
+# same values, so the dither pattern is unchanged.
+
+
+def bayer2(x, y):
+    return fract(math.floor(x) / 2.0 + math.floor(y) * math.floor(y) * 0.75)
+
+
+def bayer4(x, y):
+    return bayer2(0.5 * x, 0.5 * y) * 0.25 + bayer2(x, y)
+
+
+def bayer8(x, y):
+    """0..63/64, the standard ordered-dither threshold for this cell."""
+    return bayer4(0.5 * x, 0.5 * y) * 0.25 + bayer2(x, y)
+
 
 PIXEL = 4               # texels per dither cell — the apparent pixel size
 
@@ -145,7 +158,7 @@ def field(u, v, t):
 def tone(u, v, t, px, py):
     """Field value -> which of the four tones this pixel takes."""
     n = field(u, v, t)
-    limit = (BAYER[py % 8][px % 8] + 0.5) / 64.0
+    limit = bayer8(px, py) + 0.5 / 64.0
     # Offset the VALUE, then quantise. See the module docstring.
     n += (limit - 0.5) * (DITHER / (LEVELS - 1.0))
     idx = int(n * LEVELS)

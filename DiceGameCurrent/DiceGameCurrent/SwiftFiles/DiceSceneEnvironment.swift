@@ -149,22 +149,23 @@ enum DiceSceneEnvironment {
         let centerX = (bounds.x.lowerBound + bounds.x.upperBound) / 2
         let centerZ = (bounds.z.lowerBound + bounds.z.upperBound) / 2
 
-        // Single faceted plane — the previous two-layer arrangement (a
+        // Single plane — the previous two-layer arrangement (a
         // half-transparent photographic felt texture over a solid green
         // backing) is gone. That existed to tint a photo; the low-poly
-        // style wants flat faceted color instead, which one opaque layer
-        // gives directly. Removing the transparency also removes the
-        // depth-write and render-order juggling those two layers needed.
-        let plane = SCNPlane(width: CGFloat(width), height: CGFloat(depth))
+        // style wants flat colour instead, which one opaque layer gives
+        // directly. Removing the transparency also removes the depth-write
+        // and render-order juggling those two layers needed.
+        //
+        // Painted WIDER than the playfield, by `floorOverscan`. Nothing else
+        // grows with it: PlayfieldLayout's bounds, the physics container, the
+        // rim quads and the spawn pattern all keep consuming the true bounds,
+        // so no die ever notices. The only job of the extra margin is that
+        // there is no aspect ratio, rotation or device size at which the
+        // camera can see past the floor to the backdrop behind it.
+        let plane = SCNPlane(width: CGFloat(width * floorOverscan),
+                             height: CGFloat(depth * floorOverscan))
         let material = SCNMaterial()
-        material.diffuse.contents = surfaceTexture(for: style)
-        material.diffuse.wrapS = .clamp
-        material.diffuse.wrapT = .clamp
-        // .lambert, not .physicallyBased: pure diffuse shading with no
-        // specular highlight. PBR's glossiness is what makes a surface
-        // read as "realistic material," which is precisely what the
-        // low-poly style is avoiding — flat matte facets are the point.
-        material.lightingModel = .lambert
+        applySurface(style: style, to: material)
         plane.materials = [material]
 
         let node = SCNNode(geometry: plane)
@@ -176,14 +177,40 @@ enum DiceSceneEnvironment {
         return material
     }
 
-    private static func facetedSurfaceTexture(baseColor: UIColor) -> UIImage {
-        LowPolyTextures.facetedSurface(
-            baseColor: baseColor.darkened(by: 0.25),
-            variation: 0.10,
-            columns: 16,
-            rows: 16,
-            seed: 20260101
-        )
+    /// How much wider than the playfield the floor is painted.
+    ///
+    /// Small, because it only has to beat rounding and the rim's own cosmetic
+    /// bleed, and because everything it covers is off-camera anyway.
+    static let floorOverscan: Float = 1.06
+
+    /// Dresses a floor material for a style: the flowing field for the house
+    /// and steel arenas, a rendered pitch for the ballpark.
+    ///
+    /// One function, so building the scene and re-applying the theme cannot
+    /// disagree about what a style draws.
+    private static func applySurface(style: ArenaStyle, to material: SCNMaterial) {
+        switch style.surface {
+        case .faceted:
+            SmokeFloor.apply(to: material, color: style.surfaceColor)
+        case .baseballField:
+            // The pitch is a picture of a specific place, not a field of
+            // noise, so it stays an image and takes no shader.
+            material.shaderModifiers = nil
+            material.diffuse.contents = ballparkTexture(for: style)
+            material.diffuse.wrapS = .clamp
+            material.diffuse.wrapT = .clamp
+            material.lightingModel = .lambert
+        }
+    }
+
+    /// Re-dresses a floor already on screen, when the player changes colour.
+    private static func retintSurface(style: ArenaStyle, on material: SCNMaterial) {
+        switch style.surface {
+        case .faceted:
+            SmokeFloor.retint(material, color: style.surfaceColor)
+        case .baseballField:
+            material.diffuse.contents = ballparkTexture(for: style)
+        }
     }
 
     /// "ROLLS" written across the center of the floor in Aguafina Script,
@@ -245,7 +272,7 @@ enum DiceSceneEnvironment {
         textMaterial: SCNMaterial,
         title: String
     ) {
-        surfaceMaterial.diffuse.contents = surfaceTexture(for: style)
+        retintSurface(style: style, on: surfaceMaterial)
         textMaterial.diffuse.contents = renderScriptText(title, pointSize: 220, isDark: AppTheme.shared.rollsTextIsDark)
     }
 
@@ -304,25 +331,19 @@ enum DiceSceneEnvironment {
 
     /// The floor image a style asks for.
     ///
-    /// One function so the two callers — building the scene and re-applying
-    /// the theme when the player changes table colour — cannot disagree
-    /// about what a style draws.
-    private static func surfaceTexture(for style: ArenaStyle) -> UIImage {
-        switch style.surface {
-        case .faceted:
-            return facetedSurfaceTexture(baseColor: style.surfaceColor)
-        case .baseballField:
-            // Portrait, matching the composition the preview settled. The
-            // scoreboard is NOT part of this: it changes during the game
-            // and this texture is built once, so it is its own plane (see
-            // BaseballScoreboard).
-            //
-            // The turf takes the table colour, so the pitch answers the
-            // picker like every other floor. Only the turf — see
-            // BaseballField.grass.
-            return BaseballField.render(size: CGSize(width: 820, height: 1100),
-                                        turf: style.surfaceColor)
-        }
+    /// The ballpark pitch. Portrait, matching the composition the preview
+    /// settled. The scoreboard is NOT part of this: it changes during the
+    /// game and this texture is built once, so it is its own plane (see
+    /// BaseballScoreboard).
+    ///
+    /// The turf takes the table colour, so the pitch answers the picker like
+    /// every other floor. Only the turf — see BaseballField.grass.
+    ///
+    /// The house and steel arenas have no equivalent, because their floor is
+    /// no longer a picture: see `SmokeFloor`.
+    private static func ballparkTexture(for style: ArenaStyle) -> UIImage {
+        BaseballField.render(size: CGSize(width: 820, height: 1100),
+                             turf: style.surfaceColor)
     }
 
     /// Visible wood frame around the play area — separate from the

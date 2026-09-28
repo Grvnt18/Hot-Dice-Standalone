@@ -39,13 +39,22 @@ struct DiceTraySceneView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> SCNView {
         let view = LayoutReportingSCNView()
-        view.backgroundColor = .black
+        // Never black. If any sliver of backdrop is ever visible — an aspect
+        // ratio the overscanned floor somehow does not cover, a frame during
+        // rotation, the instant before assembly finishes — it should read as
+        // part of the field rather than as a hole punched in it.
+        view.backgroundColor = SmokeFloor.backdrop(from: AppTheme.shared.floorBaseColor)
         view.antialiasingMode = .multisampling4X
         view.isPlaying = true
         return view
     }
 
     func updateUIView(_ uiView: SCNView, context: Context) {
+        // Re-set on every update, not only at creation, because the backdrop
+        // follows the player's table colour. A value assigned once in
+        // makeUIView would keep the colour the app launched with and show
+        // through as the wrong shade after a swatch change.
+        uiView.backgroundColor = SmokeFloor.backdrop(from: AppTheme.shared.floorBaseColor)
         (uiView as? LayoutReportingSCNView)?.onLayout = { view in
             assembleIfReady(view, coordinator: context.coordinator)
         }

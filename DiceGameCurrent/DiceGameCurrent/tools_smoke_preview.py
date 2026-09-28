@@ -46,12 +46,25 @@ GAIN = 0.5
 
 WARP_A = 2.4            # how far the first warp drags the field
 WARP_B = 1.8            # and the second — this pair is what curls it
-DRIFT_A = 0.022         # per-second motion of each warp layer. Deliberately
-DRIFT_B = 0.014         # incommensurate, so the field never returns to a
-DRIFT_C = 0.010         # previous state and the loop is genuinely endless.
-                        # A fifth of the first pass: this sits behind dice and
-                        # wants to be calming, and anything quick enough to
-                        # notice reads as a screensaver competing with the roll.
+LOOP_SECONDS = 30.0     # one full cycle, after which the field is EXACTLY
+                        # where it started — not approximately.
+
+# Time enters the field only as a point travelling a circle. That is the whole
+# trick: a linear drift (`y + t * DRIFT`) never returns, so it can never loop,
+# however long you wait. Offsetting each noise sample by (R·cos a, R·sin a)
+# with a = 2π·t/LOOP makes every term periodic in LOOP, so the composite is
+# too, exactly, with no cross-fade. Cross-dissolving two drifting fields is
+# the other way to fake a loop and it ghosts visibly at the seam.
+#
+# The cost is real and worth stating: a circle only explores as far as its
+# radius, so speed = 2π·R / LOOP. A long calm loop cannot also travel far.
+# What keeps it from feeling stuck is that the warp layers RESHAPE the field
+# as they orbit, and that is not bounded by the radius the way translation is.
+ORBIT_Q = 0.45          # first warp layer
+ORBIT_R = 0.55          # second warp layer
+ORBIT_N = 0.22          # the field itself — see the note on ORBIT_N below
+PHASE_R = 2.1           # each layer starts somewhere else on its circle, so
+PHASE_N = 4.3           # they never line up into one obvious sweep
 
 ORIGIN_X = 17.3         # the field is sampled away from (0,0) on purpose.
 ORIGIN_Y = 9.1          # sin-fract value noise degenerates at the origin —
@@ -138,19 +151,38 @@ def field(u, v, t):
 
     One fbm gives blobs that drift. Feeding fbm its own output as an offset is
     what makes them fold back through each other and read as smoke rather than
-    as clouds sliding past. The second warp is what keeps it from settling into
-    a visible rotation.
+    as clouds sliding past.
+
+    ORBIT_N is the one that stops the floor being half-dead. The final sample
+    used to be `fbm(x + WARP_B*rx, y + WARP_B*ry)` — no time term at all — so
+    the base field was pinned in space and only the warp offsets moved it.
+    Wherever the warp gradient was weak, that part of the floor just sat
+    there, which is exactly how it looked: motion in one band and stillness
+    everywhere else. Giving the final sample its own orbit translates the
+    WHOLE field, so every pixel changes; the warp orbits, running at other
+    radii and phases, keep that from reading as a rigid slide.
+
+    The old drift was also applied to the `y` coordinate alone, so what motion
+    there was ran vertically. A circle has no such preference.
     """
     x = u * FIELD_SCALE + ORIGIN_X
     y = v * FIELD_SCALE * FIELD_ASPECT + ORIGIN_Y
 
-    qx = fbm(x, y + t * DRIFT_A)
-    qy = fbm(x + 5.2, y + 1.3 - t * DRIFT_B)
+    a = 2.0 * math.pi * (t / LOOP_SECONDS)
+    ca, sa = math.cos(a), math.sin(a)
+    cr, sr = math.cos(a + PHASE_R), math.sin(a + PHASE_R)
+    cn, sn = math.cos(a + PHASE_N), math.sin(a + PHASE_N)
 
-    rx = fbm(x + WARP_A * qx + 1.7, y + WARP_A * qy + 9.2 + t * DRIFT_C)
-    ry = fbm(x + WARP_A * qx + 8.3, y + WARP_A * qy + 2.8 - t * DRIFT_A)
+    qx = fbm(x + ORBIT_Q * ca, y + ORBIT_Q * sa)
+    qy = fbm(x + 5.2 - ORBIT_Q * sa, y + 1.3 + ORBIT_Q * ca)
 
-    n = fbm(x + WARP_B * rx, y + WARP_B * ry)
+    rx = fbm(x + WARP_A * qx + 1.7 + ORBIT_R * cr,
+             y + WARP_A * qy + 9.2 + ORBIT_R * sr)
+    ry = fbm(x + WARP_A * qx + 8.3 - ORBIT_R * sr,
+             y + WARP_A * qy + 2.8 + ORBIT_R * cr)
+
+    n = fbm(x + WARP_B * rx + ORBIT_N * cn,
+            y + WARP_B * ry + ORBIT_N * sn)
 
     # fbm lands around 0.5 with most of its mass in the middle; without this
     # stretch the four tones split a band so narrow that two of them barely
@@ -371,6 +403,54 @@ def write_gif(path, frames, size, palette, delay_cs):
     return path
 
 
+# --- the two properties an eye cannot check ------------------------------
+
+def check_loop(cells=24, places=12):
+    """t = 0 and t = LOOP_SECONDS must be the SAME field, not a close one."""
+    worst = 0.0
+    for cy in range(cells):
+        v = (cy + 0.5) / cells
+        for cx in range(cells):
+            u = (cx + 0.5) / cells
+            worst = max(worst, abs(field(u, v, 0.0) - field(u, v, LOOP_SECONDS)))
+    ok = round(worst, places) == 0.0
+    print("  loop closes            %s (worst drift over %d cells: %.3e)"
+          % ("ok" if ok else "FAIL", cells * cells, worst))
+    return ok
+
+
+def check_everywhere(cells=16, steps=16):
+    """Every part of the floor must visibly CHANGE TONE over a cycle.
+
+    The first version of this check measured the span of the raw field value
+    and passed happily on a floor with the defect still in it. The mistake was
+    measuring the wrong quantity: the field is posterised to four levels, so a
+    step is 0.25, and a region whose value wanders by 0.17 never crosses a
+    boundary and never changes colour. It is frozen on screen while the number
+    looks healthy.
+
+    So this asks the only question that matches what an eye sees — how many
+    distinct tones does this region actually take over the cycle — and fails
+    any region that only ever shows one. Dither is included, since it shifts
+    where the boundaries fall.
+    """
+    worst, where = 99, None
+    for cy in range(cells):
+        v = (cy + 0.5) / cells
+        for cx in range(cells):
+            u = (cx + 0.5) / cells
+            seen = {tone(u, v, LOOP_SECONDS * i / steps, cx, cy)
+                    for i in range(steps)}
+            if len(seen) < worst:
+                worst, where = len(seen), (round(u, 3), round(v, 3))
+    ok = worst >= 2
+    print("  every region moves     %s (quietest of %d regions shows %d tone%s"
+          " over the cycle, at %s)"
+          % ("ok" if ok else "FAIL", cells * cells, worst,
+             "" if worst == 1 else "s", where))
+    return ok
+
+
 # A spread across the picker: the default, the two that stress the ramp hardest
 # (near-black and near-white), and a vivid one.
 SAMPLES = [
@@ -386,7 +466,27 @@ if __name__ == "__main__":
         code = args[args.index("--hex") + 1].lstrip("#")
         SAMPLES = [("custom-" + code.lower(), code)]
 
-    if "--gif" in args:
+    if "--check" in args:
+        print("smoke field:")
+        good = check_loop() and check_everywhere()
+        sys.exit(0 if good else 1)
+
+    if "--loop" in args:
+        # A full cycle, played fast. 30s of field in 2.4s of GIF, so the point
+        # being checked is that the wrap is seamless — NOT the speed, which is
+        # what --gif shows.
+        size, count, delay_cs = 192, 60, 4
+        for name, code in SAMPLES[:1]:
+            frames, pal = [], ramp(code)
+            for i in range(count):
+                rows, _ = render(code, size, LOOP_SECONDS * i / count)
+                frames.append(rows)
+                print("  frame %2d/%d" % (i + 1, count))
+            p = write_gif(os.path.join(out, "smoke-%s-loop.gif" % name),
+                          frames, size, pal, delay_cs)
+            print("wrote %s  (one %.0fs cycle at %.0fx)"
+                  % (p, LOOP_SECONDS, LOOP_SECONDS / (count * delay_cs / 100.0)))
+    elif "--gif" in args:
         # delay_cs x count IS the playback duration, so the sampled time has to
         # advance at exactly that rate or the preview misrepresents the speed.
         # It did: t ran 0..6 over frames that play in 1.2s, five times too fast,

@@ -127,7 +127,7 @@ struct BoneheadsGrid: View {
     private func label(_ index: Int, total: Int) -> some View {
         HStack(spacing: 4) {
             Text(BoneheadsRules.name(of: index))
-                .font(.poppins(10))
+                .font(.poppins(11))
                 .foregroundStyle(.white.opacity(0.55))
             Text("\(total)")
                 .font(.poppins(12))

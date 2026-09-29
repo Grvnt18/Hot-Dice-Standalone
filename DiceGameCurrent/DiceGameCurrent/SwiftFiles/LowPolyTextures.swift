@@ -40,10 +40,22 @@ enum LowPolyTextures {
         // score bar, so facets stay roughly equilateral instead of being
         // stretched into slivers when the image is scaled to fit.
         pixelHeight: CGFloat? = nil,
+        // When set, every facet's shade is snapped to the nearest of these
+        // before it is filled — the surface keeps its low-poly geometry and
+        // loses its continuous tone, which is what "posterised" means here.
+        //
+        // Snapping per FACET rather than per pixel is the right unit for
+        // this generator: a facet is already a flat region, so the tone
+        // boundary lands on a triangle edge, which is already hard. The
+        // floor dithers because its field is continuous and its boundaries
+        // would otherwise be smooth contours; there is nothing here for a
+        // dither to break up.
+        tones: [UIColor]? = nil,
         seed: UInt64 = 12345
     ) -> UIImage {
         let h = pixelHeight ?? pixelSize
-        let key = "\(baseColor)-\(variation)-\(columns)x\(rows)-\(pixelSize)x\(h)-\(seed)"
+        let toneKey = tones.map { $0.map(\.description).joined(separator: ",") } ?? "-"
+        let key = "\(baseColor)-\(variation)-\(columns)x\(rows)-\(pixelSize)x\(h)-\(toneKey)-\(seed)"
         if let cached = cache.value(key) { return cached }
 
         let size = CGSize(width: pixelSize, height: h)
@@ -83,12 +95,13 @@ enum LowPolyTextures {
 
                     for tri in triangles {
                         let delta = (CGFloat(rng.nextUnit()) * 2 - 1) * variation
+                        let facet = tones.map { snap(shade(baseColor, by: delta), to: $0) }
                         // .set() sets BOTH fill and stroke. Using
                         // .setFill() alone left the stroke at its default
                         // black, so the seam-closing stroke below outlined
                         // every facet in heavy black lines instead of
                         // blending invisibly into the fill.
-                        shade(baseColor, by: delta).set()
+                        (facet ?? shade(baseColor, by: delta)).set()
 
                         let path = UIBezierPath()
                         path.move(to: tri[0])
@@ -223,6 +236,31 @@ enum LowPolyTextures {
                 }
             }
         }
+    }
+
+    /// The nearest of `tones` to `color`, by straight RGB distance.
+    ///
+    /// Straight distance rather than a perceptual one on purpose: the tones
+    /// are a ramp off one base colour, so they differ almost entirely in
+    /// brightness, and along a single hue's ramp every distance metric
+    /// gives the same ordering. A perceptual one would be more code saying
+    /// the same thing.
+    private static func snap(_ color: UIColor, to tones: [UIColor]) -> UIColor {
+        guard !tones.isEmpty else { return color }
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        guard color.getRed(&r, green: &g, blue: &b, alpha: &a) else { return color }
+        var best = tones[0]
+        var bestDistance = CGFloat.greatestFiniteMagnitude
+        for tone in tones {
+            var tr: CGFloat = 0, tg: CGFloat = 0, tb: CGFloat = 0, ta: CGFloat = 0
+            guard tone.getRed(&tr, green: &tg, blue: &tb, alpha: &ta) else { continue }
+            let distance = (r - tr) * (r - tr) + (g - tg) * (g - tg) + (b - tb) * (b - tb)
+            if distance < bestDistance {
+                bestDistance = distance
+                best = tone
+            }
+        }
+        return best
     }
 
     private static func shade(_ color: UIColor, by delta: CGFloat) -> UIColor {

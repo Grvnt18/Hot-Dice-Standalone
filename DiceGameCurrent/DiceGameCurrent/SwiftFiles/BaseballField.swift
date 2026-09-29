@@ -41,6 +41,27 @@ enum BaseballField {
     static let live = UIColor(hex: "#F3D9A4")
     static let out = UIColor(hex: "#D9463E")
 
+    /// The scoreboard's edge: hard outline, one-step bevel.
+    ///
+    /// The panel is Core Graphics drawn onto a texture rather than a
+    /// SwiftUI view, so `PixelPanel` cannot be applied to it — only its
+    /// recipe hand-ported. These are that recipe's three tones, named here
+    /// so `tools_baseball_field_verify.py` can hold the port and the
+    /// preview to the same numbers.
+    ///
+    /// `panelOutline` is `PixelPanel.outlineColor`'s value, written out
+    /// rather than read across: that is a SwiftUI `Color` and this file
+    /// works in `UIColor`, and a conversion here would be a second source
+    /// of truth dressed up as a shared one.
+    static let panelOutline = UIColor(hex: "#1A120D")
+    static let panelBevelLit = UIColor(white: 1, alpha: 0.18)
+    static let panelBevelShade = UIColor(white: 0, alpha: 0.28)
+
+    /// The outline and bevel widths, as a fraction of the field width, so
+    /// they scale with the texture exactly as every other constant here.
+    static let panelOutlineW: CGFloat = 0.0035
+    static let panelBevelW: CGFloat = 0.0035
+
     // MARK: Geometry
 
     static let home = CGPoint(x: 0.500, y: 0.800)
@@ -121,7 +142,18 @@ enum BaseballField {
             // a pitch painted in two flat colours read as a different app.
             // The layout is untouched — the same diamond, the same circles,
             // the same measurements — and only what fills them changes.
-            let turfTexture = faceted(turf, size: size, seed: 771001)
+            // The turf posterises to the floor's own four tones; the dirt
+            // does NOT.
+            //
+            // That asymmetry is the whole point rather than an oversight.
+            // The dirt is what makes the green read as grass — it is the
+            // one surface on this pitch whose job is to be a different
+            // material, and flattening it to four tones off its own base
+            // narrows exactly the contrast that does that work. Same
+            // argument that keeps the chalk, the bases and the panel off
+            // the picker.
+            let turfTexture = faceted(turf, size: size, seed: 771001,
+                                      posterised: true)
             let clay = faceted(dirt, size: size, seed: 771002)
 
             turfTexture.draw(in: CGRect(origin: .zero, size: size))
@@ -247,7 +279,8 @@ enum BaseballField {
     /// the cell counts follow the canvas and the triangles stay roughly
     /// equilateral instead of stretching into slivers.
     private static func faceted(_ colour: UIColor, size: CGSize,
-                                seed: UInt64) -> UIImage {
+                                seed: UInt64,
+                                posterised: Bool = false) -> UIImage {
         let columns = 22
         let rows = Int((CGFloat(columns) * size.height / size.width).rounded())
         return LowPolyTextures.facetedSurface(
@@ -257,6 +290,7 @@ enum BaseballField {
             rows: rows,
             pixelSize: size.width,
             pixelHeight: size.height,
+            tones: posterised ? SmokeFloor.ramp(from: colour) : nil,
             seed: seed
         )
     }
@@ -344,8 +378,49 @@ enum BaseballField {
         let metrics = boardMetrics
         let panelRect = CGRect(x: px(boardX), y: py(boardY),
                                width: px(boardW), height: py(metrics.height))
-        panel.withAlphaComponent(0.9).setFill()
-        UIBezierPath(roundedRect: panelRect, cornerRadius: px(0.014)).fill()
+        // Square-cornered, opaque, hard-outlined, one-step bevel — the
+        // variant that was previewed and chosen.
+        //
+        // Opaque rather than the 0.9 it used to carry: a bevel drawn over
+        // a translucent panel picks up whatever turf is behind it and
+        // reads as a smudge rather than as a turned edge, which is the one
+        // way this treatment can look worse than the rounded rect it
+        // replaces.
+        panel.setFill()
+        UIBezierPath(rect: panelRect).fill()
+
+        let outlineW = px(panelOutlineW)
+        let bevelW = px(panelBevelW)
+
+        cg.setFillColor(panelOutline.cgColor)
+        for edge in [
+            CGRect(x: panelRect.minX, y: panelRect.minY,
+                   width: panelRect.width, height: outlineW),
+            CGRect(x: panelRect.minX, y: panelRect.maxY - outlineW,
+                   width: panelRect.width, height: outlineW),
+            CGRect(x: panelRect.minX, y: panelRect.minY,
+                   width: outlineW, height: panelRect.height),
+            CGRect(x: panelRect.maxX - outlineW, y: panelRect.minY,
+                   width: outlineW, height: panelRect.height)
+        ] {
+            cg.fill(edge)
+        }
+
+        // Inside the outline, so the lit edge reads as the panel's own
+        // turned corner rather than as a second border. Light from above
+        // and the left, which is what PieceSheen.litFromTop states for the
+        // whole app.
+        let inner = panelRect.insetBy(dx: outlineW, dy: outlineW)
+        cg.setFillColor(panelBevelLit.cgColor)
+        cg.fill(CGRect(x: inner.minX, y: inner.minY,
+                       width: inner.width, height: bevelW))
+        cg.fill(CGRect(x: inner.minX, y: inner.minY,
+                       width: bevelW, height: inner.height))
+        cg.setFillColor(panelBevelShade.cgColor)
+        cg.fill(CGRect(x: inner.minX, y: inner.maxY - bevelW,
+                       width: inner.width, height: bevelW))
+        cg.fill(CGRect(x: inner.maxX - bevelW, y: inner.minY,
+                       width: bevelW, height: inner.height))
 
         let labelW: CGFloat = 0.050
         let gridX = boardX + labelW
@@ -385,9 +460,13 @@ enum BaseballField {
                 // the game is without counting boxes.
                 (index + 1 == currentInning ? live : cell).setFill()
                 cg.fill(box)
-                panel.setStroke()
-                cg.setLineWidth(1)
-                cg.stroke(box)
+                // The same hard outline the panel wears, at the same
+                // width, rather than a 1pt hairline — at the sizes this
+                // texture is drawn and then sampled at, a 1pt line is
+                // sub-pixel and the boxes lose their edges entirely.
+                panelOutline.setStroke()
+                cg.setLineWidth(outlineW)
+                cg.stroke(box.insetBy(dx: outlineW / 2, dy: outlineW / 2))
 
                 // A box is blank until that half-inning has been played —
                 // an unplayed inning and a scoreless one are different

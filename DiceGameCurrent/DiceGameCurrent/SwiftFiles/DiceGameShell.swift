@@ -270,7 +270,9 @@ struct DiceScoreBar: View {
                 // gets the panel treatment the rest of the chrome has.
                 .pixelPanel(fill: .solid(Color(hex: die.colorway.bodyHex)),
                             elevation: .piece,
-                            radius: PixelPanel.cellRadius)
+                            radius: PixelPanel.cellRadius,
+                            outline: PixelPanel.cellOutline,
+                            bevel: PixelPanel.cellBevel)
         } else {
             // An empty slot is a hole in the panel, not a thing on it, so the
             // light runs the other way — see .pixelWell. The hairline dashed
@@ -279,7 +281,9 @@ struct DiceScoreBar: View {
             // device the app runs on, which is the opposite of pixel art.
             Color.clear
                 .frame(width: width, height: height)
-                .pixelWell(radius: PixelPanel.cellRadius)
+                .pixelWell(radius: PixelPanel.cellRadius,
+                           outline: PixelPanel.cellOutline,
+                           bevel: PixelPanel.cellBevel)
         }
     }
 }

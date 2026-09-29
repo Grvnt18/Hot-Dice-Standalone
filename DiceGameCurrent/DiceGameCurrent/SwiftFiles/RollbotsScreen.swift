@@ -92,10 +92,18 @@ struct RollbotsScreen: View {
                 // The viewing seat is always on the left — your own numbers
                 // stay where your thumb is, the same way Boneheads keeps
                 // your own grid nearest you.
-                // Wider than before: the rails now carry two marks and two
-                // labels apiece, and the old 74-104pt band squeezed the
-                // weapon name to a scale factor rather than reading it.
-                let railWidth = min(max(geo.size.width * 0.22, 92), 128)
+                // The floor came back down to 78 once the rails started
+                // sizing their own text.
+                //
+                // It was raised to 92 to stop the weapon name collapsing,
+                // which was the right fix for a rail with a FIXED 12pt
+                // label. But at 92 the clamp floor wins on every phone —
+                // 0.22 x 375 is 82.5 — so two rails took 184pt of a 375pt
+                // screen, half of it, and the tray got what was left. The
+                // labels are derived from this width now (NetSeatRail.label),
+                // so the rail can be narrow and still legible, which is what
+                // deriving it was for.
+                let railWidth = min(max(geo.size.width * 0.22, 78), 128)
                 let barHeight: CGFloat = phase == .setup ? 0 : 104
                 let bodyHeight = max(geo.size.height - barHeight, 0)
 

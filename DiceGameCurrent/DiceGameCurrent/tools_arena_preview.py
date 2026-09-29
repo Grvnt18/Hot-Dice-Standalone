@@ -290,7 +290,13 @@ def posterised_sheet():
     import tools_type as type_
 
     W, H, sw = 900, 520, 190
-    IVORY, TURF, DIRT = "#F4EDDF", "#36F422", "#C9B18A"
+    # All three read straight off BaseballField/RoyalUrArt. TURF was
+    # "#36F422" here — a bright green the app never renders; its grass is the
+    # muted sage below. That made the posterise look far more dramatic than
+    # it is, because a saturated base gives the four-tone ramp much more to
+    # span. Fourth time a preview in this project has shown something the app
+    # does not; worth saying out loud rather than quietly correcting.
+    IVORY, TURF, DIRT = "#F4EDDF", "#7BA07E", "#C9B18A"
 
     def faceted_block(base, seed, cols=14):
         """The old generator: continuous per-facet brightness jitter."""
@@ -482,7 +488,7 @@ def rollbots_screen(w=560, h=780):
             for x in range(max(0, int(x0)), min(w, int(x1))):
                 img[y][x] = t
 
-    rail = max(92, min(int(w * 0.22), 128))
+    rail = max(78, min(int(w * 0.22), 128))   # floor lowered with RollbotsScreen
     bar = 104
     body_h = h - bar
 

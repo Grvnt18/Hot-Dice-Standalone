@@ -67,11 +67,11 @@ struct FreighterYachtDinghyScreen: View {
                     .background(SmokeFloor.backdropColor)
                     .overlay(alignment: .topLeading) {
                         if let onExit {
-                            overlayButton(systemName: "chevron.left") { onExit() }
+                            OverlayChromeButton(systemName: "chevron.left") { onExit() }
                         }
                     }
                     .overlay(alignment: .topTrailing) {
-                        overlayButton(systemName: "gearshape.fill") {
+                        OverlayChromeButton(systemName: "gearshape.fill") {
                             showingSettings = true
                         }
                     }
@@ -286,20 +286,4 @@ struct FreighterYachtDinghyScreen: View {
 
     // MARK: Chrome
 
-    private func overlayButton(systemName: String, action: @escaping () -> Void) -> some View {
-        Button {
-            SoundEngine.shared.play(.buttonTap)
-            action()
-        } label: {
-            Image(systemName: systemName)
-                .font(.system(size: 18, weight: systemName == "chevron.left" ? .semibold : .regular))
-                .foregroundStyle(.white.opacity(0.75))
-                .padding(9)
-                .background(
-                    Color.black.opacity(0.45),
-                    in: RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                )
-        }
-        .padding(10)
-    }
 }

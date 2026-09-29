@@ -19,6 +19,18 @@ enum RoyalUrArt {
     static let petalRed = Color(hex: "#DB362C")
     static let tileBase = UIColor(hex: "#F4EDDF")
 
+    /// Board furniture, sampled off the reference photograph.
+    ///
+    /// Fixed, and deliberately not theme-derived, for exactly the reason
+    /// the ink and the petal red are fixed: these are the board. A frame
+    /// that followed the swatch would collide with the two seat colours on
+    /// a third of the picker, and the markings are what a player reads a
+    /// move from.
+    static let grout = Color(red: 62 / 255, green: 106 / 255, blue: 114 / 255)
+    static let frameRed = Color(red: 192 / 255, green: 80 / 255, blue: 60 / 255)
+    static let frameCream = Color(red: 232 / 255, green: 211 / 255, blue: 169 / 255)
+    static let roseGold = Color(red: 217 / 255, green: 164 / 255, blue: 65 / 255)
+
     /// The same generator the floor uses, at a much lower variation — a
     /// board tile should read as aged ivory, not as a patchwork.
     static let tileTexture = LowPolyTextures.facetedSurface(
@@ -124,8 +136,12 @@ struct RoyalUrBoardView: View {
                 // height-bound, and a strip above and below on a phone.
                 // Timber edge to edge cannot leave one at any size, and
                 // the squares stay exactly where RoyalUrLayout puts them.
+                // No black wash over it any more. That flattened the
+                // timber's four fixed tones into four muddier ones, so the
+                // board frame stopped matching the header, footer and rim
+                // it is meant to be one piece of wood with — which is the
+                // whole point of using WoodTiledBackground here.
                 WoodTiledBackground()
-                    .overlay(Color.black.opacity(0.22))
                     .frame(width: geo.size.width, height: geo.size.height)
                     .clipShape(RoundedRectangle(cornerRadius: layout.tile * 0.14))
                     .overlay(
@@ -148,8 +164,80 @@ struct RoyalUrBoardView: View {
 
     // MARK: Drawing
 
+    /// The cream-and-red diamond band with a medallion at each corner.
+    ///
+    /// The most recognisable thing about a Royal UR board, and the one
+    /// piece of it the app did not draw at all. Sized off `layout.tile` so
+    /// it holds its proportion at any screen size rather than becoming a
+    /// hairline on a phone or a slab on a tablet.
+    private func drawFrame(in context: GraphicsContext, layout: RoyalUrLayout) {
+        let size = context.clipBoundingRect.size
+        let band = max(6, layout.margin * 1.35)
+
+        var edges = Path()
+        edges.addRect(CGRect(x: 0, y: 0, width: size.width, height: band))
+        edges.addRect(CGRect(x: 0, y: size.height - band, width: size.width, height: band))
+        edges.addRect(CGRect(x: 0, y: 0, width: band, height: size.height))
+        edges.addRect(CGRect(x: size.width - band, y: 0, width: band, height: size.height))
+        context.fill(edges, with: .color(RoyalUrArt.frameCream))
+
+        // One diamond per band-width, so the run stays even whatever the
+        // frame's length works out to.
+        var diamonds = Path()
+        func diamond(_ cx: CGFloat, _ cy: CGFloat) {
+            let r = band * 0.38
+            diamonds.move(to: CGPoint(x: cx, y: cy - r))
+            diamonds.addLine(to: CGPoint(x: cx + r, y: cy))
+            diamonds.addLine(to: CGPoint(x: cx, y: cy + r))
+            diamonds.addLine(to: CGPoint(x: cx - r, y: cy))
+            diamonds.closeSubpath()
+        }
+        var x = band * 1.5
+        while x < size.width - band {
+            diamond(x, band / 2)
+            diamond(x, size.height - band / 2)
+            x += band
+        }
+        var y = band * 1.5
+        while y < size.height - band {
+            diamond(band / 2, y)
+            diamond(size.width - band / 2, y)
+            y += band
+        }
+        context.fill(diamonds, with: .color(RoyalUrArt.frameRed))
+
+        for corner in [CGPoint(x: band / 2, y: band / 2),
+                       CGPoint(x: size.width - band / 2, y: band / 2),
+                       CGPoint(x: band / 2, y: size.height - band / 2),
+                       CGPoint(x: size.width - band / 2, y: size.height - band / 2)] {
+            let outer = CGRect(x: corner.x - band / 2, y: corner.y - band / 2,
+                               width: band, height: band)
+            context.fill(Path(outer), with: .color(RoyalUrArt.frameRed))
+            context.fill(Path(outer.insetBy(dx: band * 0.25, dy: band * 0.25)),
+                         with: .color(RoyalUrArt.frameCream))
+        }
+    }
+
+    /// The teal channel the tiles are set into.
+    ///
+    /// The gap between squares was already there — it simply showed timber
+    /// through it, so the board read as a grid drawn ON wood rather than
+    /// as tiles set INTO something. One plate under all twenty squares is
+    /// enough; the tiles are opaque and cover everything but the channel.
+    private func drawGrout(in context: GraphicsContext, layout: RoyalUrLayout) {
+        var plate = Path()
+        for square in RoyalUrBoard.squares {
+            plate.addRect(layout.rect(for: square).insetBy(dx: -layout.gap,
+                                                           dy: -layout.gap))
+        }
+        context.fill(plate, with: .color(RoyalUrArt.grout))
+    }
+
     private func draw(in context: GraphicsContext, layout: RoyalUrLayout) {
         let texture = context.resolve(Image(uiImage: RoyalUrArt.tileTexture))
+
+        drawFrame(in: context, layout: layout)
+        drawGrout(in: context, layout: layout)
 
         for square in RoyalUrBoard.squares {
             let rect = layout.rect(for: square)
@@ -163,7 +251,13 @@ struct RoyalUrBoardView: View {
             tile.clip(to: shape)
             tile.draw(texture, in: rect)
 
-            context.stroke(shape, with: .color(RoyalUrArt.ink.opacity(0.75)), lineWidth: 1.5)
+            // A set-in edge rather than a drawn outline: the grout behind
+            // already separates one tile from the next, so this is the
+            // tile's own shadowed lip, and it is 2pt because everything
+            // else in the restyle is (see PixelPanel.outlineWidth — 1pt
+            // lands on a 2- or 3-device-pixel line the rasteriser may
+            // soften at the ends).
+            context.stroke(shape, with: .color(RoyalUrArt.ink.opacity(0.55)), lineWidth: 2)
 
             let inset = rect.insetBy(dx: layout.tile * 0.09, dy: layout.tile * 0.09)
             RoyalUrArt.draw(
@@ -384,13 +478,20 @@ extension RoyalUrArt {
             context.fill(petal, with: .color(i % 2 == 0 ? petalRed : ink))
         }
 
-        context.fill(
-            Path(ellipseIn: CGRect(
-                x: center.x - rect.width * 0.06, y: center.y - rect.width * 0.06,
-                width: rect.width * 0.12, height: rect.width * 0.12
-            )),
-            with: .color(.white.opacity(0.9))
+        // Gold, around both the star and the centre. On the reference board
+        // this is what separates the petals from the ivory and makes the
+        // rosette read as an inlay rather than as paint — and the rosette is
+        // the only marking the rules care about, so it earns the extra pass.
+        context.stroke(star, with: .color(RoyalUrArt.roseGold),
+                       lineWidth: max(1, rect.width * 0.035))
+
+        let eye = CGRect(
+            x: center.x - rect.width * 0.07, y: center.y - rect.width * 0.07,
+            width: rect.width * 0.14, height: rect.width * 0.14
         )
+        context.fill(Path(ellipseIn: eye), with: .color(.white))
+        context.stroke(Path(ellipseIn: eye), with: .color(RoyalUrArt.roseGold),
+                       lineWidth: max(1, rect.width * 0.028))
     }
 
     /// Four lens shapes with a dot in each, and the vertical banding
@@ -533,7 +634,12 @@ extension RoyalUrArt {
         // on the piece, which is a glow — a shadow falls AWAY from the
         // light, and Elevation is where that direction and depth are
         // stated for the whole app.
-        context.fill(Path(ellipseIn: body.offsetBy(dx: 0, dy: Elevation.piece.dy)),
+        // dx as well as dy. Elevation.offset's own doc says a hard shadow
+        // thrown straight down reads as a seam rather than as a shadow, and
+        // this was the one consumer in the app still ignoring the sideways
+        // component added when shadows went to zero blur.
+        context.fill(Path(ellipseIn: body.offsetBy(dx: Elevation.piece.dx,
+                                                   dy: Elevation.piece.dy)),
                      with: .color(Elevation.piece.color))
         context.fill(Path(ellipseIn: body), with: .color(seatColor(seat)))
         // The same sheen the placed dice carry, so a piece on this board

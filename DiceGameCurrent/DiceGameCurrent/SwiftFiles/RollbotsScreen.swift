@@ -104,7 +104,7 @@ struct RollbotsScreen: View {
                         state: state,
                         seat: viewingSeat,
                         name: names[viewingSeat],
-                        isActive: true
+                        width: railWidth
                     )
                     .frame(width: railWidth)
 
@@ -141,11 +141,11 @@ struct RollbotsScreen: View {
                     .frame(height: bodyHeight)
                     .overlay(alignment: .topLeading) {
                         if let onExit {
-                            overlayButton("chevron.left") { onExit() }
+                            OverlayChromeButton(systemName: "chevron.left", tint: NetArt.text) { onExit() }
                         }
                     }
                     .overlay(alignment: .topTrailing) {
-                        overlayButton("gearshape.fill") { showingSettings = true }
+                        OverlayChromeButton(systemName: "gearshape.fill", tint: NetArt.text) { showingSettings = true }
                     }
 
                     if phase != .setup {
@@ -164,7 +164,7 @@ struct RollbotsScreen: View {
                         state: state,
                         seat: 1 - viewingSeat,
                         name: names[1 - viewingSeat],
-                        isActive: false
+                        width: railWidth
                     )
                     .frame(width: railWidth)
                 }
@@ -791,20 +791,4 @@ struct RollbotsScreen: View {
         phase = .setup
     }
 
-    private func overlayButton(_ systemName: String, action: @escaping () -> Void) -> some View {
-        Button {
-            SoundEngine.shared.play(.buttonTap)
-            action()
-        } label: {
-            Image(systemName: systemName)
-                .font(.system(size: 18, weight: systemName == "chevron.left" ? .semibold : .regular))
-                .foregroundStyle(NetArt.text.opacity(0.75))
-                .padding(9)
-                .background(
-                    Color.black.opacity(0.5),
-                    in: RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                )
-        }
-        .padding(10)
-    }
 }

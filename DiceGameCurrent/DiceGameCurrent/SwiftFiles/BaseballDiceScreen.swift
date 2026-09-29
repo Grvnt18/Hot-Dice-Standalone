@@ -120,10 +120,10 @@ struct BaseballDiceScreen: View {
                     }
                     .frame(height: fieldHeight)
                     .overlay(alignment: .topLeading) {
-                        if let onExit { overlayButton("chevron.left") { onExit() } }
+                        if let onExit { OverlayChromeButton(systemName: "chevron.left") { onExit() } }
                     }
                     .overlay(alignment: .topTrailing) {
-                        overlayButton("gearshape.fill") { showingSettings = true }
+                        OverlayChromeButton(systemName: "gearshape.fill") { showingSettings = true }
                     }
 
                     DiceRollButton(
@@ -619,23 +619,6 @@ struct BaseballDiceScreen: View {
         }
     }
 
-    private func overlayButton(_ systemName: String,
-                               action: @escaping () -> Void) -> some View {
-        Button {
-            SoundEngine.shared.play(.buttonTap)
-            action()
-        } label: {
-            Image(systemName: systemName)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.75))
-                .padding(9)
-                .background(
-                    Color.black.opacity(0.45),
-                    in: RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                )
-        }
-        .padding(10)
-    }
 }
 
 // MARK: - Dice

@@ -224,6 +224,9 @@ KNOWN = {
     "simd_quatf", "simd_slerp", "simd_float3", "simd_float3x3",
     # UIKit and SwiftUI members reached without a receiver
     "getRed", "getHue", "dismiss", "overlay", "shadow", "content",
+    # SwiftUI's ViewModifier plumbing. PixelPanel is the first thing here to
+    # define one, which is exactly the case this list exists to absorb.
+    "modifier", "inset",
     "selector", "build", "region", "special", "decided",
     # payload error cases, declared as `case name(...)` in their enums
     "scoreMismatch", "unknownGame", "unsupportedVersion",

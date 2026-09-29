@@ -33,26 +33,42 @@ struct ArenaStyle {
     /// follows the player's table colour, which is what the house style is.
     var surfaceOverride: UIColor?
 
-    /// Whether to build the visible wooden rim.
+    /// What the visible rim around the playfield is made of.
     ///
-    /// Only the *visible* timber. The physics container in
-    /// DicePlayfieldPhysics is separate and always built, so turning this
-    /// off changes what you see and never what can escape — the two were
+    /// Only the *visible* material. The physics container in
+    /// DicePlayfieldPhysics is separate and always built, so `.none`
+    /// changes what you see and never what can escape — the two were
     /// decoupled when the walls were written, which is what makes this
     /// safe.
-    var showsWoodenRim: Bool
+    ///
+    /// This was a `Bool` (`showsWoodenRim`) until Rollbots needed a third
+    /// state. A bool cannot say "a rim, but not that one", and the
+    /// alternative — a second bool beside it — makes "both true" a
+    /// representable state that means nothing.
+    enum RimMaterial {
+        case none
+        case wood
+        case steel
+    }
 
-    static let house = ArenaStyle(surfaceOverride: nil, showsWoodenRim: true)
+    var rim: RimMaterial
 
-    /// Rollbots: brushed steel, no rim.
+    static let house = ArenaStyle(surfaceOverride: nil, rim: .wood)
+
+    /// Rollbots: the arena is steel, and so is its rim.
+    ///
+    /// The rim is NOT timber here on purpose — the wooden tray is the
+    /// wrong object for a duel in the net, and that decision is recorded
+    /// in three places. This gives the screen the rim every other game
+    /// has without reversing it.
     static let steel = ArenaStyle(surfaceOverride: UIColor(hex: "#3A424C"),
-                                  showsWoodenRim: false)
+                                  rim: .steel)
 
     /// Baseball Dice: the pitch itself, inside a thin wooden rim.
     static func ballpark() -> ArenaStyle {
         ArenaStyle(surface: .baseballField,
                    surfaceOverride: nil,
-                   showsWoodenRim: true)
+                   rim: .wood)
     }
 
     var surfaceColor: UIColor { surfaceOverride ?? AppTheme.shared.floorBaseColor }
@@ -381,7 +397,8 @@ enum DiceSceneEnvironment {
         to rootNode: SCNNode,
         bounds: (x: ClosedRange<Float>, z: ClosedRange<Float>),
         floorY: Float,
-        visualHeight: Float
+        visualHeight: Float,
+        material rimMaterial: ArenaStyle.RimMaterial
     ) {
         let width = bounds.x.upperBound - bounds.x.lowerBound
         // Cosmetic reach past the nominal bounds, covering any hairline
@@ -420,7 +437,7 @@ enum DiceSceneEnvironment {
         // scale corrections) is what actually guarantees a continuous,
         // non-stretched board regardless of which world direction a given
         // segment happens to run in.
-        let material = wallMaterial()
+        let material = wallMaterial(rimMaterial)
         // tileWorldSize matches DiceScoreBar's header background — see
         // PlayfieldRim.woodTileFraction for why both read from one number.
         let tileWorldSize = width * PlayfieldRim.woodTileFraction
@@ -453,18 +470,26 @@ enum DiceSceneEnvironment {
         )
     }
 
-    private static func wallMaterial() -> SCNMaterial {
+    private static func wallMaterial(_ rim: ArenaStyle.RimMaterial) -> SCNMaterial {
         let material = SCNMaterial()
         // Same generator, palette and plank density as the header/footer
-        // backdrop (DiceGameShell.HeaderFooterWood) — and the SAME single
-        // seed, not a different one per segment, so the frame and the
-        // header/footer read as one continuous piece of timber rather than
-        // unrelated wood treatments that merely resemble each other.
-        // (LowPolyTextures caches by these exact parameters — both sides take
-        // the defaults, so this call returns the identical image
-        // HeaderFooterWood.image does, without either file needing to see the
-        // other's constants.)
-        material.diffuse.contents = LowPolyTextures.pixelWood()
+        // backdrop (DiceGameShell.HeaderFooterWood / HeaderFooterSteel) —
+        // and the SAME single seed, not a different one per segment, so the
+        // frame and the header/footer read as one continuous piece of
+        // material rather than unrelated treatments that merely resemble
+        // each other. (LowPolyTextures caches by these exact parameters —
+        // both sides take the defaults, so this call returns the identical
+        // image HeaderFooterWood.image / HeaderFooterSteel.image does,
+        // without either file needing to see the other's constants.)
+        //
+        // `.none` never reaches here: addWalls is not called at all for it,
+        // so there are no quads to give a material to. It falls to timber
+        // rather than crashing because a rim you can see is a better
+        // failure than a scene that stops.
+        switch rim {
+        case .steel: material.diffuse.contents = LowPolyTextures.pixelSteel()
+        case .wood, .none: material.diffuse.contents = LowPolyTextures.pixelWood()
+        }
         material.diffuse.wrapS = .repeat
         material.diffuse.wrapT = .repeat
         material.lightingModel = .lambert

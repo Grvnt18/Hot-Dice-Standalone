@@ -27,6 +27,7 @@ import sys
 from tools_swiftconst import source
 
 import tools_wood_preview as preview
+import tools_arena_preview as arena
 
 CONSTANTS = {
     "woodPlanks": "PLANKS",
@@ -42,6 +43,20 @@ CONSTANTS = {
 }
 
 TUPLES = {"woodBevels": "PLANK_BEVEL", "woodShades": "PLANK_SHADE"}
+
+# The steel rim is the same arrangement in a second material, so it gets the
+# same guards rather than a second tool: the constants agree with the preview
+# that was approved, and the rim and the chrome above it share one image at
+# one tile fraction. Rollbots is the only screen with a material join that is
+# not timber, so it is the only place this contract could silently rot.
+STEEL_CONSTANTS = {
+    "steelPlates": "PLATES",
+    "steelSeam": "PLATE_SEAM",
+    "steelBevel": "BEVEL",
+    "steelShade": "SHADE_EDGE",
+    "steelRivetRadius": "RIVET_R",
+    "steelRivetInset": "RIVET_INSET",
+}
 
 
 def main():
@@ -126,6 +141,54 @@ def main():
         elif not failed:
             print("  %-24s ok (%.2f of width, read by both)"
                   % ("tile scale", float(frac.group(1))))
+
+    # --- 3b. The steel says the same things. --------------------------
+    steel = {m.group(1): float(m.group(2))
+             for m in re.finditer(r'(?:static |private static )?let (steel\w+)'
+                                  r'(?::\s*[\w<>]+)? = (-?[\d.]+)', lp)}
+    for name, py_name in sorted(STEEL_CONSTANTS.items()):
+        if name not in steel:
+            failed.append("LowPolyTextures no longer declares `%s`" % name)
+            continue
+        want = float(getattr(arena, py_name))
+        if abs(steel[name] - want) > 1e-9:
+            failed.append("pixelSteel %s = %g but tools_arena_preview.%s = %g"
+                          % (name, steel[name], py_name, want))
+
+    sbase = re.search(r'steelBaseHex = "(#\w+)"', lp)
+    if not sbase:
+        failed.append("LowPolyTextures no longer declares steelBaseHex")
+    elif sbase.group(1).lstrip("#").upper() != arena.STEEL_BASE.lstrip("#").upper():
+        failed.append("pixelSteel steelBaseHex = %s but "
+                      "tools_arena_preview.STEEL_BASE = %s"
+                      % (sbase.group(1), arena.STEEL_BASE))
+
+    scalls = []
+    for name in ("DiceSceneEnvironment.swift", "DiceGameShell.swift"):
+        body = source(name)
+        for m in re.finditer(r'LowPolyTextures\.pixelSteel\(([^)]*)\)', body):
+            scalls.append((name, m.group(1).strip()))
+    if len(scalls) < 2:
+        failed.append("expected pixelSteel to be called by both the 3D rim "
+                      "(DiceSceneEnvironment) and the tiled chrome "
+                      "(DiceGameShell); found %d call(s) — Rollbots' rim and "
+                      "its panels must be one piece of plate for the same "
+                      "reason the tray and its header are one board"
+                      % len(scalls))
+    elif len({args for _, args in scalls}) != 1:
+        failed.append("pixelSteel is called with different arguments in "
+                      + " and ".join("%s(%s)" % (n, a or "defaults")
+                                     for n, a in scalls)
+                      + " — the cache keys on the arguments, so these are two "
+                      "different images and there is a seam")
+    else:
+        print("  %-24s ok (%d call sites, identical arguments)"
+              % ("one piece of plate", len(scalls)))
+
+    spal = arena.steel_palette()
+    if len(spal) != 4 or len(set(spal)) != 4:
+        failed.append("the steel palette is %d tones, %d distinct — four, like "
+                      "everything else" % (len(spal), len(set(spal))))
 
     # --- 4. Four tones, still. ----------------------------------------
     pal = preview.palette()

@@ -228,7 +228,14 @@ struct RollbotsScreen: View {
             VStack(spacing: 0) {
                 Spacer(minLength: 0)
                 ZStack {
-                    NetFacet().opacity(0.97)
+                    // The same plate the arena rim is made of, tiled at the
+                    // same fraction — so this panel and the rim it butts
+                    // against read as one piece of metal, exactly the way
+                    // the wooden games' header and tray do. The dark wash
+                    // over it is what keeps the cards readable; without it
+                    // the plate's own highlights compete with the text.
+                    SteelTiledBackground()
+                    NetArt.background.opacity(0.80)
                     menu
                 }
                 // Setup has the longest list and no dice worth seeing yet,

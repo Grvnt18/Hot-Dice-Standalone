@@ -493,6 +493,131 @@ extension UIColor {
     }
 }
 
+// MARK: - The arena plate
+
+/// Rollbots' rim: riveted steel plate, in the same grammar as the tray timber.
+///
+/// Rollbots deliberately has no wood. That decision is recorded in three
+/// places — "a dice tray on a table is the wrong object for a duel in the net"
+/// — and it is right, so this is not `pixelWood` recoloured grey. It is the
+/// same STRUCTURE (four tones, hard seams, chamfered edges, a repeating
+/// structural motif at a readable scale) built from a different material:
+/// plates and rivets where the timber has planks and knots.
+///
+/// Five bays across the tile, not the wood's three. A plank is a plank at any
+/// width, but three plates across a rim read as empty panelling rather than as
+/// structure.
+extension LowPolyTextures {
+
+    static let steelBaseHex = "#48525F"
+
+    static let steelPlates = 5
+    private static let steelSeam = 2
+    private static let steelBevel = 3
+    private static let steelShade = 2
+    private static let steelRivetRadius: CGFloat = 5
+    private static let steelRivetInset = 34
+
+    /// outline, shadow, base, highlight — darkest first, as everywhere else.
+    static func steelPalette(base: UIColor = UIColor(hex: steelBaseHex)) -> [UIColor] {
+        [shade(base, by: -0.42).saturated(by: 0.04),
+         shade(base, by: -0.20).saturated(by: 0.02),
+         base,
+         shade(base, by: 0.26).saturated(by: -0.06)]
+    }
+
+    static func pixelSteel(base: UIColor = UIColor(hex: steelBaseHex),
+                           plates: Int = steelPlates,
+                           pixelSize: CGFloat = 1024,
+                           pixelHeight: CGFloat = 256,
+                           seed: UInt64 = 44021) -> UIImage {
+        let key = "pixelsteel-\(base)-\(plates)-\(pixelSize)x\(pixelHeight)-\(seed)"
+        if let cached = cache.value(key) { return cached }
+
+        let w = Int(pixelSize)
+        let h = Int(pixelHeight)
+        let tones = steelPalette(base: base)
+        let plateW = w / plates
+        var px = [[Int]](repeating: [Int](repeating: 2, count: w), count: h)
+
+        func fill(_ x0: Int, _ y0: Int, _ x1: Int, _ y1: Int, _ tone: Int) {
+            for y in max(0, y0)..<min(h, y1) {
+                for x in max(0, x0)..<min(w, x1) { px[y][x] = tone }
+            }
+        }
+
+        // Chamfer top and bottom, so a flat quad reads as having thickness
+        // under the orthographic camera — same trick as the timber.
+        fill(0, 0, w, steelBevel, 3)
+        fill(0, h - steelShade, w, h, 1)
+
+        for p in 0..<plates {
+            let left = p * plateW
+
+            fill(left, 0, left + steelSeam, h, 0)                 // the bay seam
+            fill(left + steelSeam, steelBevel,
+                 left + steelSeam + 2, h - steelShade, 3)          // lit edge
+            fill(left + plateW - 2, steelBevel,
+                 left + plateW, h - steelShade, 1)                 // shadowed edge
+
+            // An inset panel line inside each bay.
+            //
+            // The first version scattered short random scuffs here as "brushed
+            // metal". At rim scale they did not read as brushing, they read as
+            // debris lying on the plate — disconnected dashes at arbitrary
+            // angles to everything else. Panelling gets its character from
+            // edges, so this is an edge.
+            let ix0 = left + steelSeam + 6
+            let ix1 = left + plateW - 6
+            for x in max(0, ix0)..<min(w, ix1) {
+                px[steelBevel + 8][x] = 1
+                px[steelBevel + 9][x] = 3
+                px[h - steelShade - 9][x] = 1
+                px[h - steelShade - 8][x] = 3
+            }
+
+            // Rivets. Five pixels, not three: at the scale a rim is actually
+            // seen, three simply vanished.
+            for ry in [steelRivetInset, h - steelRivetInset] {
+                let rx = left + plateW / 2
+                let r = steelRivetRadius
+                for dy in Int(-r - 1)...Int(r + 1) {
+                    for dx in Int(-r - 1)...Int(r + 1) {
+                        let d = (CGFloat(dx * dx + dy * dy)).squareRoot()
+                        let y = ry + dy
+                        let x = ((rx + dx) % w + w) % w
+                        guard y >= 0 && y < h else { continue }
+                        if d <= r - 1 { px[y][x] = 3 }
+                        else if d <= r { px[y][x] = 0 }
+                    }
+                }
+            }
+        }
+
+        let format = UIGraphicsImageRendererFormat()
+        format.opaque = true
+        format.scale = 1
+        let image = UIGraphicsImageRenderer(
+            size: CGSize(width: pixelSize, height: pixelHeight), format: format
+        ).image { ctx in
+            for y in 0..<h {
+                var x = 0
+                while x < w {
+                    let tone = px[y][x]
+                    var run = 1
+                    while x + run < w && px[y][x + run] == tone { run += 1 }
+                    tones[tone].setFill()
+                    ctx.fill(CGRect(x: x, y: y, width: run, height: 1))
+                    x += run
+                }
+            }
+        }
+
+        cache.insert(image, for: key)
+        return image
+    }
+}
+
 // ---------------------------------------------------------------------
 // The flowing floor lives here rather than in a SmokeFloor.swift of its
 // own. This project is assembled by hand in Swift Playgrounds, which does

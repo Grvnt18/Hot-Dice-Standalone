@@ -129,6 +129,17 @@ enum HeaderFooterWood {
     static let image = LowPolyTextures.pixelWood()
 }
 
+/// The same thing in steel, for Rollbots.
+///
+/// Rollbots' arena rim is plate, not timber (ArenaStyle.RimMaterial.steel),
+/// and the one-shared-image contract the wood has is exactly as load-bearing
+/// here: the rim and any chrome tiled with this must be the SAME UIImage at
+/// the SAME fraction, or the join between the 3D rim and the SwiftUI panel
+/// above it shows a seam.
+enum HeaderFooterSteel {
+    static let image = LowPolyTextures.pixelSteel()
+}
+
 /// Tiles HeaderFooterWood.image at the same fraction of its own width that
 /// the 3D side/end walls tile their identical wood texture across the
 /// playfield (PlayfieldRim.woodTileFraction). Using the SAME source image
@@ -138,12 +149,26 @@ enum HeaderFooterWood {
 /// rather than three separately-styled panels that merely resemble each
 /// other.
 struct WoodTiledBackground: View {
+    var body: some View { TiledMaterialBackground(image: HeaderFooterWood.image) }
+}
+
+/// The steel counterpart, for Rollbots' chrome.
+struct SteelTiledBackground: View {
+    var body: some View { TiledMaterialBackground(image: HeaderFooterSteel.image) }
+}
+
+/// The tiling itself, shared so timber and plate cannot drift to different
+/// tile fractions — which would be invisible in the diff and obvious on the
+/// device, as one screen's rim stopped lining up with its header.
+private struct TiledMaterialBackground: View {
+    let image: UIImage
+
     var body: some View {
         GeometryReader { geo in
             let tileWidth = geo.size.width * CGFloat(PlayfieldRim.woodTileFraction)
-            let scale = tileWidth / HeaderFooterWood.image.size.width
+            let scale = tileWidth / image.size.width
             Rectangle()
-                .fill(ImagePaint(image: Image(uiImage: HeaderFooterWood.image), scale: scale))
+                .fill(ImagePaint(image: Image(uiImage: image), scale: scale))
         }
     }
 }

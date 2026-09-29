@@ -474,12 +474,13 @@ enum DiceSceneAssembler {
         // survive any particular bounce height.
         // Visible only. The containment boundary below is built either way,
         // so an arena with no rim still cannot lose a die.
-        if style.showsWoodenRim {
+        if style.rim != .none {
             DiceSceneEnvironment.addWalls(
                 to: scene.rootNode,
                 bounds: layout.bounds,
                 floorY: floorY,
-                visualHeight: 10.4 // doubled again from 5.2 per request
+                visualHeight: 10.4, // doubled again from 5.2 per request
+                material: style.rim
             )
         }
 

@@ -115,7 +115,7 @@ struct FreeRollScreen: View {
             VStack(spacing: 6) {
                 HStack {
                     Text("\(pool.total) / \(FreeRollPool.maxDice)")
-                        .font(.stackSans(13))
+                        .font(.poppins(13))
                         .foregroundStyle(.white.opacity(0.85))
 
                     Spacer()
@@ -125,7 +125,7 @@ struct FreeRollScreen: View {
                         showingTotals.toggle()
                     } label: {
                         Text("Totals")
-                            .font(.stackSans(12))
+                            .font(.poppins(12))
                             .foregroundStyle(.white.opacity(showingTotals ? 1 : 0.7))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
@@ -142,7 +142,7 @@ struct FreeRollScreen: View {
                         applyPool()
                     } label: {
                         Text("Clear")
-                            .font(.stackSans(12))
+                            .font(.poppins(12))
                             .foregroundStyle(.white.opacity(0.8))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
@@ -178,7 +178,7 @@ struct FreeRollScreen: View {
 
                 if showingTotals {
                     Text(totalsLine)
-                        .font(.stackSans(11))
+                        .font(.poppins(11))
                         .foregroundStyle(.white.opacity(0.85))
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
@@ -270,10 +270,10 @@ private struct DiceChip: View {
 
             VStack(spacing: 0) {
                 Text("d\(sides)")
-                    .font(.stackSans(12))
+                    .font(.poppins(12))
                     .foregroundStyle(.white)
                 Text("\(count)")
-                    .font(.stackSans(15))
+                    .font(.poppins(15))
                     .foregroundStyle(.white.opacity(count == 0 ? 0.45 : 1))
             }
             .frame(maxWidth: .infinity)

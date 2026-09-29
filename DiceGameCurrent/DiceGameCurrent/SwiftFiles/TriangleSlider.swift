@@ -72,7 +72,7 @@ struct TriangleSlider: View {
                 Spacer()
                 Text("100%")
             }
-            .font(.stackSans(11))
+            .font(.poppins(11))
             .foregroundStyle(.secondary)
         }
     }

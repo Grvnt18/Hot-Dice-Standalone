@@ -25,7 +25,7 @@ struct MatchScoreboard: View {
             VStack(spacing: 4) {
                 if let totalRounds {
                     Text("Round \(min(match.round, totalRounds)) of \(totalRounds)")
-                        .font(.stackSans(12))
+                        .font(.poppins(12))
                         .foregroundStyle(.white.opacity(0.75))
                 }
 
@@ -37,7 +37,7 @@ struct MatchScoreboard: View {
 
                 if let subtitle, !subtitle.isEmpty {
                     Text(subtitle)
-                        .font(.stackSans(11))
+                        .font(.poppins(11))
                         .foregroundStyle(.white.opacity(0.7))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
@@ -52,10 +52,10 @@ struct MatchScoreboard: View {
         let isActive = participant == match.activeParticipant && !match.isOver
         return VStack(spacing: 1) {
             Text(match.displayName(for: participant))
-                .font(.stackSans(10))
+                .font(.poppins(10))
                 .foregroundStyle(.white.opacity(isActive ? 0.95 : 0.6))
             Text("\(match.score(for: participant))")
-                .font(.stackSans(22))
+                .font(.poppins(22, .semibold))
                 .foregroundStyle(.white.opacity(isActive ? 1 : 0.65))
         }
         .frame(maxWidth: .infinity)
@@ -97,7 +97,7 @@ struct TurnActionBar: View {
                     onPrimary()
                 } label: {
                     Text(primaryLabel)
-                        .font(.stackSans(15))
+                        .font(.poppins(15))
                         .frame(maxWidth: .infinity)
                         .frame(height: 48)
                 }
@@ -111,7 +111,7 @@ struct TurnActionBar: View {
                         onSecondary()
                     } label: {
                         Text(secondaryLabel)
-                            .font(.stackSans(15))
+                            .font(.poppins(15))
                             .frame(maxWidth: .infinity)
                             .frame(height: 48)
                     }
@@ -123,7 +123,7 @@ struct TurnActionBar: View {
 
             if !subtitle.isEmpty {
                 Text(subtitle)
-                    .font(.stackSans(12))
+                    .font(.poppins(12))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -163,23 +163,30 @@ struct HandoverGate: View {
             VStack(spacing: 18) {
                 if let lastTurnSummary, !lastTurnSummary.isEmpty {
                     Text(lastTurnSummary)
-                        .font(.stackSans(15))
+                        .font(.poppins(15))
                         .foregroundStyle(.white.opacity(0.85))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 28)
                 }
 
-                ScriptText("Pass to \(match.activeDisplayName)", size: 46, lineLimit: 2)
+                // Tells the next human to pick up the device, and names
+                // them. Note this whole view is under .textCase(.uppercase),
+                // so the script's lowercase forms — most of what gives a
+                // script its character — were being discarded here anyway.
+                Text("Pass to \(match.activeDisplayName)")
+                    .font(.poppins(46, .semibold))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
                     .foregroundStyle(.white)
 
                 HStack(spacing: 14) {
                     ForEach(match.participants, id: \.self) { participant in
                         VStack(spacing: 2) {
                             Text(match.displayName(for: participant))
-                                .font(.stackSans(11))
+                                .font(.poppins(11))
                                 .foregroundStyle(.white.opacity(0.7))
                             Text("\(match.score(for: participant))")
-                                .font(.stackSans(24))
+                                .font(.poppins(24, .bold))
                                 .foregroundStyle(.white)
                         }
                     }
@@ -190,7 +197,7 @@ struct HandoverGate: View {
                     onReady()
                 } label: {
                     Text("I'm Ready")
-                        .font(.stackSans(16))
+                        .font(.poppins(16))
                         .frame(maxWidth: .infinity)
                         .frame(height: 50)
                 }
@@ -229,12 +236,17 @@ struct MatchResultView: View {
                 .allowsHitTesting(false)
 
             VStack(spacing: 16) {
-                ScriptText(headline, size: 54, lineLimit: 2)
+                // "<name> Wins" — dynamic, decides the match, and also
+                // uppercased by the enclosing view.
+                Text(headline)
+                    .font(.poppins(54, .bold))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
                     .foregroundStyle(.white)
 
                 if let reason {
                     Text(reason)
-                        .font(.stackSans(14))
+                        .font(.poppins(14))
                         .foregroundStyle(.white.opacity(0.85))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 30)
@@ -244,10 +256,10 @@ struct MatchResultView: View {
                     ForEach(match.participants, id: \.self) { participant in
                         VStack(spacing: 2) {
                             Text(match.displayName(for: participant))
-                                .font(.stackSans(11))
+                                .font(.poppins(11))
                                 .foregroundStyle(.white.opacity(0.7))
                             Text("\(match.score(for: participant))")
-                                .font(.stackSans(30))
+                                .font(.poppins(30, .bold))
                                 .foregroundStyle(.white)
                         }
                     }
@@ -260,7 +272,7 @@ struct MatchResultView: View {
                         onPlayAgain()
                     } label: {
                         Text("Play Again")
-                            .font(.stackSans(16))
+                            .font(.poppins(16))
                             .frame(maxWidth: .infinity)
                             .frame(height: 48)
                     }
@@ -273,7 +285,7 @@ struct MatchResultView: View {
                         onExit()
                     } label: {
                         Text("Back to Games")
-                            .font(.stackSans(14))
+                            .font(.poppins(14))
                             .frame(maxWidth: .infinity)
                             .frame(height: 42)
                     }

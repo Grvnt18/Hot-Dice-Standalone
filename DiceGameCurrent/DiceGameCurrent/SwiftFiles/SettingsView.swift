@@ -50,7 +50,7 @@ struct SettingsView: View {
             Text(perGame
                  ? "Saved for \(gameName). Each game keeps its own."
                  : "The same in every game.")
-                .font(.stackSans(11))
+                .font(.poppins(11))
         }
     }
 
@@ -66,12 +66,12 @@ struct SettingsView: View {
             Form {
                 Section {
                     Toggle("Music", isOn: $sound.musicEnabled)
-                        .font(.stackSans(15))
+                        .font(.poppins(15))
                         .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
 
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Music Volume")
-                            .font(.stackSans(12))
+                            .font(.poppins(12))
                             .foregroundStyle(.secondary)
                         TriangleSlider(value: $sound.musicVolume, tint: theme.accentColor)
                     }
@@ -96,17 +96,17 @@ struct SettingsView: View {
                     // stays too, for the destination list this style still
                     // has for choosing a different track.
                     Picker("Track", selection: $sound.selectedTrackIndex) {
-                        Text("Shuffle").font(.stackSans(14)).foregroundStyle(theme.accentColor).tag(nil as Int?)
+                        Text("Shuffle").font(.poppins(14)).foregroundStyle(theme.accentColor).tag(nil as Int?)
                         ForEach(Array(SoundEngine.tracks.enumerated()), id: \.offset) { idx, track in
-                            Text(track.displayName).font(.stackSans(14)).foregroundStyle(theme.accentColor).tag(idx as Int?)
+                            Text(track.displayName).font(.poppins(14)).foregroundStyle(theme.accentColor).tag(idx as Int?)
                         }
                     }
                     .pickerStyle(.menu)
-                    .font(.stackSans(15))
+                    .font(.poppins(15))
                     .opacity(sound.musicEnabled ? 1 : 0.4)
                     .disabled(!sound.musicEnabled)
                 } header: {
-                    Text("Music").font(.stackSans(12))
+                    Text("Music").font(.poppins(12))
                 } footer: {
                     scopeNote(perGame: musicPerGame)
                 }
@@ -117,29 +117,29 @@ struct SettingsView: View {
                 if gameName == nil {
                     Section {
                         Toggle("Music Per Game", isOn: $musicPerGame)
-                            .font(.stackSans(15))
+                            .font(.poppins(15))
                             .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
                             .onChange(of: musicPerGame) { _, now in
                                 GameScope.musicIsPerGame = now
                             }
                     } header: {
-                        Text("Music Scope").font(.stackSans(12))
+                        Text("Music Scope").font(.poppins(12))
                     } footer: {
                         Text(musicPerGame
                              ? "Each game remembers its own track and volume."
                              : "One track and volume across every game.")
-                            .font(.stackSans(11))
+                            .font(.poppins(11))
                     }
                 }
 
                 Section {
                     Toggle("Sound Effects", isOn: $sound.sfxEnabled)
-                        .font(.stackSans(15))
+                        .font(.poppins(15))
                         .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
 
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Effects Volume")
-                            .font(.stackSans(12))
+                            .font(.poppins(12))
                             .foregroundStyle(.secondary)
                         TriangleSlider(value: $sound.sfxVolume, tint: theme.accentColor)
                     }
@@ -147,14 +147,14 @@ struct SettingsView: View {
                     .disabled(!sound.sfxEnabled)
 
                 } header: {
-                    Text("Sound Effects").font(.stackSans(12))
+                    Text("Sound Effects").font(.poppins(12))
                 }
 
                 Section {
                     ColorwayPicker(theme: theme)
                         .padding(.vertical, 4)
                 } header: {
-                    Text("Table Color").font(.stackSans(12))
+                    Text("Table Color").font(.poppins(12))
                 } footer: {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Changes the playing surface and this menu's own accent color.")
@@ -163,7 +163,7 @@ struct SettingsView: View {
                         // backing track is not.
                         scopeNote(perGame: true)
                     }
-                    .font(.stackSans(11))
+                    .font(.poppins(11))
                 }
 
                 // Inside a game this opens that game's guide. On the hub
@@ -176,7 +176,7 @@ struct SettingsView: View {
                         showingHowToPlay = true
                     } label: {
                         Text(rules.isEmpty ? "How to Play — Every Game" : "Quick Start")
-                            .font(.stackSans(15))
+                            .font(.poppins(15))
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
@@ -191,11 +191,11 @@ struct SettingsView: View {
                 // won't accept a custom face, so the title would have been
                 // the one piece of this screen still in the system font.
                 ToolbarItem(placement: .principal) {
-                    Text("Settings").font(.stackSans(17))
+                    Text("Settings").font(.poppins(17, .semibold))
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
-                        .font(.stackSans(15))
+                        .font(.poppins(15))
                         .buttonStyle(.borderedProminent)
                         // The same radius as the volume toggles' track
                         // (RoundedSquareToggleStyle, ControlShapes.swift),
@@ -326,7 +326,7 @@ struct HowToPlayView: View {
                 if let tagline, !tagline.isEmpty {
                     Section {
                         Text(tagline)
-                            .font(.stackSans(14))
+                            .font(.poppins(14))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -334,9 +334,9 @@ struct HowToPlayView: View {
                 ForEach(sections) { section in
                     Section {
                         Text(section.body)
-                            .font(.stackSans(14))
+                            .font(.poppins(14))
                     } header: {
-                        Text(section.title).font(.stackSans(12))
+                        Text(section.title).font(.poppins(12))
                     }
                 }
 
@@ -345,7 +345,7 @@ struct HowToPlayView: View {
                         Text("The full rules — every table, every edge case "
                              + "— are on the game selection screen: "
                              + "Settings, then How to Play.")
-                            .font(.stackSans(12))
+                            .font(.poppins(12))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -358,13 +358,13 @@ struct HowToPlayView: View {
                     // now that the sheet is reachable from more than one.
                     Text(gameName.map { "\($0) — \(isQuickStart ? "Quick Start" : "How to Play")" }
                          ?? "How to Play")
-                        .font(.stackSans(17))
+                        .font(.poppins(17, .semibold))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
-                        .font(.stackSans(15))
+                        .font(.poppins(15))
                         .buttonStyle(.borderedProminent)
                         // The same radius as the volume toggles' track
                         // (RoundedSquareToggleStyle, ControlShapes.swift),

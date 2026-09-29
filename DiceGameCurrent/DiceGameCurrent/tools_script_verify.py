@@ -1,10 +1,16 @@
-"""Checks that Aguafina cannot lose its last character again.
+"""Checks that the script face cannot lose its last character again.
 
 Why this exists
 ---------------
-The face's terminal swashes are drawn past their own advance width. Core
+The face's terminal glyphs are drawn past their own advance width. Core
 Text and `size(withAttributes:)` both measure the advance, so anything that
 sizes a box from them cuts the final glyph.
+
+Still true after the swap from Aguafina to Lobster, and checked rather than
+assumed: Lobster's `L` overhangs its advance by +0.284 em, against Aguafina's
+worst of +0.490 on `Y`. Tamer, nowhere near tame enough to retire this — and
+`L` is its worst glyph, in a face whose whole remaining job is "Rolls" and
+"ROLLS".
 
 That has been fixed three times in this project, three different ways — an
 ink-measured canvas for the floor text, a guessed trailing pad for the hub,
@@ -14,7 +20,7 @@ schemes, and the two newest sites had none at all.
 
 So the fix is a single path, and this is the part that keeps it single:
 
-  * nothing outside AppFonts.swift may name the font or call .aguafina(),
+  * nothing outside AppFonts.swift may name the font or call .lobster(),
     which the compiler already enforces via fileprivate — this catches an
     attempt to reconstruct the name from a literal, which it would not
   * every UIKit site that draws it measures with AppFonts.inkBounds, never
@@ -36,7 +42,7 @@ HOME = "AppFonts.swift"
 
 # The PostScript name, as a literal. Anything reconstructing it has gone
 # around the fileprivate.
-FONT_NAME = "AguafinaScript-Regular"
+FONT_NAME = "Lobster-Regular"
 
 
 def swift_files():
@@ -73,9 +79,9 @@ def main():
         code = strip_comments(source(name))
         for label, pattern in (
             ("names the font directly", re.escape(FONT_NAME)),
-            ("calls .aguafina(", r'\.aguafina\('),
+            ("calls .lobster(", r'\.lobster\('),
             ("reaches for the PostScript name",
-             r'aguafinaScriptPostScriptName'),
+             r'lobsterPostScriptName'),
         ):
             for match in re.finditer(pattern, code):
                 line = code[:match.start()].count("\n") + 1
@@ -131,11 +137,11 @@ def main():
     home = strip_comments(source(HOME))
     if not re.search(r'var reserved: String \{[^}]*\\u\{00A0\}', home):
         failed.append("ScriptText lost its no-break-space reserve")
-    if "fileprivate static let aguafinaScriptPostScriptName" not in home:
+    if "fileprivate static let lobsterPostScriptName" not in home:
         failed.append("the PostScript name is no longer fileprivate, so "
                       "any file can start from the raw font again")
-    if "fileprivate static func aguafina(" not in home:
-        failed.append("Font.aguafina is no longer fileprivate")
+    if "fileprivate static func lobster(" not in home:
+        failed.append("Font.lobster is no longer fileprivate")
     if not failed:
         print("  %-28s ok (reserve present, font sealed in %s)"
               % ("ScriptText", HOME))

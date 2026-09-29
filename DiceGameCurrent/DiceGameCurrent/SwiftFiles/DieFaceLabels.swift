@@ -705,21 +705,27 @@ enum DieFaceLabels {
     }
 
     private static func drawLabel(number: Int, underlined: Bool) -> UIImage {
-        // Canvas resolution raised significantly (128 -> 512, now 256 —
-        // see labelCanvas for why it came back down) and kept as
-        // Stack Sans per your correction — my previous switch to a bold
-        // system font was the wrong fix for the wrong reason. The size
-        // request was aesthetic, not a workaround, and abandoning the
-        // font wasn't the right way to solve legibility either. The real
-        // issue: Stack Sans Notch's only registered instance is
-        // ExtraLight (thin strokes), and at a 128px source canvas, those
-        // thin strokes had very few pixels to work with once minified
-        // onto d8/d10/d12's smaller label planes — the detail simply
-        // wasn't there to survive the scale-down. A 4x larger source
-        // canvas gives the renderer far more pixels to resolve those thin
-        // strokes clearly before any minification happens, which should
-        // let them survive shrinking onto even d12's small labels while
-        // staying genuinely Stack Sans throughout.
+        // The history here is worth keeping, because the cause has only
+        // now actually been removed.
+        //
+        // Numerals kept vanishing on d8/d10/d12. The diagnosis was right:
+        // Stack Sans Notch was a variable font whose ONLY registered
+        // instance was ExtraLight, and those thin strokes had very few
+        // pixels to work with once minified onto the smaller label planes
+        // — the detail was not there to survive the scale-down. The fix
+        // available at the time was resolution, so the canvas went
+        // 128 -> 512 -> 256 (see labelCanvas for why it came back down),
+        // giving the renderer more pixels to resolve thin strokes before
+        // minification. An earlier attempt had swapped in a bold system
+        // font, which was rejected for abandoning the typeface to solve a
+        // legibility problem.
+        //
+        // Poppins ends that trade: it ships as separate static weights, so
+        // the numerals can simply be SEMIBOLD. The strokes are thick enough
+        // to survive minification on their own merits, in the app's actual
+        // typeface, which is what both earlier attempts were reaching for.
+        // The larger canvas stays — it is cheap, it is cached, and it is
+        // now belt-and-braces rather than the load-bearing fix.
         let size = CGSize(width: labelCanvas, height: labelCanvas)
         // Explicit format with opaque = false — UIGraphicsImageRenderer's
         // default format can be opaque depending on context, which would
@@ -739,17 +745,16 @@ enum DieFaceLabels {
             UIRectFill(CGRect(origin: .zero, size: size))
 
             let text = "\(number)"
-            // Back to Stack Sans, per your correction. Font size scaled
-            // up to match the 4x larger canvas (84 -> 340), so the glyph
-            // still fills a similar proportion of the canvas as before —
-            // this is about resolution/fidelity, not making the glyph
-            // relatively bigger within its own canvas.
+            // Font size derived from the canvas (84 -> 340 when the canvas
+            // grew), so the glyph fills a similar proportion of it either
+            // way — this was always about resolution, not about making the
+            // numeral relatively bigger.
             let attrs: [NSAttributedString.Key: Any] = [
                 // Derived from the canvas rather than restated: the two
                 // moved together once already, and a font size left behind
                 // by a canvas change is a glyph that no longer fits.
-                .font: UIFont(name: AppFonts.stackSansPostScriptName, size: glyphPointSize)
-                    ?? UIFont.systemFont(ofSize: glyphPointSize, weight: .bold),
+                .font: UIFont(name: AppFonts.Weight.semibold.rawValue, size: glyphPointSize)
+                    ?? UIFont.systemFont(ofSize: glyphPointSize, weight: .semibold),
                 .foregroundColor: UIColor.white
             ]
             let textSize = text.size(withAttributes: attrs)

@@ -172,10 +172,10 @@ struct DiceScoreBar: View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Score")
-                    .font(.stackSans(14))
+                    .font(.poppins(14))
                     .foregroundStyle(.secondary)
                 Text("\(score)")
-                    .font(.stackSans(40)) // was 36 — enlarged further alongside the cells
+                    .font(.poppins(40, .bold)) // was 36 — enlarged further alongside the cells
             }
             .padding(.trailing, 8)
             .overlay(alignment: .trailing) {
@@ -232,7 +232,7 @@ struct DiceScoreBar: View {
         if index < bankedOrder.count {
             let die = bankedOrder[index]
             Text("\(die.currentValue ?? 0)")
-                .font(.stackSans(17))
+                .font(.poppins(17, .semibold))
                 // The die's own paired number color, not a hardcoded
                 // white — that made the near-white die (#FCFBF9) show
                 // white-on-white and effectively vanish. Each colorway
@@ -276,7 +276,7 @@ struct DiceRollButton: View {
         VStack(spacing: 2) {
             Button(action: action) {
                 Text(label)
-                    .font(.stackSans(15))
+                    .font(.poppins(15))
                     .frame(maxWidth: .infinity)
                     .frame(height: 48)
                     // Load-bearing, not belt-and-braces. `.plain` hit-tests
@@ -316,7 +316,7 @@ struct DiceRollButton: View {
 
             if !subtitle.isEmpty {
                 Text(subtitle)
-                    .font(.stackSans(12))
+                    .font(.poppins(12))
                     .foregroundStyle(.secondary)
             }
         }
@@ -458,24 +458,43 @@ struct TurnCompleteOverlay: View {
                     // NOT uppercased — the screen-wide .textCase(.uppercase)
                     // would flatten the script's lowercase forms, which is
                     // most of what gives it its character.
-                    ScriptText(caption,
-                               size: score >= 20 ? 46 : 68,
-                               lineLimit: 2,
-                               minimumScaleFactor: 0.4)
+                    // Praise, not information — the score below carries the
+                    // meaning, and the caption is deliberately absent in the
+                    // middle band. So the short words stay on the script face.
+                    //
+                    // The 20+ band is the exception, and it is why the size
+                    // was already conditional here: it is not a word, it is
+                    // the sentence "You're going to need some luck!", which at
+                    // minimumScaleFactor 0.4 can land around 18pt across two
+                    // lines. That is a sentence to read, so it takes the sans.
+                    Group {
+                        if score >= 20 {
+                            Text(caption)
+                                .font(.poppins(46, .medium))
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.4)
+                                .multilineTextAlignment(.center)
+                        } else {
+                            ScriptText(caption,
+                                       size: 68,
+                                       lineLimit: 2,
+                                       minimumScaleFactor: 0.4)
+                        }
+                    }
                         .textCase(nil)
                         .foregroundStyle(.white)
                         .padding(.horizontal, 28)
                 }
 
                 // Trailing spaces, same reasoning as the caption above
-                // — stackSans is a plain sans face with much less
-                // overhang than Aguafina's script swashes, but the
+                // — Poppins is a plain sans face with much less
+                // overhang than a script's swashes, but the
                 // minimumScaleFactor(0.05) here is far more extreme, so
                 // the same class of advance-width-vs-ink-extent gap is
                 // cheap insurance against a repeat of the digit clipping
                 // this exact screen originally shipped with.
                 Text("\(score)  ")
-                    .font(.stackSans(220))
+                    .font(.poppins(220, .black))
                     .minimumScaleFactor(0.05)
                     .lineLimit(1)
                     .foregroundStyle(.white)
@@ -711,7 +730,7 @@ struct DiceGameScreen: View {
         // reliably cascade across custom sizes the same simple way), but
         // uppercase casing genuinely does cascade from one place here.
         .textCase(.uppercase)
-        // AppFonts' stackSans/aguafina use the relativeTo: overload of
+        // AppFonts' poppins/lobster use the relativeTo: overload of
         // Font.custom so minimumScaleFactor can actually shrink them
         // instead of clipping their last glyph (see AppFonts.swift), which
         // as a side effect makes them respond to the system's Dynamic Type

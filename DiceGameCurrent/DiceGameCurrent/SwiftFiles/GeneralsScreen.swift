@@ -326,7 +326,11 @@ struct GeneralsCardView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 10) {
-                ScriptText(hand == nil ? "Scorecard" : "Claim a Category", size: 40)
+                // Which of these two words appears is the only signal that
+                // the cells below are tappable, so the text is state-bearing
+                // even though both strings are fixed.
+                Text(hand == nil ? "Scorecard" : "Claim a Category")
+                    .font(.poppins(40, .semibold))
                     .foregroundStyle(.white)
 
                 // One sheet, with twelve cells printed on it — which is
@@ -384,7 +388,7 @@ struct GeneralsCardView: View {
                     onClose()
                 } label: {
                     Text(hand == nil ? "Back" : "Not Yet")
-                        .font(.stackSans(15))
+                        .font(.poppins(15))
                         .frame(maxWidth: .infinity)
                         .frame(height: 46)
                 }
@@ -420,24 +424,24 @@ struct GeneralsCardView: View {
         } label: {
             VStack(spacing: 2) {
                 Text(category.displayName)
-                    .font(.stackSans(GeneralsCardLayout.nameSize(forCell: height)))
+                    .font(.poppins(GeneralsCardLayout.nameSize(forCell: height), .medium))
                     .foregroundStyle(GeneralsPaper.ink.opacity(isOpen ? 0.95 : 0.5))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
 
                 if let claim {
                     Text("\(match.displayName(for: claim.participant)) · \(claim.points)")
-                        .font(.stackSans(GeneralsCardLayout.detailSize(forCell: height)))
+                        .font(.poppins(GeneralsCardLayout.detailSize(forCell: height)))
                         .foregroundStyle(GeneralsPaper.ink.opacity(0.62))
                 } else if let wouldScore {
                     // A zero is shown as a zero rather than hidden: taking
                     // one is a legal, and sometimes correct, move.
                     Text("\(wouldScore)")
-                        .font(.stackSans(GeneralsCardLayout.scoreSize(forCell: height)))
+                        .font(.poppins(GeneralsCardLayout.scoreSize(forCell: height), .semibold))
                         .foregroundStyle(GeneralsPaper.ink.opacity(wouldScore > 0 ? 1 : 0.45))
                 } else {
                     Text(category.detail)
-                        .font(.stackSans(GeneralsCardLayout.detailSize(forCell: height)))
+                        .font(.poppins(GeneralsCardLayout.detailSize(forCell: height)))
                         .foregroundStyle(GeneralsPaper.ink.opacity(0.58))
                         .lineLimit(2)
                         .minimumScaleFactor(0.7)

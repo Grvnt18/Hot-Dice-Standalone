@@ -46,7 +46,7 @@ struct GuideBubbleCluster: View {
                         Text("Pick a game for its full rules — every table "
                              + "and every edge case. The short version is "
                              + "in each game's own Settings.")
-                            .font(.stackSans(13))
+                            .font(.poppins(13))
                             .foregroundStyle(.white.opacity(0.75))
                             .padding(.top, 8)
 
@@ -64,11 +64,11 @@ struct GuideBubbleCluster: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Text("How to Play").font(.stackSans(17))
+                    Text("How to Play").font(.poppins(17, .semibold))
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
-                        .font(.stackSans(15))
+                        .font(.poppins(15))
                         .buttonStyle(.borderedProminent)
                         .buttonBorderShape(
                             .roundedRectangle(radius: ControlShape.cornerRadius * 0.6))
@@ -94,10 +94,15 @@ struct GuideBubbleCluster: View {
             SoundEngine.shared.play(.buttonTap)
             opened = entry
         } label: {
-            ScriptText(entry.tileName,
-                       size: GuideBubbleLayout.nameSize,
-                       lineLimit: 2,
-                       minimumScaleFactor: 0.5)
+            // Poppins, not the script face. These are navigation labels —
+            // the player reads them to pick whose rules to open — and at a
+            // minimumScaleFactor of 0.5 a 24pt name can end up 12pt, which
+            // is where a display script stops being readable first.
+            Text(entry.tileName)
+                .font(.poppins(GuideBubbleLayout.nameSize, .semibold))
+                .lineLimit(2)
+                .minimumScaleFactor(0.5)
+                .multilineTextAlignment(.center)
                 .textCase(nil)
                 .foregroundStyle(.white)
                 .padding(.horizontal, 14)

@@ -246,7 +246,7 @@ struct BoneheadsScreen: View {
                         }
                     )
                     .frame(height: trayHeight)
-                    .background(Color.black)
+                    .background(SmokeFloor.backdropColor)
                     .overlay(alignment: .topLeading) {
                         if let onExit {
                             overlayButton("chevron.left") { onExit() }

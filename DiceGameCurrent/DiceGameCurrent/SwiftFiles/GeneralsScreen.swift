@@ -66,7 +66,7 @@ struct GeneralsScreen: View {
                         }
                     )
                     .frame(height: sceneHeight)
-                    .background(Color.black)
+                    .background(SmokeFloor.backdropColor)
                     .overlay(alignment: .topLeading) {
                         if let onExit {
                             overlayButton(systemName: "chevron.left") { onExit() }

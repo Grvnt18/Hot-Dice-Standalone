@@ -109,7 +109,7 @@ struct BaseballDiceScreen: View {
                                 refreshField(newSession)
                             }
                         )
-                        .background(Color.black)
+                        .background(SmokeFloor.backdropColor)
 
                         if phase == .pickingStyle || phase == .swinging {
                             cardOverlay

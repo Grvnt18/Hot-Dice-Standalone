@@ -361,8 +361,235 @@ def posterised_sheet():
     return p
 
 
+# --- 4. whole play areas ------------------------------------------------
+#
+# The border and the surfaces were approved in isolation, which is not the
+# same as approving the screen. These lay the real layouts out at their real
+# proportions, taken from the Swift rather than invented:
+#
+#   Rollbots — NetGrid behind everything; HStack of rail | tray+bar | rail,
+#              railWidth = clamp(width * 0.22, 92, 128), bar 104pt
+#              (RollbotsScreen.body)
+#   Royal UR — VStack of scoreboard 15% | board 34% | tray | button 104pt,
+#              board is 3 rows x 8 columns minus the four corners of the
+#              bridge, five rosettes (RoyalUrScreen.body, RoyalUrBoard)
+
+def rollbots_screen(w=560, h=780):
+    import tools_type as type_
+
+    steel = steel_palette()
+    tile = render_steel()
+    arena = tone_ramp("#05070E")
+    panel = tone_ramp("#0B1220")
+    CY, MG, INK, DIM = (34, 227, 255), (255, 45, 120), (201, 247, 255), (120, 150, 165)
+    pal = list(steel) + arena + panel + [CY, MG, INK, DIM]
+    S0, A0, P0 = 0, len(steel), len(steel) + len(arena)
+    CYI, MGI, INKI, DIMI = P0 + 4, P0 + 5, P0 + 6, P0 + 7
+
+    img = [bytearray([A0 + 1]) * w for _ in range(h)]
+
+    def rect(x0, y0, x1, y1, t):
+        for y in range(max(0, y0), min(h, y1)):
+            for x in range(max(0, x0), min(w, x1)):
+                img[y][x] = t
+
+    rail = max(92, min(int(w * 0.22), 128))
+    bar = 104
+    body_h = h - bar
+
+    # The arena field, behind everything, in the game's own near-black.
+    cells = max(8, (w - 2 * rail) // 4)
+    for cy in range(cells):
+        v = (cy + .5) / cells
+        row = [smoke.tone((cx + .5) / cells, v, 0.0, cx, cy) for cx in range(cells)]
+        for dy in range(body_h * cy // cells, body_h * (cy + 1) // cells):
+            for dx in range(w - 2 * rail):
+                img[dy][rail + dx] = A0 + row[dx * cells // (w - 2 * rail)]
+
+    # Steel rails down both edges, tiled from the same plate texture.
+    th, tw = len(tile), len(tile[0])
+    tile_h = max(1, int(rail * th / tw) * 3)
+    for y in range(h):
+        for x in list(range(rail)) + list(range(w - rail, w)):
+            img[y][x] = tile[int((y % tile_h) * th / tile_h) % th][
+                            int((x % rail) * tw / rail) % tw]
+
+    # A cyan seam where each rail meets the field — the same one line the
+    # border preview used, so the rails read as the same object as the rim.
+    for y in range(body_h):
+        img[y][rail] = CYI
+        img[y][w - rail - 1] = MGI
+
+    def panel_box(x0, y0, x1, y1, fill, edge):
+        rect(x0 + 2, y0 + 2, x1 + 2, y1 + 2, S0)
+        rect(x0, y0, x1, y1, S0)
+        rect(x0 + 2, y0 + 2, x1 - 2, y1 - 2, fill)
+        rect(x0 + 2, y0 + 2, x1 - 2, y0 + 4, edge)
+
+    for side, (x0, seat, name, ip) in enumerate(
+            ((6, CYI, "YOU", 42), (w - rail + 6, MGI, "RIVAL", 31))):
+        type_.draw(img, pal, name, "Poppins-SemiBold", 13, x0 + 4, 30, INK)
+        type_.draw(img, pal, str(ip), "Poppins-Bold", 34, x0 + 4, 74, INK)
+        type_.draw(img, pal, "IP", "Poppins-Regular", 11, x0 + 4, 94, DIMI)
+        # The IP bar: fills from the bottom, seat-coloured.
+        bx0, bx1, by0, by1 = x0 + 4, x0 + rail - 16, 110, 430
+        rect(bx0, by0, bx1, by1, P0 + 1)
+        frac = ip / 50.0
+        rect(bx0, int(by1 - (by1 - by0) * frac), bx1, by1, seat)
+        rect(bx0, by0, bx1, by0 + 2, S0); rect(bx0, by1 - 2, bx1, by1, S0)
+        rect(bx0, by0, bx0 + 2, by1, S0); rect(bx1 - 2, by0, bx1, by1, S0)
+        type_.draw(img, pal, "RAIL GUN", "Poppins-SemiBold", 12, x0 + 4, 486, INK)
+        type_.draw(img, pal, "Phase", "Poppins-Regular", 10, x0 + 4, 540, DIMI)
+
+    # The two corner chrome buttons, on the field.
+    for bx, glyph in ((rail + 12, "<"), (w - rail - 44, "=")):
+        panel_box(bx, 12, bx + 32, 44, A0, P0 + 3)
+        type_.draw(img, pal, glyph, "Poppins-SemiBold", 16, bx + 16, 36, INK,
+                   centre=True)
+
+    # The action bar.
+    panel_box(rail + 8, body_h + 10, w - rail - 8, h - 12, P0 + 1, CYI)
+    type_.draw(img, pal, "ATTACK", "Poppins-Bold", 20, w // 2, body_h + 52, INK,
+               centre=True)
+    type_.draw(img, pal, "3 dice · rail gun", "Poppins-Regular", 12, w // 2,
+               body_h + 78, DIMI, centre=True)
+
+    p = os.path.join(OUT, "rollbots-screen.png")
+    wood.write_png(p, img, pal)
+    return p
+
+
+def royalur_screen(w=560, h=880):
+    import tools_type as type_
+
+    IVORY, INK, PETAL = "#F4EDDF", (27, 42, 74), (219, 54, 44)
+    woodpal = wood.palette()
+    tile = wood.render_tile()
+    ivory = tone_ramp(IVORY)
+    field = tone_ramp("#36F422")
+    pal = list(woodpal) + ivory + field + [INK, PETAL, (250, 248, 244), (168, 160, 148)]
+    W0, I0, F0 = 0, len(woodpal), len(woodpal) + len(ivory)
+    INKI, PETI, WHT, DIM = F0 + 4, F0 + 5, F0 + 6, F0 + 7
+
+    img = [bytearray([W0 + 2]) * w for _ in range(h)]
+
+    def rect(x0, y0, x1, y1, t):
+        for y in range(max(0, y0), min(h, y1)):
+            for x in range(max(0, x0), min(w, x1)):
+                img[y][x] = t
+
+    header = int(h * 0.15)
+    board_h = int(h * 0.34)
+    button = 104
+    tray_h = h - header - board_h - button
+
+    th, tw = len(tile), len(tile[0])
+    tile_w = max(1, int(w * wood.TILE_FRACTION))
+    tile_h = max(1, int(tile_w * th / tw))
+    for y in range(h):
+        for x in range(w):
+            img[y][x] = tile[int((y % tile_h) * th / tile_h) % th][
+                            int((x % tile_w) * tw / tile_w) % tw]
+
+    # The board. 3 rows x 8 columns, minus the four corners of the bridge
+    # (columns 5 and 6 exist only on the middle row). Five rosettes.
+    ROSETTES = {(1, 1), (3, 1), (2, 4), (1, 7), (3, 7)}
+    tile_px = min((w - 24) // 8, (board_h - 20) // 3)
+    bx0 = (w - tile_px * 8) // 2
+    by0 = header + (board_h - tile_px * 3) // 2
+
+    for row in range(1, 4):
+        for col in range(1, 9):
+            if col in (5, 6) and row != 2:
+                continue
+            x0 = bx0 + (col - 1) * tile_px
+            y0 = by0 + (row - 1) * tile_px
+            # Ivory, posterised to 4 tones and dithered, as approved.
+            for yy in range(y0 + 2, y0 + tile_px - 2):
+                for xx in range(x0 + 2, x0 + tile_px - 2):
+                    lim = smoke.bayer8(xx, yy) - 0.5
+                    img[yy][xx] = I0 + max(0, min(3, int(1.6 + lim * 2.2)))
+            rect(x0, y0, x0 + tile_px, y0 + 2, INKI)
+            rect(x0, y0 + tile_px - 2, x0 + tile_px, y0 + tile_px, INKI)
+            rect(x0, y0, x0 + 2, y0 + tile_px, INKI)
+            rect(x0 + tile_px - 2, y0, x0 + tile_px, y0 + tile_px, INKI)
+            if (row, col) in ROSETTES:
+                cx, cy, r = x0 + tile_px // 2, y0 + tile_px // 2, tile_px // 3
+                for a in range(16):
+                    ang = a * math.pi / 8
+                    rr = r if a % 2 == 0 else r // 2
+                    px_ = int(cx + rr * math.cos(ang))
+                    py_ = int(cy + rr * math.sin(ang))
+                    for dy in range(-2, 3):
+                        for dx in range(-2, 3):
+                            yy, xx = py_ + dy, px_ + dx
+                            if 0 <= yy < h and 0 <= xx < w:
+                                img[yy][xx] = PETI if a % 2 == 0 else INKI
+                for dy in range(-3, 4):
+                    for dx in range(-3, 4):
+                        if dx * dx + dy * dy <= 9:
+                            img[cy + dy][cx + dx] = WHT
+
+    # Two pieces, one per seat.
+    for (row, col), seat in (((2, 2), INKI), ((2, 7), PETI)):
+        cx = bx0 + (col - 1) * tile_px + tile_px // 2
+        cy = by0 + (row - 1) * tile_px + tile_px // 2
+        r = tile_px // 3
+        for dy in range(-r - 2, r + 3):
+            for dx in range(-r - 2, r + 3):
+                d = math.hypot(dx, dy)
+                if d <= r:
+                    img[cy + dy + 2][cx + dx + 1] = W0    # hard offset shadow
+        for dy in range(-r, r + 1):
+            for dx in range(-r, r + 1):
+                d = math.hypot(dx, dy)
+                if d <= r:
+                    img[cy + dy][cx + dx] = seat
+                elif d <= r + 1:
+                    img[cy + dy][cx + dx] = W0
+
+    # Scoreboard header and the tray below the board.
+    type_.draw(img, pal, "ROYAL UR", "Poppins-SemiBold", 17, 20, 42, WHT)
+    type_.draw(img, pal, "3", "Poppins-Black", 40, 40, 100, WHT, centre=True)
+    type_.draw(img, pal, "2", "Poppins-Black", 40, w - 40, 100, WHT, centre=True)
+    type_.draw(img, pal, "Your move", "Poppins-Regular", 13, w // 2, 106, DIM,
+               centre=True)
+
+    ty0 = header + board_h
+    rim = 14
+    cells = max(8, (w - 2 * rim) // 4)
+    for cy in range(cells):
+        v = (cy + .5) / cells
+        row_t = [smoke.tone((cx + .5) / cells, v, 0.0, cx, cy) for cx in range(cells)]
+        for dy in range(max(0, tray_h - 2 * rim) * cy // cells,
+                        max(0, tray_h - 2 * rim) * (cy + 1) // cells):
+            for dx in range(w - 2 * rim):
+                img[ty0 + rim + dy][rim + dx] = F0 + row_t[dx * cells // (w - 2 * rim)]
+    for i in range(rim - 2, rim):
+        for x in range(rim - 2, w - rim + 2):
+            img[ty0 + i][x] = W0
+            img[ty0 + tray_h - 1 - i][x] = W0
+        for y in range(ty0 + rim - 2, ty0 + tray_h - rim + 2):
+            img[y][i] = W0
+            img[y][w - 1 - i] = W0
+    type_.draw(img, pal, "Royal Ur", "Lobster-Regular", 46, w // 2,
+               ty0 + tray_h // 2 + 14, tuple(field[0]), centre=True)
+
+    by = h - button + 14
+    rect(16 + 2, by + 2, w - 16 + 2, by + 50, W0)
+    rect(16, by, w - 16, by + 48, W0)
+    rect(18, by + 2, w - 18, by + 46, F0 + 2)
+    rect(18, by + 2, w - 18, by + 4, W0 + 3)
+    type_.draw(img, pal, "ROLL", "Poppins-Bold", 20, w // 2, by + 32, WHT,
+               centre=True)
+
+    p = os.path.join(OUT, "royalur-screen.png")
+    wood.write_png(p, img, pal)
+    return p
+
+
 if __name__ == "__main__":
-    want = sys.argv[1:] or ["steel", "board", "surfaces"]
+    want = sys.argv[1:] or ["steel", "board", "surfaces", "screens"]
     if "steel" in want:
         print("wrote", steel_sheet())
     if "board" in want:
@@ -370,3 +597,6 @@ if __name__ == "__main__":
             print("wrote", p)
     if "surfaces" in want:
         print("wrote", posterised_sheet())
+    if "screens" in want:
+        print("wrote", rollbots_screen())
+        print("wrote", royalur_screen())

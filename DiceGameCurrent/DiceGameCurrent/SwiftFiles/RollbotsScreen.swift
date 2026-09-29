@@ -257,7 +257,7 @@ struct RollbotsScreen: View {
                 }
             }
         )
-        .background(Color.black)
+        .background(SmokeFloor.backdropColor)
     }
 
     // MARK: Setup

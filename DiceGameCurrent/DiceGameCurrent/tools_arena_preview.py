@@ -374,30 +374,118 @@ def posterised_sheet():
 #              board is 3 rows x 8 columns minus the four corners of the
 #              bridge, five rosettes (RoyalUrScreen.body, RoyalUrBoard)
 
+def load_icon(name, out_size):
+    """The app's own bundled icon art, as an alpha mask.
+
+    These are drawn with .renderingMode(.template) in the app — the PNG is a
+    silhouette and the colour comes from the tint. So only the alpha matters,
+    which is what this returns: a `out_size` x `out_size` grid of 0..1 coverage,
+    box-downsampled from the 800x800 source.
+
+    Using the real files rather than drawing stand-in glyphs, because the whole
+    question being previewed is whether an icon and its label read as one unit
+    at rail width, and a placeholder triangle cannot answer that.
+    """
+    import struct
+    import zlib
+
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "Resources", name + ".png")
+    d = open(path, "rb").read()
+    i, idat, trns, plte = 8, b"", b"", b""
+    w = h = 0
+    while i < len(d):
+        ln = struct.unpack(">I", d[i:i + 4])[0]
+        tag = d[i + 4:i + 8]
+        body = d[i + 8:i + 8 + ln]
+        if tag == b"IHDR":
+            w, h = struct.unpack(">II", body[:8])
+        elif tag == b"PLTE":
+            plte = body
+        elif tag == b"tRNS":
+            trns = body
+        elif tag == b"IDAT":
+            idat += body
+        elif tag == b"IEND":
+            break
+        i += 12 + ln
+
+    raw = zlib.decompress(idat)
+    rows, pos, prev = [], 0, bytearray(w)
+    for _y in range(h):
+        filt = raw[pos]; pos += 1
+        line = bytearray(raw[pos:pos + w]); pos += w
+        if filt == 1:
+            for x in range(1, w):
+                line[x] = (line[x] + line[x - 1]) & 255
+        elif filt == 2:
+            for x in range(w):
+                line[x] = (line[x] + prev[x]) & 255
+        elif filt == 3:
+            for x in range(w):
+                line[x] = (line[x] + ((line[x - 1] if x else 0) + prev[x]) // 2) & 255
+        elif filt == 4:
+            for x in range(w):
+                a = line[x - 1] if x else 0
+                b = prev[x]
+                c = prev[x - 1] if x else 0
+                p = a + b - c
+                pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+                pr = a if (pa <= pb and pa <= pc) else (b if pb <= pc else c)
+                line[x] = (line[x] + pr) & 255
+        rows.append(line)
+        prev = line
+
+    def alpha_of(idx):
+        if idx < len(trns):
+            return trns[idx] / 255.0
+        # No tRNS entry means opaque; a very dark palette entry in these files
+        # is the silhouette itself.
+        if plte:
+            r, g, b = plte[idx * 3:idx * 3 + 3]
+            return 1.0 if (r + g + b) < 690 else 0.0
+        return 1.0
+
+    out = []
+    step = h / float(out_size)
+    for oy in range(out_size):
+        line = []
+        for ox in range(out_size):
+            acc = n = 0.0
+            for sy in range(int(oy * step), max(int(oy * step) + 1, int((oy + 1) * step))):
+                for sx in range(int(ox * step), max(int(ox * step) + 1, int((ox + 1) * step))):
+                    if sy < h and sx < w:
+                        acc += alpha_of(rows[sy][sx]); n += 1
+            line.append(acc / n if n else 0.0)
+        out.append(line)
+    return out
+
+
 def rollbots_screen(w=560, h=780):
+    """The arena with the rails rebuilt: icon and label as one unit, white
+    reading text scaled to the column, and both sides equally bright."""
     import tools_type as type_
 
     steel = steel_palette()
     tile = render_steel()
     arena = tone_ramp("#05070E")
     panel = tone_ramp("#0B1220")
-    CY, MG, INK, DIM = (34, 227, 255), (255, 45, 120), (201, 247, 255), (120, 150, 165)
-    pal = list(steel) + arena + panel + [CY, MG, INK, DIM]
+    CY, MG, WHITE, DIM = (34, 227, 255), (255, 45, 120), (255, 255, 255), (150, 172, 184)
+    pal = list(steel) + arena + panel + [CY, MG, WHITE, DIM]
     S0, A0, P0 = 0, len(steel), len(steel) + len(arena)
-    CYI, MGI, INKI, DIMI = P0 + 4, P0 + 5, P0 + 6, P0 + 7
+    CYI, MGI, WHI, DIMI = P0 + 4, P0 + 5, P0 + 6, P0 + 7
 
     img = [bytearray([A0 + 1]) * w for _ in range(h)]
 
     def rect(x0, y0, x1, y1, t):
-        for y in range(max(0, y0), min(h, y1)):
-            for x in range(max(0, x0), min(w, x1)):
+        for y in range(max(0, int(y0)), min(h, int(y1))):
+            for x in range(max(0, int(x0)), min(w, int(x1))):
                 img[y][x] = t
 
     rail = max(92, min(int(w * 0.22), 128))
     bar = 104
     body_h = h - bar
 
-    # The arena field, behind everything, in the game's own near-black.
     cells = max(8, (w - 2 * rail) // 4)
     for cy in range(cells):
         v = (cy + .5) / cells
@@ -406,7 +494,6 @@ def rollbots_screen(w=560, h=780):
             for dx in range(w - 2 * rail):
                 img[dy][rail + dx] = A0 + row[dx * cells // (w - 2 * rail)]
 
-    # Steel rails down both edges, tiled from the same plate texture.
     th, tw = len(tile), len(tile[0])
     tile_h = max(1, int(rail * th / tw) * 3)
     for y in range(h):
@@ -414,42 +501,69 @@ def rollbots_screen(w=560, h=780):
             img[y][x] = tile[int((y % tile_h) * th / tile_h) % th][
                             int((x % rail) * tw / rail) % tw]
 
-    # A cyan seam where each rail meets the field — the same one line the
-    # border preview used, so the rails read as the same object as the rim.
     for y in range(body_h):
         img[y][rail] = CYI
         img[y][w - rail - 1] = MGI
 
-    def panel_box(x0, y0, x1, y1, fill, edge):
-        rect(x0 + 2, y0 + 2, x1 + 2, y1 + 2, S0)
-        rect(x0, y0, x1, y1, S0)
-        rect(x0 + 2, y0 + 2, x1 - 2, y1 - 2, fill)
-        rect(x0 + 2, y0 + 2, x1 - 2, y0 + 4, edge)
+    # Label size derived from the rail, not fixed. The rail is
+    # clamp(width * 0.22, 92, 128); the old 10-13pt labels left the widest
+    # rail a third empty, which is what the 128 clamp was raised for.
+    label = max(11, int(rail * 0.125))
+    icon_px = int(rail * 0.44)
 
-    for side, (x0, seat, name, ip) in enumerate(
-            ((6, CYI, "YOU", 42), (w - rail + 6, MGI, "RIVAL", 31))):
-        type_.draw(img, pal, name, "Poppins-SemiBold", 13, x0 + 4, 30, INK)
-        type_.draw(img, pal, str(ip), "Poppins-Bold", 34, x0 + 4, 74, INK)
-        type_.draw(img, pal, "IP", "Poppins-Regular", 11, x0 + 4, 94, DIMI)
-        # The IP bar: fills from the bottom, seat-coloured.
-        bx0, bx1, by0, by1 = x0 + 4, x0 + rail - 16, 110, 430
-        rect(bx0, by0, bx1, by1, P0 + 1)
-        frac = ip / 50.0
-        rect(bx0, int(by1 - (by1 - by0) * frac), bx1, by1, seat)
-        rect(bx0, by0, bx1, by0 + 2, S0); rect(bx0, by1 - 2, bx1, by1, S0)
-        rect(bx0, by0, bx0 + 2, by1, S0); rect(bx1 - 2, by0, bx1, by1, S0)
-        type_.draw(img, pal, "RAIL GUN", "Poppins-SemiBold", 12, x0 + 4, 486, INK)
-        type_.draw(img, pal, "Phase", "Poppins-Regular", 10, x0 + 4, 540, DIMI)
+    def icon(mask, x0, y0, size, tone):
+        for iy in range(size):
+            for ix in range(size):
+                if mask[iy][ix] > 0.45:
+                    y, x = y0 + iy, x0 + ix
+                    if 0 <= y < h and 0 <= x < w:
+                        img[y][x] = tone
 
-    # The two corner chrome buttons, on the field.
-    for bx, glyph in ((rail + 12, "<"), (w - rail - 44, "=")):
-        panel_box(bx, 12, bx + 32, 44, A0, P0 + 3)
-        type_.draw(img, pal, glyph, "Poppins-SemiBold", 16, bx + 16, 36, INK,
+    gun = load_icon("bot-rail", icon_px)
+    phase = load_icon("bot-phase", icon_px)
+
+    for x0, seat, name, ip, wpn, abl in (
+            (0, CYI, "YOU", 42, "RAIL GUN", "PHASE"),
+            (w - rail, MGI, "RIVAL", 31, "RAIL GUN", "PHASE")):
+        cx = x0 + rail // 2
+        type_.draw(img, pal, name, "Poppins-SemiBold", label, cx, 28, WHI,
+                   centre=True)
+        type_.draw(img, pal, str(ip), "Poppins-Black", int(rail * 0.30), cx, 76,
+                   WHI, centre=True)
+        type_.draw(img, pal, "IP", "Poppins-Medium", label - 2, cx, 96, DIMI,
                    centre=True)
 
-    # The action bar.
-    panel_box(rail + 8, body_h + 10, w - rail - 8, h - 12, P0 + 1, CYI)
-    type_.draw(img, pal, "ATTACK", "Poppins-Bold", 20, w // 2, body_h + 52, INK,
+        bx0, bx1, by0, by1 = x0 + 12, x0 + rail - 12, 112, 388
+        rect(bx0, by0, bx1, by1, P0 + 1)
+        frac = ip / 50.0
+        rect(bx0, by1 - (by1 - by0) * frac, bx1, by1, seat)
+        rect(bx0, by0, bx1, by0 + 2, S0); rect(bx0, by1 - 2, bx1, by1, S0)
+        rect(bx0, by0, bx0 + 2, by1, S0); rect(bx1 - 2, by0, bx1, by1, S0)
+
+        # Icon and label as ONE unit, boxed together, so the weapon reads as a
+        # thing with a name rather than a picture near some words.
+        for (mask, text, top) in ((gun, wpn, 406), (phase, abl, 552)):
+            bh = icon_px + label + 34
+            rect(x0 + 8, top, x0 + rail - 8, top + bh, P0)
+            rect(x0 + 8, top, x0 + rail - 8, top + 2, S0)
+            rect(x0 + 8, top + bh - 2, x0 + rail - 8, top + bh, S0)
+            rect(x0 + 8, top, x0 + 10, top + bh, S0)
+            rect(x0 + rail - 10, top, x0 + rail - 8, top + bh, S0)
+            icon(mask, cx - icon_px // 2, top + 8, icon_px, seat)
+            type_.draw(img, pal, text, "Poppins-SemiBold", label, cx,
+                       top + icon_px + label + 16, WHI, centre=True)
+
+    for bx, glyph in ((rail + 12, "<"), (w - rail - 44, "=")):
+        rect(bx + 2, 14, bx + 34, 46, S0)
+        rect(bx, 12, bx + 32, 44, S0)
+        rect(bx + 2, 14, bx + 30, 42, A0)
+        type_.draw(img, pal, glyph, "Poppins-SemiBold", 16, bx + 16, 36, WHI,
+                   centre=True)
+
+    rect(rail + 10, body_h + 12, w - rail - 6, h - 10, S0)
+    rect(rail + 8, body_h + 10, w - rail - 8, h - 12, P0 + 1)
+    rect(rail + 8, body_h + 10, w - rail - 8, body_h + 13, CYI)
+    type_.draw(img, pal, "ATTACK", "Poppins-Bold", 20, w // 2, body_h + 52, WHI,
                centre=True)
     type_.draw(img, pal, "3 dice · rail gun", "Poppins-Regular", 12, w // 2,
                body_h + 78, DIMI, centre=True)
@@ -459,131 +573,197 @@ def rollbots_screen(w=560, h=780):
     return p
 
 
-def royalur_screen(w=560, h=880):
-    import tools_type as type_
+# Board furniture, sampled from the reference photograph. These are fixed,
+# for the same reason the ink and the petal red are fixed: they are the board,
+# not the player's theme.
+GROUT = (62, 106, 114)          # the teal-grey channel between set tiles
+FRAME_RED = (192, 80, 60)
+FRAME_CREAM = (232, 211, 169)
+ROSE_GOLD = (217, 164, 65)
+TILE_IVORY = (238, 228, 205)
 
-    IVORY, INK, PETAL = "#F4EDDF", (27, 42, 74), (219, 54, 44)
-    woodpal = wood.palette()
-    tile = wood.render_tile()
-    ivory = tone_ramp(IVORY)
-    field = tone_ramp("#36F422")
-    pal = list(woodpal) + ivory + field + [INK, PETAL, (250, 248, 244), (168, 160, 148)]
-    W0, I0, F0 = 0, len(woodpal), len(woodpal) + len(ivory)
-    INKI, PETI, WHT, DIM = F0 + 4, F0 + 5, F0 + 6, F0 + 7
+# Exactly what RoyalUrBoard.decor(at:) assigns. Reproduced rather than
+# invented: the app's markings already match the standard board square for
+# square, and the earlier preview showing plain tiles was the preview's fault.
+ROSETTES = {(1, 1), (3, 1), (2, 4), (1, 7), (3, 7)}
 
-    img = [bytearray([W0 + 2]) * w for _ in range(h)]
+
+def ur_decor(row, col):
+    if (row, col) in ROSETTES:
+        return "rosette"
+    if (row, col) == (2, 1):
+        return "squaresGrid"
+    if (row, col) in ((2, 3), (2, 6)):
+        return "dottedField"
+    if (row, col) in ((1, 8), (3, 8)):
+        return "zigzagFive"
+    if (row, col) in ((1, 2), (3, 2), (1, 4), (3, 4), (2, 7)):
+        return "eyes"
+    return "fiveDots"
+
+
+def royalur_board(w=1040, h=420):
+    """The board alone, at a size the markings can actually be judged at."""
+    pal = [GROUT, TILE_IVORY, (27, 42, 74), (219, 54, 44), FRAME_RED,
+           FRAME_CREAM, ROSE_GOLD, (255, 255, 255), (20, 16, 14)]
+    GR, IV, INK, PET, FR, FC, GD, WH, SH = range(9)
+    img = [bytearray([GR]) * w for _ in range(h)]
 
     def rect(x0, y0, x1, y1, t):
-        for y in range(max(0, y0), min(h, y1)):
-            for x in range(max(0, x0), min(w, x1)):
+        for y in range(max(0, int(y0)), min(h, int(y1))):
+            for x in range(max(0, int(x0)), min(w, int(x1))):
                 img[y][x] = t
 
-    header = int(h * 0.15)
-    board_h = int(h * 0.34)
-    button = 104
-    tray_h = h - header - board_h - button
+    def disc(cx, cy, r, t):
+        for dy in range(int(-r) - 1, int(r) + 2):
+            for dx in range(int(-r) - 1, int(r) + 2):
+                if dx * dx + dy * dy <= r * r:
+                    y, x = int(cy + dy), int(cx + dx)
+                    if 0 <= y < h and 0 <= x < w:
+                        img[y][x] = t
 
-    th, tw = len(tile), len(tile[0])
-    tile_w = max(1, int(w * wood.TILE_FRACTION))
-    tile_h = max(1, int(tile_w * th / tw))
-    for y in range(h):
-        for x in range(w):
-            img[y][x] = tile[int((y % tile_h) * th / tile_h) % th][
-                            int((x % tile_w) * tw / tile_w) % tw]
+    def ring(cx, cy, r, t):
+        for a in range(0, 360, 3):
+            rad = math.radians(a)
+            for k in (0, 1):
+                y = int(cy + (r - k) * math.sin(rad))
+                x = int(cx + (r - k) * math.cos(rad))
+                if 0 <= y < h and 0 <= x < w:
+                    img[y][x] = t
 
-    # The board. 3 rows x 8 columns, minus the four corners of the bridge
-    # (columns 5 and 6 exist only on the middle row). Five rosettes.
-    ROSETTES = {(1, 1), (3, 1), (2, 4), (1, 7), (3, 7)}
-    tile_px = min((w - 24) // 8, (board_h - 20) // 3)
-    bx0 = (w - tile_px * 8) // 2
-    by0 = header + (board_h - tile_px * 3) // 2
+    # --- the patterned frame -------------------------------------------
+    #
+    # A cream band carrying a run of red diamonds, with a solid medallion at
+    # each corner. The most recognisable thing about the reference board, and
+    # the one piece of it the app does not draw at all.
+    band = 26
+    rect(0, 0, w, band, FC); rect(0, h - band, w, h, FC)
+    rect(0, 0, band, h, FC); rect(w - band, 0, w, h, FC)
+    step = band
+    for i in range(w // step + 1):
+        cx = i * step + step // 2
+        for k in range(step // 2):
+            rect(cx - k, band // 2 - (step // 2 - k), cx + k,
+                 band // 2 + (step // 2 - k), FR)
+            rect(cx - k, h - band // 2 - (step // 2 - k), cx + k,
+                 h - band // 2 + (step // 2 - k), FR)
+    for i in range(h // step + 1):
+        cy = i * step + step // 2
+        for k in range(step // 2):
+            rect(band // 2 - (step // 2 - k), cy - k,
+                 band // 2 + (step // 2 - k), cy + k, FR)
+            rect(w - band // 2 - (step // 2 - k), cy - k,
+                 w - band // 2 + (step // 2 - k), cy + k, FR)
+    for (mx, my) in ((band // 2, band // 2), (w - band // 2, band // 2),
+                     (band // 2, h - band // 2), (w - band // 2, h - band // 2)):
+        rect(mx - band // 2, my - band // 2, mx + band // 2, my + band // 2, FR)
+        rect(mx - band // 4, my - band // 4, mx + band // 4, my + band // 4, FC)
+
+    # --- tiles, set into grout with a real gap -------------------------
+    inner_w, inner_h = w - 2 * band, h - 2 * band
+    grout = 7
+    tile = min((inner_w - grout * 9) // 8, (inner_h - grout * 4) // 3)
+    ox = band + (inner_w - (tile * 8 + grout * 9)) // 2 + grout
+    oy = band + (inner_h - (tile * 3 + grout * 4)) // 2 + grout
+
+    def tile_rect(row, col):
+        return (ox + (col - 1) * (tile + grout), oy + (row - 1) * (tile + grout))
 
     for row in range(1, 4):
         for col in range(1, 9):
             if col in (5, 6) and row != 2:
                 continue
-            x0 = bx0 + (col - 1) * tile_px
-            y0 = by0 + (row - 1) * tile_px
-            # Ivory, posterised to 4 tones and dithered, as approved.
-            for yy in range(y0 + 2, y0 + tile_px - 2):
-                for xx in range(x0 + 2, x0 + tile_px - 2):
-                    lim = smoke.bayer8(xx, yy) - 0.5
-                    img[yy][xx] = I0 + max(0, min(3, int(1.6 + lim * 2.2)))
-            rect(x0, y0, x0 + tile_px, y0 + 2, INKI)
-            rect(x0, y0 + tile_px - 2, x0 + tile_px, y0 + tile_px, INKI)
-            rect(x0, y0, x0 + 2, y0 + tile_px, INKI)
-            rect(x0 + tile_px - 2, y0, x0 + tile_px, y0 + tile_px, INKI)
-            if (row, col) in ROSETTES:
-                cx, cy, r = x0 + tile_px // 2, y0 + tile_px // 2, tile_px // 3
-                for a in range(16):
-                    ang = a * math.pi / 8
-                    rr = r if a % 2 == 0 else r // 2
-                    px_ = int(cx + rr * math.cos(ang))
-                    py_ = int(cy + rr * math.sin(ang))
-                    for dy in range(-2, 3):
-                        for dx in range(-2, 3):
-                            yy, xx = py_ + dy, px_ + dx
-                            if 0 <= yy < h and 0 <= xx < w:
-                                img[yy][xx] = PETI if a % 2 == 0 else INKI
-                for dy in range(-3, 4):
-                    for dx in range(-3, 4):
-                        if dx * dx + dy * dy <= 9:
-                            img[cy + dy][cx + dx] = WHT
+            x0, y0 = tile_rect(row, col)
+            rect(x0, y0, x0 + tile, y0 + tile, IV)
+            rect(x0, y0, x0 + tile, y0 + 2, SH)        # a set-in edge
+            rect(x0, y0, x0 + 2, y0 + tile, SH)
+            c = tile / 2.0
+            cx, cy = x0 + c, y0 + c
+            d = ur_decor(row, col)
+            q = tile / 4.0
 
-    # Two pieces, one per seat.
-    for (row, col), seat in (((2, 2), INKI), ((2, 7), PETI)):
-        cx = bx0 + (col - 1) * tile_px + tile_px // 2
-        cy = by0 + (row - 1) * tile_px + tile_px // 2
-        r = tile_px // 3
-        for dy in range(-r - 2, r + 3):
-            for dx in range(-r - 2, r + 3):
-                d = math.hypot(dx, dy)
-                if d <= r:
-                    img[cy + dy + 2][cx + dx + 1] = W0    # hard offset shadow
-        for dy in range(-r, r + 1):
-            for dx in range(-r, r + 1):
-                d = math.hypot(dx, dy)
-                if d <= r:
-                    img[cy + dy][cx + dx] = seat
-                elif d <= r + 1:
-                    img[cy + dy][cx + dx] = W0
+            if d == "rosette":
+                # Eight POINTED petals alternating red and blue, gold outline,
+                # white centre. Drawn as tapered wedges rather than discs: the
+                # first pass used circles and read as a flower rather than the
+                # reference's eight-point star, which is the single most
+                # recognisable marking on the board.
+                for a in range(8):
+                    ang = a * math.pi / 4
+                    tone = PET if a % 2 == 0 else INK
+                    tipx, tipy = cx + math.cos(ang) * q * 1.85, cy + math.sin(ang) * q * 1.85
+                    steps = int(q * 2)
+                    for stp in range(steps + 1):
+                        t = stp / max(1, steps)
+                        px_ = cx + (tipx - cx) * t
+                        py_ = cy + (tipy - cy) * t
+                        disc(px_, py_, max(1.0, q * 0.52 * (1.0 - t * 0.88)), tone)
+                ring(cx, cy, q * 1.9, GD)
+                disc(cx, cy, q * 0.5, WH)
+                ring(cx, cy, q * 0.5, GD)
+            elif d == "fiveDots":
+                for (dx, dy) in ((-q, -q), (q, -q), (0, 0), (-q, q), (q, q)):
+                    disc(cx + dx, cy + dy, tile * 0.075, INK)
+                    ring(cx + dx, cy + dy, tile * 0.115, INK)
+            elif d == "eyes":
+                for dy in (-q, q):
+                    for dx in (-q, q):
+                        for k in range(3):
+                            ring(cx + dx, cy + dy, tile * (0.10 + k * 0.022), INK)
+                        disc(cx + dx, cy + dy, tile * 0.05, INK)
+            elif d == "squaresGrid":
+                for gy in range(3):
+                    for gx in range(3):
+                        sx = x0 + tile * (0.16 + gx * 0.26)
+                        sy = y0 + tile * (0.16 + gy * 0.26)
+                        rect(sx, sy, sx + tile * 0.19, sy + tile * 0.19, INK)
+                        rect(sx + 2, sy + 2, sx + tile * 0.19 - 2,
+                             sy + tile * 0.19 - 2, IV)
+                        disc(sx + tile * 0.095, sy + tile * 0.095,
+                             tile * 0.045, INK)
+            elif d == "dottedField":
+                for gy in range(5):
+                    for gx in range(5):
+                        disc(x0 + tile * (0.16 + gx * 0.17),
+                             y0 + tile * (0.16 + gy * 0.17), tile * 0.035, INK)
+            else:   # zigzagFive
+                # Continuous chevron bands, not a field of dashes.
+                #
+                # The first pass stepped a short rectangle up and down and drew
+                # disconnected ticks — at tile size that read as another dotted
+                # pattern, which this board already has two of. A zigzag is a
+                # LINE; it has to actually connect corner to corner.
+                for zy in range(4):
+                    yy = y0 + tile * (0.17 + zy * 0.215)
+                    amp = tile * 0.075
+                    period = tile * 0.22
+                    span = tile * 0.72
+                    px_prev = None
+                    for stp in range(int(span)):
+                        xx = x0 + tile * 0.14 + stp
+                        phase = (stp % period) / period
+                        yv = yy + (amp * (2 * phase - 1) if (stp // period) % 2 == 0
+                                   else amp * (1 - 2 * phase))
+                        if px_prev is not None:
+                            steps2 = max(1, int(abs(yv - px_prev)))
+                            for k in range(steps2 + 1):
+                                iy = px_prev + (yv - px_prev) * k / steps2
+                                rect(xx, iy, xx + 2, iy + 2, INK)
+                        px_prev = yv
+                for (dx, dy) in ((-q, -q), (q, -q), (0, 0), (-q, q), (q, q)):
+                    disc(cx + dx * 0.9, cy + dy * 0.9, tile * 0.045, INK)
 
-    # Scoreboard header and the tray below the board.
-    type_.draw(img, pal, "ROYAL UR", "Poppins-SemiBold", 17, 20, 42, WHT)
-    type_.draw(img, pal, "3", "Poppins-Black", 40, 40, 100, WHT, centre=True)
-    type_.draw(img, pal, "2", "Poppins-Black", 40, w - 40, 100, WHT, centre=True)
-    type_.draw(img, pal, "Your move", "Poppins-Regular", 13, w // 2, 106, DIM,
-               centre=True)
+    # Two pieces, with the hard offset shadow Elevation now specifies — dx as
+    # well as dy, which drawPiece currently omits.
+    for (row, col), seat in (((2, 2), INK), ((2, 7), PET)):
+        x0, y0 = tile_rect(row, col)
+        cx, cy, r = x0 + tile / 2, y0 + tile / 2, tile * 0.30
+        disc(cx + 2, cy + 2, r, SH)
+        disc(cx, cy, r, seat)
+        ring(cx, cy, r, WH)
+        ring(cx, cy, r * 0.62, WH)
 
-    ty0 = header + board_h
-    rim = 14
-    cells = max(8, (w - 2 * rim) // 4)
-    for cy in range(cells):
-        v = (cy + .5) / cells
-        row_t = [smoke.tone((cx + .5) / cells, v, 0.0, cx, cy) for cx in range(cells)]
-        for dy in range(max(0, tray_h - 2 * rim) * cy // cells,
-                        max(0, tray_h - 2 * rim) * (cy + 1) // cells):
-            for dx in range(w - 2 * rim):
-                img[ty0 + rim + dy][rim + dx] = F0 + row_t[dx * cells // (w - 2 * rim)]
-    for i in range(rim - 2, rim):
-        for x in range(rim - 2, w - rim + 2):
-            img[ty0 + i][x] = W0
-            img[ty0 + tray_h - 1 - i][x] = W0
-        for y in range(ty0 + rim - 2, ty0 + tray_h - rim + 2):
-            img[y][i] = W0
-            img[y][w - 1 - i] = W0
-    type_.draw(img, pal, "Royal Ur", "Lobster-Regular", 46, w // 2,
-               ty0 + tray_h // 2 + 14, tuple(field[0]), centre=True)
-
-    by = h - button + 14
-    rect(16 + 2, by + 2, w - 16 + 2, by + 50, W0)
-    rect(16, by, w - 16, by + 48, W0)
-    rect(18, by + 2, w - 18, by + 46, F0 + 2)
-    rect(18, by + 2, w - 18, by + 4, W0 + 3)
-    type_.draw(img, pal, "ROLL", "Poppins-Bold", 20, w // 2, by + 32, WHT,
-               centre=True)
-
-    p = os.path.join(OUT, "royalur-screen.png")
+    p = os.path.join(OUT, "royalur-board.png")
     wood.write_png(p, img, pal)
     return p
 
@@ -599,4 +779,5 @@ if __name__ == "__main__":
         print("wrote", posterised_sheet())
     if "screens" in want:
         print("wrote", rollbots_screen())
-        print("wrote", royalur_screen())
+    if "board" in want or "screens" in want:
+        print("wrote", royalur_board())

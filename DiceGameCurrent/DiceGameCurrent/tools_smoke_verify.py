@@ -75,10 +75,61 @@ SHADER_SHAPE = [
     (r"rx \+ onn\.x", "the field itself orbits (x)"),
     (r"ry \+ onn\.y", "the field itself orbits (y)"),
     # Time is a point on a circle, never a linear ramp.
-    (r"6\.2831853 \* \(u_time /", "time travels a closed path"),
+    (r"6\.2831853 \* \(scn_frame\.time /", "time travels a closed path"),
     # Four tones, chosen by step, no interpolation between them.
     (r"_surface\.diffuse = float4\(tone, 1\.0\)", "the four tones are written flat"),
 ]
+
+
+# Spellings that belong to OpenGL ES, not Metal.
+#
+# SceneKit stopped rendering with OpenGL on iOS years ago: a shader
+# modifier string is translated and compiled as METAL. Most of this shader
+# was already written that way — float2/float3/float4 rather than
+# vec2/vec3/vec4 — and that is precisely what made the one OpenGL-only
+# identifier in it invisible for a whole release. `u_time` compiled
+# nowhere, and because SceneKit reports a shader failure asynchronously on
+# the render thread there was nothing to catch:
+#
+#   [SceneKit] Error: FATAL ERROR : failed compiling shader:
+#   error: use of undeclared identifier 'u_time'
+#
+# There is no Metal compiler in this container, so this cannot prove a
+# shader compiles. What it can do is refuse the handful of names that are
+# guaranteed not to, which is the whole of what went wrong here.
+OPENGL_ONLY = [
+    (r"\bu_time\b", "scn_frame.time"),
+    (r"\bu_inverseResolution\b", "a #pragma arguments uniform"),
+    (r"\bgl_\w+", "the Metal equivalent"),
+    (r"\bvec[234]\b", "float2 / float3 / float4"),
+    (r"\bmat[234]\b", "float2x2 / float3x3 / float4x4"),
+    (r"\btexture2D\s*\(", "texture.sample(...)"),
+    (r"\bgl_FragColor\b", "_output.color"),
+]
+
+
+def shader_source(text):
+    """Just the shader string, with its comments removed.
+
+    Both halves matter. Reading to end-of-file swept up the Swift below
+    it, and the shader's own `//` comments legitimately NAME the OpenGL
+    spellings while explaining why they are not used — a check that fails
+    on the note explaining itself is worse than no check.
+    """
+    start = text.index('static let surfaceModifier: String = """')
+    body = text[start:]
+    body = body[body.index('"""') + 3:]
+    body = body[: body.index('"""')]
+    return re.sub(r"//[^\n]*", "", body)
+
+
+def check_metal_only(shader, failed):
+    """No OpenGL-only spelling survives in a shader Metal has to compile."""
+    for pattern, instead in OPENGL_ONLY:
+        for m in re.finditer(pattern, shader):
+            failed.append("the shader uses %r, which is OpenGL ES — "
+                          "SceneKit compiles this as Metal. Use %s."
+                          % (m.group(0), instead))
 
 
 def swift_constants(text):
@@ -114,6 +165,7 @@ def main():
 
     # --- 2. The shader still does the things that matter. ------------
     shader = text[text.index("surfaceModifier"):] if "surfaceModifier" in text else ""
+    check_metal_only(shader_source(text), failed)
     missing = [why for pattern, why in SHADER_SHAPE
                if not re.search(pattern, shader)]
     for why in missing:

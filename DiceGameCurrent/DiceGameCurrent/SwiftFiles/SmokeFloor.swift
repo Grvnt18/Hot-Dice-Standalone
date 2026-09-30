@@ -129,7 +129,19 @@ enum SmokeFloor {
     p.x = (cell.x + 0.5) / \(cellsAcross) * \(fieldScale) + \(originX);
     p.y = (cell.y + 0.5) / \(cellsAcross) * \(fieldScale) * \(fieldAspect) + \(originY);
 
-    float ang = 6.2831853 * (u_time / \(loopSeconds));
+    // scn_frame.time, not u_time. `u_time` is the OpenGL ES spelling, and
+    // SceneKit has not rendered with OpenGL on iOS for years — a shader
+    // modifier is translated into Metal, where the scene-wide uniforms
+    // arrive in `scn_frame` (an SCNSceneBuffer) and time is a member of
+    // it. `u_time` compiles nowhere and took the whole material with it:
+    //
+    //   [SceneKit] Error: FATAL ERROR : failed compiling shader:
+    //   error: use of undeclared identifier 'u_time'
+    //
+    // Everything else in here was already Metal — float2/float3/float4
+    // rather than vec2/vec3/vec4 — which is exactly why one OpenGL-only
+    // identifier was easy to miss.
+    float ang = 6.2831853 * (scn_frame.time / \(loopSeconds));
     float2 oq = float2(cos(ang), sin(ang)) * \(orbitQ);
     float2 orr = float2(cos(ang + \(phaseR)), sin(ang + \(phaseR))) * \(orbitR);
     float2 onn = float2(cos(ang + \(phaseN)), sin(ang + \(phaseN))) * \(orbitN);

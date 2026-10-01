@@ -495,4 +495,39 @@ for f in SOURCES:
         aa_bad += 1
 print("antialiasing check:", "FAIL" if aa_bad else "PASS", "(%d)" % aa_bad)
 
-sys.exit(1 if bad or escapes or merged or undeclared or render_bad or member_bad or nested_bad or aa_bad else 0)
+# ---------------------------------------------------------------------
+# 9. Render scale: every scene takes it from SceneRenderScale.
+#
+# The same shape as the antialiasing check above, and for the same reason —
+# scenes that must agree are how they stop agreeing. It is worth its own
+# check rather than folding into that one because the failure is different:
+# antialiasing drifting makes one tray smoother than another, where this
+# drifting makes one tray a DIFFERENT PIXEL SIZE than another, and a pixel
+# grid that changes between screens is worse than no grid at all.
+#
+# Both halves of SceneRenderScale.apply are load-bearing and neither works
+# alone: a low contentScaleFactor renders coarse and then the layer smooths
+# it back up on display, which is blur rather than pixel art. So the check
+# rejects a bare contentScaleFactor as firmly as it rejects a literal.
+scale_bad = 0
+for f in SOURCES:
+    name = os.path.basename(f)
+    src_f = strip(open(f).read())
+    if name == "DiceSceneEnvironment.swift":
+        continue                      # the enum itself
+    for m in re.finditer(r'\.contentScaleFactor\s*=', src_f):
+        print("  RENDERSCALE %s:%d  sets contentScaleFactor directly — take "
+              "it from SceneRenderScale.apply(to:), which also sets the "
+              "magnification filter the coarse pass is useless without"
+              % (os.path.relpath(f), src_f[:m.start()].count("\n") + 1))
+        scale_bad += 1
+    if "antialiasingMode = SceneAntialiasing.mode" in src_f \
+            and "SceneRenderScale.apply" not in src_f:
+        print("  RENDERSCALE %s  is a scene view that takes the shared "
+              "antialiasing but not the shared render scale — it would "
+              "render at a different pixel size from every other tray"
+              % os.path.relpath(f))
+        scale_bad += 1
+print("render-scale check:", "FAIL" if scale_bad else "PASS", "(%d)" % scale_bad)
+
+sys.exit(1 if bad or escapes or merged or undeclared or render_bad or member_bad or nested_bad or aa_bad or scale_bad else 0)

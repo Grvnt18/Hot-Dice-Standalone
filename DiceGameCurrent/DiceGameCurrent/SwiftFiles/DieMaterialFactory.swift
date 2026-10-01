@@ -166,6 +166,40 @@ enum DieMaterial {
     /// goes 3.03:1 -> 3.34:1.
     static let celShadeGamma: Float = 1.4
 
+    /// Where a facet boundary starts and finishes going black.
+    ///
+    /// The reference sprite spends 258 of its pixels — about 8% of the die —
+    /// on pure black: a line at every facet edge and a rim round the
+    /// silhouette. Nothing in the shading alone produces that, however wide
+    /// the tonal range gets, which is why flat facets at a 21.7x spread still
+    /// read as soft.
+    ///
+    /// Detected from the NORMAL rather than from geometry. A facet boundary
+    /// is exactly where the surface normal changes discontinuously, and
+    /// `fwidth` — the screen-space derivative — measures precisely that. The
+    /// dice meshes carry flat per-triangle normals, so every facet is
+    /// constant and every boundary spikes.
+    ///
+    /// It catches the silhouette too, which is the part worth spelling out:
+    /// `isDoubleSided` is true, so back faces are rendered, and the outline
+    /// of the die is therefore also a normal discontinuity in the rendered
+    /// image rather than an edge against nothing.
+    ///
+    /// The alternative was building line geometry from each mesh — reading
+    /// SCNGeometrySource and SCNGeometryElement byte buffers, rebuilding a
+    /// triangle list, deduping shared edges by comparing face normals, per
+    /// mesh, for six meshes, with no compiler in this container. This is four
+    /// lines and it gives both halves at once.
+    ///
+    /// And it lands at the right weight by construction. `fwidth` is a
+    /// screen-space derivative, so the line is one to two RENDERED pixels
+    /// wherever the die is and whatever size it is — which at
+    /// `SceneRenderScale`'s coarse pass is one to two chunky pixels, the same
+    /// ratio the reference draws at. The two changes only work together: at
+    /// full resolution this would be a hairline.
+    static let celEdgeSoft: Float = 0.6
+    static let celEdgeHard: Float = 1.4
+
     /// Quantises how strongly the light shades a die body, into
     /// `celBands` flat steps.
     ///
@@ -240,7 +274,15 @@ enum DieMaterial {
     float celStep = pow((celBand + 0.5) / \(celBands), \(celShadeGamma));
     float celFactor = celLo + (celHi - celLo) * celStep;
 
-    _output.color = float4(clamp(celBase * celFactor, 0.0, 1.0),
+    float3 celBody = clamp(celBase * celFactor, 0.0, 1.0);
+
+    // Ink the facet boundaries and the silhouette. `fwidth` of a flat-shaded
+    // normal is ~0 across a facet and spikes at every edge between two, so
+    // one test draws both the interior lines and the outer rim.
+    float celEdge = length(fwidth(_surface.normal));
+    float celInk = smoothstep(\(celEdgeSoft), \(celEdgeHard), celEdge);
+
+    _output.color = float4(mix(celBody, float3(0.0), celInk),
                            _output.color.a);
     """
 

@@ -26,6 +26,10 @@ struct DiceSceneView: UIViewRepresentable {
         // Off, for the pixel-art edge and because the Simulator aborts on
         // any multisampling — see SceneAntialiasing.
         view.antialiasingMode = SceneAntialiasing.mode
+        // Coarse render, magnified with no interpolation — the screen-space
+        // pixel grid the dice's drawn edges need to read as lines rather
+        // than hairlines. See SceneRenderScale.
+        SceneRenderScale.apply(to: view)
         view.isPlaying = true // ensures the physics/render loop actually runs continuously
         return view
     }

@@ -603,3 +603,53 @@ enum SceneAntialiasing {
     // costs nothing.
     static var mode: SCNAntialiasingMode { SCNAntialiasingMode.none }
 }
+
+// MARK: - Render resolution
+
+/// How coarsely every scene in the app is rendered, as drawable pixels per
+/// point.
+///
+/// This is the one thing texture work could never produce. A pattern painted
+/// on a surface rotates, stretches and aliases with the geometry; pixel art's
+/// defining property is the opposite — a uniform grid in SCREEN space, every
+/// pixel the same size whatever the object's orientation or distance. The
+/// only way to get that is to render coarse and magnify with no
+/// interpolation, which is what this does.
+///
+/// **1.0, which is gentler than it sounds.** `PlayfieldLayout` maps ten world
+/// units across the view's width and `DiceSceneBuilder` normalises every die
+/// to 1.0, so a die is always exactly a TENTH of the playfield's width. On an
+/// ~820pt playfield that is 82pt, and at one drawable pixel per point a die
+/// lands at ~82 pixels across — visibly stepped, and coarse enough that a
+/// one-pixel edge reads as a drawn line rather than a hairline. The reference
+/// art is nearer 70 pixels across a die; half this would match it exactly and
+/// is the knob if this reads too fine.
+///
+/// **What this does NOT touch**, because it is a property of the scene views
+/// alone: every SwiftUI surface stays at full resolution — the score bar, the
+/// roll button, the pixel panels, the header and footer timber, the guide
+/// bubbles, the hub, Settings, and Royal UR's board, which is a SwiftUI
+/// Canvas. World coarse, interface sharp, which is how pixel-art games are
+/// normally presented.
+///
+/// Two costs, measured rather than discovered: Baseball's scoreboard panel is
+/// about 40% of the field's width, so it gets ~160 pixels for up to nine
+/// inning columns, and the floor wordmark gets ~180 for a whole word. Both
+/// are legible but tight, and both are fixable without touching this.
+enum SceneRenderScale {
+
+    /// Drawable pixels per point. Below 1.0 is coarser, not finer.
+    static let pixelsPerPoint: CGFloat = 1.0
+
+    /// Applies the scale and turns off the interpolation that would undo it.
+    ///
+    /// Both halves are load-bearing and they only work as a pair. A low
+    /// `contentScaleFactor` alone renders coarse and then the layer SMOOTHS
+    /// it back up on display, which is blur rather than pixel art — strictly
+    /// worse than not doing it. `.nearest` is what keeps the texels hard.
+    static func apply(to view: SCNView) {
+        view.contentScaleFactor = pixelsPerPoint
+        view.layer.magnificationFilter = .nearest
+        view.layer.minificationFilter = .nearest
+    }
+}

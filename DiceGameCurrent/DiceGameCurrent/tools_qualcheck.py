@@ -219,6 +219,10 @@ KNOWN = {
     "abs", "min", "max", "ceil", "floor", "round", "sqrt", "sin", "cos",
     "tan", "atan2", "pow", "stride", "zip", "print", "precondition",
     "assert", "fatalError", "withAnimation",
+    # os — os_proc_available_memory is how many more bytes this process may
+    # allocate before the system kills it, which is the figure that decides
+    # a jetsam. Used by the temporary RollsTrace; remove with it.
+    "os_proc_available_memory",
     # simd
     "simd_cross", "simd_dot", "simd_length", "simd_normalize",
     "simd_quatf", "simd_slerp", "simd_float3", "simd_float3x3",

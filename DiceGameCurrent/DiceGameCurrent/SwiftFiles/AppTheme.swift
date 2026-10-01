@@ -106,6 +106,27 @@ final class AppTheme: ObservableObject {
     /// For SwiftUI: tints the settings menu's buttons and sliders.
     var accentColor: Color { Color(hex: currentHex) }
 
+    /// Text drawn ON the accent colour: black on a bright swatch, white on a
+    /// dark one.
+    ///
+    /// Added because the rebuilt menus need it — a Done button filled with
+    /// the chosen swatch had white text on every one of them, and fourteen of
+    /// the twenty-four swatches are pale enough that white on them is close
+    /// to unreadable.
+    ///
+    /// An INSTANCE property rather than a static, so it republishes with the
+    /// swatch. A static would be read once and never again, which is the same
+    /// shape as the toolbar `.tint` bug this menu rebuild removed: the
+    /// reported "only updates after you close and re-open Settings".
+    ///
+    /// Judged on the raw swatch, which is the colour actually behind the
+    /// text here — unlike `rollsTextIsDark` below, which judges the brightest
+    /// of the four tones the FLOOR paints, because that is what its script
+    /// sits on. The two look similar and answer different questions.
+    var accentTextColor: Color {
+        UIColor(hex: currentHex).relativeLuminance > 0.6 ? .black : .white
+    }
+
     /// For SceneKit: the four tones of the rolling area are derived from
     /// this — see `SmokeFloor.ramp(from:)`, which hangs them downward from
     /// the swatch so the brightest of the four IS the colour picked here.

@@ -170,6 +170,38 @@ def main():
                               "track the sentence, not the frame"
                               % (name, line, tiled))
 
+    # --- The menus wear the app's chrome, not the system's. ------------
+    #
+    # Settings and How to Play were a SwiftUI Form inside a NavigationStack:
+    # a grey grouped list under a translucent nav bar, reached from screens
+    # made of timber, steel and pixel panels. It made them the one surface in
+    # the suite that looked like a different app.
+    #
+    # Two specific things came with that and are worth naming, because both
+    # were live bugs rather than taste. Toolbar content is hoisted out of the
+    # view's body, so it never received the container's `.tint` and the Done
+    # button stayed system blue while everything below it followed the chosen
+    # swatch. And `.navigationTitle` renders in the system face and will not
+    # take a custom one, which is why the title was already a principal item.
+    #
+    # Checked by absence rather than by presence: there is no single token
+    # that proves a screen is styled correctly, but a Form or a toolbar is
+    # proof it is not.
+    menus = strip_comments(source("SettingsView.swift"))
+    for token, why in (
+        ("Form {", "a Form is the system's grouped list"),
+        ("NavigationStack", "a NavigationStack brings the system nav bar"),
+        (".toolbar {", "toolbar content is hoisted out of the body, so it "
+                       "never receives the container's tint"),
+        (".buttonStyle(.borderedProminent)", "the system's button, not "
+                                             "pixelPanel"),
+    ):
+        if token in menus:
+            failed.append("SettingsView.swift still uses `%s` — %s. The menus "
+                          "are built from WoodTiledBackground, pixelPanel and "
+                          "MenuHeaderBar like the rest of the app."
+                          % (token, why))
+
     for line in failed:
         print("  %-26s FAILED  %s" % ("cohesion", line))
     if failed:

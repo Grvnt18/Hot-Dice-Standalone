@@ -62,164 +62,250 @@ struct SettingsView: View {
     @State private var musicPerGame = GameScope.musicIsPerGame
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Toggle("Music", isOn: $sound.musicEnabled)
-                        .font(.poppins(15))
-                        .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
+        // No NavigationStack and no Form. Both were the system's own
+        // chrome — a grey grouped list under a translucent nav bar — on a
+        // screen reached from timber, steel and pixel panels, which made
+        // Settings the one surface in the app that looked like a different
+        // app. Everything here is built from what the rest of the suite is
+        // already built from: WoodTiledBackground, pixelPanel, pixelWell,
+        // RoundedSquareToggleStyle, ControlShape and Poppins.
+        //
+        // The CONTENT is untouched — same sections in the same order, same
+        // strings, same bindings, same scope notes. This is paint.
+        ZStack {
+            WoodTiledBackground().ignoresSafeArea()
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Music Volume")
-                            .font(.poppins(12))
-                            .foregroundStyle(.secondary)
-                        TriangleSlider(value: $sound.musicVolume, tint: theme.accentColor)
-                    }
-                    // Dimmed rather than removed when music is off — a
-                    // control that vanishes makes the form jump around and
-                    // hides that the setting still exists.
-                    .opacity(sound.musicEnabled ? 1 : 0.4)
-                    .disabled(!sound.musicEnabled)
+            VStack(spacing: 0) {
+                MenuHeaderBar(title: "Settings") { dismiss() }
 
-                    // tag(nil as Int?) is required: the selection binding is
-                    // Int?, and a plain tag(nil) can't infer that, which
-                    // silently breaks matching for the Shuffle row.
-                    //
-                    // .menu style (rather than the Form default, a
-                    // navigation-link push to a separate list screen) shows
-                    // the current track title inline and in the ambient
-                    // tint color automatically — the default style's
-                    // collapsed-row preview text ignores a row Text's own
-                    // .foregroundStyle, so that alone wasn't enough to make
-                    // the title track the slider's color; this style
-                    // doesn't have that problem. Per-row foregroundStyle
-                    // stays too, for the destination list this style still
-                    // has for choosing a different track.
-                    Picker("Track", selection: $sound.selectedTrackIndex) {
-                        Text("Shuffle").font(.poppins(14)).foregroundStyle(theme.accentColor).tag(nil as Int?)
-                        ForEach(Array(SoundEngine.tracks.enumerated()), id: \.offset) { idx, track in
-                            Text(track.displayName).font(.poppins(14)).foregroundStyle(theme.accentColor).tag(idx as Int?)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .font(.poppins(15))
-                    .opacity(sound.musicEnabled ? 1 : 0.4)
-                    .disabled(!sound.musicEnabled)
-                } header: {
-                    Text("Music").font(.poppins(12))
-                } footer: {
-                    scopeNote(perGame: musicPerGame)
-                }
+                ScrollView {
+                    VStack(spacing: 14) {
+                        panel("Music", footer: AnyView(scopeNote(perGame: musicPerGame))) {
+                            Toggle("Music", isOn: $sound.musicEnabled)
+                                .font(.poppins(15))
+                                .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
 
-                // The hub only. Inside a game this would be a control that
-                // changes what every OTHER game does, which is exactly the
-                // kind of setting people cannot find again afterwards.
-                if gameName == nil {
-                    Section {
-                        Toggle("Music Per Game", isOn: $musicPerGame)
-                            .font(.poppins(15))
-                            .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
-                            .onChange(of: musicPerGame) { _, now in
-                                GameScope.musicIsPerGame = now
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Music Volume")
+                                    .font(.poppins(12))
+                                    .foregroundStyle(MenuInk.dim)
+                                TriangleSlider(value: $sound.musicVolume, tint: theme.accentColor)
                             }
-                    } header: {
-                        Text("Music Scope").font(.poppins(12))
-                    } footer: {
-                        Text(musicPerGame
-                             ? "Each game remembers its own track and volume."
-                             : "One track and volume across every game.")
-                            .font(.poppins(11))
-                    }
-                }
+                            // Dimmed rather than removed when music is off — a
+                            // control that vanishes makes the page jump around
+                            // and hides that the setting still exists.
+                            .opacity(sound.musicEnabled ? 1 : 0.4)
+                            .disabled(!sound.musicEnabled)
 
-                Section {
-                    Toggle("Sound Effects", isOn: $sound.sfxEnabled)
-                        .font(.poppins(15))
-                        .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Effects Volume")
-                            .font(.poppins(12))
-                            .foregroundStyle(.secondary)
-                        TriangleSlider(value: $sound.sfxVolume, tint: theme.accentColor)
-                    }
-                    .opacity(sound.sfxEnabled ? 1 : 0.4)
-                    .disabled(!sound.sfxEnabled)
-
-                } header: {
-                    Text("Sound Effects").font(.poppins(12))
-                }
-
-                Section {
-                    ColorwayPicker(theme: theme)
-                        .padding(.vertical, 4)
-                } header: {
-                    Text("Table Color").font(.poppins(12))
-                } footer: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Changes the playing surface and this menu's own accent color.")
-                        // Always per game, whatever the music is set to —
-                        // a floor is part of a game's look in a way a
-                        // backing track is not.
-                        scopeNote(perGame: true)
-                    }
-                    .font(.poppins(11))
-                }
-
-                // Inside a game this opens that game's guide. On the hub
-                // there is no game to explain, so it opens the whole set
-                // as a cluster of bubbles — which is the one place a
-                // player browsing the suite can read the rules of a game
-                // before deciding to play it.
-                Section {
-                    Button {
-                        showingHowToPlay = true
-                    } label: {
-                        Text(rules.isEmpty ? "How to Play — Every Game" : "Quick Start")
+                            // tag(nil as Int?) is required: the selection
+                            // binding is Int?, and a plain tag(nil) cannot
+                            // infer that, which silently breaks matching for
+                            // the Shuffle row.
+                            //
+                            // .menu style shows the current track title inline
+                            // rather than pushing to a separate list screen,
+                            // which there is no navigation stack for any more.
+                            Picker("Track", selection: $sound.selectedTrackIndex) {
+                                Text("Shuffle").font(.poppins(14)).tag(nil as Int?)
+                                ForEach(Array(SoundEngine.tracks.enumerated()), id: \.offset) { idx, track in
+                                    Text(track.displayName).font(.poppins(14)).tag(idx as Int?)
+                                }
+                            }
+                            .pickerStyle(.menu)
                             .font(.poppins(15))
-                            .frame(maxWidth: .infinity)
+                            .tint(theme.accentColor)
+                            .opacity(sound.musicEnabled ? 1 : 0.4)
+                            .disabled(!sound.musicEnabled)
+                        }
+
+                        // The hub only. Inside a game this would be a control
+                        // that changes what every OTHER game does, which is
+                        // exactly the kind of setting people cannot find again
+                        // afterwards.
+                        if gameName == nil {
+                            panel("Music Scope",
+                                  footer: AnyView(
+                                    Text(musicPerGame
+                                         ? "Each game remembers its own track and volume."
+                                         : "One track and volume across every game.")
+                                        .font(.poppins(11)))) {
+                                Toggle("Music Per Game", isOn: $musicPerGame)
+                                    .font(.poppins(15))
+                                    .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
+                                    .onChange(of: musicPerGame) { _, now in
+                                        GameScope.musicIsPerGame = now
+                                    }
+                            }
+                        }
+
+                        panel("Sound Effects") {
+                            Toggle("Sound Effects", isOn: $sound.sfxEnabled)
+                                .font(.poppins(15))
+                                .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
+
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Effects Volume")
+                                    .font(.poppins(12))
+                                    .foregroundStyle(MenuInk.dim)
+                                TriangleSlider(value: $sound.sfxVolume, tint: theme.accentColor)
+                            }
+                            .opacity(sound.sfxEnabled ? 1 : 0.4)
+                            .disabled(!sound.sfxEnabled)
+                        }
+
+                        panel("Table Color",
+                              footer: AnyView(
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Changes the playing surface and this menu's own accent color.")
+                                    // Always per game, whatever the music is
+                                    // set to — a floor is part of a game's look
+                                    // in a way a backing track is not.
+                                    scopeNote(perGame: true)
+                                }
+                                .font(.poppins(11)))) {
+                            ColorwayPicker(theme: theme)
+                                .padding(.vertical, 4)
+                        }
+
+                        // Inside a game this opens that game's guide. On the
+                        // hub there is no game to explain, so it opens the
+                        // whole set as a cluster of bubbles — the one place a
+                        // player browsing the suite can read the rules of a
+                        // game before deciding to play it.
+                        Button {
+                            SoundEngine.shared.play(.buttonTap)
+                            showingHowToPlay = true
+                        } label: {
+                            Text(rules.isEmpty ? "How to Play — Every Game" : "Quick Start")
+                                .font(.poppins(15))
+                                .foregroundStyle(theme.accentTextColor)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 48)
+                                .contentShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
+                        }
+                        .buttonStyle(.plain)
+                        .pixelPanel(fill: .solid(theme.accentColor), elevation: .lifted)
                     }
-                    .buttonStyle(.borderedProminent)
-                }
-                .listRowBackground(Color.clear)
-            }
-            .tint(theme.accentColor)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                // A principal toolbar item rather than .navigationTitle —
-                // navigationTitle renders with the system nav-bar font and
-                // won't accept a custom face, so the title would have been
-                // the one piece of this screen still in the system font.
-                ToolbarItem(placement: .principal) {
-                    Text("Settings").font(.poppins(17, .semibold))
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                        .font(.poppins(15))
-                        .buttonStyle(.borderedProminent)
-                        // The same radius as the volume toggles' track
-                        // (RoundedSquareToggleStyle, ControlShapes.swift),
-                        // so the two shapes match rather than merely
-                        // resembling each other.
-                        .buttonBorderShape(
-                            .roundedRectangle(radius: ControlShape.cornerRadius * 0.6))
-                        // Tinted HERE, not only on the Form below. Toolbar
-                        // content is hoisted into the navigation bar, which
-                        // sits outside the Form's view tree — so the
-                        // container's .tint never reached this button and
-                        // it stayed system blue while everything under it
-                        // followed the chosen colour.
-                        .tint(theme.accentColor)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 16)
                 }
             }
-            .sheet(isPresented: $showingHowToPlay) {
-                if rules.isEmpty {
-                    GuideBubbleCluster()
-                } else {
-                    HowToPlayView(gameName: gameName, tagline: tagline,
-                                  sections: rules, isQuickStart: true)
-                }
+        }
+        .sheet(isPresented: $showingHowToPlay) {
+            if rules.isEmpty {
+                GuideBubbleCluster()
+            } else {
+                HowToPlayView(gameName: gameName, tagline: tagline,
+                              sections: rules, isQuickStart: true)
             }
+        }
+    }
+
+    /// One titled group of controls, as a pixel panel on the timber.
+    ///
+    /// The ViewBuilder closure is called ONCE, here, and the result stored
+    /// before it reaches any container — the same shape RollbotsScreen's
+    /// menuSheet was rewritten into after a non-escaping parameter captured
+    /// by a GeometryReader closure failed to compile. There is no
+    /// GeometryReader here, but the habit is cheap and the failure is one
+    /// tools_qualcheck.py already watches for.
+    @ViewBuilder
+    private func panel<Content: View>(
+        _ title: String,
+        footer: AnyView? = nil,
+        @ViewBuilder _ content: () -> Content
+    ) -> some View {
+        let rows = content()
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title.uppercased())
+                .font(.poppins(12, .semibold))
+                .foregroundStyle(MenuInk.dim)
+                .padding(.leading, 2)
+
+            VStack(alignment: .leading, spacing: 12) {
+                rows
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .pixelPanel(fill: .solid(MenuInk.panel), elevation: .resting)
+
+            if let footer {
+                footer
+                    .foregroundStyle(MenuInk.dim)
+                    .padding(.horizontal, 2)
+            }
+        }
+        .foregroundStyle(MenuInk.text)
+    }
+}
+
+/// The ink this menu is written in.
+///
+/// Named rather than scattered, because these three values appear on every
+/// panel in both Settings and How to Play, and the whole reason this screen
+/// was rebuilt is that it had drifted away from the rest of the app.
+enum MenuInk {
+
+    /// A dark wash over the timber, so a panel reads as a plate laid on the
+    /// wood rather than as a lighter patch of it. Not opaque: the grain
+    /// still shows through, which is what keeps it one surface.
+    static let panel = Color.black.opacity(0.42)
+    static let text = Color(white: 0.96)
+    static let dim = Color(white: 0.96).opacity(0.65)
+}
+
+/// The title bar both menus wear, replacing the system navigation bar.
+///
+/// The old one was a `.toolbar` on a NavigationStack, which carried two
+/// problems worth recording. Toolbar content is hoisted out of the view's
+/// body, so it never received the container's `.tint` and the Done button
+/// stayed system blue while everything below it followed the chosen colour
+/// — and `.navigationTitle` renders in the system face and will not take a
+/// custom one, which is why the title was already a principal item here.
+/// Drawing the bar means neither is a special case any more.
+struct MenuHeaderBar: View {
+    let title: String
+    let onDone: () -> Void
+
+    @ObservedObject private var theme = AppTheme.shared
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(title)
+                .font(.poppins(17, .semibold))
+                .foregroundStyle(MenuInk.text)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+
+            Spacer(minLength: 8)
+
+            Button {
+                SoundEngine.shared.play(.buttonTap)
+                onDone()
+            } label: {
+                Text("Done")
+                    .font(.poppins(15))
+                    .foregroundStyle(theme.accentTextColor)
+                    .padding(.horizontal, 18)
+                    .frame(height: 38)
+                    .contentShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius * 0.6))
+            }
+            .buttonStyle(.plain)
+            .pixelPanel(fill: .solid(theme.accentColor),
+                        elevation: .lifted,
+                        radius: ControlShape.cornerRadius * 0.6)
+            // Rebuilt when the swatch changes. The old toolbar button relied
+            // on .tint, which is published through the environment and does
+            // not re-run hoisted toolbar content — the reported "only updates
+            // after you close and re-open Settings".
+            .id(theme.colorwayIndex)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity)
+        .background(WoodTiledBackground())
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Color.black.opacity(0.45)).frame(height: 2)
         }
     }
 }
@@ -316,71 +402,68 @@ struct HowToPlayView: View {
     @ObservedObject private var theme = AppTheme.shared
 
     var body: some View {
-        NavigationStack {
-            Form {
-                // The one-line pitch, ahead of the rules that explain it.
-                // These lines were written for the hub tiles and lost their
-                // home when the tiles went square and icon-led; this is
-                // where a newcomer actually wants them — the shape of the
-                // game before the detail of it.
-                if let tagline, !tagline.isEmpty {
-                    Section {
-                        Text(tagline)
-                            .font(.poppins(14))
-                            .foregroundStyle(.secondary)
-                    }
-                }
+        // Same rebuild as Settings above, and for the same reason: a Form in
+        // a NavigationStack is the system's grey grouped list, which is not
+        // what any other surface in this app is made of. Content unchanged —
+        // the tagline, every section in order, the quick-start note.
+        ZStack {
+            WoodTiledBackground().ignoresSafeArea()
 
-                ForEach(sections) { section in
-                    Section {
-                        Text(section.body)
-                            .font(.poppins(14))
-                    } header: {
-                        Text(section.title).font(.poppins(12))
-                    }
-                }
+            VStack(spacing: 0) {
+                MenuHeaderBar(
+                    title: gameName.map {
+                        "\($0) — \(isQuickStart ? "Quick Start" : "How to Play")"
+                    } ?? "How to Play"
+                ) { dismiss() }
 
-                if isQuickStart {
-                    Section {
-                        Text("The full rules — every table, every edge case "
-                             + "— are on the game selection screen: "
-                             + "Settings, then How to Play.")
-                            .font(.poppins(12))
-                            .foregroundStyle(.secondary)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        // The one-line pitch, ahead of the rules that explain
+                        // it. These lines were written for the hub tiles and
+                        // lost their home when the tiles went square and
+                        // icon-led; this is where a newcomer actually wants
+                        // them — the shape of the game before the detail.
+                        if let tagline, !tagline.isEmpty {
+                            Text(tagline)
+                                .font(.poppins(14))
+                                .foregroundStyle(MenuInk.dim)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(12)
+                                .pixelPanel(fill: .solid(MenuInk.panel), elevation: .resting)
+                        }
+
+                        ForEach(sections) { section in
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(section.title.uppercased())
+                                    .font(.poppins(12, .semibold))
+                                    .foregroundStyle(MenuInk.dim)
+                                    .padding(.leading, 2)
+
+                                Text(section.body)
+                                    .font(.poppins(14))
+                                    .foregroundStyle(MenuInk.text)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(12)
+                                    .pixelPanel(fill: .solid(MenuInk.panel), elevation: .resting)
+                            }
+                        }
+
+                        if isQuickStart {
+                            Text("The full rules — every table, every edge case "
+                                 + "— are on the game selection screen: "
+                                 + "Settings, then How to Play.")
+                                .font(.poppins(12))
+                                .foregroundStyle(MenuInk.dim)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.horizontal, 2)
+                        }
                     }
-                }
-            }
-            .tint(theme.accentColor)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    // Named so it is obvious which game's rules these are,
-                    // now that the sheet is reachable from more than one.
-                    Text(gameName.map { "\($0) — \(isQuickStart ? "Quick Start" : "How to Play")" }
-                         ?? "How to Play")
-                        .font(.poppins(17, .semibold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                        .font(.poppins(15))
-                        .buttonStyle(.borderedProminent)
-                        // The same radius as the volume toggles' track
-                        // (RoundedSquareToggleStyle, ControlShapes.swift),
-                        // so the two shapes match rather than merely
-                        // resembling each other.
-                        .buttonBorderShape(
-                            .roundedRectangle(radius: ControlShape.cornerRadius * 0.6))
-                        // Tinted HERE, not only on the Form below. Toolbar
-                        // content is hoisted into the navigation bar, which
-                        // sits outside the Form's view tree — so the
-                        // container's .tint never reached this button and
-                        // it stayed system blue while everything under it
-                        // followed the chosen colour.
-                        .tint(theme.accentColor)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 16)
                 }
             }
         }
     }
 }
+

@@ -279,6 +279,25 @@ struct DiceRollButton: View {
                     .font(.stackSans(15))
                     .frame(maxWidth: .infinity)
                     .frame(height: 48)
+                    // Load-bearing, not belt-and-braces. `.plain` hit-tests
+                    // the DRAWN content, and a Text draws only its glyphs —
+                    // a .frame around it is layout, not something to tap. So
+                    // without this the bar responded on the word "Roll" and
+                    // nowhere else, which is what happened the moment the
+                    // style changed.
+                    //
+                    // `.borderedProminent` used to draw a filled capsule
+                    // INSIDE the button, and that fill was what made the
+                    // whole bar tappable. The fill now comes from
+                    // .pixelPanel applied OUTSIDE the button, where it is
+                    // decoration and cannot contribute to hit-testing.
+                    //
+                    // Same radius as the panel, so the tap target is exactly
+                    // the shape the player can see. This is the second time
+                    // this bug has shipped — GameHubView's tiles were the
+                    // first, when their filled plate was removed — so
+                    // tools_cohesion_verify.py now checks for it.
+                    .contentShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
             }
             // .plain, not .borderedProminent: the system style draws its own
             // rounded, subtly gradiented capsule and there is no way to stop

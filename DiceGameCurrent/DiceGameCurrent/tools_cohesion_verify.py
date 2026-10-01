@@ -103,6 +103,40 @@ def main():
                               "InsettableShape — this does not compile"
                               % (name, line, param))
 
+    # --- a plain Button whose fill is decoration, not a tap target ----
+    #
+    # SwiftUI's .plain button style hit-tests the DRAWN content. A Text
+    # draws only its glyphs, and a .frame around it is layout — not
+    # something to tap. So a plain Button whose fill arrives from
+    # .pixelPanel applied AFTER .buttonStyle is a button you can see but
+    # mostly cannot press: the panel sits outside the button and takes no
+    # part in hit-testing.
+    #
+    # This has now shipped twice. GameHubView's tiles were the first, when
+    # their filled plate was removed and only the artwork stayed tappable;
+    # the roll bar was the second, when .borderedProminent — which drew its
+    # fill INSIDE the button — became .plain plus a panel outside. Both
+    # were reported from the device, by someone tapping and getting
+    # nothing.
+    #
+    # The fix either time is one line, .contentShape, which is why this
+    # checks for it rather than trusting the next restyle to remember.
+    for name in sorted(os.listdir(SWIFT)):
+        if not name.endswith(".swift"):
+            continue
+        code = strip_comments(open(os.path.join(SWIFT, name)).read())
+        for match in re.finditer(r'\.buttonStyle\(\.plain\)', code):
+            chain = code[match.end(): match.end() + 400].split("\n\n")[0]
+            if ".pixelPanel(" not in chain:
+                continue          # fill is inside the label; nothing to do
+            if ".contentShape(" in code[max(0, match.start() - 1200): match.start()]:
+                continue
+            line = code[:match.start()].count("\n") + 1
+            failed.append("%s:%d is a .plain Button whose fill comes from a "
+                          ".pixelPanel applied outside it, with no "
+                          ".contentShape — the panel is visible but only the "
+                          "label itself is tappable" % (name, line))
+
     for line in failed:
         print("  %-26s FAILED  %s" % ("cohesion", line))
     if failed:
@@ -111,6 +145,8 @@ def main():
     print("  %-26s ok (direction shared, three heights)" % "one light")
     print("  %-26s ok (paper + ink, solid placements)" % "materials in use")
     print("  %-26s ok (no strokeBorder on a bare Shape)" % "shape constraints")
+    print("  %-26s ok (every plain Button fills its own tap target)"
+          % "tap targets")
     print("cohesion: PASS")
 
 

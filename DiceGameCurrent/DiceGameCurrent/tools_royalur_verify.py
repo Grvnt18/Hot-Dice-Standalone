@@ -12,6 +12,7 @@ for you — and both seats use it, so the order is the only asymmetry left.
 
 Expected: about 27 messages a match, 2.8 captures, 1.2 Setbacks, dead
 turns well under one a game, and the first seat around 52%."""
+import re
 import random
 
 import tools_swiftconst as swiftconst
@@ -183,6 +184,62 @@ def check_board():
     print("board: PASS (20 squares, rosettes on 4/8/12/16, 12 contested)")
 
 
+def check_layout():
+    """The diamond band and the squares' margin must be ONE number.
+
+    Two bugs came out of them being two. The band was `margin * 1.35` while
+    the squares were inset by `margin`, so the board overlapped its own
+    border by the difference — drawFrame paints first and the squares paint
+    over it. And the band was drawn against the whole VIEW while the squares
+    are laid out from a centred board rect, so any frame wider than the
+    board's ratio left bare timber between the band and the first square.
+
+    Both are gone by construction rather than by tuning once margin IS the
+    band, and the layout constants follow from it:
+
+        width  = 8 tiles + 7 gaps + 2 margins
+        height = 3 tiles + 2 gaps + 2 margins
+
+    Asserted from the Swift so the four numbers cannot drift apart, which is
+    exactly how they came apart in the first place.
+    """
+    # Comments stripped first. The comment in drawFrame that EXPLAINS the
+    # clipBoundingRect bug naturally names it, so an unstripped scan fails on
+    # the very documentation that prevents the bug coming back — the same trap
+    # the shader-dialect check in tools_dice_verify.py already fell into.
+    raw = swiftconst.source("RoyalUrBoardView.swift")
+    text = "\n".join(line.split("//")[0] for line in raw.split("\n"))
+
+    def constant(name):
+        m = re.search(r'self\.%s = tile \* ([\d.]+)' % name, text)
+        assert m, "RoyalUrBoardView no longer sets %s from tile" % name
+        return float(m.group(1))
+
+    gap, margin = constant("gap"), constant("margin")
+
+    band = re.search(r'let band = ([^\n]+)', text)
+    assert band, "drawFrame no longer declares a band width"
+    assert band.group(1).strip() == "layout.margin", (
+        "the diamond band is %s, not layout.margin — if it is wider the "
+        "board overlaps its own border, and if narrower a gap opens between "
+        "them" % band.group(1).strip())
+
+    assert "context.clipBoundingRect" not in text, (
+        "drawFrame measures the VIEW again instead of the board's own rect — "
+        "that is what left bare timber down the horizontal edges")
+
+    want_w = 8 + 7 * gap + 2 * margin
+    want_h = 3 + 2 * gap + 2 * margin
+    for axis, want in (("width", want_w), ("height", want_h)):
+        hits = re.findall(r'tile \* ([\d.]+)', text)
+        assert any(abs(float(h) - want) < 1e-9 for h in hits), (
+            "no %s constant equals %g tiles (8/3 tiles + gaps + margins at "
+            "gap %g, margin %g) — the board would not fit its own frame"
+            % (axis, want, gap, margin))
+    print("layout: PASS (band == margin == %g tile, board %g x %g tiles)"
+          % (margin, want_w, want_h))
+
+
 def check_trays():
     """Waiting and finished pieces live in the board's own four-cell notch.
 
@@ -244,6 +301,7 @@ def check_rules():
 def main():
     swiftconst.expect("Royal UR", "RoyalUrRules.swift", SWIFT_CONSTANTS)
     check_board()
+    check_layout()
     check_trays()
     check_rules()
     rng = random.Random(20260922)

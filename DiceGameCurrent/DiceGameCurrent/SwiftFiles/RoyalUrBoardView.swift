@@ -66,17 +66,25 @@ struct RoyalUrLayout {
     let origin: CGPoint
 
     init(size: CGSize) {
-        // gap = 0.08 tile, margin = 0.18 tile, so:
-        //   width  = 8 tiles + 7 gaps + 2 margins = 8.92 tiles
-        //   height = 3 tiles + 2 gaps + 2 margins = 3.52 tiles
-        let tile = max(min(size.width / 8.92, size.height / 3.52), 1)
+        // gap = 0.08 tile, margin = 0.24 tile, so:
+        //   width  = 8 tiles + 7 gaps + 2 margins = 9.04 tiles
+        //   height = 3 tiles + 2 gaps + 2 margins = 3.64 tiles
+        //
+        // THE MARGIN IS THE DIAMOND BAND. They were different numbers —
+        // margin 0.18 tile, band `margin * 1.35` = 0.243 — and the board
+        // overlapped its own border by the difference, because drawFrame
+        // paints first and the squares paint over it. Making them one number
+        // means a square begins exactly where the band ends, by construction
+        // rather than by tuning, and 0.24 keeps the band at the weight it
+        // had. tools_royalur_verify.py asserts the two agree.
+        let tile = max(min(size.width / 9.04, size.height / 3.64), 1)
         self.tile = tile
         self.gap = tile * 0.08
-        self.margin = tile * 0.18
-        self.boardSize = CGSize(width: tile * 8.92, height: tile * 3.52)
+        self.margin = tile * 0.24
+        self.boardSize = CGSize(width: tile * 9.04, height: tile * 3.64)
         self.origin = CGPoint(
-            x: (size.width - tile * 8.92) / 2,
-            y: (size.height - tile * 3.52) / 2
+            x: (size.width - tile * 9.04) / 2,
+            y: (size.height - tile * 3.64) / 2
         )
     }
 
@@ -129,7 +137,7 @@ struct RoyalUrBoardView: View {
                 // reads as a board edge rather than as more of the header.
                 //
                 // It fills the WHOLE frame rather than just the board's
-                // own 2.53:1. The plate used to be `layout.boardSize`, so
+                // own 2.48:1. The plate used to be `layout.boardSize`, so
                 // whenever the frame did not share that ratio the table
                 // colour showed through beside it — two coloured bars
                 // down the sides on a tablet, where the layout is
@@ -171,8 +179,23 @@ struct RoyalUrBoardView: View {
     /// it holds its proportion at any screen size rather than becoming a
     /// hairline on a phone or a slab on a tablet.
     private func drawFrame(in context: GraphicsContext, layout: RoyalUrLayout) {
-        let size = context.clipBoundingRect.size
-        let band = max(6, layout.margin * 1.35)
+        // Drawn against the BOARD's own rect, not the view's.
+        //
+        // This was `context.clipBoundingRect.size` — the whole view — while
+        // the squares are laid out from `layout.origin`, which centres a
+        // 9.04 x 3.64-tile board inside it. On any frame wider than that
+        // ratio the band sat at the view's edge and the squares were inset
+        // from the board's, leaving a strip of bare timber between them:
+        // the gaps along the horizontal edges. Concentric with the squares,
+        // there is nowhere for a gap to appear at any aspect.
+        //
+        // Timber outside the band is correct and intended: the board is an
+        // object resting on the table, and WoodTiledBackground still fills
+        // the whole frame behind it, so no table colour can show.
+        var context = context
+        context.translateBy(x: layout.origin.x, y: layout.origin.y)
+        let size = layout.boardSize
+        let band = layout.margin
 
         var edges = Path()
         edges.addRect(CGRect(x: 0, y: 0, width: size.width, height: band))

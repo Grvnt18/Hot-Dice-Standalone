@@ -455,4 +455,44 @@ for f in SOURCES:
 print("inference-hazard check:", "FAIL" if nested_bad else "PASS",
       "(%d)" % nested_bad)
 
-sys.exit(1 if bad or escapes or merged or undeclared or render_bad or member_bad or nested_bad else 0)
+# ---------------------------------------------------------------------
+# 8. Antialiasing: every scene must take its mode from SceneAntialiasing,
+#    never from a literal.
+#
+# Two unrelated reasons want the same answer, which is exactly why the
+# decision belongs in one enum rather than at three call sites:
+#
+#   * The LOOK. 4x MSAA smooths every die's silhouette, which is the one
+#     thing that keeps a stippled, posterised, hard-outlined tray from
+#     reading as pixel art. The faces were already chunky and the edges
+#     were still soft, and the edges are what the eye reads first.
+#   * The SIMULATOR, where any multisampling sets up a multisampled DEPTH
+#     attachment it cannot resolve, and the validation layer aborts the
+#     process mid-frame:
+#         MTLStoreActionMultisampleResolve ... is not supported by device
+#         MTLPixelFormatDepth32Float cannot be a MSAA resolve target
+#
+# Three call sites that must agree is how they stop agreeing — the lesson
+# OverlayChromeButton taught when the restyle landed on ten screens and
+# missed the eleventh. So: no file may write a multisampling literal, and
+# every scene that sets a mode must route through the enum.
+aa_bad = 0
+AA_ENUM = "SceneAntialiasing"
+for f in SOURCES:
+    name = os.path.basename(f)
+    src_f = strip(open(f).read())
+    for m in re.finditer(r'\.multisampling\w*', src_f):
+        if name == "DiceSceneEnvironment.swift":
+            continue                  # the enum itself may name the modes
+        print("  ANTIALIAS   %s:%d  '%s' written as a literal — take it from "
+              "%s.mode instead, so three scenes cannot drift apart"
+              % (os.path.relpath(f), src_f[:m.start()].count("\n") + 1,
+                 m.group(0), AA_ENUM))
+        aa_bad += 1
+    if re.search(r'antialiasingMode\s*[:=]', src_f) and AA_ENUM not in src_f:
+        print("  ANTIALIAS   %s  sets an antialiasing mode without going "
+              "through %s" % (os.path.relpath(f), AA_ENUM))
+        aa_bad += 1
+print("antialiasing check:", "FAIL" if aa_bad else "PASS", "(%d)" % aa_bad)
+
+sys.exit(1 if bad or escapes or merged or undeclared or render_bad or member_bad or nested_bad or aa_bad else 0)

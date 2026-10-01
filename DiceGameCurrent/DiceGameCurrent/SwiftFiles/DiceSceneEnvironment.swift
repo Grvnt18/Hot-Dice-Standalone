@@ -553,3 +553,53 @@ enum DiceSceneEnvironment {
         rootNode.addChildNode(node)
     }
 }
+
+// MARK: - Antialiasing
+
+/// How much antialiasing every scene in the app uses: none.
+///
+/// One enum rather than a literal at three call sites, because three things
+/// that must agree is how they stop agreeing — the lesson
+/// `OverlayChromeButton` taught when the restyle landed on ten screens and
+/// read as a bug on the eleventh. `tools_qualcheck.py` asserts no file
+/// writes a multisampling literal.
+///
+/// **Off for the look, and that is the primary reason.** 4x MSAA smooths
+/// every die's silhouette, and a smoothed outline is what kept this tray
+/// from reading as pixel art even once the faces carried the floor's own
+/// Bayer stipple and the turf was posterised: the body was chunky and the
+/// EDGE was soft, and the edge is what the eye reads first. Turning it off
+/// is what makes a die's outline land on the pixel grid the rest of the
+/// surface already sits on.
+///
+/// So the jaggies are the point. If a future round reads a hard edge as a
+/// defect and reaches for `.multisampling4X`, that is the thing to not do —
+/// it would undo the dither, the posterisation and this together.
+///
+/// **And off for the Simulator, which could not have it anyway.** Any
+/// multisampling — 2X included, since halving it sets up the same
+/// attachment — makes SceneKit ask for a multisampled DEPTH buffer that the
+/// Simulator's Metal cannot resolve, and the validation layer aborts the
+/// process mid-frame:
+///
+///     MTLStoreActionMultisampleResolve store action for the depth
+///     attachment is not supported by device
+///     MTLPixelFormatDepth32Float cannot be a MSAA resolve target
+///
+/// That abort is why nothing rendered in the Simulator at all: the pass
+/// never completed, so there were no dice, the playfield stayed black, and
+/// the chrome stopped responding because the app was no longer alive.
+///
+/// Deliberately NOT written as `#if targetEnvironment(simulator)` returning
+/// two different values, which is how this started life. Both environments
+/// want the same answer now, and a compile-time branch whose arms are
+/// identical reads as though they differ.
+enum SceneAntialiasing {
+
+    // Spelled out rather than left as `.none`. Implicit member lookup
+    // would resolve it correctly here, but `.none` is also
+    // `Optional.none`, and this session has already lost a build to one
+    // expression the solver had to work too hard on. Naming the type
+    // costs nothing.
+    static var mode: SCNAntialiasingMode { SCNAntialiasingMode.none }
+}

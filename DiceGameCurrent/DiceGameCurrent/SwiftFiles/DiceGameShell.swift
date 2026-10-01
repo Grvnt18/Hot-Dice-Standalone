@@ -23,7 +23,9 @@ struct DiceSceneView: UIViewRepresentable {
         // rotation, the instant before assembly finishes — it should read as
         // part of the field rather than as a hole punched in it.
         view.backgroundColor = SmokeFloor.backdrop(from: AppTheme.shared.floorBaseColor)
-        view.antialiasingMode = .multisampling4X
+        // Off, for the pixel-art edge and because the Simulator aborts on
+        // any multisampling — see SceneAntialiasing.
+        view.antialiasingMode = SceneAntialiasing.mode
         view.isPlaying = true // ensures the physics/render loop actually runs continuously
         return view
     }

@@ -112,7 +112,10 @@ enum BoneheadsDieImage {
 
         return renderer.snapshot(atTime: 0,
                                  with: CGSize(width: pixels, height: pixels),
-                                 antialiasingMode: .multisampling4X)
+                                 // A banked die is meant to look like the
+                                 // die that was thrown, so it takes the
+                                 // tray's setting rather than its own.
+                                 antialiasingMode: SceneAntialiasing.mode)
     }
 
     /// Turns the die so `value` is the face pointing up.

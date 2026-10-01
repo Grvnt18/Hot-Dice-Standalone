@@ -28,7 +28,7 @@ from tools_swiftconst import source
 
 import tools_smoke_preview as preview
 
-SWIFT = "SmokeFloor.swift"
+SWIFT = "LowPolyTextures.swift"   # SmokeFloor folded in; see that file's note
 
 # Swift `static let` name -> the Python module-level constant it must equal.
 # Anything in the shader's maths belongs here; anything that only affects how

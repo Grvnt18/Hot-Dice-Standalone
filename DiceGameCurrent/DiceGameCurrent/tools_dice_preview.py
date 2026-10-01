@@ -58,8 +58,13 @@ STRENGTHS = [0.05, 0.10, 0.16, 0.24]
 # `DieMaterialFactory.ditherCellsPerFace`, and tools_dice_verify.py asserts
 # the two agree — so this sheet shows the density that actually ships rather
 # than a density that merely looked nice once.
-CELL = 9          # texels per dither cell, at the scale a die is seen
-SWATCH = 126      # preview swatch side, ~ a die at arm's length on a tablet
+CELL = 6          # texels per dither cell, at the scale a die is seen
+SWATCH = 120      # preview swatch side, ~ a die at arm's length on a tablet
+
+# 120 // 6 = 20 cells across a face, down from 126 // 9 = 14. The iPad said
+# 14 was too coarse — the pixels were what you noticed rather than the die —
+# so both numbers moved together and the swatch stayed the same size, since
+# it stands for a real die at a real viewing distance and that did not change.
 
 
 def rgb(hexcode):
@@ -229,7 +234,7 @@ def sheet():
     return path
 
 
-def scale_sheet(strength=0.16):
+def scale_sheet(strength=0.10):
     """The same strength at several cell sizes, which is the other unknown.
 
     Strength can be reasoned about — it is a contrast number and the check

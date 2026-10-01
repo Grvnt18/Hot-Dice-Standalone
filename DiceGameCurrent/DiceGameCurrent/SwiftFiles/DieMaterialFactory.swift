@@ -80,13 +80,19 @@ enum DieMaterial {
     /// posterised to four tones; the dice deliberately do NOT, because that
     /// palette is how you know which die you are looking at.
     ///
-    /// 0.16 chosen off tools_dice_preview.py: clearly a stipple at arm's
-    /// length without muddying the mid-tone bodies. Measured there, the
-    /// worst any numeral drops to at this strength is 5.48:1 (#7CBD7B with
-    /// its dark numeral), against a 3:1 large-text bar — and three
-    /// colourways already sit under that bar FLAT, today, which this
-    /// improves rather than causes.
-    static let ditherStrength: CGFloat = 0.16
+    /// 0.10, DOWN FROM 0.16 after looking at it on the iPad — which is the
+    /// only place this could be judged, and the reason it shipped at 0.16
+    /// first rather than waiting for a preview nobody could see on a device.
+    /// At 0.16 the stipple read as too heavy over the body colours; at 0.10
+    /// it is still unambiguously a stipple and stops competing with the
+    /// numerals.
+    ///
+    /// Measured in tools_dice_preview.py, the worst any numeral drops to at
+    /// this strength is 6.28:1 (#7CBD7B with its dark numeral), against a 3:1
+    /// large-text bar — better than 0.16's 5.48:1, since a fainter dither
+    /// takes less contrast away. Three colourways already sit under that bar
+    /// FLAT, today, which this improves rather than causes.
+    static let ditherStrength: CGFloat = 0.10
 
     /// How many dither cells run across one die face.
     ///
@@ -94,10 +100,19 @@ enum DieMaterial {
     /// many screen pixels a cell ends up covering on a real device, and too
     /// FINE is the failure that matters: a stipple below what the eye
     /// resolves stops reading as pixel art and becomes photographic noise,
-    /// which is exactly what `applyGrainToDice = false` turned off. 14 puts
-    /// a cell at roughly 9px on a die at arm's length, which previewed as
-    /// unambiguously deliberate.
-    static let ditherCellsPerFace: CGFloat = 14
+    /// which is exactly what `applyGrainToDice = false` turned off.
+    ///
+    /// 20, UP FROM 14, after the first device test: at 14 a cell covered
+    /// roughly 9px on a die at arm's length and read as too coarse — the
+    /// pixels, not the die, were what you noticed. 20 puts a cell at about
+    /// 6px, which is finer without crossing into the noise this comment
+    /// warns about. If it ever does cross, the symptom is specific: the
+    /// faces stop looking printed and start looking dirty.
+    ///
+    /// tools_dice_verify.py pins this to the preview's own grid
+    /// (SWATCH / CELL), so the density on the sheet is always the density
+    /// that ships — the two cannot drift.
+    static let ditherCellsPerFace: CGFloat = 20
 
     /// One 8x8 Bayer matrix, white where the body shows through and grey
     /// where it is pulled down. Built once and shared by every die.

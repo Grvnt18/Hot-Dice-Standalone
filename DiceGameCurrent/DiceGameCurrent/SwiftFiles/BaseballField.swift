@@ -136,6 +136,31 @@ enum BaseballField {
             func py(_ value: CGFloat) -> CGFloat { value * h }
             func point(_ p: CGPoint) -> CGPoint { CGPoint(x: px(p.x), y: py(p.y)) }
 
+            // NO ANTIALIASING ANYWHERE ON THIS PITCH.
+            //
+            // The faceted surfaces were always hard-edged, but the chalk, the
+            // foul lines, the batter's boxes, the mound and the bases are
+            // drawn with CoreGraphics strokes and fills — so they came out
+            // smooth, and they were the only smooth thing left once the dice,
+            // the floor and the rim had all gone to a pixel grid. A soft
+            // white line over hard-edged turf reads as vector art laid on top
+            // of pixel art rather than as part of it.
+            cg.setShouldAntialias(false)
+            cg.interpolationQuality = .none
+
+            // The clay and the chalk belong to the chosen colourway now.
+            //
+            // The turf already followed the picker; these two were fixed
+            // (#C9B18A and pure white), so a blue table gave a tinted pitch
+            // with a sand infield that answered to nothing. They are TINTED
+            // TOWARD the swatch rather than derived from it: clay that is
+            // literally a ramp off a green turf stops being clay, and the
+            // dirt's job is to be a different material from the grass. A
+            // partial blend keeps that job and still ties both to the table.
+            let clayColour = tinted(dirt, toward: turf, amount: 0.35)
+            let chalkColour = tinted(chalk, toward: turf, amount: 0.18)
+            let baseColour = tinted(baseWhite, toward: turf, amount: 0.18)
+
             // The turf and the dirt are FACETED, not flat.
             //
             // Every other playfield in the suite is a low-poly surface, and
@@ -154,7 +179,16 @@ enum BaseballField {
             // the picker.
             let turfTexture = faceted(turf, size: size, seed: 771001,
                                       posterised: true)
-            let clay = faceted(dirt, size: size, seed: 771002)
+            // Posterised like the turf. It was deliberately left smooth —
+            // "the one surface on this pitch whose job is to be a different
+            // material" — and that argument held while the dirt's contrast
+            // against the grass was the only thing telling them apart. It
+            // does not hold now: the clay is tinted toward the swatch, so the
+            // two are told apart by hue as well, and being the single
+            // continuous-tone surface on a pixel-art pitch cost more than the
+            // contrast was worth.
+            let clay = faceted(clayColour, size: size, seed: 771002,
+                               posterised: true)
 
             turfTexture.draw(in: CGRect(origin: .zero, size: size))
 
@@ -179,7 +213,7 @@ enum BaseballField {
             }
 
             // Foul lines, running out past the corners.
-            chalk.setStroke()
+            chalkColour.setStroke()
             cg.setLineWidth(px(0.008))
             for corner in [CGPoint(x: -0.05, y: 0.330), CGPoint(x: 1.05, y: 0.330)] {
                 cg.move(to: point(home))
@@ -191,7 +225,7 @@ enum BaseballField {
             fill(cg, with: clay, size: size) {
                 $0.addEllipse(in: circle(at: point(mound), radius: px(moundRadius)))
             }
-            chalk.setFill()
+            chalkColour.setFill()
             cg.fill(CGRect(x: px(mound.x - 0.030), y: py(mound.y) - px(0.006),
                            width: px(0.060), height: px(0.012)))
             fill(cg, with: clay, size: size) {
@@ -199,7 +233,7 @@ enum BaseballField {
             }
 
             // Batter's boxes.
-            chalk.setStroke()
+            chalkColour.setStroke()
             cg.setLineWidth(px(0.006))
             for side in [-1.0, 1.0] as [CGFloat] {
                 let left = home.x + (side > 0 ? 0.028 : -0.076)
@@ -207,7 +241,7 @@ enum BaseballField {
                                  width: px(0.048), height: px(0.100)))
             }
 
-            baseWhite.setFill()
+            baseColour.setFill()
             for centre in [first, second, third] {
                 cg.addPath(diamondPath(centre: centre, half: baseSize, in: size))
                 cg.fillPath()
@@ -303,6 +337,24 @@ enum BaseballField {
     /// same places. Clipping one continuous image means the dirt under the
     /// mound and the dirt at first base are different parts of one surface,
     /// which is what stops the repetition reading as wallpaper.
+    /// `base` moved `amount` of the way toward `tint`, in straight RGB.
+    ///
+    /// Partial on purpose. A full derivation would make the clay a ramp off
+    /// the turf, and clay that is a shade of the grass stops reading as a
+    /// different material — which is the one job the infield has.
+    private static func tinted(_ base: UIColor, toward tint: UIColor,
+                               amount: CGFloat) -> UIColor {
+        var br: CGFloat = 0, bg: CGFloat = 0, bb: CGFloat = 0, ba: CGFloat = 0
+        var tr: CGFloat = 0, tg: CGFloat = 0, tb: CGFloat = 0, ta: CGFloat = 0
+        guard base.getRed(&br, green: &bg, blue: &bb, alpha: &ba),
+              tint.getRed(&tr, green: &tg, blue: &tb, alpha: &ta) else { return base }
+        let k = max(0, min(1, amount))
+        return UIColor(red: br + (tr - br) * k,
+                       green: bg + (tg - bg) * k,
+                       blue: bb + (tb - bb) * k,
+                       alpha: ba)
+    }
+
     private static func fill(_ cg: CGContext, with texture: UIImage,
                              size: CGSize, region: (CGContext) -> Void) {
         cg.saveGState()

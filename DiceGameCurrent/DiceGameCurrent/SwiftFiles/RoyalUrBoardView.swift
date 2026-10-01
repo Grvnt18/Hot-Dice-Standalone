@@ -256,10 +256,30 @@ struct RoyalUrBoardView: View {
         context.fill(plate, with: .color(RoyalUrArt.grout))
     }
 
-    private func draw(in context: GraphicsContext, layout: RoyalUrLayout) {
-        let texture = context.resolve(Image(uiImage: RoyalUrArt.tileTexture))
+    private func draw(in outerContext: GraphicsContext, layout: RoyalUrLayout) {
+        let texture = outerContext.resolve(Image(uiImage: RoyalUrArt.tileTexture))
 
-        drawFrame(in: context, layout: layout)
+        drawFrame(in: outerContext, layout: layout)
+
+        // EVERYTHING AFTER THE FRAME IS CLIPPED INSIDE THE BAND, and this is
+        // a guarantee where the previous attempt was arithmetic.
+        //
+        // Making `band == margin` put the SQUARES flush against the border,
+        // and they are. What still crossed it was behind them: drawGrout
+        // expands every square by `gap` on all sides
+        // (`rect.insetBy(dx: -gap, dy: -gap)`), so the grout plate — which is
+        // what the eye reads as "the board" — ran 0.08 tile under the
+        // diamonds, and each square's 2pt stroke is centred so it bleeds a
+        // further 1pt outward on top of that.
+        //
+        // Solving that by widening the margin again would fix these two and
+        // leave the next one. Clipping makes the border inviolable: no change
+        // to the grout's inset, the stroke's width, a tile's corner radius or
+        // anything added later can reach it.
+        var context = outerContext
+        context.clip(to: Path(CGRect(origin: layout.origin, size: layout.boardSize)
+            .insetBy(dx: layout.margin, dy: layout.margin)))
+
         drawGrout(in: context, layout: layout)
 
         for square in RoyalUrBoard.squares {

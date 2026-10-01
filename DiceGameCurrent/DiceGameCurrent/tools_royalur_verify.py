@@ -228,6 +228,24 @@ def check_layout():
         "drawFrame measures the VIEW again instead of the board's own rect — "
         "that is what left bare timber down the horizontal edges")
 
+    # The border is protected by a CLIP, not by arithmetic — and the
+    # difference is the whole reason this assertion exists rather than another
+    # measurement. Making band == margin put the squares flush, and they were;
+    # what still crossed the border was drawGrout, which expands every square
+    # by `gap` on all sides, plus each square's centred 2pt stroke bleeding a
+    # further 1pt. The arithmetic check passed the whole time.
+    #
+    # So: everything after drawFrame must draw into a clipped context. That
+    # holds however the grout's inset, the stroke's width or a tile's corner
+    # changes, which an arithmetic rule never would.
+    assert re.search(r'context\.clip\(to: Path\(CGRect\(origin: layout\.origin', text), (
+        "the board content is no longer clipped inside the band — the grout "
+        "expands past every square by `gap` and the tile stroke bleeds 1pt, "
+        "so without the clip they cross the border even when band == margin")
+    assert "drawFrame(in: outerContext" in text, (
+        "drawFrame must paint into the UNCLIPPED context — it draws the "
+        "border itself, so clipping it to the inside erases it")
+
     want_w = 8 + 7 * gap + 2 * margin
     want_h = 3 + 2 * gap + 2 * margin
     for axis, want in (("width", want_w), ("height", want_h)):

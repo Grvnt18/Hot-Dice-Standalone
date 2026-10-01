@@ -126,14 +126,7 @@ final class LayoutReportingSCNView: SCNView {
 // image instance — a second copy generated from the same parameters would
 // tile from a different origin and show a seam.
 enum HeaderFooterWood {
-    static let image = LowPolyTextures.woodSurface(
-        baseColor: UIColor(hex: "#8B6039"),
-        planks: 5,
-        shardsPerPlank: 16,
-        pixelSize: 1024,
-        pixelHeight: 256,
-        seed: 77123
-    )
+    static let image = LowPolyTextures.pixelWood()
 }
 
 /// Tiles HeaderFooterWood.image at the same fraction of its own width that
@@ -248,12 +241,20 @@ struct DiceScoreBar: View {
                 // 3D dice use.
                 .foregroundStyle(Color(hex: die.colorway.numberHex))
                 .frame(width: width, height: height)
-                .background(Color(hex: die.colorway.bodyHex))
-                .clipShape(RoundedRectangle(cornerRadius: 5))
+                // A banked die is a solid thing sitting on the panel, so it
+                // gets the panel treatment the rest of the chrome has.
+                .pixelPanel(fill: .solid(Color(hex: die.colorway.bodyHex)),
+                            elevation: .piece,
+                            radius: PixelPanel.cellRadius)
         } else {
-            RoundedRectangle(cornerRadius: 5)
-                .strokeBorder(Color.secondary.opacity(0.3), style: StrokeStyle(lineWidth: 0.5, dash: [2]))
+            // An empty slot is a hole in the panel, not a thing on it, so the
+            // light runs the other way — see .pixelWell. The hairline dashed
+            // border this replaces was the one piece of chrome that could not
+            // survive the restyle: a 0.5pt dashed stroke is sub-pixel on every
+            // device the app runs on, which is the opposite of pixel art.
+            Color.clear
                 .frame(width: width, height: height)
+                .pixelWell(radius: PixelPanel.cellRadius)
         }
     }
 }
@@ -279,12 +280,19 @@ struct DiceRollButton: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 48)
             }
-            .buttonStyle(.borderedProminent)
-            .buttonBorderShape(.roundedRectangle(radius: ControlShape.cornerRadius))
-            // .borderedProminent fills with the TINT, which defaults to the
-            // system blue — the one control in every game that ignored the
-            // chosen table colour, and the largest one on screen.
-            .tint(theme.accentColor)
+            // .plain, not .borderedProminent: the system style draws its own
+            // rounded, subtly gradiented capsule and there is no way to stop
+            // it, so the panel would be sitting on top of a shape that
+            // disagreed with it at every corner. The tint it used to supply
+            // is now the panel's fill, which is the same colour doing the
+            // same job — the chosen table colour on the largest control on
+            // screen, rather than the system blue it defaulted to.
+            .buttonStyle(.plain)
+            .foregroundStyle(isEnabled ? Color.white : Color.white.opacity(0.5))
+            .pixelPanel(fill: .solid(isEnabled
+                                     ? theme.accentColor
+                                     : theme.accentColor.opacity(0.4)),
+                        elevation: .lifted)
             .disabled(!isEnabled)
 
             if !subtitle.isEmpty {
@@ -633,12 +641,15 @@ struct DiceGameScreen: View {
                                 } label: {
                                     Image(systemName: "chevron.left")
                                         .font(.system(size: 18, weight: .semibold))
-                                        .foregroundStyle(.white.opacity(0.75))
+                                        .foregroundStyle(.white.opacity(0.9))
                                         .padding(9)
-                                        .background(
-                                            Color.black.opacity(0.45),
-                                            in: RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                                        )
+                                        // These two float directly over the
+                                        // playfield, so they take the field's
+                                        // own darkest tone rather than a black
+                                        // wash — the same reason nothing else
+                                        // behind the tray is black any more.
+                                        .pixelPanel(fill: .solid(SmokeFloor.backdropColor.opacity(0.85)),
+                                                    elevation: .piece)
                                 }
                                 .padding(10)
                             }
@@ -650,12 +661,10 @@ struct DiceGameScreen: View {
                             } label: {
                                 Image(systemName: "gearshape.fill")
                                     .font(.system(size: 18))
-                                    .foregroundStyle(.white.opacity(0.75))
+                                    .foregroundStyle(.white.opacity(0.9))
                                     .padding(9)
-                                    .background(
-                                        Color.black.opacity(0.45),
-                                        in: RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                                    )
+                                    .pixelPanel(fill: .solid(SmokeFloor.backdropColor.opacity(0.85)),
+                                                elevation: .piece)
                             }
                             .padding(10)
                         }

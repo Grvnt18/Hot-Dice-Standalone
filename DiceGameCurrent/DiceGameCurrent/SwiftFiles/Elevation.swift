@@ -24,24 +24,32 @@ enum Elevation {
     case piece       // a die or a counter on a board
     case lifted      // the hub's wordmark, a card held out
 
+    /// Raised across the board, because a hard-edged shadow at the old
+    /// opacities reads as a smudge rather than as a silhouette. With no blur
+    /// to soften it, the shadow either commits or looks like a mistake.
     var opacity: Double {
         switch self {
-        case .resting: return 0.28
-        case .piece:   return 0.34
-        case .lifted:  return 0.45
+        case .resting: return 0.45
+        case .piece:   return 0.55
+        case .lifted:  return 0.70
         }
     }
 
-    /// How far the shadow spreads. Higher things throw softer edges.
-    var radius: CGFloat {
-        switch self {
-        case .resting: return 2
-        case .piece:   return 3
-        case .lifted:  return 5
-        }
-    }
+    /// How far the shadow spreads — which is now nowhere, at every height.
+    ///
+    /// A blurred shadow is the single thing that most stops a UI reading as
+    /// pixel art. Everything else can be flat, hard-edged and four-tone, and
+    /// one soft grey halo under a button still says "rendered". So the three
+    /// heights are now told apart by how FAR the shadow is thrown rather than
+    /// how soft it is, which is what a sprite does: a hard offset silhouette,
+    /// one, two or three whole pixels clear of the thing casting it.
+    var radius: CGFloat { 0 }
 
     /// How far the shadow is thrown along the light's direction.
+    ///
+    /// Whole pixels, and now the ONLY thing separating the three heights —
+    /// see `radius`. Also thrown sideways as well as down, because a hard
+    /// shadow directly below reads as a seam rather than as a shadow.
     var offset: CGFloat {
         switch self {
         case .resting: return 1
@@ -49,6 +57,10 @@ enum Elevation {
         case .lifted:  return 3
         }
     }
+
+    /// Sideways throw. Half the vertical, rounded to a whole pixel, so the
+    /// light stays up-and-slightly-left the way PieceSheen assumes.
+    var dx: CGFloat { (offset / 2).rounded() }
 
     /// Signed for the light: away from it, whichever way it points.
     var dy: CGFloat { PieceSheen.litFromTop ? offset : -offset }
@@ -65,6 +77,7 @@ extension View {
     func elevated(_ elevation: Elevation) -> some View {
         shadow(color: elevation.color,
                radius: elevation.radius,
+               x: elevation.dx,
                y: elevation.dy)
     }
 }

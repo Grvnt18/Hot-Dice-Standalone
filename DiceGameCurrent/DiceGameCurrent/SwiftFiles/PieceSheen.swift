@@ -43,12 +43,24 @@ enum PieceSheen {
     /// Stated once because there are two consumers with different needs —
     /// a `View` overlay for SwiftUI shapes, and a `GraphicsContext`
     /// shading for the pieces Royal UR draws in a `Canvas`.
+    /// Three flat bands with hard steps between them, not a ramp.
+    ///
+    /// Repeating a location is what makes the step hard: the gradient has
+    /// nowhere to interpolate across, so it jumps. That is the whole
+    /// difference between a lit face and a shaded one, and a soft vertical
+    /// wash — which is what this was, five stops smoothly blended, and which
+    /// reads as rendered no matter how flat everything around it is.
+    ///
+    /// Still a gradient rather than three stacked rectangles because both
+    /// consumers want one paint: a SwiftUI overlay clipped to an arbitrary
+    /// shape, and a `GraphicsContext.Shading` for Royal UR's `Canvas`.
     static var stops: [Gradient.Stop] {
         [
             .init(color: .white.opacity(highlight), location: 0.0),
-            .init(color: .white.opacity(highlight * 0.35), location: 0.22),
-            .init(color: .clear, location: 0.52),
-            .init(color: .black.opacity(shade * 0.5), location: 0.80),
+            .init(color: .white.opacity(highlight), location: 0.30),
+            .init(color: .clear, location: 0.30),
+            .init(color: .clear, location: 0.68),
+            .init(color: .black.opacity(shade), location: 0.68),
             .init(color: .black.opacity(shade), location: 1.0)
         ]
     }
@@ -76,12 +88,16 @@ enum PieceSheen {
     /// second half of reading as solid from an orthographic top-down
     /// camera — which shows no sides at all, so the edge is the only place
     /// the form can show.
+    /// Two flat halves, lit above and shadowed below, with one hard step.
+    ///
+    /// This is the pixel-art bevel: a sprite draws a raised edge as one row
+    /// of light and one row of dark, never a fade between them.
     static var bevel: LinearGradient {
         LinearGradient(
             stops: [
                 .init(color: .white.opacity(highlight * 1.6), location: 0.0),
-                .init(color: .white.opacity(0), location: 0.35),
-                .init(color: .black.opacity(0), location: 0.65),
+                .init(color: .white.opacity(highlight * 1.6), location: 0.5),
+                .init(color: .black.opacity(shade * 1.4), location: 0.5),
                 .init(color: .black.opacity(shade * 1.4), location: 1.0)
             ],
             startPoint: litFromTop ? .top : .bottom,

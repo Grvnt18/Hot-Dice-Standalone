@@ -455,17 +455,11 @@ enum DiceSceneEnvironment {
         // seed, not a different one per segment, so the frame and the
         // header/footer read as one continuous piece of timber rather than
         // unrelated wood treatments that merely resemble each other.
-        // (LowPolyTextures caches by these exact parameters, so this call
-        // returns the identical image HeaderFooterWood.image does, without
-        // either file needing to see the other's private constant.)
-        material.diffuse.contents = LowPolyTextures.woodSurface(
-            baseColor: UIColor(hex: "#8B6039"),
-            planks: 5,
-            shardsPerPlank: 16,
-            pixelSize: 1024,
-            pixelHeight: 256,
-            seed: 77123
-        )
+        // (LowPolyTextures caches by these exact parameters — both sides take
+        // the defaults, so this call returns the identical image
+        // HeaderFooterWood.image does, without either file needing to see the
+        // other's constants.)
+        material.diffuse.contents = LowPolyTextures.pixelWood()
         material.diffuse.wrapS = .repeat
         material.diffuse.wrapT = .repeat
         material.lightingModel = .lambert

@@ -41,13 +41,59 @@ persist via UserDefaults. The session uses `.ambient` with
 
 ## Visual style
 
-Low-poly throughout: all materials use `.lambert` (flat matte, no
+Four colours, flat, hard-edged. Materials use `.lambert` (flat matte, no
 specular), lit by a hard directional key at ~60 degrees plus a strong
-ambient fill. Floor and walls use procedurally generated faceted textures
-(`LowPolyTextures`) rather than photographs — the floor must stay
-geometrically flat to match the physics collider, so facets could only
-differ in colour anyway, which a texture provides at a fraction of the
-cost.
+ambient fill.
+
+**The rolling area is a shader**, and the only animated material in the
+app — `SmokeFloor`. Domain-warped value noise, ordered-dithered against an
+8x8 Bayer threshold and posterised to exactly four tones, moving on a
+closed 30-second path so it loops perfectly rather than drifting forever.
+The four tones are derived from whichever swatch the player picked, hung
+downward from it so the brightest of the four IS that colour.
+
+It arrives as a *string*, compiled by SceneKit at runtime, because this is
+a Swift Playgrounds project: there is no target to add a `.metal` file to
+and no build step to hook, so the only way a shader gets in is as data. A
+still frame of the same maths is set as the diffuse texture first and the
+shader layered over it — SceneKit reports a shader that fails to compile
+asynchronously on the render thread, so there is nothing to catch, and
+ordering it this way means the tray cannot end up black.
+
+**Nothing behind or beside the tray is black.** The floor plane is painted
+6% wider than the playfield so the camera cannot see past it at any aspect
+(bounds, colliders, rim and spawn all still use the true bounds), and both
+scene backgrounds take the field's darkest tone.
+
+**The wood** (`LowPolyTextures.pixelWood`) is four tones as well: three
+chunky boards with hard seams, chamfered edges, curved grain, knots and
+studs. Its base `#AE7B5B` was measured off the low-poly reference art
+rather than chosen. The 3D rim and the SwiftUI header and footer must call
+it with identical arguments — the cache keys on them, so identical
+arguments return the identical image and the three read as one piece of
+timber.
+
+**The chrome** goes through three files and only those: `Elevation` owns
+depth (hard offsets, zero blur), `PieceSheen` owns the light (flat bands
+with hard steps, no interpolation) and `PixelPanel` owns the edge.
+
+`BaseballField` and Royal UR's board still use the older
+`facetedSurface` generator, which is unchanged.
+
+### Seeing any of it without an iPad
+
+There is no Swift compiler or renderer in the container this was
+developed in, so every visual decision was made against a Python port and
+then checked against the Swift:
+
+    python3 tools_smoke_preview.py            # stills, several swatches
+    python3 tools_smoke_preview.py --gif      # the field at true speed
+    python3 tools_smoke_preview.py --loop     # one whole cycle, fast
+    python3 tools_smoke_preview.py --check    # loop closes, everything moves
+    python3 tools_wood_preview.py             # the tile, and a tray using it
+
+    python3 tools_smoke_verify.py             # Swift and Python agree
+    python3 tools_wood_verify.py              # ...and the timber is one piece
 
 ## Latest round: physics tuning, labels, selection, layout
 

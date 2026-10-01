@@ -94,7 +94,10 @@ enum PlayfieldRim {
     /// that's what keeps the plank pitch continuous across the seam
     /// between the header and the walls instead of jumping to a different
     /// scale right where they meet.
-    static let woodTileFraction: Float = 0.4
+    /// Raised from 0.4 with the move to three boards. At the old value five
+    /// planks landed at about 2% of the screen each, which reads as veneer;
+    /// this puts a board at a size you could believe someone planed.
+    static let woodTileFraction: Float = 0.75
 }
 
 /// Vertical containment shared between the camera (DiceCameraFactory), the

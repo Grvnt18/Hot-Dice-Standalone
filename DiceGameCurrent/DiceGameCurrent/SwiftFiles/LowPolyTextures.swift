@@ -114,7 +114,7 @@ enum LowPolyTextures {
 
     /// Low-poly paper: aged off-white stock, faceted like everything else.
     ///
-    /// A third generator beside `facetedSurface` and `woodSurface`, and it
+    /// A third generator beside `facetedSurface` and `pixelWood`, and it
     /// exists for the same reason wood does — the field generator is wrong
     /// for it. Wood needed direction; paper needs the opposite: almost no
     /// variation at all, because a sheet is flat and facets that read as
@@ -225,90 +225,6 @@ enum LowPolyTextures {
         }
     }
 
-    /// Low-poly wood: horizontal plank bands, each split into long
-    /// shallow triangles running WITH the grain.
-    ///
-    /// Deliberately not the same generator as `facetedSurface`. That one
-    /// makes roughly equilateral triangles, which reads as crystal or
-    /// terrain — fine for a field, wrong for timber. Wood's visual
-    /// signature is strong directionality: long parallel bands with
-    /// lengthwise variation and hard divisions between planks. So the
-    /// cells here are wide and short, split along their long axis, and
-    /// each plank carries its own base tone so the seams between boards
-    /// stay legible.
-    static func woodSurface(
-        baseColor: UIColor,
-        plankVariation: CGFloat = 0.14,
-        shardVariation: CGFloat = 0.05,
-        planks: Int = 5,
-        shardsPerPlank: Int = 14,
-        pixelSize: CGFloat = 1024,
-        pixelHeight: CGFloat = 256,
-        seed: UInt64 = 4242
-    ) -> UIImage {
-        let key = "wood-\(baseColor)-\(planks)x\(shardsPerPlank)-\(pixelSize)x\(pixelHeight)-\(seed)"
-        if let cached = cache.value(key) { return cached }
-
-        let size = CGSize(width: pixelSize, height: pixelHeight)
-        let format = UIGraphicsImageRendererFormat()
-        format.opaque = true
-        let renderer = UIGraphicsImageRenderer(size: size, format: format)
-        var rng = SeededGenerator(seed: seed)
-
-        let plankH = pixelHeight / CGFloat(planks)
-        let shardW = pixelSize / CGFloat(shardsPerPlank)
-
-        let image = renderer.image { ctx in
-            baseColor.setFill()
-            ctx.fill(CGRect(origin: .zero, size: size))
-
-            for p in 0..<planks {
-                // Per-plank tone first, so boards read as distinct pieces
-                // of timber rather than one continuous noisy surface.
-                let plankDelta = (CGFloat(rng.nextUnit()) * 2 - 1) * plankVariation
-                let plankColor = shade(baseColor, by: plankDelta)
-                let y = CGFloat(p) * plankH
-
-                for sIdx in 0..<shardsPerPlank {
-                    let x = CGFloat(sIdx) * shardW
-                    let tl = CGPoint(x: x, y: y)
-                    let tr = CGPoint(x: x + shardW, y: y)
-                    let bl = CGPoint(x: x, y: y + plankH)
-                    let br = CGPoint(x: x + shardW, y: y + plankH)
-                    // Alternating diagonal keeps the grain from forming an
-                    // obvious repeating zigzag along the plank.
-                    let flip = (sIdx + p) % 2 == 0
-                    let tris: [[CGPoint]] = flip
-                        ? [[tl, tr, bl], [tr, br, bl]]
-                        : [[tl, tr, br], [tl, br, bl]]
-                    for tri in tris {
-                        let d = (CGFloat(rng.nextUnit()) * 2 - 1) * shardVariation
-                        shade(plankColor, by: d).set()
-                        let path = UIBezierPath()
-                        path.move(to: tri[0]); path.addLine(to: tri[1])
-                        path.addLine(to: tri[2]); path.close()
-                        path.lineWidth = 1
-                        path.fill(); path.stroke()
-                    }
-                }
-
-                // Hard seam between boards.
-                shade(baseColor, by: -0.30).setStroke()
-                let seam = UIBezierPath()
-                seam.move(to: CGPoint(x: 0, y: y))
-                seam.addLine(to: CGPoint(x: pixelSize, y: y))
-                seam.lineWidth = 2
-                seam.stroke()
-            }
-        }
-        cache.insert(image, for: key)
-        return image
-    }
-
-    /// Brightens (positive) or darkens (negative) a color by a fraction,
-    /// working in HSB so hue stays put and only the value shifts — mixing
-    /// toward white/black in RGB would wash out the saturation and make
-    /// facets look dusty rather than shaded.
     private static func shade(_ color: UIColor, by delta: CGFloat) -> UIColor {
         var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         guard color.getHue(&h, saturation: &s, brightness: &b, alpha: &a) else { return color }
@@ -367,6 +283,215 @@ struct BoundedImageCache {
     }
 }
 
+// MARK: - The tray timber
+
+/// The wood the whole app is framed in: the 3D rim of the tray, and — tiled at
+/// the same fraction of width — the SwiftUI header behind the score and the
+/// footer behind the roll button.
+///
+/// It has to read as ONE piece of timber across those joins. That is the
+/// entire reason the tray and the score panel look like a single object rather
+/// than two stacked panels, and it is why `wallMaterial` and
+/// `HeaderFooterWood` must call this with identical arguments: the cache key
+/// is built from them, so identical arguments return the identical `UIImage`,
+/// and anything else puts a visible seam exactly where the two meet.
+///
+/// `tools_wood_preview.py` is this in Python, and the only way to see it
+/// before an iPad does.
+extension LowPolyTextures {
+
+    /// Measured, not chosen. The low-poly table reference is an 8-bit
+    /// colormapped PNG, so its palette could be read straight out of the file;
+    /// its plank tone clusters tightly around this. It is noticeably lighter
+    /// and more orange than the #8B6039 this app used before — which is most
+    /// of the difference between furniture and a game object.
+    static let woodBaseHex = "#AE7B5B"
+
+    /// Three boards, not five.
+    ///
+    /// Five tiled at the old 0.4 of the view width put each board at about 2%
+    /// of the screen, which reads as veneer or wicker rather than timber.
+    /// Three at 0.75 read as a tray you could pick up.
+    static let woodPlanks = 3
+
+    private static let woodSeam = 2
+    private static let woodGrainPerPlank = 2
+    private static let woodGrainThick = 2
+    private static let woodGrainAmplitude: CGFloat = 6.0
+    private static let woodGrainCycles: CGFloat = 1.3
+    private static let woodKnotChance = 45
+    private static let woodKnotRadius: CGFloat = 5
+    private static let woodStudInset = 14
+    private static let woodStudRadius: CGFloat = 3
+
+    /// Boards are told apart by the WIDTH of their chamfer bands, not by
+    /// colour. The first attempt dithered a sparse veil of the neighbouring
+    /// tone across each face to lean it darker or paler — which works on the
+    /// floor, where the field underneath is already broken up, and fails badly
+    /// over a flat fill, where it reads as a regular dotted grid. Fabric, not
+    /// timber. Varying the bands gives the same tonal spread with nothing
+    /// repeating.
+    private static let woodBevels = [3, 1, 5]
+    private static let woodShades = [2, 5, 1]
+
+    /// outline, shadow, base, highlight — darkest first, like the floor's.
+    ///
+    /// Four, for the same reason the floor has four: flat regions with hard
+    /// edges between them read as drawn, where a continuous ramp reads as
+    /// rendered.
+    static func woodPalette(base: UIColor = UIColor(hex: woodBaseHex)) -> [UIColor] {
+        [shade(base, by: -0.50).saturated(by: 0.06),
+         shade(base, by: -0.26).saturated(by: 0.13),
+         base,
+         shade(base, by: 0.22).saturated(by: -0.16)]
+    }
+
+    /// The tile. 1024x256, because the rim's world-mapped UVs assume 4:1.
+    static func pixelWood(base: UIColor = UIColor(hex: woodBaseHex),
+                          planks: Int = woodPlanks,
+                          pixelSize: CGFloat = 1024,
+                          pixelHeight: CGFloat = 256,
+                          seed: UInt64 = 77123) -> UIImage {
+        let key = "pixelwood-\(base)-\(planks)-\(pixelSize)x\(pixelHeight)-\(seed)"
+        if let cached = cache.value(key) { return cached }
+
+        let w = Int(pixelSize)
+        let h = Int(pixelHeight)
+        let tones = woodPalette(base: base)
+        let plankH = h / planks
+
+        var rng = SeededGenerator(seed: seed)
+
+        // Built as indices first and painted once at the end. Everything snaps
+        // to whole pixels: a grain line at a fractional y antialiases into a
+        // fifth and sixth tone, and the whole point is that there are four.
+        var px = [[Int]](repeating: [Int](repeating: 2, count: w), count: h)
+
+        func fill(_ y0: Int, _ y1: Int, _ tone: Int) {
+            for y in max(0, y0)..<min(h, y1) {
+                for x in 0..<w { px[y][x] = tone }
+            }
+        }
+
+        for p in 0..<planks {
+            let top = p * plankH
+            let bot = top + plankH
+
+            // The seam goes down FIRST and the bevel starts below it. Painted
+            // the other way round the seam simply erases the lit edge, which
+            // is what the first pass did — every board came out flat and the
+            // chamfer was nowhere on screen.
+            fill(top, top + woodSeam, 0)
+
+            let bevel = woodBevels[p % woodBevels.count]
+            let shadeEdge = woodShades[p % woodShades.count]
+            let innerTop = top + woodSeam
+
+            // Lit along the top edge, shadowed along the bottom. This is what
+            // gives a flat quad the look of a board with thickness — which
+            // matters here because the rim genuinely has none: it is four flat
+            // quads seen under an orthographic camera.
+            fill(innerTop, innerTop + bevel, 3)
+            fill(bot - shadeEdge, bot, 1)
+
+            let faceTop = innerTop + bevel
+            let faceBot = bot - shadeEdge
+            guard faceBot > faceTop else { continue }
+
+            // Grain: a few long, slowly curving swooshes rather than evenly
+            // spaced straight lines — the clearest single difference between
+            // the hand-painted reference wood and generic plank art.
+            for _ in 0..<woodGrainPerPlank {
+                let span = max(1, faceBot - faceTop - woodGrainThick)
+                let gy = faceTop + Int(rng.next() % UInt64(span))
+                let phase = CGFloat(rng.nextUnit()) * 2 * .pi
+                let x0 = Int(rng.next() % UInt64(w))
+                let length = w / 2 + Int(rng.next() % UInt64(w / 2))
+                for i in 0..<length {
+                    let x = (x0 + i) % w
+                    let t = phase + woodGrainCycles * 2 * .pi * CGFloat(i) / CGFloat(w)
+                    let baseY = gy + Int((woodGrainAmplitude * sin(t)).rounded())
+                    for k in 0..<woodGrainThick {
+                        let y = baseY + k
+                        if y >= faceTop && y < faceBot { px[y][x] = 1 }
+                    }
+                }
+            }
+
+            // A knot now and then: dark centre, lighter halo, so it reads as a
+            // feature of the board rather than a blot on it.
+            if Int(rng.next() % 100) < woodKnotChance {
+                let kx = Int(rng.next() % UInt64(w))
+                let ky = (faceTop + faceBot) / 2
+                let r = woodKnotRadius
+                for dy in Int(-r - 1)...Int(r + 1) {
+                    for dx in Int(-r - 1)...Int(r + 1) {
+                        let d = (CGFloat(dx * dx + dy * dy)).squareRoot()
+                        let y = ky + dy
+                        let x = ((kx + dx) % w + w) % w
+                        guard y >= faceTop && y < faceBot else { continue }
+                        if d <= r - 1.5 { px[y][x] = 0 }
+                        else if d <= r { px[y][x] = 1 }
+                        else if d <= r + 1 { px[y][x] = 3 }
+                    }
+                }
+            }
+
+            // Studs at the board ends, per the crate and low-poly table refs.
+            for sx in [woodStudInset, w - woodStudInset] {
+                let sy = (faceTop + faceBot) / 2
+                let r = woodStudRadius
+                for dy in Int(-r - 1)...Int(r + 1) {
+                    for dx in Int(-r - 1)...Int(r + 1) {
+                        let d = (CGFloat(dx * dx + dy * dy)).squareRoot()
+                        let y = sy + dy
+                        let x = ((sx + dx) % w + w) % w
+                        guard y >= faceTop && y < faceBot else { continue }
+                        if d <= r - 1 { px[y][x] = 3 }
+                        else if d <= r { px[y][x] = 0 }
+                    }
+                }
+            }
+        }
+
+        let format = UIGraphicsImageRendererFormat()
+        format.opaque = true
+        format.scale = 1
+        let image = UIGraphicsImageRenderer(
+            size: CGSize(width: pixelSize, height: pixelHeight),
+            format: format
+        ).image { ctx in
+            // Painted in runs rather than per pixel: a 1024x256 tile is 262144
+            // fills otherwise, and the rows are mostly long stretches of one
+            // tone.
+            for y in 0..<h {
+                var x = 0
+                while x < w {
+                    let tone = px[y][x]
+                    var run = 1
+                    while x + run < w && px[y][x + run] == tone { run += 1 }
+                    tones[tone].setFill()
+                    ctx.fill(CGRect(x: x, y: y, width: run, height: 1))
+                    x += run
+                }
+            }
+        }
+
+        cache.insert(image, for: key)
+        return image
+    }
+}
+
+extension UIColor {
+    /// Shifts saturation while leaving hue and brightness alone, so the wood's
+    /// four tones can lean warmer in shadow and paler in the light the way the
+    /// reference art does, rather than being one colour at four brightnesses.
+    func saturated(by delta: CGFloat) -> UIColor {
+        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        guard getHue(&h, saturation: &s, brightness: &b, alpha: &a) else { return self }
+        return UIColor(hue: h, saturation: max(0, min(1, s + delta)), brightness: b, alpha: a)
+    }
+}
 
 // ---------------------------------------------------------------------
 // The flowing floor lives here rather than in a SmokeFloor.swift of its

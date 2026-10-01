@@ -137,6 +137,39 @@ def main():
                           ".contentShape — the panel is visible but only the "
                           "label itself is tappable" % (name, line))
 
+    # --- A tiled surface may not be sized by variable-height text. -----
+    #
+    # NetActionBar applied .background(SteelTiledBackground()) to a padded
+    # VStack, and the caller centred that in a fixed .frame(height: 104). A
+    # VStack sizes to its content, and that content is a subtitle with
+    # lineLimit(3) and minimumScaleFactor(0.7) whose sentence changes every
+    # phase — so the steel grew and shrank with the text, leaving bare arena
+    # colour above and below it that moved as the turn progressed.
+    #
+    # The rule is narrowed to exactly that hazard rather than to every tiled
+    # background, because most of them are legitimately content-sized: a score
+    # bar's height follows its grid of cells, which is deterministic. What is
+    # never legitimate is letting a sentence decide how far a MATERIAL
+    # reaches. A surface is a surface; it does not breathe with a caption.
+    TILED = ("SteelTiledBackground", "WoodTiledBackground")
+    VARIABLE = ("lineLimit(", "minimumScaleFactor(")
+    for name in sorted(f for f in os.listdir(SWIFT) if f.endswith(".swift")):
+        code = strip_comments(source(name))
+        for tiled in TILED:
+            for m in re.finditer(r'\.background\(%s\(\)\)' % tiled, code):
+                window = code[max(0, m.start() - 900):m.start()]
+                if not any(v in window for v in VARIABLE):
+                    continue          # nothing in it can change height
+                if re.search(r'maxHeight:\s*\.infinity', window):
+                    continue          # told to fill: correct
+                if re.search(r'\.frame\(height:\s*\w', window):
+                    continue          # given its own explicit height
+                line = code[:m.start()].count("\n") + 1
+                failed.append("%s:%d backs variable-height text with %s and "
+                              "never tells it to fill — the material will "
+                              "track the sentence, not the frame"
+                              % (name, line, tiled))
+
     for line in failed:
         print("  %-26s FAILED  %s" % ("cohesion", line))
     if failed:

@@ -359,6 +359,20 @@ struct NetActionBar: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
+        // Fill BEFORE the plate goes on, and this is load-bearing rather
+        // than tidy.
+        //
+        // The VStack above sizes to its content, and that content is a
+        // subtitle with lineLimit(3) whose sentence changes every phase.
+        // The caller gives this bar a fixed .frame(height: 104) — so with
+        // the plate applied to the content, the steel grew and shrank with
+        // the text and was then CENTRED in that 104, leaving bare arena
+        // colour above and below it that moved as the turn progressed.
+        //
+        // Filling first means the steel covers whatever height the bar is
+        // given, whatever the subtitle says. A surface does not breathe
+        // with a caption. tools_cohesion_verify.py asserts it.
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(SteelTiledBackground())
         .background(NetArt.background.opacity(0.80))
         .overlay(alignment: .top) {

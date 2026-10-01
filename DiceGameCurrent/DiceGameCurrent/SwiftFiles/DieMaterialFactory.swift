@@ -69,62 +69,22 @@ enum DieMaterial {
     /// How strongly the pixel-grain shows over the body color, when on.
     private static let grainOpacity: CGFloat = 0.05
 
-    // MARK: Ordered dither
-
-    /// How far a dark dither cell pulls the body colour down.
-    ///
-    /// MULTIPLY, not replace, and that is the whole reason the fifteen
-    /// colourways survive this: every texel is either the body colour or the
-    /// body colour scaled by (1 - this), so the hue never moves and one die
-    /// stays exactly as tellable from another as it was. The floor gets
-    /// posterised to four tones; the dice deliberately do NOT, because that
-    /// palette is how you know which die you are looking at.
-    ///
-    /// 0.10, DOWN FROM 0.16 after looking at it on the iPad — which is the
-    /// only place this could be judged, and the reason it shipped at 0.16
-    /// first rather than waiting for a preview nobody could see on a device.
-    /// At 0.16 the stipple read as too heavy over the body colours; at 0.10
-    /// it is still unambiguously a stipple and stops competing with the
-    /// numerals.
-    ///
-    /// Measured in tools_dice_preview.py, the worst any numeral drops to at
-    /// this strength is 6.28:1 (#7CBD7B with its dark numeral), against a 3:1
-    /// large-text bar — better than 0.16's 5.48:1, since a fainter dither
-    /// takes less contrast away. Three colourways already sit under that bar
-    /// FLAT, today, which this improves rather than causes.
-    static let ditherStrength: CGFloat = 0.10
-
-    /// How many dither cells run across one die face.
-    ///
-    /// The one number here that cannot be reasoned out — it is purely how
-    /// many screen pixels a cell ends up covering on a real device, and too
-    /// FINE is the failure that matters: a stipple below what the eye
-    /// resolves stops reading as pixel art and becomes photographic noise,
-    /// which is exactly what `applyGrainToDice = false` turned off.
-    ///
-    /// 20, UP FROM 14, after the first device test: at 14 a cell covered
-    /// roughly 9px on a die at arm's length and read as too coarse — the
-    /// pixels, not the die, were what you noticed. 20 puts a cell at about
-    /// 6px, which is finer without crossing into the noise this comment
-    /// warns about. If it ever does cross, the symptom is specific: the
-    /// faces stop looking printed and start looking dirty.
-    ///
-    /// tools_dice_verify.py pins this to the preview's own grid
-    /// (SWATCH / CELL), so the density on the sheet is always the density
-    /// that ships — the two cannot drift.
-    static let ditherCellsPerFace: CGFloat = 20
-
     // MARK: Cel shading
 
     /// How many flat tone steps a die face is allowed.
     ///
-    /// Three: lit face, mid face, shadow face, nothing between. This is the
-    /// change that made the dice read as pixel art when the dither, the finer
-    /// cells and the hard silhouette had each only moved it a little — and
-    /// the reason is that none of those touched the SHADING. A face's colour
-    /// was quantised while the light falling on it stayed a smooth gradient,
-    /// so the body was chunky and the thing underneath it was not.
-    static let celBands: Float = 3
+    /// Five flat steps, and the form of a die comes entirely from which step
+    /// each facet lands on. There is no texture of any kind on a die body —
+    /// see `applyBodyMaterial` — so this is the only thing giving a face
+    /// anything to look at.
+    ///
+    /// **Five is bolder than the three this started at, not a retreat from
+    /// it.** Three was the boldest option across the narrow 0.62-1.00 range
+    /// it shipped with, where each step was 0.127 of the body colour. Across
+    /// 0.08-1.00 five steps are 0.184 apart — bigger steps AND more of them.
+    /// It is also about the number of distinct tones in the reference art
+    /// this is built from.
+    static let celBands: Float = 5
 
     /// The darkest and brightest a face may be, as a fraction of its own
     /// body colour.
@@ -150,9 +110,29 @@ enum DieMaterial {
     /// which already sits at 2.52:1 FLAT today. Zero pairings that clear the
     /// 3:1 large-text bar fall below it.
     ///
-    /// Widening this is the knob if the banding reads too subtly, and the
-    /// cost is known: 0.55 costs one pairing (2.80:1), 0.45 costs five.
-    static let celShadeFloor: Float = 0.62
+    /// **0.08, widened hard from 0.62 — and it made legibility BETTER, which
+    /// is the opposite of what the first version of this assumed.** That
+    /// version protected the numeral on every band, which was answering the
+    /// wrong question: the tray camera is straight down orthographic, the key
+    /// light is above, and a die snaps to a face on settle, so THE FACE YOU
+    /// READ IS ALWAYS THE BRIGHTEST ONE. Side faces sinking to near-black is
+    /// not a regression, it is the look.
+    ///
+    /// Measured on the top band, which is the face that is actually read:
+    ///
+    ///     range        bands  spread  worst top band
+    ///     0.62-1.00      3     1.4x      2.86:1
+    ///     0.15-1.00      4     3.5x      3.11:1
+    ///     0.08-1.00      5     5.3x      3.03:1   <- ships
+    ///     0.05-1.00      6     7.1x      2.96:1
+    ///
+    /// Widening lowers the top band's own factor (0.937 -> 0.908), and a
+    /// slightly darkened body separates BETTER from a light numeral — so the
+    /// worst pairing in the palette rises from 2.86:1 to 3.03:1 and clears
+    /// the 3:1 large-text bar it currently misses.
+    ///
+    /// Factors: 0.172, 0.356, 0.540, 0.724, 0.908.
+    static let celShadeFloor: Float = 0.08
     static let celShadeCeiling: Float = 1.0
 
     /// Quantises how strongly the light shades a die body, into
@@ -165,14 +145,12 @@ enum DieMaterial {
     /// `_output.color` once lighting is done, which is the only place a hard
     /// tone step can survive.
     ///
-    /// **The dither becomes a band dither, which is better than what it
-    /// was.** `_output.color` already carries the multiply channel, so the
-    /// shade this measures includes the stipple — which means a dithered
-    /// fragment lands one band lower instead of being flatly darkened by
-    /// 10%. Band boundaries come out stippled rather than as clean contours.
-    /// That is exactly what SmokeFloor's shader does on the floor ("dither
-    /// the VALUE, then quantise"), so the dice and the playfield now break
-    /// up their tone boundaries the same way.
+    /// **Nothing rides along in the multiply channel any more**, so what this
+    /// measures is pure lighting, which is what it was always meant to be. An
+    /// ordered stipple used to sit there and was removed: it had no
+    /// counterpart in the reference, and it was the source of the texture
+    /// popping in and out as dice tumbled — an 8x8 tile sampled `.nearest`
+    /// with no mipmaps aliases badly once a face goes oblique.
     ///
     /// **Hue and saturation are untouched**, because the output is the body
     /// colour scaled, never a replacement. All fifteen colourways stay
@@ -207,8 +185,7 @@ enum DieMaterial {
     // a defensive flourish.
     float celBaseLum = max(dot(celBase, celWeights), 0.004);
 
-    // How far the light — and the dither riding along in the multiply
-    // channel — has moved this fragment from the body's own colour.
+    // How far the light has moved this fragment from the body's own colour.
     float celShade = dot(lit, celWeights) / celBaseLum;
 
     float celLo = \(celShadeFloor);
@@ -229,62 +206,6 @@ enum DieMaterial {
     _output.color = float4(clamp(celBase * celFactor, 0.0, 1.0),
                            _output.color.a);
     """
-
-    /// One 8x8 Bayer matrix, white where the body shows through and grey
-    /// where it is pulled down. Built once and shared by every die.
-    private static var ditherTextureCache: UIImage?
-
-    /// The standard 8x8 ordered-dither threshold matrix, 0..63.
-    ///
-    /// The same one SmokeFloor derives arithmetically in GLSL — written as a
-    /// literal here because this runs once on the CPU, where a table is
-    /// simply clearer than three nested recursions.
-    private static let bayer8: [[Int]] = [
-        [ 0, 32,  8, 40,  2, 34, 10, 42],
-        [48, 16, 56, 24, 50, 18, 58, 26],
-        [12, 44,  4, 36, 14, 46,  6, 38],
-        [60, 28, 52, 20, 62, 30, 54, 22],
-        [ 3, 35, 11, 43,  1, 33,  9, 41],
-        [51, 19, 59, 27, 49, 17, 57, 25],
-        [15, 47,  7, 39, 13, 45,  5, 37],
-        [63, 31, 55, 23, 61, 29, 53, 21]
-    ]
-
-    /// The dither tile: exactly 8x8 texels, one per Bayer cell.
-    ///
-    /// Deliberately the smallest image that can express the pattern. It is
-    /// magnified enormously on the die, which is what makes
-    /// `magnificationFilter = .nearest` at the call site load-bearing rather
-    /// than a nicety — with the default linear filter SceneKit interpolates
-    /// between texels and the dither arrives as a soft grey wash, which is
-    /// the one result that would look worse than no dither at all.
-    private static func ditherTexture() -> UIImage? {
-        if let cached = ditherTextureCache { return cached }
-
-        let side = 8
-        let format = UIGraphicsImageRendererFormat()
-        format.opaque = true
-        format.scale = 1
-        let renderer = UIGraphicsImageRenderer(
-            size: CGSize(width: side, height: side), format: format)
-
-        let dark = UIColor(white: 1 - ditherStrength, alpha: 1)
-        let image = renderer.image { ctx in
-            UIColor.white.setFill()
-            ctx.fill(CGRect(x: 0, y: 0, width: side, height: side))
-            dark.setFill()
-            for row in 0..<side {
-                for col in 0..<side {
-                    // A fixed half-duty threshold, which gives the regular
-                    // checker the reference art uses rather than a gradient.
-                    guard bayer8[row][col] >= 32 else { continue }
-                    ctx.fill(CGRect(x: col, y: row, width: 1, height: 1))
-                }
-            }
-        }
-        ditherTextureCache = image
-        return image
-    }
 
     /// Distinct grain layouts, applied as UV offsets/flips rather than
     /// separate baked images, so this no longer multiplies texture memory.
@@ -348,33 +269,6 @@ enum DieMaterial {
     }
 
 
-    /// UV transform tiling the 8x8 dither across a face at the chosen cell
-    /// density, offset per die so neighbouring dice do not land on the same
-    /// phase and read as one printed sheet.
-    ///
-    /// The offsets are deliberately NOT required to land on whole cells, and
-    /// the earlier claim that they do was wrong twice over — recorded here
-    /// because a later round would otherwise trust it and "fix" working code.
-    ///
-    /// First, they do not: `SCNMatrix4Translate(m, tx, ty, tz)` concatenates
-    /// the translation BEFORE `m`, the way `CATransform3DTranslate` does, so
-    /// each offset is multiplied by `repeats` (14/8 = 1.75). The real step is
-    /// 1.75 cells, not 1.
-    ///
-    /// Second, it does not matter: `.nearest` never interpolates between
-    /// texels, so no UV offset — fractional or otherwise — can soften an
-    /// edge. A fractional offset only shifts where cell boundaries fall on
-    /// the face, which is precisely the de-phasing this exists to produce.
-    ///
-    /// Same shape as `grainTransform` above, whose offsets (0.37, 0.61) never
-    /// pretended to be whole anything.
-    private static func ditherTransform(variant: Int) -> SCNMatrix4 {
-        let repeats = Float(ditherCellsPerFace / 8)
-        let v = variant % grainVariantCount
-        let scale = SCNMatrix4MakeScale(repeats, repeats, 1)
-        return SCNMatrix4Translate(scale, Float(v % 4) / 8, Float(v / 4) / 8, 0)
-    }
-
     static func apply(
         sides: Int,
         colorway: DieColorway,
@@ -435,28 +329,6 @@ enum DieMaterial {
             material.multiply.wrapS = .repeat
             material.multiply.wrapT = .repeat
             material.multiply.contentsTransform = grainTransform(variant: grainVariant)
-        } else if let dither = ditherTexture() {
-            // The ordered stipple, in the same channel the grain used and
-            // for the opposite reason: the grain was scanned photographic
-            // noise and fought the flat faceting, where this IS the flat
-            // grammar — the floor's own 8x8 Bayer, on the dice.
-            //
-            // It cannot reach the numerals, and that is structural rather
-            // than careful: DieFaceLabels puts every numeral on its own
-            // SCNPlane child node with its own material, while this sets
-            // `node.geometry?.materials = [material]` on the die body
-            // alone. There is no path from this channel to a numeral.
-            material.multiply.contents = dither
-            material.multiply.wrapS = .repeat
-            material.multiply.wrapT = .repeat
-            // Nearest, not linear. The tile is 8x8 texels magnified across a
-            // whole face, so the default filter would interpolate between
-            // them and deliver a soft grey wash instead of hard cells — the
-            // one outcome worse than not doing this at all.
-            material.multiply.magnificationFilter = .nearest
-            material.multiply.minificationFilter = .nearest
-            material.multiply.mipFilter = .none
-            material.multiply.contentsTransform = ditherTransform(variant: grainVariant)
         }
         // .lambert: flat matte shading with no specular term at all, so a
         // highlight is not merely dialled down but physically impossible.
@@ -492,10 +364,10 @@ enum DieMaterial {
         // is the idiom SmokeFloor.apply documents: a shader modifier that
         // fails to compile does so asynchronously, on the render thread,
         // rather than throwing — there is nothing to catch and nothing to
-        // test for. So the flat body colour and the dither multiply are set
-        // first and the shader is layered over them. If it compiles it
-        // overwrites the lit result; if it does not, the die is exactly the
-        // flat dithered die it was before this change.
+        // test for. So the flat body colour is set first and the shader is
+        // layered over it. If it compiles it overwrites the lit result; if it
+        // does not, the die is a flat-coloured die under ordinary lambert
+        // shading — plainer than intended, but correct and readable.
         //
         // The failure mode that ordering removes is a black die, and it is
         // the kind that would not show up here: it would look right on every

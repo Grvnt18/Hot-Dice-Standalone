@@ -61,12 +61,10 @@ PLANK_SHADE = (2, 5, 1)
 
 KNOT_CHANCE = 45        # 1 in N shard columns carries a knot
 KNOT_R = 5
-STUD_INSET = 14         # px from each plank end to the stud centre
-STUD_R = 3
 
 # The four tones, as offsets from the base in HSB. Fixed rather than derived
 # per plank: with only four tones there is no room for per-plank COLOUR, so
-# boards are told apart by their grain, knots and studs instead, which is how
+# boards are told apart by their grain and knots instead, which is how
 # the pixel-art references do it anyway.
 HILITE = (0.22, -0.16)  # (brightness up, saturation down)
 SHADOW = (-0.26, 0.13)
@@ -220,19 +218,9 @@ def render_tile(w=TILE_W, h=TILE_H, seed=77123):
                     elif d <= KNOT_R + 1:
                         px[y][x] = HIL
 
-        # Studs at the board ends, per the crate and low-poly table refs.
-        for sx in (STUD_INSET, w - STUD_INSET):
-            sy = (face_top + face_bot) // 2
-            for dy in range(-STUD_R - 1, STUD_R + 2):
-                for dx in range(-STUD_R - 1, STUD_R + 2):
-                    d = math.hypot(dx, dy)
-                    y, x = sy + dy, (sx + dx) % w
-                    if not (face_top <= y < face_bot):
-                        continue
-                    if d <= STUD_R - 1:
-                        px[y][x] = HIL
-                    elif d <= STUD_R:
-                        px[y][x] = OUT
+        # The studs are gone — two per plank at a fixed inset from each end,
+        # which is where a crate's fasteners sit and what they read as. The
+        # knots above stay: a knot is grain, not a fastener.
 
     return px
 

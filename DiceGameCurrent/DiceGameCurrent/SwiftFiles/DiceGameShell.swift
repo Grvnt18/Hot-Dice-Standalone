@@ -155,7 +155,29 @@ enum HeaderFooterSteel {
 /// rather than three separately-styled panels that merely resemble each
 /// other.
 struct WoodTiledBackground: View {
-    var body: some View { TiledMaterialBackground(image: HeaderFooterWood.image) }
+
+    /// How wide one tile is, as a fraction of the view's width.
+    ///
+    /// The default is `PlayfieldRim.woodTileFraction`, which is what makes
+    /// the header, the walls and the roll button read as one continuous
+    /// piece of timber — see above.
+    ///
+    /// The menus pass a SMALLER one. At the default they showed the same
+    /// grain at the same scale as the screen behind them, so a settings panel
+    /// read as a window cut through to the background rather than as its own
+    /// board. Finer grain is what a smaller board looks like: same timber,
+    /// same tones, same image — milled smaller.
+    var fraction: Float = PlayfieldRim.woodTileFraction
+
+    var body: some View {
+        TiledMaterialBackground(image: HeaderFooterWood.image, fraction: fraction)
+    }
+}
+
+/// The tile fraction the menus use, so Settings and both guides cannot drift
+/// to different grains from each other.
+enum MenuTimber {
+    static let fraction: Float = 0.30
 }
 
 /// The playfield, recessed into the timber it sits in.
@@ -211,7 +233,11 @@ extension View {
 
 /// The steel counterpart, for Rollbots' chrome.
 struct SteelTiledBackground: View {
-    var body: some View { TiledMaterialBackground(image: HeaderFooterSteel.image) }
+    var fraction: Float = PlayfieldRim.woodTileFraction
+
+    var body: some View {
+        TiledMaterialBackground(image: HeaderFooterSteel.image, fraction: fraction)
+    }
 }
 
 /// The tiling itself, shared so timber and plate cannot drift to different
@@ -219,10 +245,11 @@ struct SteelTiledBackground: View {
 /// device, as one screen's rim stopped lining up with its header.
 private struct TiledMaterialBackground: View {
     let image: UIImage
+    var fraction: Float = PlayfieldRim.woodTileFraction
 
     var body: some View {
         GeometryReader { geo in
-            let tileWidth = geo.size.width * CGFloat(PlayfieldRim.woodTileFraction)
+            let tileWidth = geo.size.width * CGFloat(fraction)
             let scale = tileWidth / image.size.width
             Rectangle()
                 .fill(ImagePaint(image: Image(uiImage: image), scale: scale))

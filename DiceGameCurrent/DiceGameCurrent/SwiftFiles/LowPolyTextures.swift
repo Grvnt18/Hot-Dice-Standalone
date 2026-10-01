@@ -377,8 +377,6 @@ extension LowPolyTextures {
     private static let woodGrainCycles: CGFloat = 1.3
     private static let woodKnotChance = 45
     private static let woodKnotRadius: CGFloat = 5
-    private static let woodStudInset = 14
-    private static let woodStudRadius: CGFloat = 3
 
     /// Boards are told apart by the WIDTH of their chamfer bands, not by
     /// colour. The first attempt dithered a sparse veil of the neighbouring
@@ -493,21 +491,18 @@ extension LowPolyTextures {
                 }
             }
 
-            // Studs at the board ends, per the crate and low-poly table refs.
-            for sx in [woodStudInset, w - woodStudInset] {
-                let sy = (faceTop + faceBot) / 2
-                let r = woodStudRadius
-                for dy in Int(-r - 1)...Int(r + 1) {
-                    for dx in Int(-r - 1)...Int(r + 1) {
-                        let d = (CGFloat(dx * dx + dy * dy)).squareRoot()
-                        let y = sy + dy
-                        let x = ((sx + dx) % w + w) % w
-                        guard y >= faceTop && y < faceBot else { continue }
-                        if d <= r - 1 { px[y][x] = 3 }
-                        else if d <= r { px[y][x] = 0 }
-                    }
-                }
-            }
+            // THE STUDS ARE GONE. Two per plank at a fixed inset from each
+            // end, which is exactly where a crate's fasteners sit and exactly
+            // what they read as — rivets or screw heads punched through the
+            // boards. They came from the crate and low-poly table references
+            // and they were right for that; they are wrong for a table the
+            // games are played on, and they were the most regular, most
+            // man-made thing in an otherwise organic surface.
+            //
+            // The KNOTS above stay. A knot is wood grain rather than a
+            // fastener — irregular, occasional, and what keeps a plank from
+            // reading as a flat brown rectangle. If they ever read as screws
+            // too, woodKnotChance is the one number to take to zero.
         }
 
         let format = UIGraphicsImageRendererFormat()

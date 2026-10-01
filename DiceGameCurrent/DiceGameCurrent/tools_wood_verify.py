@@ -38,8 +38,6 @@ CONSTANTS = {
     "woodGrainCycles": "GRAIN_CYCLES",
     "woodKnotChance": "KNOT_CHANCE",
     "woodKnotRadius": "KNOT_R",
-    "woodStudInset": "STUD_INSET",
-    "woodStudRadius": "STUD_R",
 }
 
 TUPLES = {"woodBevels": "PLANK_BEVEL", "woodShades": "PLANK_SHADE"}

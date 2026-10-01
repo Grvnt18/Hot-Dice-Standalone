@@ -187,7 +187,12 @@ def main():
     # Checked by absence rather than by presence: there is no single token
     # that proves a screen is styled correctly, but a Form or a toolbar is
     # proof it is not.
-    menus = strip_comments(source("SettingsView.swift"))
+    # GuideBubbles.swift is in this list because it was NOT in the first
+    # version of this check, and that is exactly how it kept its pill-shaped
+    # bubbles and its system Done button through a pass that rebuilt the other
+    # two menus. A check scoped to one file proves nothing about its siblings.
+    MENU_FILES = ("SettingsView.swift", "GuideBubbles.swift")
+    menus = "\n".join(strip_comments(source(f)) for f in MENU_FILES)
     for token, why in (
         ("Form {", "a Form is the system's grouped list"),
         ("NavigationStack", "a NavigationStack brings the system nav bar"),
@@ -195,12 +200,15 @@ def main():
                        "never receives the container's tint"),
         (".buttonStyle(.borderedProminent)", "the system's button, not "
                                              "pixelPanel"),
+        ("Capsule()", "a pill is the one shape the restyle replaced "
+                      "everywhere else, so one here reads as another app"),
     ):
         if token in menus:
-            failed.append("SettingsView.swift still uses `%s` — %s. The menus "
-                          "are built from WoodTiledBackground, pixelPanel and "
-                          "MenuHeaderBar like the rest of the app."
-                          % (token, why))
+            where = [f for f in MENU_FILES if token in strip_comments(source(f))]
+            failed.append("%s still uses `%s` — %s. The menus are built from "
+                          "WoodTiledBackground, pixelPanel and MenuHeaderBar "
+                          "like the rest of the app."
+                          % (", ".join(where), token, why))
 
     for line in failed:
         print("  %-26s FAILED  %s" % ("cohesion", line))

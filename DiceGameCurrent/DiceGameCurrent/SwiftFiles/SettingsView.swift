@@ -73,7 +73,7 @@ struct SettingsView: View {
         // The CONTENT is untouched — same sections in the same order, same
         // strings, same bindings, same scope notes. This is paint.
         ZStack {
-            WoodTiledBackground().ignoresSafeArea()
+            WoodTiledBackground(fraction: MenuTimber.fraction).ignoresSafeArea()
 
             VStack(spacing: 0) {
                 MenuHeaderBar(title: "Settings") { dismiss() }
@@ -303,7 +303,7 @@ struct MenuHeaderBar: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity)
-        .background(WoodTiledBackground())
+        .background(WoodTiledBackground(fraction: MenuTimber.fraction))
         .overlay(alignment: .bottom) {
             Rectangle().fill(Color.black.opacity(0.45)).frame(height: 2)
         }
@@ -407,7 +407,7 @@ struct HowToPlayView: View {
         // what any other surface in this app is made of. Content unchanged —
         // the tagline, every section in order, the quick-start note.
         ZStack {
-            WoodTiledBackground().ignoresSafeArea()
+            WoodTiledBackground(fraction: MenuTimber.fraction).ignoresSafeArea()
 
             VStack(spacing: 0) {
                 MenuHeaderBar(

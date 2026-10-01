@@ -34,12 +34,17 @@ struct GuideBubbleCluster: View {
                                 count: 2)
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                WoodTiledBackground()
-                    .ignoresSafeArea()
-                Color.black.opacity(0.35)
-                    .ignoresSafeArea()
+        // Same rebuild as Settings and HowToPlayView: no NavigationStack, no
+        // toolbar, the app's own header bar instead. This sheet was missed in
+        // that pass, which is why the cohesion check now covers this file too.
+        ZStack {
+            WoodTiledBackground(fraction: MenuTimber.fraction)
+                .ignoresSafeArea()
+            Color.black.opacity(0.35)
+                .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                MenuHeaderBar(title: "How to Play") { dismiss() }
 
                 ScrollView {
                     VStack(spacing: 14) {
@@ -59,20 +64,6 @@ struct GuideBubbleCluster: View {
                         .padding(.horizontal, GuideBubbleLayout.margin)
                         .padding(.bottom, 24)
                     }
-                }
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text("How to Play").font(.poppins(17, .semibold))
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                        .font(.poppins(15))
-                        .buttonStyle(.borderedProminent)
-                        .buttonBorderShape(
-                            .roundedRectangle(radius: ControlShape.cornerRadius * 0.6))
-                        .tint(theme.accentColor)
                 }
             }
         }
@@ -110,17 +101,16 @@ struct GuideBubbleCluster: View {
                 .minimumScaleFactor(0.5)
                 .multilineTextAlignment(.center)
                 .textCase(nil)
-                .foregroundStyle(.white)
+                .foregroundStyle(theme.accentTextColor)
                 .padding(.horizontal, 14)
                 .frame(maxWidth: .infinity)
                 .frame(height: GuideBubbleLayout.height)
-                .background(
-                    Capsule().fill(theme.accentColor.opacity(0.92))
-                )
-                .overlay(
-                    Capsule().strokeBorder(.white.opacity(0.35), lineWidth: 1)
-                )
-                .elevated(.lifted)
+                .contentShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
+                // Rectangular, like every other control in the suite. These
+                // were Capsules, which is the one shape the restyle replaced
+                // everywhere else — a pill here made the guide read as a
+                // different app's screen.
+                .pixelPanel(fill: .solid(theme.accentColor), elevation: .lifted)
         }
         .buttonStyle(.plain)
         // Off the grid, alternating, so eleven bubbles read as a cluster

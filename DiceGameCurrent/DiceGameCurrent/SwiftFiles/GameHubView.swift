@@ -221,10 +221,15 @@ enum HubLayout {
         labelFont(tile: tile) * 2.4
     }
 
-    /// The suite mark above the wordmark, bounded at both ends: big enough
-    /// to read on a phone, not so big it dwarfs the grid on an iPad.
+    /// The suite mark above the wordmark: exactly the size of a tile's icon.
+    ///
+    /// This was `min(max(width * 0.22, 72), 120)`, which approximated the
+    /// tiles and undershot them — 86pt on a 393pt phone where a tile's icon
+    /// is 95. Derived from the grid instead, so "the same size as the other
+    /// icons" is what the code says rather than what a constant happens to
+    /// land near, and it stays true if the grid's spacing ever moves.
     static func headerMark(forWidth width: CGFloat) -> CGFloat {
-        min(max(width * 0.22, 72), 120)
+        iconSide(tile: tileSide(forWidth: width))
     }
 
     /// What is left for the artwork once the name has its room.
@@ -263,7 +268,10 @@ private struct HubTitle: View {
                 .frame(width: HubLayout.headerMark(forWidth: width),
                        height: HubLayout.headerMark(forWidth: width))
 
-            ScriptText("Rolls", size: 52)
+            // The SUITE's name. Rolls is still a game in it — see
+            // RollsGame.displayName, which keeps that title — but it stopped
+            // being the name of the thing holding the other ten.
+            ScriptText("Hot Dice", size: 52)
                 .foregroundStyle(.white)
                 .elevated(.lifted)
         }
@@ -290,10 +298,17 @@ private struct GameTile: View {
                 GameIconView(id: entry.id)
                     .frame(width: HubLayout.iconSide(tile: side),
                            height: HubLayout.iconSide(tile: side))
+                    // Through Elevation, which is the app's one shadow
+                    // system — four hand-picked values were collapsed into
+                    // it precisely so a twelfth could not be added here.
+                    .elevated(.lifted)
 
                 Text(entry.tileName)
                     .font(.poppins(HubLayout.labelFont(tile: side), .semibold))
-                    .foregroundStyle(.white)
+                    // Black on the timber. The artwork is black line work on
+                    // transparency, so a white name beside it was the one
+                    // element on the tile not drawn in the same ink.
+                    .foregroundStyle(.black)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
                     // One size across the grid, with the longest names

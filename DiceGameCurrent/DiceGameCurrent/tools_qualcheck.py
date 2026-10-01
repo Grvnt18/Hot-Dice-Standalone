@@ -402,4 +402,57 @@ for f in SOURCES:
 print("static-member check:", "FAIL" if member_bad else "PASS",
       "(%d)" % member_bad)
 
-sys.exit(1 if bad or escapes or merged or undeclared or render_bad or member_bad else 0)
+# ---------------------------------------------------------------------
+# 7. Inference hazard: a generic `map` nested inside another closure's
+#    `map`, in one expression.
+#
+# Stage D built on the iPad up to D2 and failed at D3 with an EMPTY
+# diagnostics pane and an EMPTY console — no red line, no trap. The only
+# novel type-inference shape in that delta was one line:
+#
+#     let toneKey = tones.map { $0.map(\.description).joined(separator: ",") } ?? "-"
+#
+# `tones` is `[UIColor]?`, so the outer `map` is Optional.map; the inner
+# one is Sequence.map with a key-path-as-function whose root has to be
+# inferred through it; `joined(separator:)` has two overloads that both
+# admit the result; and `?? "-"` wraps the lot, with no annotation on
+# `toneKey` to anchor any of it. Every one of those is cheap alone. In
+# one expression they multiply.
+#
+# Why this check and not the type-check heuristic that already exists:
+# `tools_typecheck_verify.py` scores `var body: some View` blocks only,
+# and this line is in a plain static function, so that guard could never
+# have seen it. Scored expressions and scored view bodies are different
+# problems and want different checks.
+#
+# Key-path-as-function on its own is NOT flagged: the tree has fifteen of
+# them and stage C, which builds, carries all fifteen. The nesting is
+# what is new, and the nesting is what this looks for.
+#
+# The remedy is always the same and never changes behaviour: give the
+# local an explicit type, or write the loop out. A loop whose element
+# type is stated costs the solver nothing.
+nested_bad = 0
+NEST = re.compile(r'\.(?:map|compactMap|flatMap)\s*(?:\{|\()')
+for f in SOURCES:
+    raw = open(f).read()
+    for n, line in enumerate(raw.split("\n"), 1):
+        code = strip(line)
+        # A closure opened and closed on this line, with a second
+        # map-family call inside it.
+        for m in re.finditer(r'\.(?:map|compactMap|flatMap)\s*\{', code):
+            tail = code[m.end():]
+            close = tail.find('}')
+            if close == -1:
+                continue                  # closure runs past this line
+            if NEST.search(tail[:close]):
+                print("  NESTED-MAP  %s:%d  a map-family call nested inside "
+                      "another's closure in one expression — annotate the "
+                      "local or write the loop out\n              %s"
+                      % (os.path.relpath(f), n, code.strip()[:88]))
+                nested_bad += 1
+                break
+print("inference-hazard check:", "FAIL" if nested_bad else "PASS",
+      "(%d)" % nested_bad)
+
+sys.exit(1 if bad or escapes or merged or undeclared or render_bad or member_bad or nested_bad else 0)

@@ -54,7 +54,25 @@ enum LowPolyTextures {
         seed: UInt64 = 12345
     ) -> UIImage {
         let h = pixelHeight ?? pixelSize
-        let toneKey = tones.map { $0.map(\.description).joined(separator: ",") } ?? "-"
+        // Written as a loop on purpose. It was one expression:
+        //
+        //     tones.map { $0.map(\.description).joined(separator: ",") } ?? "-"
+        //
+        // which is Optional.map around Sequence.map, with a key path whose
+        // root has to be inferred through both, feeding a `joined(separator:)`
+        // that has two overloads admitting the result, all under a `??` with
+        // nothing annotated to anchor it. Each of those is cheap alone; in one
+        // expression they multiply, and it was the only such shape in the tree.
+        // Stating `parts`' type costs the solver nothing and draws the same
+        // string. See tools_qualcheck.py's inference-hazard check.
+        var toneKey = "-"
+        if let tones = tones {
+            var parts: [String] = []
+            for tone in tones {
+                parts.append(tone.description)
+            }
+            toneKey = parts.joined(separator: ",")
+        }
         let key = "\(baseColor)-\(variation)-\(columns)x\(rows)-\(pixelSize)x\(h)-\(toneKey)-\(seed)"
         if let cached = cache.value(key) { return cached }
 

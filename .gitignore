@@ -21,5 +21,6 @@ motif-*.png
 # regenerate and look at them rather than tracking pictures that can
 # drift from the scripts that draw them.
 royalur-board.png
+rollbots-screen.png
 scoreboard-*.png
 surfaces.png

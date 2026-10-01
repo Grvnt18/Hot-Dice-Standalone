@@ -91,7 +91,8 @@ def main():
     # colour, so drift here is invisible in the diff and obvious on the glass.
     for const, attr in (("celBands", "CEL_BANDS"),
                         ("celShadeFloor", "CEL_SHADE_FLOOR"),
-                        ("celShadeCeiling", "CEL_SHADE_CEILING")):
+                        ("celShadeCeiling", "CEL_SHADE_CEILING"),
+                        ("celShadeGamma", "CEL_SHADE_GAMMA")):
         m = re.search(r'static let %s: Float = ([\d.]+)' % const, text)
         if not m:
             failed.append("%s no longer declares `%s`" % (SWIFT, const))

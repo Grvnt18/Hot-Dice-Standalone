@@ -54,8 +54,16 @@ CEL_BANDS = 5
 
 # The shade range the bands span, as a fraction of a die's own body colour.
 # Mirrors DieMaterialFactory.celShadeFloor / celShadeCeiling.
-CEL_SHADE_FLOOR = 0.08
+CEL_SHADE_FLOOR = 0.0
 CEL_SHADE_CEILING = 1.0
+
+# Curve applied to a band's position before it becomes a shade factor.
+# Mirrors DieMaterialFactory.celShadeGamma. Measured off the reference
+# sprite, whose facets run 1.00 / 0.62 / 0.21 / 0.05 of its brightest —
+# steps that fall away far faster at the dark end than any linear ramp.
+# Linear band centres also cap the spread at 2n-1 (nine times at five
+# bands), so the reference's 21.8x was unreachable by construction.
+CEL_SHADE_GAMMA = 1.4
 
 
 def rgb(hexcode):
@@ -77,7 +85,8 @@ def contrast(a, b):
 
 
 def band_factors(bands=CEL_BANDS,
-                 lo=CEL_SHADE_FLOOR, hi=CEL_SHADE_CEILING):
+                 lo=CEL_SHADE_FLOOR, hi=CEL_SHADE_CEILING,
+                 gamma=CEL_SHADE_GAMMA):
     """The shade factors the shader quantises to: the centre of each band.
 
     `lo + (hi - lo) * (b + 0.5) / bands`, exactly as the Metal does. At three
@@ -85,7 +94,8 @@ def band_factors(bands=CEL_BANDS,
     the range is ever actually reached, and in particular no face is driven to
     its own full brightness, which is the case that erases a numeral.
     """
-    return [lo + (hi - lo) * (b + 0.5) / bands for b in range(bands)]
+    return [lo + (hi - lo) * ((b + 0.5) / bands) ** gamma
+            for b in range(bands)]
 
 
 def banded(body, factor):

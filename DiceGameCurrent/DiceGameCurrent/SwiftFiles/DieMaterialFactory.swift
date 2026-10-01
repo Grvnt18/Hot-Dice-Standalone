@@ -131,9 +131,40 @@ enum DieMaterial {
     /// worst pairing in the palette rises from 2.86:1 to 3.03:1 and clears
     /// the 3:1 large-text bar it currently misses.
     ///
-    /// Factors: 0.172, 0.356, 0.540, 0.724, 0.908.
-    static let celShadeFloor: Float = 0.08
+    /// The floor and ceiling are now just the bounds; `celShadeGamma` below
+    /// does the shaping.
+    static let celShadeFloor: Float = 0.0
     static let celShadeCeiling: Float = 1.0
+
+    /// Curve applied to a band's position before it becomes a shade factor.
+    ///
+    /// **Measured off the reference art rather than chosen.** Its facets were
+    /// sampled from the sprite itself (a 90x90 image at 5px blocks) and, taken
+    /// as fractions of its brightest facet, they run:
+    ///
+    ///     1.00   0.62   0.21   0.05        spread 21.8x
+    ///
+    /// Those steps are not evenly spaced — they fall away far faster at the
+    /// dark end than a linear ramp does, which is why every linear version of
+    /// this looked too flat however wide the range was set. Worse, linear
+    /// band CENTRES cap the achievable spread at `2n - 1`: five bands can
+    /// never exceed 9x, so the reference's 21.8x was out of reach by
+    /// construction rather than by tuning.
+    ///
+    /// A power curve fits it closely. At 1.4 over five bands:
+    ///
+    ///     factor      0.040  0.185  0.379  0.607  0.863
+    ///     of the top   0.05   0.21   0.44   0.70   1.00     spread 21.7x
+    ///
+    /// The two darkest steps land exactly on the reference's 0.21 and 0.05,
+    /// and the spread matches to within a tenth. The extra band simply sits
+    /// between its 0.62 and 1.00.
+    ///
+    /// And it improves legibility a third time, for the same reason widening
+    /// did: the top band's factor falls to 0.863, and a slightly darkened body
+    /// separates better from a light numeral. The worst pairing in the palette
+    /// goes 3.03:1 -> 3.34:1.
+    static let celShadeGamma: Float = 1.4
 
     /// Quantises how strongly the light shades a die body, into
     /// `celBands` flat steps.
@@ -198,10 +229,16 @@ enum DieMaterial {
     float celBand = clamp(floor(celT * \(celBands)), 0.0, \(celBands) - 1.0);
 
     // The band's CENTRE, not its lower edge, so neither end of the range is
-    // ever actually reached: the darkest face is 0.683 of its colour rather
-    // than 0.62, and the brightest 0.937 rather than full. A face driven to
-    // its own full brightness is the case that erases a numeral.
-    float celFactor = celLo + (celHi - celLo) * (celBand + 0.5) / \(celBands);
+    // ever actually reached. A face driven to its own full brightness is the
+    // case that erases a numeral, and one driven to zero is a hole.
+    //
+    // Raised to celShadeGamma, which is what makes the dark end fall away as
+    // steeply as the reference's does. Linear band centres cap the spread at
+    // 2n-1 — nine times at five bands — where the reference is 21.8x, so this
+    // is not a tuning preference but the only way to reach it at this band
+    // count.
+    float celStep = pow((celBand + 0.5) / \(celBands), \(celShadeGamma));
+    float celFactor = celLo + (celHi - celLo) * celStep;
 
     _output.color = float4(clamp(celBase * celFactor, 0.0, 1.0),
                            _output.color.a);

@@ -307,7 +307,12 @@ enum DiceSceneEnvironment {
         // one place rather than three. Drawing at -origin is the other
         // half of it: the origin is usually negative, and ignoring it
         // clips the leading stroke instead of the trailing one.
-        let ink = AppFonts.inkBounds(of: text, font: font)
+        // canvasBounds, not inkBounds: the union of the ink box and the
+        // line box. Sizing from ink alone and then drawing with
+        // draw(at:) mixes two coordinate conventions — it held for
+        // Aguafina and clipped Lobster's descender off the bottom of the
+        // floor wordmark the moment the faces were swapped.
+        let ink = AppFonts.canvasBounds(of: text, font: font)
         // A little air beyond the ink, so the wordmark is not flush to the
         // texture's edge where filtering could nibble at it.
         let padding: CGFloat = pointSize * 0.12

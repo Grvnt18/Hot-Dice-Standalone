@@ -22,5 +22,7 @@ motif-*.png
 # drift from the scripts that draw them.
 royalur-board.png
 rollbots-screen.png
+dice-dither.png
+dice-dither-scale.png
 scoreboard-*.png
 surfaces.png

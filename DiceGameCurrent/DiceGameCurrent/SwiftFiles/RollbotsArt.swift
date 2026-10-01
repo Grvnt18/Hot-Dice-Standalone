@@ -16,7 +16,20 @@ enum NetArt {
     static let background = Color(hex: backgroundHex)
     static let panel = Color(hex: panelHex)
     static let line = Color(hex: "#16E0FF")
-    static let text = Color(hex: "#C9F7FF")
+
+    /// Reading text: white, for maximum contrast against #05070E.
+    ///
+    /// This was #C9F7FF — a pale cyan, which looked of a piece with the
+    /// arena and cost real contrast for the sake of it: 15.9:1 against the
+    /// background where white gives 19.6:1, and worse than that once a
+    /// label is dimmed to 0.6 or sits on the lighter panel.
+    ///
+    /// The seat colours and the neon line keep their cyan and magenta, so
+    /// the arena still reads as the arena and the two players are still
+    /// told apart by colour. The distinction is that identity is coloured
+    /// and READING is white — which is the same split the rails already
+    /// use.
+    static let text = Color(hex: "#FFFFFF")
     static let warn = Color(hex: "#FFB340")
 
     /// Seat colours, also used for that seat's dice.

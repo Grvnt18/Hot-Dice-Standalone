@@ -59,6 +59,25 @@ nothing for a dither to break up. The **dirt is deliberately left
 unposterised**: it is the one surface on that pitch whose job is to be a
 different material, and it is what makes the green read as grass.
 
+The **dice** carry the same 8x8 Bayer stipple, but as a *shading* pass
+rather than a quantiser: it sits in the body material's multiply channel, so
+every texel is either the body colour or the body colour scaled by
+`1 - ditherStrength`. The hue never moves and all fifteen colourways stay as
+distinguishable as they were — the floor posterises to four tones and the
+dice deliberately do not, because that palette is how you tell one die from
+another.
+
+The numerals are unreachable by it, and that is structural rather than
+careful: `DieFaceLabels` puts each numeral on its own `SCNPlane` child node
+with its own material, while `applyBodyMaterial` sets
+`node.geometry?.materials = [material]` on the die body alone. There is no
+path from that channel to a numeral, and `tools_dice_verify.py` asserts both
+halves of it. That tool also guards the two settings that look like
+nits and are not: `magnificationFilter = .nearest`, without which an 8x8 tile
+magnified across a face arrives as a soft grey wash, and the multiply channel
+itself, since the same texture in `diffuse` would replace the body colour
+rather than shade it.
+
 Rollbots is the one arena in **steel** rather than timber —
 `ArenaStyle.RimMaterial` is `.none`/`.wood`/`.steel`, and `pixelSteel` is
 `pixelWood`'s sibling in the same grammar: four tones, hard seams, chamfered

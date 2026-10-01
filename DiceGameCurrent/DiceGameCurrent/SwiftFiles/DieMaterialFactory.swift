@@ -69,6 +69,92 @@ enum DieMaterial {
     /// How strongly the pixel-grain shows over the body color, when on.
     private static let grainOpacity: CGFloat = 0.05
 
+    // MARK: Ordered dither
+
+    /// How far a dark dither cell pulls the body colour down.
+    ///
+    /// MULTIPLY, not replace, and that is the whole reason the fifteen
+    /// colourways survive this: every texel is either the body colour or the
+    /// body colour scaled by (1 - this), so the hue never moves and one die
+    /// stays exactly as tellable from another as it was. The floor gets
+    /// posterised to four tones; the dice deliberately do NOT, because that
+    /// palette is how you know which die you are looking at.
+    ///
+    /// 0.16 chosen off tools_dice_preview.py: clearly a stipple at arm's
+    /// length without muddying the mid-tone bodies. Measured there, the
+    /// worst any numeral drops to at this strength is 5.48:1 (#7CBD7B with
+    /// its dark numeral), against a 3:1 large-text bar — and three
+    /// colourways already sit under that bar FLAT, today, which this
+    /// improves rather than causes.
+    static let ditherStrength: CGFloat = 0.16
+
+    /// How many dither cells run across one die face.
+    ///
+    /// The one number here that cannot be reasoned out — it is purely how
+    /// many screen pixels a cell ends up covering on a real device, and too
+    /// FINE is the failure that matters: a stipple below what the eye
+    /// resolves stops reading as pixel art and becomes photographic noise,
+    /// which is exactly what `applyGrainToDice = false` turned off. 14 puts
+    /// a cell at roughly 9px on a die at arm's length, which previewed as
+    /// unambiguously deliberate.
+    static let ditherCellsPerFace: CGFloat = 14
+
+    /// One 8x8 Bayer matrix, white where the body shows through and grey
+    /// where it is pulled down. Built once and shared by every die.
+    private static var ditherTextureCache: UIImage?
+
+    /// The standard 8x8 ordered-dither threshold matrix, 0..63.
+    ///
+    /// The same one SmokeFloor derives arithmetically in GLSL — written as a
+    /// literal here because this runs once on the CPU, where a table is
+    /// simply clearer than three nested recursions.
+    private static let bayer8: [[Int]] = [
+        [ 0, 32,  8, 40,  2, 34, 10, 42],
+        [48, 16, 56, 24, 50, 18, 58, 26],
+        [12, 44,  4, 36, 14, 46,  6, 38],
+        [60, 28, 52, 20, 62, 30, 54, 22],
+        [ 3, 35, 11, 43,  1, 33,  9, 41],
+        [51, 19, 59, 27, 49, 17, 57, 25],
+        [15, 47,  7, 39, 13, 45,  5, 37],
+        [63, 31, 55, 23, 61, 29, 53, 21]
+    ]
+
+    /// The dither tile: exactly 8x8 texels, one per Bayer cell.
+    ///
+    /// Deliberately the smallest image that can express the pattern. It is
+    /// magnified enormously on the die, which is what makes
+    /// `magnificationFilter = .nearest` at the call site load-bearing rather
+    /// than a nicety — with the default linear filter SceneKit interpolates
+    /// between texels and the dither arrives as a soft grey wash, which is
+    /// the one result that would look worse than no dither at all.
+    private static func ditherTexture() -> UIImage? {
+        if let cached = ditherTextureCache { return cached }
+
+        let side = 8
+        let format = UIGraphicsImageRendererFormat()
+        format.opaque = true
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(
+            size: CGSize(width: side, height: side), format: format)
+
+        let dark = UIColor(white: 1 - ditherStrength, alpha: 1)
+        let image = renderer.image { ctx in
+            UIColor.white.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: side, height: side))
+            dark.setFill()
+            for row in 0..<side {
+                for col in 0..<side {
+                    // A fixed half-duty threshold, which gives the regular
+                    // checker the reference art uses rather than a gradient.
+                    guard bayer8[row][col] >= 32 else { continue }
+                    ctx.fill(CGRect(x: col, y: row, width: 1, height: 1))
+                }
+            }
+        }
+        ditherTextureCache = image
+        return image
+    }
+
     /// Distinct grain layouts, applied as UV offsets/flips rather than
     /// separate baked images, so this no longer multiplies texture memory.
     static let grainVariantCount = 8
@@ -131,6 +217,33 @@ enum DieMaterial {
     }
 
 
+    /// UV transform tiling the 8x8 dither across a face at the chosen cell
+    /// density, offset per die so neighbouring dice do not land on the same
+    /// phase and read as one printed sheet.
+    ///
+    /// The offsets are deliberately NOT required to land on whole cells, and
+    /// the earlier claim that they do was wrong twice over — recorded here
+    /// because a later round would otherwise trust it and "fix" working code.
+    ///
+    /// First, they do not: `SCNMatrix4Translate(m, tx, ty, tz)` concatenates
+    /// the translation BEFORE `m`, the way `CATransform3DTranslate` does, so
+    /// each offset is multiplied by `repeats` (14/8 = 1.75). The real step is
+    /// 1.75 cells, not 1.
+    ///
+    /// Second, it does not matter: `.nearest` never interpolates between
+    /// texels, so no UV offset — fractional or otherwise — can soften an
+    /// edge. A fractional offset only shifts where cell boundaries fall on
+    /// the face, which is precisely the de-phasing this exists to produce.
+    ///
+    /// Same shape as `grainTransform` above, whose offsets (0.37, 0.61) never
+    /// pretended to be whole anything.
+    private static func ditherTransform(variant: Int) -> SCNMatrix4 {
+        let repeats = Float(ditherCellsPerFace / 8)
+        let v = variant % grainVariantCount
+        let scale = SCNMatrix4MakeScale(repeats, repeats, 1)
+        return SCNMatrix4Translate(scale, Float(v % 4) / 8, Float(v / 4) / 8, 0)
+    }
+
     static func apply(
         sides: Int,
         colorway: DieColorway,
@@ -191,6 +304,28 @@ enum DieMaterial {
             material.multiply.wrapS = .repeat
             material.multiply.wrapT = .repeat
             material.multiply.contentsTransform = grainTransform(variant: grainVariant)
+        } else if let dither = ditherTexture() {
+            // The ordered stipple, in the same channel the grain used and
+            // for the opposite reason: the grain was scanned photographic
+            // noise and fought the flat faceting, where this IS the flat
+            // grammar — the floor's own 8x8 Bayer, on the dice.
+            //
+            // It cannot reach the numerals, and that is structural rather
+            // than careful: DieFaceLabels puts every numeral on its own
+            // SCNPlane child node with its own material, while this sets
+            // `node.geometry?.materials = [material]` on the die body
+            // alone. There is no path from this channel to a numeral.
+            material.multiply.contents = dither
+            material.multiply.wrapS = .repeat
+            material.multiply.wrapT = .repeat
+            // Nearest, not linear. The tile is 8x8 texels magnified across a
+            // whole face, so the default filter would interpolate between
+            // them and deliver a soft grey wash instead of hard cells — the
+            // one outcome worse than not doing this at all.
+            material.multiply.magnificationFilter = .nearest
+            material.multiply.minificationFilter = .nearest
+            material.multiply.mipFilter = .none
+            material.multiply.contentsTransform = ditherTransform(variant: grainVariant)
         }
         // .lambert for the low-poly style: flat matte shading, no
         // specular highlight. The dice meshes are already genuinely

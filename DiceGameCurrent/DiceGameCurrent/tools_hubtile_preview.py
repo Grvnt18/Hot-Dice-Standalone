@@ -19,9 +19,20 @@ sys.path.insert(0, HERE)
 from tools_hublayout_verify import layout, label_formula   # noqa: E402
 from tools_swiftconst import constant, source              # noqa: E402
 
-# Stack Sans is narrow; 0.46em an average glyph is close enough to judge
-# whether a name spans an icon, which is all this is for.
-ADV = 0.46
+# Mean advance per character, measured over the NAMES below rather than
+# estimated — parse each face's hmtx and cmap and average what these exact
+# strings actually cost:
+#
+#   Stack Sans ExtraLight   0.497 em
+#   Poppins Regular         0.535 em
+#   Poppins SemiBold        0.551 em   <- the hub labels
+#
+# Worth recording that the old value here was 0.46, which was already low
+# for Stack Sans by about 8%. This preview exists to predict whether a name
+# spans its icon, and an ADV that is too small under-predicts wrapping —
+# so it was quietly optimistic about the face it was written for, before
+# any of this changed.
+ADV = 0.55
 NAMES = ["Baseball Dice", "Rolls", "Jackpot", "HOG", "Generals",
          "Three Thousand", "F.Y.D.", "Royal UR",
          "Rollbots", "Boneheads", "Free Roll"]

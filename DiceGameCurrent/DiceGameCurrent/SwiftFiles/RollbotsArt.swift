@@ -124,17 +124,17 @@ struct NetSeatRail: View {
     var body: some View {
         VStack(spacing: 6) {
             Text(name)
-                .font(.stackSans(13))
+                .font(.poppins(13))
                 .foregroundStyle(colour.opacity(isActive ? 1 : 0.6))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
 
             Text("\(max(0, state.ip[seat]))")
-                .font(.stackSans(34))
+                .font(.poppins(34, .bold))
                 .foregroundStyle(colour)
 
             Text("IP")
-                .font(.stackSans(11))
+                .font(.poppins(11))
                 .foregroundStyle(NetArt.text.opacity(0.6))
 
             // Vertical, filling from the bottom: a tall thin bar reads far
@@ -156,7 +156,7 @@ struct NetSeatRail: View {
                 .frame(height: 40)
 
             Text(state.activeWeapon(seat).displayName)
-                .font(.stackSans(12))
+                .font(.poppins(12))
                 .foregroundStyle(NetArt.text.opacity(0.8))
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
@@ -171,7 +171,7 @@ struct NetSeatRail: View {
                 .frame(height: 32)
 
             Text(state.wareUsed[seat] ? "Spent" : state.ware[seat].displayName)
-                .font(.stackSans(10))
+                .font(.poppins(10))
                 .foregroundStyle(NetArt.text.opacity(state.wareUsed[seat] ? 0.45 : 0.75))
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
@@ -179,7 +179,7 @@ struct NetSeatRail: View {
 
             ForEach(statusPips, id: \.self) { pip in
                 Text(pip)
-                    .font(.stackSans(12))
+                    .font(.poppins(12))
                     .foregroundStyle(NetArt.warn)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
@@ -245,16 +245,16 @@ struct NetCard: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.stackSans(16))
+                    .font(.poppins(16))
                     .foregroundStyle(isEnabled ? tint : NetArt.text.opacity(0.3))
                 Text(summary)
-                    .font(.stackSans(12))
+                    .font(.poppins(12))
                     .foregroundStyle(NetArt.text.opacity(isEnabled ? 0.75 : 0.25))
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
                 if let detail {
                     Text(detail)
-                        .font(.stackSans(12))
+                        .font(.poppins(12))
                         .foregroundStyle(NetArt.warn.opacity(isEnabled ? 0.9 : 0.3))
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
@@ -295,7 +295,7 @@ struct NetActionBar: View {
         VStack(spacing: 4) {
             if !subtitle.isEmpty {
                 Text(subtitle)
-                    .font(.stackSans(16))
+                    .font(.poppins(16))
                     .foregroundStyle(NetArt.text.opacity(0.95))
                     .lineLimit(3)
                     .minimumScaleFactor(0.7)
@@ -324,7 +324,7 @@ struct NetActionBar: View {
             action()
         } label: {
             Text(label)
-                .font(.stackSans(16))
+                .font(.poppins(16))
                 .foregroundStyle(enabled ? (filled ? NetArt.background : tint)
                                          : NetArt.text.opacity(0.3))
                 .frame(maxWidth: .infinity)
@@ -366,18 +366,18 @@ struct NetHandoverGate: View {
             VStack(spacing: 18) {
                 if let summary, !summary.isEmpty {
                     Text(summary)
-                        .font(.stackSans(14))
+                        .font(.poppins(14))
                         .foregroundStyle(NetArt.text)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 28)
                 }
 
                 Text("Hand over to")
-                    .font(.stackSans(13))
+                    .font(.poppins(13))
                     .foregroundStyle(NetArt.text.opacity(0.6))
 
                 Text(nextName)
-                    .font(.stackSans(30))
+                    .font(.poppins(30, .bold))
                     .foregroundStyle(NetArt.seat(nextSeat))
 
                 Button {
@@ -385,7 +385,7 @@ struct NetHandoverGate: View {
                     onReady()
                 } label: {
                     Text("Jack In")
-                        .font(.stackSans(15))
+                        .font(.poppins(15))
                         .foregroundStyle(NetArt.background)
                         .frame(maxWidth: .infinity)
                         .frame(height: 48)
@@ -418,22 +418,22 @@ struct NetResultView: View {
 
             VStack(spacing: 14) {
                 Text(headline)
-                    .font(.stackSans(28))
+                    .font(.poppins(28, .bold))
                     .foregroundStyle(winners.count == 1 ? NetArt.seat(winners[0]) : NetArt.warn)
                     .multilineTextAlignment(.center)
 
                 Text(winners.count == 1 ? "Connection terminated" : "Both decks flatlined")
-                    .font(.stackSans(14))
+                    .font(.poppins(14))
                     .foregroundStyle(NetArt.text.opacity(0.65))
 
                 HStack(spacing: 18) {
                     ForEach([0, 1], id: \.self) { seat in
                         VStack(spacing: 2) {
                             Text(names[seat])
-                                .font(.stackSans(13))
+                                .font(.poppins(13))
                                 .foregroundStyle(NetArt.text.opacity(0.65))
                             Text("\(max(0, state.ip[seat]))")
-                                .font(.stackSans(26))
+                                .font(.poppins(26, .bold))
                                 .foregroundStyle(NetArt.seat(seat))
                         }
                     }
@@ -446,7 +446,7 @@ struct NetResultView: View {
                         onPlayAgain()
                     } label: {
                         Text("Run It Back")
-                            .font(.stackSans(15))
+                            .font(.poppins(15))
                             .foregroundStyle(NetArt.background)
                             .frame(maxWidth: .infinity)
                             .frame(height: 46)
@@ -460,7 +460,7 @@ struct NetResultView: View {
                         onExit()
                     } label: {
                         Text("Log Off")
-                            .font(.stackSans(13))
+                            .font(.poppins(13))
                             .foregroundStyle(NetArt.text)
                             .frame(maxWidth: .infinity)
                             .frame(height: 42)

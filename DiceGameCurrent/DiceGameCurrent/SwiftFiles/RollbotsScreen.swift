@@ -266,12 +266,12 @@ struct RollbotsScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
                 Text("\(names[setupSeat]) — choose your loadout")
-                    .font(.stackSans(13))
+                    .font(.poppins(13))
                     .foregroundStyle(NetArt.seat(setupSeat))
                     .padding(.top, 4)
 
                 Text("Weapon")
-                    .font(.stackSans(13))
+                    .font(.poppins(13))
                     .foregroundStyle(NetArt.text.opacity(0.6))
                 ForEach(CyberWeapon.selectable) { weapon in
                     NetCard(
@@ -284,7 +284,7 @@ struct RollbotsScreen: View {
                 }
 
                 Text("Cyberware")
-                    .font(.stackSans(13))
+                    .font(.poppins(13))
                     .foregroundStyle(NetArt.text.opacity(0.6))
                     .padding(.top, 4)
                 ForEach(Cyberware.allCases) { ware in
@@ -303,7 +303,7 @@ struct RollbotsScreen: View {
                     confirmSetup()
                 } label: {
                     Text(setupSeat == 0 ? "Lock In" : "Begin The Duel")
-                        .font(.stackSans(15))
+                        .font(.poppins(15))
                         .foregroundStyle(NetArt.background)
                         .frame(maxWidth: .infinity)
                         .frame(height: 46)
@@ -349,7 +349,7 @@ struct RollbotsScreen: View {
                 let ware = state.ware[attacker]
 
                 Text("\(names[attacker]) — your move")
-                    .font(.stackSans(13))
+                    .font(.poppins(13))
                     .foregroundStyle(NetArt.seat(attacker))
                     .padding(.top, 4)
 
@@ -388,12 +388,12 @@ struct RollbotsScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
                 Text("\(names[attacker]) — switch weapon")
-                    .font(.stackSans(13))
+                    .font(.poppins(13))
                     .foregroundStyle(NetArt.seat(attacker))
                     .padding(.top, 4)
 
                 Text("Switching costs your turn, and any held charge.")
-                    .font(.stackSans(13))
+                    .font(.poppins(13))
                     .foregroundStyle(NetArt.text.opacity(0.7))
 
                 ForEach(CyberWeapon.selectable) { weapon in
@@ -423,12 +423,12 @@ struct RollbotsScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
                 Text("\(names[defender]) — incoming")
-                    .font(.stackSans(13))
+                    .font(.poppins(13))
                     .foregroundStyle(NetArt.seat(defender))
                     .padding(.top, 4)
 
                 Text("\(state.activeWeapon(attacker).displayName) · accuracy \(accuracy)")
-                    .font(.stackSans(16))
+                    .font(.poppins(16))
                     .foregroundStyle(NetArt.warn)
 
                 ForEach(state.defences(for: defender)) { option in

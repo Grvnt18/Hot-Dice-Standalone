@@ -1,13 +1,13 @@
 # Rolls — Dice Game
 
-Full project state. 25 Swift files, 43 resources.
+Full project state. 72 Swift files, 119 resources.
 
 ## Setup
 
 1. Swift Playgrounds → Create → App (blank template), saved "On My iPad."
 2. Delete the default generated files.
-3. Add all 25 files from `SwiftFiles/`.
-4. Add all 43 files from `Resources/`.
+3. Add all 72 files from `SwiftFiles/`.
+4. Add all 119 files from `Resources/`.
 5. Run.
 
 ## Audio
@@ -199,13 +199,25 @@ call site instead of the current, correct one.
   is far taller (60 units) — deliberately decoupled so containment is
   guaranteed regardless of roll energy without the visible walls looking
   absurd.
-- **Fonts**: Stack Sans Notch (ExtraLight, the only registered weight of
-  the bundled variable font) as the default everywhere, uppercase
-  cascaded via `.textCase(.uppercase)`. Aguafina Script for the "ROLLS"
-  floor text specifically. Both registered at runtime via CoreText as the
-  first line of `DiceSceneAssembler.assemble` — not via `.onAppear` on a
-  SwiftUI view, which raced against scene assembly and was the actual
+- **Fonts**: **Poppins** everywhere, in five bundled static weights
+  (Regular, Medium, SemiBold, Bold, Black), uppercase cascaded via
+  `.textCase(.uppercase)`. **Lobster** for four ornamental places only: the
+  hub wordmark, the floor title, the "ROLLS" die face, and the short praise
+  words on the turn-complete overlay. All registered at runtime via CoreText
+  as the first line of `DiceSceneAssembler.assemble` — not via `.onAppear`
+  on a SwiftUI view, which raced against scene assembly and was the actual
   cause of a "gameplay area not rendering" bug in an earlier round.
+
+  The script face is kept off anything a player has to read. The largest
+  case was the ballpark: `BaseballField` funnelled the *entire scoreboard*
+  — inning numbers, run totals, the V/H rows and OUTS — through the script
+  at 2.4-3.0% of texture width. Also moved to Poppins: the guide-bubble
+  game names, the baseball turn prompts, option-card titles and at-bat
+  result banner, the pass-and-play handover and match result, the Generals
+  scorecard title, and the one praise caption that is a sentence rather
+  than a word. The tell was mechanical — every site with a
+  `minimumScaleFactor` at or below 0.6 was text expected to shrink, and a
+  script fails first under shrink.
 - **Palette**: 15 colors computed directly from javier.xyz/cohesive-colors'
   documented blend algorithm (Overlay blend against #FF9C00 at 30%
   intensity), not eyeballed. Number colors computed per-body-color for
@@ -213,10 +225,10 @@ call site instead of the current, correct one.
 
 ## Known limitations / judgment calls worth knowing about
 
-- The bundled Stack Sans file is a variable font; only its ExtraLight
-  instance is registered, since SwiftUI's `Font.custom` doesn't drive
-  variable-font weight axes directly. Every size uses that same light
-  weight.
+- Poppins is bundled as five separate static files rather than one
+  variable font, because SwiftUI's `Font.custom` does not drive variable
+  weight axes — which is exactly why the previous face shipped at a single
+  ExtraLight weight at every size. A weight is now a file.
 - `.dae` mesh files are kept in Resources as a defensive last-resort
   fallback (`DieMeshLibrary` tries `.scn`, then `.obj`, then `.dae`) even
   though `.obj` is what's actually loading successfully — intentionally

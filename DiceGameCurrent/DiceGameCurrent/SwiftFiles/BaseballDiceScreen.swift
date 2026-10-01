@@ -202,7 +202,11 @@ struct BaseballDiceScreen: View {
         ZStack {
             Color.black.opacity(0.9).ignoresSafeArea()
             VStack(spacing: 14) {
-                ScriptText("How long a game?", size: 46)
+                // A fixed string, but it is a question the player has to
+                // answer before the game will start, so it is an
+                // instruction rather than a title.
+                Text("How long a game?")
+                    .font(.poppins(46, .semibold))
                     .textCase(nil)
                     .foregroundStyle(.white)
 
@@ -219,10 +223,10 @@ struct BaseballDiceScreen: View {
                     } label: {
                         VStack(spacing: 2) {
                             Text("\(innings) Innings")
-                                .font(.stackSans(20))
+                                .font(.poppins(20, .semibold))
                                 .foregroundStyle(.white)
                             Text(Self.lengthBlurb(innings))
-                                .font(.stackSans(13))
+                                .font(.poppins(13))
                                 .foregroundStyle(.white.opacity(0.75))
                         }
                         .frame(maxWidth: .infinity)
@@ -273,11 +277,15 @@ struct BaseballDiceScreen: View {
                     .ignoresSafeArea()
 
                 VStack(spacing: BaseballCardLayout.gap) {
-                    ScriptText(choosingStyle
-                               ? "\(names[pitcher]) — pick your pitching style"
-                               : "\(names[batter]) — pick your swing",
-                               size: BaseballCardLayout.headlineSize,
-                               lineLimit: 2, minimumScaleFactor: 0.6)
+                    // Names a player and tells them what to do. Shrinks to
+                    // 0.6, which a script face does not survive.
+                    Text(choosingStyle
+                         ? "\(names[pitcher]) — pick your pitching style"
+                         : "\(names[batter]) — pick your swing")
+                        .font(.poppins(BaseballCardLayout.headlineSize, .semibold))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.6)
+                        .multilineTextAlignment(.center)
                         .textCase(nil)
                         .foregroundStyle(.white)
                         .padding(.bottom, 4)
@@ -321,11 +329,17 @@ struct BaseballDiceScreen: View {
                            height: height * BaseballCardLayout.iconFraction)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    ScriptText(title, size: BaseballCardLayout.titleSize,
-                               lineLimit: 2, minimumScaleFactor: 0.6)
+                    // The label on a button the player is choosing between —
+                    // and the tagline directly below it was already sans, so
+                    // this also stops one card carrying two faces.
+                    Text(title)
+                        .font(.poppins(BaseballCardLayout.titleSize, .semibold))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.6)
+                        .multilineTextAlignment(.center)
                         .textCase(nil)
                     Text(detail)
-                        .font(.stackSans(BaseballCardLayout.detailSize))
+                        .font(.poppins(BaseballCardLayout.detailSize))
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -353,13 +367,21 @@ struct BaseballDiceScreen: View {
             VStack(spacing: 4) {
                 if let bat = lastAtBat {
                     Text("\(bat.pitch.displayName) vs \(bat.swing.displayName)  \(bat.matchup.kind.symbol)")
-                        .font(.stackSans(13))
+                        .font(.poppins(13))
                         .foregroundStyle(.white.opacity(0.8))
                     Text("\(bat.batterRoll) − \(bat.pitcherRoll) = \(bat.differential >= 0 ? "+" : "")\(bat.differential)")
-                        .font(.stackSans(15))
+                        .font(.poppins(15))
                         .foregroundStyle(.white.opacity(0.9))
                 }
-                ScriptText(line, size: 38, lineLimit: 2, minimumScaleFactor: 0.6)
+                // The outcome of the at-bat: "Caught at the wall — third
+                // out, the run does not count." The most information-dense
+                // string in the game, long enough to shrink onto two lines,
+                // and it sat above dice arithmetic that was already sans.
+                Text(line)
+                    .font(.poppins(38, .medium))
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.6)
+                    .multilineTextAlignment(.center)
                     .textCase(nil)
                     .foregroundStyle(.white)
             }

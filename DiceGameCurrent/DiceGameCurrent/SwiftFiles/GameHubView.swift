@@ -43,7 +43,7 @@ struct GameHubView: View {
                         // separate features fail quietly — see BundleCheck.
                         if let missing = BundleCheck.summary {
                             Text(missing)
-                                .font(.stackSans(12))
+                                .font(.poppins(12))
                                 .multilineTextAlignment(.center)
                                 .foregroundStyle(.white)
                                 .padding(10)
@@ -292,7 +292,7 @@ private struct GameTile: View {
                            height: HubLayout.iconSide(tile: side))
 
                 Text(entry.tileName)
-                    .font(.stackSans(HubLayout.labelFont(tile: side)))
+                    .font(.poppins(HubLayout.labelFont(tile: side), .semibold))
                     .foregroundStyle(.white)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)

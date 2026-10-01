@@ -2,7 +2,7 @@ import UIKit
 import CoreText
 import SwiftUI
 
-/// Registers the two bundled custom fonts (added as plain bundle
+/// Registers the bundled custom fonts (added as plain bundle
 /// resources, same mechanism as the dice meshes/images) at runtime via
 /// CoreText — Swift Playgrounds projects don't expose an editable
 /// Info.plist the way a full Xcode project does, so the standard
@@ -11,25 +11,50 @@ import SwiftUI
 /// files are genuinely present in the bundle.
 enum AppFonts {
 
-    /// PostScript names extracted directly from the font files' own
-    /// metadata (via fontTools) rather than guessed from the filenames —
-    /// UIFont(name:) / Font.custom(_:) require an exact match.
-    static let stackSansPostScriptName = "StackSansNotch-ExtraLight"
+    /// PostScript names read directly out of each file's `name` table
+    /// rather than guessed from the filenames — UIFont(name:) and
+    /// Font.custom(_:) require an exact match. For Poppins the two happen
+    /// to agree; for the face this replaced they did not, which is the
+    /// sort of thing that fails silently as a system-font fallback.
+    ///
+    /// Five static weights, where there used to be one.
+    ///
+    /// Stack Sans Notch was a VARIABLE font, and SwiftUI's `Font.custom`
+    /// does not drive variable weight axes — so only its ExtraLight
+    /// instance was ever registered and every size in the app, from an
+    /// 11pt settings row to the 220pt turn-complete score, rendered in
+    /// that one thin weight. That was a documented limitation. Poppins
+    /// ships as separate static files, so a weight is now just a file.
+    enum Weight: String, CaseIterable {
+        case regular = "Poppins-Regular"
+        case medium = "Poppins-Medium"
+        case semibold = "Poppins-SemiBold"
+        case bold = "Poppins-Bold"
+        case black = "Poppins-Black"
+    }
 
-    /// Deliberately `fileprivate`.
+    /// Deliberately `fileprivate`, and still deliberately so after the swap.
     ///
-    /// Aguafina's terminal swashes overhang their own advance width, so
-    /// anything that measures the advance — `Text`, `size(withAttributes:)`
-    /// — cuts the last character. That has been fixed three times in three
-    /// different ways in this project and come back each time, because
-    /// each new call site started from the raw font again.
+    /// A display script's terminal glyphs overhang their own advance width,
+    /// so anything that measures the advance — `Text`,
+    /// `size(withAttributes:)` — cuts the last character. That was fixed
+    /// three times in three different ways in this project and came back
+    /// each time, because each new call site started from the raw font
+    /// again.
     ///
-    /// So the raw name does not leave this file. SwiftUI goes through
+    /// It would have been easy to assume Lobster, being a tamer face than
+    /// Aguafina, made all of that unnecessary. Measured rather than assumed:
+    /// Lobster's `L` still overhangs its advance by **+0.284 em** (Aguafina's
+    /// worst was `Y` at +0.490). A quarter of an em is plenty to clip, and
+    /// `L` is its worst offender while the two words that stay on this face
+    /// are "Rolls" and "ROLLS". So the guard stays exactly as it was.
+    ///
+    /// The raw name does not leave this file. SwiftUI goes through
     /// `ScriptText`; UIKit goes through `scriptFont(_:)` and
     /// `inkBounds(of:font:)` below. A new game that reaches for the font
     /// directly does not compile, and `tools_script_verify.py` catches
     /// anything that tries to reconstruct the name instead.
-    fileprivate static let aguafinaScriptPostScriptName = "AguafinaScript-Regular"
+    fileprivate static let lobsterPostScriptName = "Lobster-Regular"
 
     private static var didRegister = false
 
@@ -46,9 +71,8 @@ enum AppFonts {
     /// `BundleCheck`, which reports what is missing — two lists of the
     /// same filenames would drift, and the drift would be a check that
     /// looks for a file nobody ships any more.
-    static let bundledFontResources = [
-        "StackSansNotch-VariableFont_wght", "AguafinaScript-Regular"
-    ]
+    static let bundledFontResources =
+        Weight.allCases.map(\.rawValue) + ["Lobster-Regular"]
 
     static func registerIfNeeded() {
         guard !didRegister else { return }
@@ -67,8 +91,19 @@ enum AppFonts {
     /// texture render — and a nil here once produced a zero-size image and
     /// an SCNPlane of height 0, which is degenerate geometry created
     /// mid-assembly (see `DiceSceneEnvironment.addFloorText`).
+    /// The sans face as a `UIFont`, for the things drawn into textures
+    /// rather than laid out by SwiftUI — chiefly the ballpark scoreboard.
+    ///
+    /// SemiBold: these are small numerals minified onto a texture, which is
+    /// the same problem the die numerals had, and a real weight is the same
+    /// answer.
+    static func boardFont(_ size: CGFloat) -> UIFont {
+        UIFont(name: Weight.semibold.rawValue, size: size)
+            ?? UIFont.systemFont(ofSize: size, weight: .semibold)
+    }
+
     static func scriptFont(_ size: CGFloat) -> UIFont {
-        UIFont(name: aguafinaScriptPostScriptName, size: size)
+        UIFont(name: lobsterPostScriptName, size: size)
             ?? UIFont.italicSystemFont(ofSize: size)
     }
 
@@ -120,17 +155,17 @@ extension Font {
     /// emphasis. If particular text needs to read heavier, that would need
     /// a separately-exported static weight instance of the font rather
     /// than something achievable purely at the call site here.
-    static func stackSans(_ size: CGFloat) -> Font {
+    static func poppins(_ size: CGFloat, _ weight: AppFonts.Weight = .regular) -> Font {
         // The relativeTo: overload, not plain .custom(_:size:) — the latter
         // puts the font on a code path where `.minimumScaleFactor` doesn't
         // reliably shrink the whole glyph run. Instead it can leave the
         // rightmost character clipped rather than scaled down, which is
         // exactly what was cutting off the last digit of the score on the
-        // turn-complete screen (Text(...).font(.stackSans(220)) there
+        // turn-complete screen (Text(...).font(.poppins(220, .black)) there
         // combines a huge fixed size with an aggressive minimumScaleFactor).
         // relativeTo: puts Text's shrink-to-fit on the code path that
         // actually scales the custom font instead of clipping it.
-        .custom(AppFonts.stackSansPostScriptName, size: size, relativeTo: .body)
+        .custom(weight.rawValue, size: size, relativeTo: .body)
     }
 
     /// Aguafina Script — the decorative script used for the "ROLLS" floor
@@ -142,29 +177,35 @@ extension Font {
     /// `fileprivate` for the same reason the PostScript name is: the only
     /// way to put Aguafina on screen is `ScriptText`, which reserves the
     /// room this face needs. See the note on
-    /// `AppFonts.aguafinaScriptPostScriptName`.
-    fileprivate static func aguafina(_ size: CGFloat) -> Font {
-        // Same relativeTo: fix as stackSans above — this face is also used
+    /// `AppFonts.lobsterPostScriptName`.
+    fileprivate static func lobster(_ size: CGFloat) -> Font {
+        // Same relativeTo: fix as poppins above — this face is also used
         // with minimumScaleFactor (the turn-complete caption).
-        .custom(AppFonts.aguafinaScriptPostScriptName, size: size, relativeTo: .body)
+        .custom(AppFonts.lobsterPostScriptName, size: size, relativeTo: .body)
     }
 }
 
 // MARK: - Script text
 
-/// Aguafina text that does not lose its last letter.
+/// Script text that does not lose its last letter.
 ///
-/// The face's terminal swashes overhang their own advance width, and
+/// The face's terminal glyphs overhang their own advance width, and
 /// SwiftUI sizes a `Text` from the advance — so the final glyph is cut
 /// against the trailing edge of its own frame. Five call sites had each
 /// guessed their own `.padding(.trailing, 4...6)` at that, and two more
 /// appended literal spaces to the string; all of them work at one point
 /// size and fail at the next.
 ///
-/// **This is now the only way Aguafina reaches SwiftUI.** `Font.aguafina`
+/// **This is the only way the script face reaches SwiftUI.** `Font.lobster`
 /// and the PostScript name are `fileprivate`, so a new game cannot start
 /// from the raw font and rediscover the bug — which is exactly how it came
 /// back the last three times.
+///
+/// Kept through the swap to Lobster on evidence, not habit: measured against
+/// its own advance widths, Lobster's `L` overhangs by +0.284 em (Aguafina's
+/// worst was `Y` at +0.490). Tamer, nowhere near tame enough to drop this —
+/// and `L` is its worst glyph, in a face that now renders "Rolls" and
+/// "ROLLS".
 ///
 /// Three things hold the glyph inside its box, deliberately layered,
 /// because none of them is provable without a device:
@@ -213,7 +254,7 @@ struct ScriptText: View {
 
     var body: some View {
         Text(verbatim: reserved)
-            .font(.aguafina(size))
+            .font(.lobster(size))
             .lineLimit(lineLimit)
             .minimumScaleFactor(minimumScaleFactor ?? 1)
             .multilineTextAlignment(.center)

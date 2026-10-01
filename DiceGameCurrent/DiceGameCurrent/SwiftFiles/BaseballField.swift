@@ -425,10 +425,18 @@ enum BaseballField {
 
     // MARK: Lettering
 
-    /// Everything on the board is Aguafina, through `AppFonts.scriptFont`
-    /// — the only way this file can reach the face, and one that falls
-    /// back rather than trapping, since a wrong-looking font is a far
-    /// smaller problem than a crash inside a texture render.
+    /// Everything on the board is **Poppins SemiBold**, and that is the
+    /// point of this change rather than a side effect of it.
+    ///
+    /// It used to be the script face, all of it: the inning numbers, the
+    /// per-half-inning run totals, the V and H row labels, and OUTS —
+    /// which the comment a few dozen lines down calls "the one thing on
+    /// this panel read at a glance mid-turn" — every one of them set in a
+    /// display script at between 2.4% and 3.0% of the texture width. This
+    /// is a scoreboard. It is the entire numeric state of the game, and it
+    /// was the hardest thing in the app to read.
+    ///
+    /// One funnel, so one line fixes all six draw sites.
     ///
     /// **These position by the ADVANCE, not by the ink, and that is
     /// deliberate.**
@@ -444,6 +452,13 @@ enum BaseballField {
     /// varies per glyph — centring "1" and "10" on their ink puts them in
     /// visibly different places inside identical boxes, which is exactly
     /// what went wrong when these were switched to ink.
+    ///
+    /// The sans face makes that contract MORE correct, not less: with far
+    /// less overhang than a script, the advance box and the ink now very
+    /// nearly agree, so rows line up on both measurements instead of one.
+    /// (This file is deliberately absent from `tools_script_verify.py`'s
+    /// `drawers` list, which requires ink measurement. Adding it there
+    /// once cost a release. It must stay out.)
     private static func draw(_ text: String, at origin: CGPoint,
                              size: CGFloat, colour: UIColor) {
         (text as NSString).draw(at: origin, withAttributes: attributes(size, colour))
@@ -462,6 +477,6 @@ enum BaseballField {
 
     private static func attributes(_ size: CGFloat,
                                    _ colour: UIColor) -> [NSAttributedString.Key: Any] {
-        [.font: AppFonts.scriptFont(size), .foregroundColor: colour]
+        [.font: AppFonts.boardFont(size), .foregroundColor: colour]
     }
 }

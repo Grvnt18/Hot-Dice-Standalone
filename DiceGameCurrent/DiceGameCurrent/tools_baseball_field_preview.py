@@ -45,10 +45,23 @@ PANEL_TEXT = "#FFFFFF"
 CELL = "#E9E9E9"
 RIM = "#6B4E31"          # the small wooden border
 
-# The board's lettering. Aguafina Script is the app's display face; this
-# preview can only approximate it with a cursive fallback, so the shapes
-# here are indicative and the real test is the device.
-BOARD_FONT = "Aguafina Script, cursive"
+# The board's lettering.
+#
+# This was the app's display script, and it was the single worst legibility
+# problem in the app: the whole scoreboard — inning numbers, run totals, the
+# V/H rows, OUTS — set in a cursive at 2.4-3.0% of texture width. It is now
+# Poppins SemiBold, matching BaseballField.attributes.
+#
+# The nine <text> elements below write FONT_TOKEN rather than a family, and
+# it is substituted once in `svg()`. They used to inline the family as a
+# literal and ignore this constant entirely, so editing it here did nothing
+# — a preview that silently stopped tracking the app it previews.
+#
+# A token rather than a %s because these strings are positionally
+# %-formatted; a placeholder would have to be threaded through nine separate
+# argument tuples, and the token passes through untouched.
+BOARD_FONT = "Poppins SemiBold, Poppins, sans-serif"
+FONT_TOKEN = "@BOARD_FONT@"
 
 # --- geometry, all fractions of the square -------------------------------
 RIM_WIDTH = 0.028        # the wooden border, deliberately thin
@@ -180,7 +193,7 @@ def build(innings=9, overlay=None):
         out.append('<ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="%s"/>'
                    % (px(x), py(ON_DECK_Y), px(ON_DECK_R), px(ON_DECK_R), DIRT))
         out.append('<text x="%.1f" y="%.1f" fill="%s" font-size="%.0f" '
-                   'font-family="Aguafina Script, cursive" text-anchor="middle" '
+                   'font-family="@BOARD_FONT@" text-anchor="middle" '
                    'opacity="0.9">%s</text>'
                    % (px(x), py(ON_DECK_Y) + px(0.100), LINE, px(0.026), label))
 
@@ -196,7 +209,7 @@ def build(innings=9, overlay=None):
                   RIM, px(RIM_WIDTH)))
 
     out.append("</svg>")
-    return "\n".join(out)
+    return "\n".join(out).replace(FONT_TOKEN, BOARD_FONT)
 
 
 # --- the selection overlay ------------------------------------------------
@@ -236,7 +249,7 @@ def cards(which):
 
     title = "Pick your pitching style" if which == "styles" else "Pick your swing"
     out.append('<text x="%.1f" y="%.1f" fill="#FFFFFF" font-size="%.0f" '
-               'font-family="Aguafina Script, cursive" text-anchor="middle">%s</text>'
+               'font-family="@BOARD_FONT@" text-anchor="middle">%s</text>'
                % (px(0.5), py(top) - px(0.045), px(0.055), title))
 
     for index, (name, line, note) in enumerate(entries):
@@ -247,14 +260,14 @@ def cards(which):
                       CARD_FILL, CARD_EDGE))
         centre_x = px(x + card_w / 2)
         out.append('<text x="%.1f" y="%.1f" fill="%s" font-size="%.0f" '
-                   'font-family="Aguafina Script, cursive" text-anchor="middle">%s</text>'
+                   'font-family="@BOARD_FONT@" text-anchor="middle">%s</text>'
                    % (centre_x, py(top) + px(0.075), CARD_EDGE, px(0.042), name))
         out.append('<text x="%.1f" y="%.1f" fill="%s" font-size="%.0f" '
-                   'font-family="Aguafina Script, cursive" text-anchor="middle" '
+                   'font-family="@BOARD_FONT@" text-anchor="middle" '
                    'opacity="0.8">%s</text>'
                    % (centre_x, py(top) + px(0.135), CARD_EDGE, px(0.034), line))
         out.append('<text x="%.1f" y="%.1f" fill="%s" font-size="%.0f" '
-                   'font-family="Aguafina Script, cursive" text-anchor="middle" '
+                   'font-family="@BOARD_FONT@" text-anchor="middle" '
                    'opacity="0.65">%s</text>'
                    % (centre_x, py(top + CARD_H) - px(0.040), CARD_EDGE,
                       px(0.026), note))
@@ -305,19 +318,19 @@ def scoreboard(innings):
     cell_w = (w - label_w - 0.012) / innings
 
     out.append('<text x="%.1f" y="%.1f" fill="%s" font-size="%.0f" '
-               'font-family="Aguafina Script, cursive" text-anchor="middle">INNING</text>'
+               'font-family="@BOARD_FONT@" text-anchor="middle">INNING</text>'
                % (px(x + w / 2), py(y + 0.023), PANEL_TEXT, px(0.028)))
 
     for index in range(innings):
         out.append('<text x="%.1f" y="%.1f" fill="%s" font-size="%.0f" '
-                   'font-family="Aguafina Script, cursive" text-anchor="middle">%d</text>'
+                   'font-family="@BOARD_FONT@" text-anchor="middle">%d</text>'
                    % (px(grid_x + cell_w * (index + 0.5)),
                       py(grid_top) - px(0.008), PANEL_TEXT, px(0.024), index + 1))
 
     for row, name in enumerate(("V", "H")):
         top = grid_top + row * ROW_H
         out.append('<text x="%.1f" y="%.1f" fill="%s" font-size="%.0f" '
-                   'font-family="Aguafina Script, cursive">%s</text>'
+                   'font-family="@BOARD_FONT@">%s</text>'
                    % (px(x + 0.014), py(top + ROW_H * 0.74), PANEL_TEXT,
                       px(0.028), name))
         for index in range(innings):
@@ -330,7 +343,7 @@ def scoreboard(innings):
     # at a glance mid-turn, so the pips are large and well clear of the grid.
     centre = py(outs_top + OUTS_H / 2)
     out.append('<text x="%.1f" y="%.1f" fill="%s" font-size="%.0f" '
-               'font-family="Aguafina Script, cursive" dominant-baseline="middle">OUTS</text>'
+               'font-family="@BOARD_FONT@" dominant-baseline="middle">OUTS</text>'
                % (px(x + 0.014), centre, PANEL_TEXT, px(0.030)))
     for index in range(3):
         out.append('<circle cx="%.1f" cy="%.1f" r="%.1f" fill="none" '

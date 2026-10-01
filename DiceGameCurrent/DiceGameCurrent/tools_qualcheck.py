@@ -219,10 +219,6 @@ KNOWN = {
     "abs", "min", "max", "ceil", "floor", "round", "sqrt", "sin", "cos",
     "tan", "atan2", "pow", "stride", "zip", "print", "precondition",
     "assert", "fatalError", "withAnimation",
-    # os — os_proc_available_memory is how many more bytes this process may
-    # allocate before the system kills it, which is the figure that decides
-    # a jetsam. Used by the temporary RollsTrace; remove with it.
-    "os_proc_available_memory",
     # simd
     "simd_cross", "simd_dot", "simd_length", "simd_normalize",
     "simd_quatf", "simd_slerp", "simd_float3", "simd_float3x3",
@@ -256,4 +252,57 @@ for f in SOURCES:
 print("undeclared-call check:", "FAIL" if undeclared else "PASS",
       "(%d)" % undeclared)
 
-sys.exit(1 if bad or escapes or merged or undeclared else 0)
+
+# --- render-thread delivery -------------------------------------------
+#
+# SceneKit calls renderer(_:updateAtTime:) on its OWN thread. Anything the
+# roll controller raises from there reaches game code, and game code
+# reaches SwiftUI: Rolls' recordSettledValue raises onStateChanged, which
+# syncs a view's observed object.
+#
+# Touching SwiftUI or UIKit off the main thread raises no Swift error. It
+# corrupts and dies with NOTHING printed — no "Fatal error" line, no
+# exception, no console output at all. That silence is what made it cost
+# several rounds: there was nothing to read.
+#
+# onRollComplete hopped to main from the start; onDieSettled did not,
+# though the assembler describes the two as a pair "exactly that shape".
+# This asserts they stay a pair.
+#
+# Checks DELIVERY, not subscribers, and that is the point. Nine places
+# raise onStateChanged and two screens assign it — guarding subscribers
+# means nine chances to forget. Guarding the one hand-off from the render
+# thread means none.
+RENDER_PATH_CALLBACKS = ["onDieSettled", "onRollComplete"]
+
+render_bad = 0
+_rc = [f for f in SOURCES if os.path.basename(f) == "DiceRollController.swift"]
+if not _rc:
+    print("  RENDER-THREAD  DiceRollController.swift is gone — this check "
+          "no longer protects anything")
+    render_bad += 1
+else:
+    _text = open(_rc[0]).read()
+    for _name in RENDER_PATH_CALLBACKS:
+        _idx, _seen = 0, 0
+        while True:
+            _at = _text.find("self?.%s?(" % _name, _idx)
+            if _at < 0:
+                break
+            _idx, _seen = _at + 1, _seen + 1
+            # Bounded look-back, so a hop belonging to an earlier and
+            # unrelated block cannot be credited to this call.
+            if "DispatchQueue.main.async" not in _text[max(0, _at - 700):_at]:
+                print("  RENDER-THREAD  DiceRollController.swift:%d  %s is "
+                      "raised on the render thread with no main-queue hop — "
+                      "subscribers reach SwiftUI from it, and that dies "
+                      "silently" % (_text[:_at].count("\n") + 1, _name))
+                render_bad += 1
+        if _seen == 0:
+            print("  RENDER-THREAD  nothing raises %s any more — either it "
+                  "is dead or this check names the wrong callback" % _name)
+            render_bad += 1
+print("render-thread check:", "FAIL" if render_bad else "PASS",
+      "(%d)" % render_bad)
+
+sys.exit(1 if bad or escapes or merged or undeclared or render_bad else 0)

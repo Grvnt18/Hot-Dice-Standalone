@@ -362,7 +362,6 @@ enum DiceSceneAssembler {
         // exactly at that transition — it was defined but never actually
         // wired to anything until now.
         rollController.onRollComplete = { [weak turnController] in
-            RollsTrace.log("rolls: onRollComplete -> onStateChanged")
             turnController?.onStateChanged?()
         }
         // This is the step that makes renderer(_:updateAtTime:) actually

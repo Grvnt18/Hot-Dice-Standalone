@@ -1,63 +1,6 @@
 import SwiftUI
 import SceneKit
 import Combine
-import os
-
-// MARK: - Temporary crash trace
-
-/// Breadcrumbs for the Rolls settle crash. REMOVE once it is found.
-///
-/// Why this exists rather than a console message: Playgrounds printed
-/// NOTHING when Rolls died. That is itself diagnostic — a Swift trap
-/// (index out of range, a nil unwrap, an overflow) always writes
-/// `Fatal error: …` first. Silence means the process was KILLED rather
-/// than trapped, and the four things that do that — jetsam, a GPU fault,
-/// the main-thread watchdog, a stack overflow — all leave the console
-/// empty. None of them can be read from the source.
-///
-/// So the app says where it got to instead. The last line printed before
-/// the app vanishes names the step; `free` alongside it separates jetsam
-/// from the rest, because only jetsam arrives with the figure near zero.
-///
-/// `os_proc_available_memory()` is how much more this process may
-/// allocate before the system kills it — the number that actually
-/// decides a jetsam, rather than how much is currently in use.
-///
-/// Deliberately also on the SHARED path, so Free Roll prints a working
-/// trace to compare the crashing one against. A trace with nothing to
-/// compare it to is half a measurement.
-enum RollsTrace {
-
-    /// One line to silence the whole thing.
-    static var isOn = true
-
-    private static var step = 0
-
-    /// `d` is the real call-stack depth, and it is the point of this trace
-    /// now.
-    ///
-    /// The first run answered one question and raised another. Free memory
-    /// held flat at ~2.7 GB across the whole roll, so jetsam is out. But the
-    /// `ui.sync ->` / `<- returned` pairs stopped balancing the moment a die
-    /// settled: `updateUIView` ran while a sync was still on the stack. That
-    /// is re-entrancy, and re-entrancy that compounds per die is a stack
-    /// overflow — which dies exactly the way this does, silently, with
-    /// nothing printed.
-    ///
-    /// A depth that climbs and never comes back down says so outright, where
-    /// reading the nesting by eye does not. `Thread.callStackSymbols` is slow
-    /// enough to matter in a frame loop, which is why it is only read at
-    /// these few points and why the whole trace is temporary.
-    static func log(_ label: String) {
-        guard isOn else { return }
-        step += 1
-        let depth = Thread.callStackSymbols.count
-        let main = Thread.isMainThread ? "MAIN" : "**BG**"
-        let freeMB = Double(os_proc_available_memory()) / (1024 * 1024)
-        print(String(format: "[trace %03d] %@ d=%-4d %@  (free %.0f MB)",
-                     step, main, depth, label, freeMB))
-    }
-}
 
 // MARK: - SCNView wrapper
 
@@ -86,7 +29,6 @@ struct DiceSceneView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: SCNView, context: Context) {
-        RollsTrace.log("ui: updateUIView")
         // Re-set on every update, not only at creation, because the backdrop
         // follows the player's table colour. A value assigned once in
         // makeUIView would keep the colour the app launched with and show
@@ -663,28 +605,17 @@ struct DiceGameScreen: View {
                             // Only Rolls does this. The other ten games
                             // batch through onRollComplete, which the roll
                             // controller already dispatches to main.
+                            // No main-thread hop here any more. It was
+                            // right, but it guarded one subscriber against
+                            // nine publishers — onStateChanged is raised in
+                            // nine places, and FreeRollScreen assigns it
+                            // too. The hop now lives where the render thread
+                            // actually hands off, in DiceRollController's
+                            // onDieSettled, so every consumer is safe by the
+                            // same mechanism rather than by remembering.
                             controller.onStateChanged = { [weak controller] in
-                                RollsTrace.log("rolls: onStateChanged")
-                                // Unwrapped inside `apply`, not outside it.
-                                // Unwrapping first would hand the async hop
-                                // a STRONG controller, keeping it alive past
-                                // the point the weak capture exists to
-                                // release — and the weak binding has to be
-                                // re-checked on the far side of the hop
-                                // anyway, since the screen can close between
-                                // a die settling and main picking the work
-                                // up.
-                                let apply = {
-                                    guard let controller else { return }
-                                    RollsTrace.log("rolls: ui.sync ->")
-                                    ui.sync(from: controller)
-                                    RollsTrace.log("rolls: ui.sync <- returned")
-                                }
-                                if Thread.isMainThread {
-                                    apply()
-                                } else {
-                                    DispatchQueue.main.async(execute: apply)
-                                }
+                                guard let controller else { return }
+                                ui.sync(from: controller)
                             }
                             // Initial sync so the button starts in the
                             // correct state rather than its placeholder

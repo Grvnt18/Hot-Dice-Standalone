@@ -376,7 +376,6 @@ final class DiceRollController: NSObject, SCNSceneRendererDelegate {
         rollOffAttempts.removeAll()
         rollStartTime = currentTime
         maxDurationForThisRoll = timeBudget(forDiceCount: dice.count)
-        RollsTrace.log("roll: start, \(dice.count) dice")
         isRolling = true
     }
 
@@ -394,7 +393,6 @@ final class DiceRollController: NSObject, SCNSceneRendererDelegate {
             guard let body = state.node.physicsBody else { continue }
 
             if timeIsUp {
-                RollsTrace.log("settle: FORCED (time budget spent)")
                 forceSettle(state)
                 continue
             }
@@ -410,14 +408,10 @@ final class DiceRollController: NSObject, SCNSceneRendererDelegate {
         }
 
         if trackedDice.allSatisfy({ $0.isFullyRevealed }) {
-            RollsTrace.log("settle: all revealed, resolving stacking")
             resolveStacking()
-            RollsTrace.log("settle: stacking resolved")
             isRolling = false
             DispatchQueue.main.async { [weak self] in
-                RollsTrace.log("settle: onRollComplete ->")
                 self?.onRollComplete?()
-                RollsTrace.log("settle: onRollComplete <- returned")
             }
         }
     }
@@ -702,7 +696,6 @@ final class DiceRollController: NSObject, SCNSceneRendererDelegate {
     private var dieSidesByID: [UUID: Int] = [:]
 
     private func settle(_ state: DieSettleState, allowRollOff: Bool = true) {
-        RollsTrace.log("settle: die \(state.dieID.uuidString.prefix(4)), rollOff=\(allowRollOff)")
         // Set immediately (synchronously), not deferred to the animation
         // completion below — this is what stops the frame loop from
         // re-entering settle() for this same die on every subsequent
@@ -776,7 +769,27 @@ final class DiceRollController: NSObject, SCNSceneRendererDelegate {
             // No settle sound here: DiceContactAudio now plays a real
             // impact for the final contact that brought this die to rest.
             // Firing another sound at the same moment would double it.
-            self?.onDieSettled?(state.dieID, state.node, value)
+            //
+            // DELIVERED ON MAIN, and that is load-bearing rather than
+            // tidy. This runs inside renderer(_:updateAtTime:) — SceneKit's
+            // RENDER THREAD. Subscribers to onDieSettled reach UI state
+            // from here: Rolls' recordSettledValue raises onStateChanged,
+            // which syncs a view's observed object. Touching SwiftUI or
+            // UIKit off the main thread does not raise a Swift error; it
+            // corrupts and dies with nothing printed, which cost several
+            // rounds to find because there was no message to read.
+            //
+            // onRollComplete already hopped (see renderer above) and this
+            // one did not, though the assembler describes them as a pair
+            // "exactly that shape". They are a pair now.
+            //
+            // Ordering survives: both go onto the main queue, which is
+            // FIFO, so every per-die settle still lands before the
+            // onRollComplete that follows — a game reading the whole hand
+            // on completion still sees a complete hand.
+            DispatchQueue.main.async { [weak self] in
+                self?.onDieSettled?(state.dieID, state.node, value)
+            }
         }
     }
 

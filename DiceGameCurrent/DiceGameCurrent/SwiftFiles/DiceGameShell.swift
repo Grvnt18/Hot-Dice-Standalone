@@ -154,6 +154,57 @@ struct WoodTiledBackground: View {
     var body: some View { TiledMaterialBackground(image: HeaderFooterWood.image) }
 }
 
+/// The playfield, recessed into the timber it sits in.
+///
+/// The rolling area used to meet the wood with nothing between them, so it
+/// read as a hole cut in the pattern rather than as a well sunk into it. The
+/// difference is entirely the lip: `pixelWell` is already the app's "sunk
+/// INTO the surface rather than sitting on it" treatment — the bevel runs
+/// dark-over-light instead of light-over-dark, and there is no shadow,
+/// because nothing below a surface throws one.
+///
+/// Defined once and applied at eleven call sites rather than written out at
+/// each, which is the lesson `OverlayChromeButton` taught when a restyle
+/// landed on ten screens and read as a bug on the eleventh.
+///
+/// `height` is optional because two of the eleven (Baseball Dice and
+/// Rollbots) are given their height by a parent rather than setting their
+/// own; `nil` leaves the frame unconstrained, which is what those two need.
+///
+/// `material` exists because ROLLBOTS IS NOT TIMBER. Its `ArenaStyle.steel`
+/// gives the 3D rim plate rather than wood, deliberately — "the wooden tray
+/// is the wrong object for a duel in the net" — so a timber surround would
+/// put the one material that arena rejects directly against its own rim.
+/// The well and the rim beside it must be the same stuff, which is the same
+/// contract `HeaderFooterWood` and `HeaderFooterSteel` already carry.
+enum WellMaterial {
+    case timber
+    case plate
+}
+
+extension View {
+    @ViewBuilder
+    func rollingWell(height: CGFloat? = nil,
+                     material: WellMaterial = .timber,
+                     inset: CGFloat = 10) -> some View {
+        let lipped = self
+            // The backdrop stays directly behind the scene, inside the lip,
+            // so a sliver showing during assembly still reads as field
+            // rather than as a gap in the surround.
+            .background(SmokeFloor.backdropColor)
+            .pixelWell(radius: ControlShape.cornerRadius)
+            .padding(inset)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+        switch material {
+        case .timber:
+            lipped.background(WoodTiledBackground()).frame(height: height)
+        case .plate:
+            lipped.background(SteelTiledBackground()).frame(height: height)
+        }
+    }
+}
+
 /// The steel counterpart, for Rollbots' chrome.
 struct SteelTiledBackground: View {
     var body: some View { TiledMaterialBackground(image: HeaderFooterSteel.image) }
@@ -700,8 +751,7 @@ struct DiceGameScreen: View {
                             ui.sync(from: controller)
                         }
                     )
-                        .frame(height: sceneHeight)
-                        .background(SmokeFloor.backdropColor)
+                        .rollingWell(height: sceneHeight)
                         .overlay(alignment: .topLeading) {
                             if let onExit {
                                 Button {

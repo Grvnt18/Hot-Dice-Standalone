@@ -63,8 +63,7 @@ struct FreighterYachtDinghyScreen: View {
                             }
                         }
                     )
-                    .frame(height: sceneHeight)
-                    .background(SmokeFloor.backdropColor)
+                    .rollingWell(height: sceneHeight)
                     .overlay(alignment: .topLeading) {
                         if let onExit {
                             OverlayChromeButton(systemName: "chevron.left") { onExit() }

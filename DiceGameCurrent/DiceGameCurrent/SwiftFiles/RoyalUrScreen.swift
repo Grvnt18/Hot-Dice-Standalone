@@ -102,8 +102,7 @@ struct RoyalUrScreen: View {
                             }
                         }
                     )
-                    .frame(height: trayHeight)
-                    .background(SmokeFloor.backdropColor)
+                    .rollingWell(height: trayHeight)
                     .overlay(alignment: .topLeading) {
                         if let onExit {
                             OverlayChromeButton(systemName: "chevron.left") { onExit() }

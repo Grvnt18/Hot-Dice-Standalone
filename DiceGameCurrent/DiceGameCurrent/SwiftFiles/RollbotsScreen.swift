@@ -272,7 +272,8 @@ struct RollbotsScreen: View {
                 }
             }
         )
-        .background(SmokeFloor.backdropColor)
+        // Plate, not timber: this arena's rim is steel by design.
+        .rollingWell(material: .plate)
     }
 
     // MARK: Setup

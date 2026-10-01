@@ -46,13 +46,19 @@ struct MatchScoreboard: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
         }
+        // Pinned like every game screen (see DiceGameShell's note): these
+        // layouts are geometric, and at the larger accessibility sizes the
+        // labels win the fight with the frames they sit in. AppFonts' faces
+        // use the relativeTo: overload, so shrink-to-fit still works inside
+        // the pinned size.
+        .dynamicTypeSize(.large)
     }
 
     private func seat(_ participant: String) -> some View {
         let isActive = participant == match.activeParticipant && !match.isOver
         return VStack(spacing: 1) {
             Text(match.displayName(for: participant))
-                .font(.poppins(10))
+                .font(.poppins(11))
                 .foregroundStyle(.white.opacity(isActive ? 0.95 : 0.6))
             Text("\(match.score(for: participant))")
                 .font(.poppins(22, .semibold))

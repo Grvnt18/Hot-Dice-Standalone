@@ -47,15 +47,17 @@ struct RoyalUrScreen: View {
 
     var body: some View {
         ZStack {
-            // The same faceted surface as the playfield floor, so the board
-            // sits on the table the rest of the suite is played on.
-            Image(uiImage: LowPolyTextures.facetedSurface(
-                baseColor: theme.floorBaseColor.darkened(by: 0.35),
-                variation: 0.08,
-                pixelSize: 512
-            ))
-            .resizable()
-            .ignoresSafeArea()
+            // The floor's own darkest tone, so the board sits on the table
+            // the rest of the suite is played on.
+            //
+            // This was a faceted surface described as "the same as the
+            // playfield floor", which stopped being true the day the floor
+            // became a shader. SmokeFloor.backdropColor is the thing that
+            // statement now means, and it is also what every other screen
+            // uses behind its tray — so a sliver at any aspect reads as
+            // the field rather than as a hole in it.
+            SmokeFloor.backdropColor
+                .ignoresSafeArea()
 
             GeometryReader { geo in
                 let headerHeight = geo.size.height * 0.15
@@ -101,14 +103,14 @@ struct RoyalUrScreen: View {
                         }
                     )
                     .frame(height: trayHeight)
-                    .background(Color.black)
+                    .background(SmokeFloor.backdropColor)
                     .overlay(alignment: .topLeading) {
                         if let onExit {
-                            overlayButton(systemName: "chevron.left") { onExit() }
+                            OverlayChromeButton(systemName: "chevron.left") { onExit() }
                         }
                     }
                     .overlay(alignment: .topTrailing) {
-                        overlayButton(systemName: "gearshape.fill") {
+                        OverlayChromeButton(systemName: "gearshape.fill") {
                             showingSettings = true
                         }
                     }
@@ -438,22 +440,6 @@ struct RoyalUrScreen: View {
 
     // MARK: Chrome
 
-    private func overlayButton(systemName: String, action: @escaping () -> Void) -> some View {
-        Button {
-            SoundEngine.shared.play(.buttonTap)
-            action()
-        } label: {
-            Image(systemName: systemName)
-                .font(.system(size: 18, weight: systemName == "chevron.left" ? .semibold : .regular))
-                .foregroundStyle(.white.opacity(0.75))
-                .padding(9)
-                .background(
-                    Color.black.opacity(0.45),
-                    in: RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                )
-        }
-        .padding(10)
-    }
 }
 
 // MARK: - Suite entry

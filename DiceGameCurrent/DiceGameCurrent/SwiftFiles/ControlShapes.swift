@@ -65,14 +65,14 @@ struct RoundedSquareToggleStyle: ToggleStyle {
 
 
 // ---------------------------------------------------------------------
-// The chrome panel lives here rather than in a file of its own. This project is
-// assembled by hand in Swift Playgrounds, which does NOT pick up a new
-// file by itself — so a copy that never received it fails at every
-// reference, with nothing to say the cause is a file list rather than
-// the code.
+// The chrome panel and the shared back/settings button live here rather
+// than in a PixelPanel.swift of their own. Swift Playgrounds does not
+// pick up a new file by itself, so every stage of this rollout stays
+// REPLACEMENTS ONLY — a stage that fails is then broken code, never a
+// file somebody forgot to add.
 //
-// This file already owns the shapes controls are drawn from, so a
-// panel and a button belong in it.
+// This file already owns the shapes controls are drawn from, so a panel
+// and a button belong in it.
 // ---------------------------------------------------------------------
 
 /// The frame every piece of in-game chrome wears: flat fill, hard outline,
@@ -168,5 +168,42 @@ extension View {
             .overlay(shape.strokeBorder(PixelPanel.outlineColor.opacity(0.55),
                                         lineWidth: PixelPanel.outlineWidth))
             .clipShape(shape)
+    }
+}
+
+// MARK: - Overlay chrome button
+
+/// The small round-cornered button that sits over a playfield: back, and
+/// settings.
+///
+/// Three screens each carried their own copy of this — Royal UR, Rollbots
+/// and Baseball Dice — identical but for the ink colour and one of them
+/// having forgotten the chevron's heavier weight. Three copies of a thing
+/// that must look the same is how a suite drifts apart, and the restyle is
+/// exactly when it shows: a panel treatment applied to two of three reads
+/// as a bug rather than as a variant.
+///
+/// The scrim stays a black wash rather than becoming a `.solid` fill: these
+/// sit over a live scene, and a button that hides what is behind it in a
+/// corner of the tray is worse than one you can partly see through.
+struct OverlayChromeButton: View {
+    let systemName: String
+    var tint: Color = .white
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            SoundEngine.shared.play(.buttonTap)
+            action()
+        } label: {
+            Image(systemName: systemName)
+                .font(.system(size: 18,
+                              weight: systemName == "chevron.left" ? .semibold : .regular))
+                .foregroundStyle(tint.opacity(0.85))
+                .padding(9)
+                .background(Color.black.opacity(0.5))
+                .pixelPanel(radius: PixelPanel.cellRadius)
+        }
+        .padding(10)
     }
 }

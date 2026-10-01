@@ -63,16 +63,16 @@ struct FreeRollScreen: View {
                     }
                 )
                 .frame(height: sceneHeight)
-                .background(Color.black)
+                .background(SmokeFloor.backdropColor)
                 .overlay(alignment: .topLeading) {
                     if let onExit {
-                        overlayButton(systemName: "chevron.left") {
+                        OverlayChromeButton(systemName: "chevron.left") {
                             onExit()
                         }
                     }
                 }
                 .overlay(alignment: .topTrailing) {
-                    overlayButton(systemName: "gearshape.fill") {
+                    OverlayChromeButton(systemName: "gearshape.fill") {
                         showingSettings = true
                     }
                 }
@@ -232,22 +232,6 @@ struct FreeRollScreen: View {
         canRoll = !(session?.isRolling ?? false) && !pool.isEmpty
     }
 
-    private func overlayButton(systemName: String, action: @escaping () -> Void) -> some View {
-        Button {
-            SoundEngine.shared.play(.buttonTap)
-            action()
-        } label: {
-            Image(systemName: systemName)
-                .font(.system(size: 18, weight: systemName == "chevron.left" ? .semibold : .regular))
-                .foregroundStyle(.white.opacity(0.75))
-                .padding(9)
-                .background(
-                    Color.black.opacity(0.45),
-                    in: RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                )
-        }
-        .padding(10)
-    }
 }
 
 // MARK: - Chip

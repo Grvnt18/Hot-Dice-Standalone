@@ -187,19 +187,35 @@ def main():
                       "elsewhere say")
 
     # --- 4. Nothing paints black behind the tray. ---------------------
-    # The colour is one line in two files and reverts easily; the requirement
-    # that there be no black margin does not.
-    for name in ("DiceGameShell.swift", "DiceTraySceneView.swift"):
-        body = source(name)
+    #
+    # This check shipped looking only at UIKit `.backgroundColor =`, in two
+    # named files. It passed cleanly while TEN game screens each carried their
+    # own SwiftUI `.background(Color.black)` behind their tray — because the
+    # shell those two files belong to is not where most screens set it. A
+    # requirement stated as very high priority was half-delivered under a
+    # green check, which is worse than no check.
+    #
+    # So: every Swift file, both spellings, no allowlist.
+    for path in sorted(os.listdir(os.path.join(here, "SwiftFiles"))):
+        if not path.endswith(".swift"):
+            continue
+        body = source(path)
         for m in re.finditer(r'\.backgroundColor = (.+)', body):
             value = m.group(1).strip()
             if "SmokeFloor" not in value:
                 failed.append("%s sets a scene backgroundColor to `%s` — it "
                               "must be SmokeFloor.backdrop(from:), so a "
                               "visible sliver reads as the field rather than "
-                              "as a hole in it" % (name, value))
-    if not any("backgroundColor" in f for f in failed):
-        print("  %-24s ok (no black behind the tray)" % "backdrop")
+                              "as a hole in it" % (path, value))
+        for m in re.finditer(r'\.background\(\s*(Color\.black|\.black)\s*\)', body):
+            failed.append("%s puts Color.black behind a view — use "
+                          "SmokeFloor.backdropColor. Black margins were "
+                          "called out as a very high priority; every game "
+                          "screen sets this for itself." % path)
+    if not any("backgroundColor" in f or "Color.black" in f for f in failed):
+        print("  %-24s ok (%d files, no black behind any tray)"
+              % ("backdrop", len([p for p in os.listdir(os.path.join(here, "SwiftFiles"))
+                                  if p.endswith(".swift")])))
 
     if failed:
         print()

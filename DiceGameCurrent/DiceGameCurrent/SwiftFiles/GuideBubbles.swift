@@ -85,6 +85,12 @@ struct GuideBubbleCluster: View {
                           sections: entry.rules)
         }
         .onAppear(perform: popIn)
+        // Pinned like every game screen (see DiceGameShell's note): these
+        // layouts are geometric, and at the larger accessibility sizes the
+        // labels win the fight with the frames they sit in. AppFonts' faces
+        // use the relativeTo: overload, so shrink-to-fit still works inside
+        // the pinned size.
+        .dynamicTypeSize(.large)
     }
 
     private func bubble(_ entry: GameCatalogEntry, index: Int) -> some View {

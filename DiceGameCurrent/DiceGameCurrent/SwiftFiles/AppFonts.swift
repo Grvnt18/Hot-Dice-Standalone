@@ -119,6 +119,39 @@ enum AppFonts {
     /// The origin is part of the answer: it is usually negative, and
     /// drawing at `-origin` is what puts every inked pixel inside the
     /// canvas. Callers that ignore it will still clip on the left.
+    /// The rect a canvas must be to hold this text, and the offset to draw
+    /// it at — the union of the INK box and the LINE box.
+    ///
+    /// `inkBounds` alone is not enough, and the floor wordmark proved it.
+    /// The two measurements are in the same coordinate space but describe
+    /// different things:
+    ///
+    ///   * ink   — where the glyphs actually put pixels. Can overhang the
+    ///             line box on any side; a script face's swash routinely
+    ///             overhangs right, and its descender overhangs below.
+    ///   * line  — the typographic box, and what `draw(at:)` positions
+    ///             from. Its origin is the line fragment origin, not the
+    ///             first glyph's corner.
+    ///
+    /// Sizing from ink and then drawing with `draw(at:)` mixes the two
+    /// conventions. Aguafina survived it; Lobster did not, and the floor
+    /// title came out clipped along the bottom — a descender hanging below
+    /// a canvas that had been measured without it.
+    ///
+    /// Taking the union cannot clip either way: the canvas holds the
+    /// glyphs wherever they fall AND the line box the draw call lays out
+    /// from. Returns the rect in line-origin space, so drawing at
+    /// `-rect.origin` places the whole thing inside the canvas.
+    static func canvasBounds(of text: String, font: UIFont) -> CGRect {
+        let ink = inkBounds(of: text, font: font)
+        let line = (text as NSString).size(withAttributes: [.font: font])
+        let minX = min(ink.minX, 0)
+        let minY = min(ink.minY, 0)
+        let maxX = max(ink.maxX, line.width)
+        let maxY = max(ink.maxY, line.height)
+        return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+    }
+
     static func inkBounds(of text: String, font: UIFont) -> CGRect {
         let unbounded = CGSize(width: CGFloat.greatestFiniteMagnitude,
                                height: CGFloat.greatestFiniteMagnitude)

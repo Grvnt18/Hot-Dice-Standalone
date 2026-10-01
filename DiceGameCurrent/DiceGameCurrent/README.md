@@ -52,6 +52,20 @@ closed 30-second path so it loops perfectly rather than drifting forever.
 The four tones are derived from whichever swatch the player picked, hung
 downward from it so the brightest of the four IS that colour.
 
+The same four-tone derivation posterises the **baseball turf**, snapped per
+facet rather than per pixel — a facet is already a flat region, so the tone
+boundary lands on a triangle edge, which is already hard, and there is
+nothing for a dither to break up. The **dirt is deliberately left
+unposterised**: it is the one surface on that pitch whose job is to be a
+different material, and it is what makes the green read as grass.
+
+Rollbots is the one arena in **steel** rather than timber —
+`ArenaStyle.RimMaterial` is `.none`/`.wood`/`.steel`, and `pixelSteel` is
+`pixelWood`'s sibling in the same grammar: four tones, hard seams, chamfered
+edges, riveted plate in place of planks and knots. Its rim and the panels
+above it share ONE image at ONE tile fraction, which is the same contract
+the timber has and the same seam it prevents.
+
 It arrives as a *string*, compiled by SceneKit at runtime, because this is
 a Swift Playgrounds project: there is no target to add a `.metal` file to
 and no build step to hook, so the only way a shader gets in is as data. A
@@ -222,6 +236,49 @@ call site instead of the current, correct one.
   documented blend algorithm (Overlay blend against #FF9C00 at 30%
   intensity), not eyeballed. Number colors computed per-body-color for
   WCAG contrast.
+
+## Scaling, and what is tight on a phone
+
+Measured against a 375pt-wide phone (iPhone SE 3rd gen, 13 mini — the
+narrowest the app runs on), with roughly 620pt of usable height.
+
+**Structurally sound, nothing to do:**
+
+- The shell derives header/scene/button from `geo.size` with a
+  `minButtonHeight` floor, and clamps `sceneHeight` to `min(width, …)` so
+  the tray can never exceed the width.
+- `BaseballField` expresses every constant as a fraction of the texture
+  width through `px()`/`py()` — including the scoreboard's outline and
+  bevel — so the panel scales natively rather than by a second set of rules.
+- `RoyalUrLayout` derives everything from one `tile`, and the frame and
+  grout are sized from `margin`/`gap`, so they hold their proportion.
+- Dynamic Type is deliberately pinned to `.large` on every screen, with
+  `AppFonts` using the `relativeTo:` overload so shrink-to-fit still works
+  inside the pin. Fixed-geometry game screens are the case where pinning is
+  correct rather than lazy.
+
+**Fixed in this pass:**
+
+- **Rollbots rails took half the phone.** `railWidth` clamped at a 92pt
+  floor, and `0.22 x 375` is 82.5, so the floor won on every phone: two
+  rails were 184pt of 375. The floor existed to stop a *fixed* 12pt weapon
+  name collapsing; the labels derive from the rail width now, so the floor
+  came down to 78.
+- **Score cells spent a quarter of themselves on chrome.** A cell is about
+  30 x 34pt on a phone and `PixelPanel` put 2pt of outline plus 2pt of
+  bevel on every side. `cellRadius`'s doc comment had promised a thinner
+  outline for cells since it was written; only the corner was ever
+  implemented. `cellOutline`/`cellBevel` at 1pt now exist and are used.
+- Two 10pt labels raised to 11, the floor the rest of the app respects.
+- `GuideBubbles` and `PassAndPlayHost` were the only two surfaces not
+  pinned to `.large`.
+
+**Noted, not changed:**
+
+- **Royal UR's finest markings are about 3pt across on a phone.** At 375pt
+  the tile is 42pt, so `dottedField`'s dots (`tile * 0.035`) land near 3pt.
+  Legible at the limit rather than wrong, and the one item here that wants
+  a device rather than a number.
 
 ## Known limitations / judgment calls worth knowing about
 

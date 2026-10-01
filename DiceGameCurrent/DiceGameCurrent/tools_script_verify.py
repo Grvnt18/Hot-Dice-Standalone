@@ -115,9 +115,53 @@ def main():
         if "AppFonts.scriptFont" not in code:
             continue                      # draws no script text any more
         checked += 1
-        if "AppFonts.inkBounds" not in code:
+        if ("AppFonts.inkBounds" not in code
+                and "AppFonts.canvasBounds" not in code):
             failed.append("%s draws script text but never measures its ink"
                           % name)
+
+        # --- and a canvas SIZED from the text needs canvasBounds ------
+        #
+        # inkBounds says where the glyphs put pixels. draw(at:) positions
+        # from the LINE box. Both are valid, in the same coordinate space,
+        # describing different rectangles — and sizing a canvas from one
+        # while drawing with the other is a mismatch that only shows up
+        # when a font's metrics change.
+        #
+        # That is exactly how it surfaced: the arrangement held for
+        # Aguafina for months, then the swap to Lobster clipped the floor
+        # wordmark along its bottom edge, because Lobster's descender hangs
+        # below a box measured without it.
+        #
+        # canvasBounds is the union of the two, so neither can be cut off.
+        # Only flagged where the canvas is DERIVED from the measurement —
+        # DieFaceLabels centres script text inside a fixed labelCanvas, and
+        # centring on ink is right there.
+        for body, start in functions(code):
+            if "AppFonts.scriptFont" not in body:
+                continue
+            if "UIGraphicsImageRenderer(" not in body:
+                continue
+            for m in re.finditer(r'let (\w+) = AppFonts\.inkBounds\(', body):
+                var = m.group(1)
+                # Deliberately a window rather than a balanced-paren
+                # match: the real code reads `CGSize(width: ceil(ink.width)
+                # + padding * 2, ...)`, and a paren-matching pattern choked
+                # on `ceil(`. The first version of this check silently
+                # matched nothing and passed — which is the failure mode
+                # every guard here is written to avoid, so it is worth the
+                # cruder, working approach.
+                sized_from_it = any(
+                    re.search(r'\b%s\.(?:width|height)\b' % var,
+                              body[c.start(): c.start() + 240])
+                    for c in re.finditer(r'CGSize\(', body))
+                if sized_from_it:
+                    line = code[:start + m.start()].count("\n") + 1
+                    failed.append(
+                        "%s:%d sizes a canvas from AppFonts.inkBounds — use "
+                        "AppFonts.canvasBounds, which also covers the line "
+                        "box draw(at:) lays out from, or the text clips when "
+                        "a font's metrics change" % (name, line))
         for body, start in functions(code):
             if "AppFonts.scriptFont" not in body:
                 continue

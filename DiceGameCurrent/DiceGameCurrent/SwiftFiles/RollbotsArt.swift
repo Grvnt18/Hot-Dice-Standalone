@@ -24,14 +24,14 @@ enum NetArt {
         index == 0 ? Color(hex: "#22E3FF") : Color(hex: "#FF2D78")
     }
 
-    /// A faceted low-poly fill, from the same generator the playfield
-    /// floor and the Royal UR board tiles use.
+    /// A faceted low-poly fill.
     ///
-    /// This is what makes the arena read as the same app as the other
-    /// nine while keeping its own palette: the surfaces are the house
-    /// material, only the colours are the duel's. Cached inside
-    /// LowPolyTextures by its parameters, so repeated panels cost one
-    /// render between them.
+    /// This once claimed to be "the same generator the playfield floor
+    /// uses", and stopped being true the day the floor became a shader
+    /// (SmokeFloor). It is now used for one thing only — the arena
+    /// backdrop — because everything else on this screen wears a
+    /// PixelPanel, which IS what the rest of the app wears. Cached inside
+    /// LowPolyTextures by its parameters.
     static func faceted(
         _ color: Color,
         variation: CGFloat = 0.14,
@@ -84,7 +84,9 @@ struct NetGrid: View {
             // Faceted, not drawn. The perspective grid this replaced was
             // the one surface in the app made of flat lines rather than
             // low-poly geometry, which is exactly what made the arena look
-            // like a different program.
+            // like a different program. This is the last faceted surface
+            // on the screen — every panel over it is now a PixelPanel —
+            // and it stays because a backdrop wants texture, not an edge.
             NetFacet(color: NetArt.background, variation: 0.30, seed: 90210)
 
             // One neon seam across the horizon, so the space still reads as
@@ -117,24 +119,40 @@ struct NetSeatRail: View {
     let state: RollbotsState
     let seat: Int
     let name: String
-    let isActive: Bool
+
+    /// The rail's own width, passed in rather than measured.
+    ///
+    /// Everything textual here is sized from it, so the widest rail stops
+    /// being a third empty — which is what the 128pt clamp was raised for
+    /// and what fixed 10-13pt labels then threw away. A GeometryReader
+    /// would measure the same number, but it is greedy in both axes and
+    /// this is a VStack of intrinsically-sized rows; the call site already
+    /// computes the width, so it hands it over.
+    let width: CGFloat
 
     private var colour: Color { NetArt.seat(seat) }
+
+    /// Reading size. White, at this size, on both rails — both players read
+    /// the same screen, so neither rail is the quiet one.
+    private var label: CGFloat { max(11, width * 0.125) }
+    private var iconSize: CGFloat { width * 0.44 }
 
     var body: some View {
         VStack(spacing: 6) {
             Text(name)
-                .font(.poppins(13))
-                .foregroundStyle(colour.opacity(isActive ? 1 : 0.6))
+                .font(.poppins(label, .semibold))
+                .foregroundStyle(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
 
             Text("\(max(0, state.ip[seat]))")
-                .font(.poppins(34, .bold))
-                .foregroundStyle(colour)
+                .font(.poppins(width * 0.30, .black))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
 
             Text("IP")
-                .font(.poppins(11))
+                .font(.poppins(max(9, label - 2), .medium))
                 .foregroundStyle(NetArt.text.opacity(0.6))
 
             // Vertical, filling from the bottom: a tall thin bar reads far
@@ -145,41 +163,31 @@ struct NetSeatRail: View {
                 let fraction = max(0, min(1, Double(state.ip[seat]) / Double(maximum)))
                 ZStack(alignment: .bottom) {
                     Rectangle().fill(colour.opacity(0.16))
-                    NetFacet(color: colour, variation: 0.18, seed: 7700 + UInt64(seat))
+                    Rectangle().fill(colour)
                         .frame(height: geo.size.height * fraction)
                 }
-                .overlay(Rectangle().stroke(colour.opacity(0.55), lineWidth: 1))
+                .pixelWell(radius: PixelPanel.cellRadius)
             }
             .frame(maxHeight: .infinity)
 
-            NetIconView(name: state.activeWeapon(seat).iconName, tint: colour.opacity(0.9))
-                .frame(height: 40)
-
-            Text(state.activeWeapon(seat).displayName)
-                .font(.poppins(12))
-                .foregroundStyle(NetArt.text.opacity(0.8))
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .minimumScaleFactor(0.6)
+            // Icon and label as ONE unit, in one panel, rather than a
+            // picture floating above some words. The weapon and its name
+            // are a single piece of information and now look like one.
+            loadout(icon: state.activeWeapon(seat).iconName,
+                    tint: colour,
+                    text: state.activeWeapon(seat).displayName)
 
             // The ability, which had no mark at all although the art has
             // shipped since the icons went in. Dimmed once spent, so a rail
             // answers "what have they still got?" without opening a menu.
-            NetIconView(name: state.ware[seat].iconName,
-                        tint: (state.wareUsed[seat] ? NetArt.text.opacity(0.28)
-                                                    : NetArt.warn))
-                .frame(height: 32)
-
-            Text(state.wareUsed[seat] ? "Spent" : state.ware[seat].displayName)
-                .font(.poppins(10))
-                .foregroundStyle(NetArt.text.opacity(state.wareUsed[seat] ? 0.45 : 0.75))
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .minimumScaleFactor(0.6)
+            loadout(icon: state.ware[seat].iconName,
+                    tint: state.wareUsed[seat] ? NetArt.text.opacity(0.28) : NetArt.warn,
+                    text: state.wareUsed[seat] ? "Spent" : state.ware[seat].displayName,
+                    dimmed: state.wareUsed[seat])
 
             ForEach(statusPips, id: \.self) { pip in
                 Text(pip)
-                    .font(.poppins(12))
+                    .font(.poppins(max(10, label - 1), .semibold))
                     .foregroundStyle(NetArt.warn)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
@@ -188,10 +196,37 @@ struct NetSeatRail: View {
         .padding(.horizontal, 6)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(NetFacet(variation: 0.10, seed: 3310).opacity(isActive ? 0.95 : 0.6))
+        .background(SteelTiledBackground())
+        .background(NetArt.background.opacity(0.78))
         .overlay(
-            Rectangle().stroke(colour.opacity(isActive ? 0.8 : 0.25), lineWidth: 1)
+            Rectangle().stroke(colour, lineWidth: 2)
         )
+    }
+
+    /// One piece of kit: its mark and its name, boxed together.
+    ///
+    /// Both rails draw these at full strength. The rail used to stroke the
+    /// waiting player's side at 0.25 against the active one's 0.8, which
+    /// made sense when one person held the device — but both players read
+    /// this same screen, and the opponent's loadout is exactly what the
+    /// player on turn needs to see.
+    private func loadout(icon: String,
+                         tint: Color,
+                         text: String,
+                         dimmed: Bool = false) -> some View {
+        VStack(spacing: 4) {
+            NetIconView(name: icon, tint: tint)
+                .frame(height: iconSize)
+            Text(text)
+                .font(.poppins(label, .semibold))
+                .foregroundStyle(dimmed ? Color.white.opacity(0.5) : .white)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.6)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .pixelPanel(fill: .solid(NetArt.panel), radius: PixelPanel.cellRadius)
     }
 
     /// Everything ticking on this runner, one short line each.
@@ -265,14 +300,15 @@ struct NetCard: View {
             .padding(10)
             .background(
                 ZStack {
-                    NetFacet(variation: 0.12, seed: 4120)
+                    Rectangle().fill(NetArt.panel)
                     if isSelected { tint.opacity(0.22) }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
             )
+            .pixelPanel(elevation: isSelected ? .lifted : .resting)
             .overlay(
-                RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                    .stroke(tint.opacity(isSelected ? 0.95 : 0.35), lineWidth: isSelected ? 2 : 1)
+                RoundedRectangle(cornerRadius: ControlShape.cornerRadius, style: .continuous)
+                    .stroke(tint.opacity(isSelected ? 0.95 : 0.45),
+                            lineWidth: isSelected ? 3 : 2)
             )
         }
         .disabled(!isEnabled)
@@ -310,9 +346,10 @@ struct NetActionBar: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(NetFacet().opacity(0.95))
+        .background(SteelTiledBackground())
+        .background(NetArt.background.opacity(0.80))
         .overlay(alignment: .top) {
-            Rectangle().fill(NetArt.line.opacity(0.35)).frame(height: 1)
+            Rectangle().fill(NetArt.line.opacity(0.55)).frame(height: 2)
         }
     }
 
@@ -329,20 +366,12 @@ struct NetActionBar: View {
                                          : NetArt.text.opacity(0.3))
                 .frame(maxWidth: .infinity)
                 .frame(height: 46)
-                .background(
-                    Group {
-                        if filled {
-                            NetFacet(color: tint, variation: 0.16, seed: 6640)
-                                .opacity(enabled ? 1 : 0.3)
-                        } else {
-                            Color.clear
-                        }
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
-                )
+                .pixelPanel(fill: .solid(filled ? tint.opacity(enabled ? 1 : 0.3)
+                                                : .clear),
+                            elevation: enabled ? .lifted : .resting)
                 .overlay(
-                    RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                        .stroke(tint.opacity(enabled ? 0.9 : 0.25), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: ControlShape.cornerRadius, style: .continuous)
+                        .stroke(tint.opacity(enabled ? 0.9 : 0.25), lineWidth: 2)
                 )
         }
         .disabled(!enabled)
@@ -389,10 +418,8 @@ struct NetHandoverGate: View {
                         .foregroundStyle(NetArt.background)
                         .frame(maxWidth: .infinity)
                         .frame(height: 48)
-                        .background(
-                            NetFacet(color: NetArt.seat(nextSeat), variation: 0.16, seed: 8820)
-                                .clipShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
-                        )
+                        .pixelPanel(fill: .solid(NetArt.seat(nextSeat)),
+                                    elevation: .lifted)
                 }
                 .padding(.horizontal, 44)
             }
@@ -450,10 +477,7 @@ struct NetResultView: View {
                             .foregroundStyle(NetArt.background)
                             .frame(maxWidth: .infinity)
                             .frame(height: 46)
-                            .background(
-                                NetFacet(color: NetArt.line, variation: 0.16, seed: 9930)
-                                    .clipShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
-                            )
+                            .pixelPanel(fill: .solid(NetArt.line), elevation: .lifted)
                     }
                     Button {
                         SoundEngine.shared.play(.buttonTap)
@@ -465,8 +489,9 @@ struct NetResultView: View {
                             .frame(maxWidth: .infinity)
                             .frame(height: 42)
                             .overlay(
-                                RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                                    .stroke(NetArt.text.opacity(0.5), lineWidth: 1)
+                                RoundedRectangle(cornerRadius: ControlShape.cornerRadius,
+                                                 style: .continuous)
+                                    .stroke(NetArt.text.opacity(0.6), lineWidth: 2)
                             )
                     }
                 }

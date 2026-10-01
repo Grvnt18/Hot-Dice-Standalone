@@ -92,10 +92,18 @@ struct RollbotsScreen: View {
                 // The viewing seat is always on the left — your own numbers
                 // stay where your thumb is, the same way Boneheads keeps
                 // your own grid nearest you.
-                // Wider than before: the rails now carry two marks and two
-                // labels apiece, and the old 74-104pt band squeezed the
-                // weapon name to a scale factor rather than reading it.
-                let railWidth = min(max(geo.size.width * 0.22, 92), 128)
+                // The floor came back down to 78 once the rails started
+                // sizing their own text.
+                //
+                // It was raised to 92 to stop the weapon name collapsing,
+                // which was the right fix for a rail with a FIXED 12pt
+                // label. But at 92 the clamp floor wins on every phone —
+                // 0.22 x 375 is 82.5 — so two rails took 184pt of a 375pt
+                // screen, half of it, and the tray got what was left. The
+                // labels are derived from this width now (NetSeatRail.label),
+                // so the rail can be narrow and still legible, which is what
+                // deriving it was for.
+                let railWidth = min(max(geo.size.width * 0.22, 78), 128)
                 let barHeight: CGFloat = phase == .setup ? 0 : 104
                 let bodyHeight = max(geo.size.height - barHeight, 0)
 
@@ -104,7 +112,7 @@ struct RollbotsScreen: View {
                         state: state,
                         seat: viewingSeat,
                         name: names[viewingSeat],
-                        isActive: true
+                        width: railWidth
                     )
                     .frame(width: railWidth)
 
@@ -141,11 +149,11 @@ struct RollbotsScreen: View {
                     .frame(height: bodyHeight)
                     .overlay(alignment: .topLeading) {
                         if let onExit {
-                            overlayButton("chevron.left") { onExit() }
+                            OverlayChromeButton(systemName: "chevron.left", tint: NetArt.text) { onExit() }
                         }
                     }
                     .overlay(alignment: .topTrailing) {
-                        overlayButton("gearshape.fill") { showingSettings = true }
+                        OverlayChromeButton(systemName: "gearshape.fill", tint: NetArt.text) { showingSettings = true }
                     }
 
                     if phase != .setup {
@@ -164,7 +172,7 @@ struct RollbotsScreen: View {
                         state: state,
                         seat: 1 - viewingSeat,
                         name: names[1 - viewingSeat],
-                        isActive: false
+                        width: railWidth
                     )
                     .frame(width: railWidth)
                 }
@@ -228,7 +236,14 @@ struct RollbotsScreen: View {
             VStack(spacing: 0) {
                 Spacer(minLength: 0)
                 ZStack {
-                    NetFacet().opacity(0.97)
+                    // The same plate the arena rim is made of, tiled at the
+                    // same fraction — so this panel and the rim it butts
+                    // against read as one piece of metal, exactly the way
+                    // the wooden games' header and tray do. The dark wash
+                    // over it is what keeps the cards readable; without it
+                    // the plate's own highlights compete with the text.
+                    SteelTiledBackground()
+                    NetArt.background.opacity(0.80)
                     menu
                 }
                 // Setup has the longest list and no dice worth seeing yet,
@@ -257,7 +272,7 @@ struct RollbotsScreen: View {
                 }
             }
         )
-        .background(Color.black)
+        .background(SmokeFloor.backdropColor)
     }
 
     // MARK: Setup
@@ -784,20 +799,4 @@ struct RollbotsScreen: View {
         phase = .setup
     }
 
-    private func overlayButton(_ systemName: String, action: @escaping () -> Void) -> some View {
-        Button {
-            SoundEngine.shared.play(.buttonTap)
-            action()
-        } label: {
-            Image(systemName: systemName)
-                .font(.system(size: 18, weight: systemName == "chevron.left" ? .semibold : .regular))
-                .foregroundStyle(NetArt.text.opacity(0.75))
-                .padding(9)
-                .background(
-                    Color.black.opacity(0.5),
-                    in: RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                )
-        }
-        .padding(10)
-    }
 }

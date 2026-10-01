@@ -376,6 +376,7 @@ final class DiceRollController: NSObject, SCNSceneRendererDelegate {
         rollOffAttempts.removeAll()
         rollStartTime = currentTime
         maxDurationForThisRoll = timeBudget(forDiceCount: dice.count)
+        RollsTrace.log("roll: start, \(dice.count) dice")
         isRolling = true
     }
 
@@ -393,6 +394,7 @@ final class DiceRollController: NSObject, SCNSceneRendererDelegate {
             guard let body = state.node.physicsBody else { continue }
 
             if timeIsUp {
+                RollsTrace.log("settle: FORCED (time budget spent)")
                 forceSettle(state)
                 continue
             }
@@ -408,10 +410,14 @@ final class DiceRollController: NSObject, SCNSceneRendererDelegate {
         }
 
         if trackedDice.allSatisfy({ $0.isFullyRevealed }) {
+            RollsTrace.log("settle: all revealed, resolving stacking")
             resolveStacking()
+            RollsTrace.log("settle: stacking resolved")
             isRolling = false
             DispatchQueue.main.async { [weak self] in
+                RollsTrace.log("settle: onRollComplete ->")
                 self?.onRollComplete?()
+                RollsTrace.log("settle: onRollComplete <- returned")
             }
         }
     }
@@ -696,6 +702,7 @@ final class DiceRollController: NSObject, SCNSceneRendererDelegate {
     private var dieSidesByID: [UUID: Int] = [:]
 
     private func settle(_ state: DieSettleState, allowRollOff: Bool = true) {
+        RollsTrace.log("settle: die \(state.dieID.uuidString.prefix(4)), rollOff=\(allowRollOff)")
         // Set immediately (synchronously), not deferred to the animation
         // completion below — this is what stops the frame loop from
         // re-entering settle() for this same die on every subsequent

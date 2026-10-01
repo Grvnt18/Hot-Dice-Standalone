@@ -42,7 +42,6 @@ extension HogRules {
 // MARK: - Suite entry
 
 enum HogGame: SuiteGame {
-    static let floorMotif = FloorMotif.pigFace
     static let id = "hog"
     static let displayName = "Hog"
     static let tagline = "Push your luck to 75."

@@ -178,7 +178,6 @@ extension JackpotRules {
 // MARK: - Suite entry
 
 enum JackpotGame: SuiteGame {
-    static let floorMotif = FloorMotif.seven
     static let id = "jackpot"
     static let displayName = "Jackpot"
     static let tagline = "Five rounds, or hit the jackpot."

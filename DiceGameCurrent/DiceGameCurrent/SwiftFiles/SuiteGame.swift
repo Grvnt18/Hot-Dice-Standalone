@@ -56,9 +56,6 @@ protocol SuiteGame {
     /// "Jackpot" and defeats "Freighter.Yacht.Dinghy".
     static var floorTitle: String { get }
 
-    /// The shape this game's floor facets carry. See `FloorMotif`.
-    static var floorMotif: FloorMotif { get }
-
     /// The name on the hub tile, when the full one will not fit.
     ///
     /// Same reason `floorTitle` exists: a name set to span the artwork has
@@ -82,10 +79,6 @@ extension SuiteGame {
     // states what makes it unusual.
     static var maxPlayers: Int { 2 }
     static var floorTitle: String { displayName }
-
-    /// No mark unless a game asks for one, so a game added later is not
-    /// obliged to have art before it can ship.
-    static var floorMotif: FloorMotif { .none }
 
     /// The full name, for the ten games it fits.
     static var tileName: String { displayName }

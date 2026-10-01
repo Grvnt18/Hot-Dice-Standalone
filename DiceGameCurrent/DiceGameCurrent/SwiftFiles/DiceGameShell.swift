@@ -1,6 +1,45 @@
 import SwiftUI
 import SceneKit
 import Combine
+import os
+
+// MARK: - Temporary crash trace
+
+/// Breadcrumbs for the Rolls settle crash. REMOVE once it is found.
+///
+/// Why this exists rather than a console message: Playgrounds printed
+/// NOTHING when Rolls died. That is itself diagnostic — a Swift trap
+/// (index out of range, a nil unwrap, an overflow) always writes
+/// `Fatal error: …` first. Silence means the process was KILLED rather
+/// than trapped, and the four things that do that — jetsam, a GPU fault,
+/// the main-thread watchdog, a stack overflow — all leave the console
+/// empty. None of them can be read from the source.
+///
+/// So the app says where it got to instead. The last line printed before
+/// the app vanishes names the step; `free` alongside it separates jetsam
+/// from the rest, because only jetsam arrives with the figure near zero.
+///
+/// `os_proc_available_memory()` is how much more this process may
+/// allocate before the system kills it — the number that actually
+/// decides a jetsam, rather than how much is currently in use.
+///
+/// Deliberately also on the SHARED path, so Free Roll prints a working
+/// trace to compare the crashing one against. A trace with nothing to
+/// compare it to is half a measurement.
+enum RollsTrace {
+
+    /// One line to silence the whole thing.
+    static var isOn = true
+
+    private static var step = 0
+
+    static func log(_ label: String) {
+        guard isOn else { return }
+        step += 1
+        let freeMB = Double(os_proc_available_memory()) / (1024 * 1024)
+        print(String(format: "[trace %03d] %@  (free %.1f MB)", step, label, freeMB))
+    }
+}
 
 // MARK: - SCNView wrapper
 
@@ -18,13 +57,23 @@ struct DiceSceneView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> SCNView {
         let view = LayoutReportingSCNView()
-        view.backgroundColor = .black
+        // Never black. If any sliver of backdrop is ever visible — an aspect
+        // ratio the overscanned floor somehow does not cover, a frame during
+        // rotation, the instant before assembly finishes — it should read as
+        // part of the field rather than as a hole punched in it.
+        view.backgroundColor = SmokeFloor.backdrop(from: AppTheme.shared.floorBaseColor)
         view.antialiasingMode = .multisampling4X
         view.isPlaying = true // ensures the physics/render loop actually runs continuously
         return view
     }
 
     func updateUIView(_ uiView: SCNView, context: Context) {
+        RollsTrace.log("ui: updateUIView")
+        // Re-set on every update, not only at creation, because the backdrop
+        // follows the player's table colour. A value assigned once in
+        // makeUIView would keep the colour the app launched with and show
+        // through as the wrong shade after a swatch change.
+        uiView.backgroundColor = SmokeFloor.backdrop(from: AppTheme.shared.floorBaseColor)
         // Re-armed on every update so the closure always writes through to
         // the current binding rather than a stale copy.
         (uiView as? LayoutReportingSCNView)?.onLayout = { view in
@@ -575,7 +624,9 @@ struct DiceGameScreen: View {
                             let controller = newSession.turnController
                             controller.onStateChanged = { [weak controller] in
                                 guard let controller else { return }
+                                RollsTrace.log("rolls: ui.sync ->")
                                 ui.sync(from: controller)
+                                RollsTrace.log("rolls: ui.sync <- returned")
                             }
                             // Initial sync so the button starts in the
                             // correct state rather than its placeholder
@@ -584,7 +635,7 @@ struct DiceGameScreen: View {
                         }
                     )
                         .frame(height: sceneHeight)
-                        .background(Color.black)
+                        .background(SmokeFloor.backdropColor)
                         .overlay(alignment: .topLeading) {
                             if let onExit {
                                 Button {

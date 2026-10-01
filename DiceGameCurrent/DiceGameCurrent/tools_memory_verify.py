@@ -100,7 +100,7 @@ def main():
     #
     # No single game is expensive. The caches were, because their keys
     # multiplied and nothing evicted: colourways times numerals, table
-    # colours times floor motifs.
+    # colours times surfaces.
     # The KEYS, specifically — `colorway.numberHex` still appears in this
     # file, as the tint `artworkMaterial` applies, and that is the point.
     for key in re.findall(r'cached\("([^"]*)"\)', labels):

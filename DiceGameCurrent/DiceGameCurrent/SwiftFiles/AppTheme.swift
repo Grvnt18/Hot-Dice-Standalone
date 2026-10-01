@@ -106,25 +106,23 @@ final class AppTheme: ObservableObject {
     /// For SwiftUI: tints the settings menu's buttons and sliders.
     var accentColor: Color { Color(hex: currentHex) }
 
-    /// For SceneKit: the floor is rendered from this, darkened the same way
-    /// the original hardcoded green always was (see
-    /// DiceSceneEnvironment.addFloorSurface) — every shade goes through the
-    /// identical faceted-surface + darken treatment, so only the hue
-    /// changes, not the overall look.
+    /// For SceneKit: the four tones of the rolling area are derived from
+    /// this — see `SmokeFloor.ramp(from:)`, which hangs them downward from
+    /// the swatch so the brightest of the four IS the colour picked here.
     var floorBaseColor: UIColor { UIColor(hex: currentHex) }
 
     /// True when the floor is bright enough that the white "ROLLS" text
     /// would lose contrast against it and needs to switch to black.
     ///
-    /// Judged against the SAME darkened tone addFloorSurface actually
-    /// paints (floorBaseColor.darkened(by: 0.25)), not the raw swatch hex —
-    /// otherwise this and the visible floor could disagree about how
-    /// bright the surface really is. The default green, for instance, is
-    /// bright enough undarkened to cross the threshold, but the darkening
-    /// already applied to the real floor brings it back under — matching
-    /// this game's existing (correct) white-on-green look rather than
-    /// changing it.
+    /// Judged against the BRIGHTEST of the four tones the floor actually
+    /// paints, not the raw swatch and no longer the old
+    /// `darkened(by: 0.25)` — script sitting on the lightest part of the
+    /// field is where it loses contrast first, so that is the tone that
+    /// decides. The principle is the one that was already here: this and the
+    /// visible floor must not disagree about how bright the surface is. Only
+    /// the floor changed.
     var rollsTextIsDark: Bool {
-        floorBaseColor.darkened(by: 0.25).relativeLuminance > 0.6
+        let brightest = SmokeFloor.ramp(from: floorBaseColor).last ?? floorBaseColor
+        return brightest.relativeLuminance > 0.6
     }
 }

@@ -114,6 +114,122 @@ enum DieMaterial {
     /// that ships — the two cannot drift.
     static let ditherCellsPerFace: CGFloat = 20
 
+    // MARK: Cel shading
+
+    /// How many flat tone steps a die face is allowed.
+    ///
+    /// Three: lit face, mid face, shadow face, nothing between. This is the
+    /// change that made the dice read as pixel art when the dither, the finer
+    /// cells and the hard silhouette had each only moved it a little — and
+    /// the reason is that none of those touched the SHADING. A face's colour
+    /// was quantised while the light falling on it stayed a smooth gradient,
+    /// so the body was chunky and the thing underneath it was not.
+    static let celBands: Float = 3
+
+    /// The darkest and brightest a face may be, as a fraction of its own
+    /// body colour.
+    ///
+    /// **This range is set by legibility, and it was measured rather than
+    /// chosen.** The first version of this shader quantised a face's ABSOLUTE
+    /// luminance to three fixed levels, which is the textbook posterise and
+    /// is wrong here for a specific reason: the palette pairs a dark numeral
+    /// with a light body and a light numeral with a dark one, and forcing
+    /// every body to the same three luminances throws that pairing away.
+    /// `tools_dice_preview.check_band_contrast` caught it before the device
+    /// did, and the numbers were not close:
+    ///
+    ///     #1B1B1B on #FCFBF9   16.66:1  ->  1.13:1   (dark band)
+    ///     #F5F5F5 on #6E6456    5.32:1  ->  1.35:1   (bright band)
+    ///
+    /// The numerals would have vanished on roughly a third of the colourways.
+    ///
+    /// So the bands quantise the SHADE — how far the light moves a face from
+    /// its own body colour — and a face is always a shaded version of itself.
+    /// At 0.62-1.00 and three bands the factors are 0.683, 0.810 and 0.937,
+    /// and the worst pairing in the whole palette is 2.86:1 on `#00ADB4`,
+    /// which already sits at 2.52:1 FLAT today. Zero pairings that clear the
+    /// 3:1 large-text bar fall below it.
+    ///
+    /// Widening this is the knob if the banding reads too subtly, and the
+    /// cost is known: 0.55 costs one pairing (2.80:1), 0.45 costs five.
+    static let celShadeFloor: Float = 0.62
+    static let celShadeCeiling: Float = 1.0
+
+    /// Quantises how strongly the light shades a die body, into
+    /// `celBands` flat steps.
+    ///
+    /// **`.fragment`, not `.surface`, and that is the whole point.** The
+    /// floor's modifier is a `.surface` one, which runs BEFORE lighting and
+    /// can only set albedo — banding there would be smoothed straight back
+    /// out by the lambert term applied after it. `.fragment` receives
+    /// `_output.color` once lighting is done, which is the only place a hard
+    /// tone step can survive.
+    ///
+    /// **The dither becomes a band dither, which is better than what it
+    /// was.** `_output.color` already carries the multiply channel, so the
+    /// shade this measures includes the stipple — which means a dithered
+    /// fragment lands one band lower instead of being flatly darkened by
+    /// 10%. Band boundaries come out stippled rather than as clean contours.
+    /// That is exactly what SmokeFloor's shader does on the floor ("dither
+    /// the VALUE, then quantise"), so the dice and the playfield now break
+    /// up their tone boundaries the same way.
+    ///
+    /// **Hue and saturation are untouched**, because the output is the body
+    /// colour scaled, never a replacement. All fifteen colourways stay
+    /// exactly as tellable apart — the palette is how a player knows which
+    /// die they are looking at, and that is the one property this must not
+    /// cost.
+    ///
+    /// Written in Metal — `float3`, not `vec3`, and nothing from the OpenGL
+    /// namespace. A shader modifier is translated into Metal, and one
+    /// OpenGL-only identifier takes the entire material down with it, which
+    /// is exactly what `u_time` did to the floor. `tools_dice_verify.py` now
+    /// scans every shader in the tree for that whole family of spellings.
+    ///
+    /// `celBase` is a `#pragma arguments` uniform because it genuinely varies
+    /// — one value per colourway — where the band count and the range are
+    /// interpolated in, being the same for every die. That is the split
+    /// SmokeFloor uses too: uniforms for the four tones that change when a
+    /// swatch is picked, interpolation for everything fixed.
+    static let celModifier: String = """
+    #pragma arguments
+    float3 celBase;
+
+    #pragma body
+    float3 lit = _output.color.rgb;
+
+    // Rec. 601 luminance, for both terms, so the ratio below is a pure
+    // measure of lighting and carries no colour of its own.
+    float3 celWeights = float3(0.299, 0.587, 0.114);
+
+    // Guarded because a near-black body colour would otherwise divide by
+    // zero. Onyx (#14140F) is in the palette, so this is a real case and not
+    // a defensive flourish.
+    float celBaseLum = max(dot(celBase, celWeights), 0.004);
+
+    // How far the light — and the dither riding along in the multiply
+    // channel — has moved this fragment from the body's own colour.
+    float celShade = dot(lit, celWeights) / celBaseLum;
+
+    float celLo = \(celShadeFloor);
+    float celHi = \(celShadeCeiling);
+    float celT = clamp((celShade - celLo) / (celHi - celLo), 0.0, 1.0);
+
+    // The same arithmetic SmokeFloor's shader uses to posterise: floor into
+    // a band, then clamp so a value of exactly 1.0 lands in the top band
+    // rather than one past it.
+    float celBand = clamp(floor(celT * \(celBands)), 0.0, \(celBands) - 1.0);
+
+    // The band's CENTRE, not its lower edge, so neither end of the range is
+    // ever actually reached: the darkest face is 0.683 of its colour rather
+    // than 0.62, and the brightest 0.937 rather than full. A face driven to
+    // its own full brightness is the case that erases a numeral.
+    float celFactor = celLo + (celHi - celLo) * (celBand + 0.5) / \(celBands);
+
+    _output.color = float4(clamp(celBase * celFactor, 0.0, 1.0),
+                           _output.color.a);
+    """
+
     /// One 8x8 Bayer matrix, white where the body shows through and grey
     /// where it is pulled down. Built once and shared by every die.
     private static var ditherTextureCache: UIImage?
@@ -342,31 +458,26 @@ enum DieMaterial {
             material.multiply.mipFilter = .none
             material.multiply.contentsTransform = ditherTransform(variant: grainVariant)
         }
-        // .lambert for the low-poly style: flat matte shading, no
-        // specular highlight. The dice meshes are already genuinely
-        // low-poly (8-36 triangles) with flat per-triangle normals, so
-        // they were always faceted — it was PBR's glossiness that made
-        // them read as smooth realistic objects rather than faceted ones.
-        // roughness/metalness are PBR-only and no longer apply.
-        // .blinn rather than .lambert for the dice specifically. Lambert
-        // is purely diffuse — no specular term at all — so it physically
-        // cannot produce a highlight. Blinn keeps the flat per-facet
-        // shading the low-poly look depends on while adding a controllable
-        // specular, which is what reads as a polished resin die.
-        // The floor and walls stay lambert; a shiny floor would fight the
-        // matte-table feel.
-        material.lightingModel = .blinn
-        // Specular deliberately well below white. At full white against
-        // the 900-intensity directional key, a facet angled into the light
-        // saturates to pure white — and a blown-out face erases the
-        // contrast the numerals depend on, which is worse than not being
-        // shiny. 0.45 grey gives a clear sheen that tops out around
-        // "bright version of the body colour" instead of white.
-        material.specular.contents = UIColor(white: 0.45, alpha: 1.0)
-        // Lower shininess widens the highlight, spreading the same energy
-        // over more of the facet rather than concentrating it into a hot
-        // spot that clips.
-        material.shininess = 0.35
+        // .lambert: flat matte shading with no specular term at all, so a
+        // highlight is not merely dialled down but physically impossible.
+        //
+        // This REVERSES an earlier deliberate choice, and the reasoning is
+        // worth keeping rather than quietly deleting. The dice used .blinn
+        // with a 0.45 grey specular, chosen so they read as polished resin —
+        // a real highlight that topped out near "bright version of the body
+        // colour" instead of clipping to white. That was right for a die
+        // meant to look like an object.
+        //
+        // It is wrong for a die meant to look like pixel art, and
+        // specifically it is wrong UNDER BANDING: a specular highlight is a
+        // smooth gradient, and quantising a smooth gradient turns it into a
+        // hard-edged bright blob sitting on the face. That reads as a
+        // rendering fault rather than as a style, which is worse than either
+        // choice made cleanly. So the sheen goes, and the cel modifier below
+        // is what gives a face its form instead.
+        //
+        // The floor and walls were always lambert, so they are unaffected.
+        material.lightingModel = .lambert
         material.transparency = 1.0
         material.transparencyMode = .aOne
         // Without this, a mesh with inconsistent or reversed face winding
@@ -375,6 +486,31 @@ enum DieMaterial {
         // makes both sides of every triangle render regardless of winding,
         // trading a small amount of fill-rate for guaranteed correctness.
         material.isDoubleSided = true
+
+        // The cel band goes on LAST, over a material that is already
+        // complete and already correct. That ordering is load-bearing and it
+        // is the idiom SmokeFloor.apply documents: a shader modifier that
+        // fails to compile does so asynchronously, on the render thread,
+        // rather than throwing — there is nothing to catch and nothing to
+        // test for. So the flat body colour and the dither multiply are set
+        // first and the shader is layered over them. If it compiles it
+        // overwrites the lit result; if it does not, the die is exactly the
+        // flat dithered die it was before this change.
+        //
+        // The failure mode that ordering removes is a black die, and it is
+        // the kind that would not show up here: it would look right on every
+        // device whose shader compiles and wrong only on the one where it
+        // does not. tools_dice_verify.py asserts the order.
+        material.shaderModifiers = [.fragment: celModifier]
+        // The body colour the shader shades, as linear components. Read back
+        // off the UIColor rather than re-parsed from the hex, so there is one
+        // interpretation of a colourway and the shader cannot disagree with
+        // material.diffuse about what colour this die is.
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        UIColor(hex: colorway.bodyHex).getRed(&r, green: &g, blue: &b, alpha: &a)
+        material.setValue(NSValue(scnVector3: SCNVector3(Float(r), Float(g), Float(b))),
+                          forKey: "celBase")
+
         node.geometry?.materials = [material]
         return true
     }

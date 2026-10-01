@@ -508,13 +508,43 @@ enum DieFaceLabels {
     ///     canvas   one d20   eight d20
     ///        512    20 MiB     160 MiB
     ///        256     5 MiB      40 MiB
+    ///         48    0.2 MiB     1.4 MiB
     ///
-    /// 256 is still well above what a face occupies on screen: a die is
-    /// roughly 100-200pt on a phone, so the label is oversampled either
-    /// way. It was raised from 128 to 512 because Stack Sans ExtraLight's
-    /// thin strokes did not survive minification from 128 — 256 keeps
-    /// double that detail while cutting the cost fourfold.
-    static let labelCanvas: CGFloat = 256
+    /// **48, and the smallness is the point now rather than a saving.** This
+    /// was 256, which is far more than a face occupies on screen — a die is
+    /// roughly 100-200pt — so every numeral arrived MINIFIED under the
+    /// default linear filter, which is to say smoothly anti-aliased. That was
+    /// correct while the dice were shaded resin. It is wrong now that the
+    /// body is a three-band cel shade over a Bayer stipple inside a hard
+    /// unantialiased silhouette: the numeral was the one perfectly smooth
+    /// thing left on the die, and banding the body without this would have
+    /// made it stand out more rather than less.
+    ///
+    /// At 48 a glyph is built of visible texels, magnified with `.nearest`
+    /// (see `artworkMaterial`) so they stay hard instead of being
+    /// interpolated back into a blur.
+    ///
+    /// The reason this was 256 no longer holds, and it is worth saying so
+    /// rather than leaving a stale justification in place: it was raised from
+    /// 128 because **Stack Sans ExtraLight's** thin strokes did not survive
+    /// minification. That face left the project in stage C. Poppins is a
+    /// much heavier geometric sans and its strokes are what a low canvas
+    /// resolves best.
+    static let labelCanvas: CGFloat = 48
+
+    /// The canvas the ROLLS wordmark alone is drawn at.
+    ///
+    /// Separate from `labelCanvas`, and the one judgement call in this pass.
+    /// Lobster is a SCRIPT face: at 48 its thin connecting strokes and the
+    /// tail on the S break up into disconnected texels, which reads as a
+    /// damaged image rather than as pixel art — the failure the dither's own
+    /// comment warns about, where below a certain resolution a thing stops
+    /// being the thing.
+    ///
+    /// 96 is visibly pixelated and still legibly the word. `drawRollsWordmark`
+    /// measures and fits its own type, so this is the only number that moves.
+    /// Still a twentieth of the old memory, and one die face in one game.
+    static let wordmarkCanvas: CGFloat = 96
 
     /// The numeral's point size, as the fraction of the canvas it has
     /// always been (340 of 512).
@@ -574,6 +604,24 @@ enum DieFaceLabels {
                                         colorway: DieColorway) -> SCNMaterial {
         let material = SCNMaterial()
         material.diffuse.contents = image
+        // Nearest, both ways, and this is half of what makes a numeral read
+        // as pixel art rather than as a blurry small image. The canvas came
+        // down from 256 to 48 (see labelCanvas); magnified back up across a
+        // face under the DEFAULT linear filter, SceneKit would interpolate
+        // between those texels and hand back a soft smudge — strictly worse
+        // than the crisp anti-aliased numeral it replaced. The canvas and the
+        // filter only work as a pair.
+        //
+        // Minification too, not just magnification: a die tumbling away from
+        // the camera, or the oversized d20 beside a normal one, samples below
+        // 1:1, and a numeral that softens as it recedes would put the smooth
+        // gradient back exactly when several dice are on screen together.
+        material.diffuse.magnificationFilter = .nearest
+        material.diffuse.minificationFilter = .nearest
+        // No mipmaps for the same reason the body's dither has none: a mip
+        // chain is a pyramid of pre-blurred copies, which is the blur this
+        // just removed, arriving by another route.
+        material.diffuse.mipFilter = .none
         // White x colour = colour, and the glyph's alpha is untouched, so
         // the transparent surround stays transparent.
         material.multiply.contents = UIColor(hex: colorway.numberHex)
@@ -626,7 +674,9 @@ enum DieFaceLabels {
     }
 
     private static func drawRollsWordmark() -> UIImage {
-        let size = CGSize(width: labelCanvas, height: labelCanvas)
+        // wordmarkCanvas, not labelCanvas — see its doc comment. A script
+        // face does not survive the resolution the numerals are happiest at.
+        let size = CGSize(width: wordmarkCanvas, height: wordmarkCanvas)
         let format = UIGraphicsImageRendererFormat()
         format.opaque = false
         let renderer = UIGraphicsImageRenderer(size: size, format: format)

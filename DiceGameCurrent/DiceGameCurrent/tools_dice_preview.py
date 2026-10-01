@@ -109,6 +109,119 @@ def contrast(a, b):
     return (hi + 0.05) / (lo + 0.05)
 
 
+# How many flat tone steps the cel shader quantises a lit die face into.
+# Mirrors DieMaterialFactory.celBands, and tools_dice_verify.py asserts the
+# two agree — the shader's banding is what the numeral now sits on, so a
+# contrast figure measured against a flat body would be measuring a die that
+# no longer exists.
+CEL_BANDS = 3
+
+# The shade range the bands span, as a fraction of a die's own body colour.
+# Mirrors DieMaterialFactory.celShadeFloor / celShadeCeiling.
+CEL_SHADE_FLOOR = 0.62
+CEL_SHADE_CEILING = 1.0
+
+
+def band_factors(bands=CEL_BANDS,
+                 lo=CEL_SHADE_FLOOR, hi=CEL_SHADE_CEILING):
+    """The shade factors the shader quantises to: the centre of each band.
+
+    `lo + (hi - lo) * (b + 0.5) / bands`, exactly as the Metal does. At three
+    bands over 0.62-1.00 that is 0.683, 0.810 and 0.937 — so neither end of
+    the range is ever actually reached, and in particular no face is driven to
+    its own full brightness, which is the case that erases a numeral.
+    """
+    return [lo + (hi - lo) * (b + 0.5) / bands for b in range(bands)]
+
+
+def banded(body, factor):
+    """A body colour as the cel shader renders it at one band's shade factor.
+
+    The output is the body colour SCALED, never replaced, which is what keeps
+    hue and saturation — and therefore keeps the fifteen colourways tellable
+    apart. Clamped as the shader clamps, which matters for a pale body in the
+    top band where an unclamped scale would push a channel past white and
+    overstate the contrast.
+    """
+    return tuple(min(255, max(0, int(round(c * factor)))) for c in body)
+
+
+def check_band_contrast(bands=CEL_BANDS):
+    """What the CEL SHADE costs the numerals, which is the live question now.
+
+    check_contrast() below measures a flat body against its numeral, which was
+    the right model while a die was flat colour under smooth lighting. It is
+    not any more: every face is quantised to one of a few shade factors, so
+    the real pairing is the numeral against EACH of them.
+
+    This check earned its place immediately. The first version of the shader
+    quantised a face's ABSOLUTE luminance to three fixed levels — the textbook
+    posterise — and this caught what that does to a palette built on pairing a
+    dark numeral with a light body and a light numeral with a dark one:
+
+        #1B1B1B on #FCFBF9   16.66:1  ->  1.13:1
+        #F5F5F5 on #6E6456    5.32:1  ->  1.35:1
+
+    A third of the colourways would have lost their numerals on the device.
+    The shader bands the SHADE instead, so a face is always a shaded version
+    of its own colour, and this is what confirms that version is safe.
+
+    No separate dither term: the stipple rides in the multiply channel, so the
+    shader measures it as part of the shade and a dithered fragment lands one
+    band lower rather than being darkened within a band. Every appearance a
+    face can take IS one of these factors.
+    """
+    bar = 3.0
+    factors = band_factors(bands)
+    print("\nNumeral contrast under the %d-band cel shade." % bands)
+    print("Shade factors: %s\n"
+          % ", ".join("%.3f" % f for f in factors))
+
+    worst = None
+    failures = []
+    for body_hex, num_hex in COLORWAYS:
+        body, num = rgb(body_hex), rgb(num_hex)
+        flat = contrast(body, num)
+        for i, factor in enumerate(factors):
+            ratio = contrast(banded(body, factor), num)
+            if worst is None or ratio < worst[0]:
+                worst = (ratio, body_hex, num_hex, i, factor)
+            if ratio < bar <= flat:
+                failures.append((i, body_hex, num_hex, flat, ratio))
+
+    for i, factor in enumerate(factors):
+        band_worst = min(
+            ((contrast(banded(rgb(h), factor), rgb(n)), h, n)
+             for h, n in COLORWAYS), key=lambda t: t[0])
+        print("  band %d (x%.3f) — worst %s on %s at %.2f:1"
+              % (i, factor, band_worst[2], band_worst[1], band_worst[0]))
+
+    print("\n  Worst across every band: %s on %s at %.2f:1"
+          % (worst[2], worst[1], worst[0]))
+
+    under_flat = [(h, n, contrast(rgb(h), rgb(n)))
+                  for h, n in COLORWAYS if contrast(rgb(h), rgb(n)) < bar]
+    if under_flat:
+        print("\n  Already under %.1f:1 FLAT, before any of this — and the" % bar)
+        print("  banding improves every one, since shading a light body under")
+        print("  a light numeral moves them apart:")
+        for h, n, r in under_flat:
+            best = max(contrast(banded(rgb(h), f), rgb(n)) for f in factors)
+            print("    %-9s on %-9s  flat %.2f:1  best band %.2f:1"
+                  % (n, h, r, best))
+
+    if failures:
+        print("\n  FAIL — the cel shade pushes these under %.1f:1 from above:"
+              % bar)
+        for i, h, n, flat, got in failures:
+            print("    band %d  %-9s on %-9s  %.2f:1 -> %.2f:1"
+                  % (i, n, h, flat, got))
+        return 1
+    print("\n  PASS — no pairing that cleared %.1f:1 flat falls below it in" % bar)
+    print("  any band.")
+    return 0
+
+
 def check_contrast():
     """What the dither costs the numerals — and what it does not.
 

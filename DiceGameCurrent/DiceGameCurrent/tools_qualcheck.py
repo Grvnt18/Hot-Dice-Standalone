@@ -308,4 +308,98 @@ else:
 print("render-thread check:", "FAIL" if render_bad else "PASS",
       "(%d)" % render_bad)
 
-sys.exit(1 if bad or escapes or merged or undeclared or render_bad else 0)
+
+# --- static members resolve ------------------------------------------
+#
+# A fold deletes a file and moves its contents into another. If a LATER
+# commit then modifies the deleted file, git applies the rest of that
+# commit and drops that one hunk — no conflict, no marker, no warning.
+# That is how PixelPanel.cellOutline and .cellBevel went missing: the
+# re-fold was taken from the commit where the conflict surfaced rather
+# than from the last commit that touched the file, and nothing anywhere
+# said so until the device refused to compile.
+#
+# Silence is what makes that the worst failure mode this project has
+# hit — worse than the crash, which at least had a trace once asked. So:
+# every `Type.member` where Type is declared in this tree must resolve.
+#
+# STATICS ONLY, deliberately. Instance members arrive from protocol
+# conformances — View, ViewModifier — and a check that tried to model
+# Swift's conformance rules would be wrong often enough to be ignored,
+# which is the one thing a guard must never be. Nothing here takes a
+# static from a protocol, so statics resolve exactly.
+#
+# It cannot catch a wrong ARGUMENT LIST ("extra arguments at position
+# #4") — that needs signature matching, which is a type-checker's job.
+# But that error shares this root cause, so what this catches is enough
+# to catch the cause.
+member_bad = 0
+
+# Swift builtins reachable on any metatype — not declared anywhere.
+_BUILTIN_MEMBERS = {"self", "init", "type", "some"}
+
+# Statics that standard-library protocols supply. The conformance walk
+# below only sees protocols declared in this tree, so the handful that
+# come from the stdlib are listed here rather than inferred — a short,
+# honest list beats a clever rule that is wrong in a way nobody checks.
+_STDLIB_STATICS = {
+    "CaseIterable": {"allCases"},
+}
+
+_decls = {}          # type name -> set of static member names
+_conforms = {}       # type name -> set of protocol/base names
+for f in SOURCES:
+    src = strip(open(f).read())
+    for m in re.finditer(
+            r'^(?:public |private |fileprivate |internal |final |@\w+ )*'
+            r'(?:struct|class|enum|protocol|extension)\s+(\w+)'
+            r'\s*(?::\s*([^{\n]+))?', src, re.M):
+        name, inherits = m.group(1), (m.group(2) or "")
+        body = body_after(src, m.end())
+        members = set(re.findall(r'static\s+(?:let|var|func)\s+`?(\w+)`?', body))
+        members |= set(re.findall(r'^\s*case\s+`?(\w+)`?', body, re.M))
+        _decls.setdefault(name, set()).update(members)
+        # `: Foo, Bar` after a type name is conformance (or a raw value).
+        for base in re.findall(r'\b([A-Z]\w*)', inherits):
+            _conforms.setdefault(name, set()).add(base)
+
+def _statics(tname, seen=None):
+    """Everything reachable as a static on this type.
+
+    Includes what its protocols declare and what extensions on those
+    protocols default — SuiteGame supplies floorTitle and
+    lowestScoreWins that way, and treating them as missing was how the
+    first draft of this check produced 49 false positives on a tree that
+    compiles. A guard that cries wolf is one that gets ignored, so the
+    conformance walk is the difference between this being useful and
+    being noise.
+    """
+    seen = seen or set()
+    if tname in seen:
+        return set()
+    seen.add(tname)
+    out = set(_decls.get(tname, ()))
+    for base in _conforms.get(tname, ()):
+        out |= _STDLIB_STATICS.get(base, set())
+        out |= _statics(base, seen)
+    return out
+
+for f in SOURCES:
+    src = strip(open(f).read())
+    for m in re.finditer(r'\b([A-Z]\w*)\.([a-z]\w*)', src):
+        tname, member = m.group(1), m.group(2)
+        if member in _BUILTIN_MEMBERS:
+            continue
+        if tname not in _decls:
+            continue                      # not a type we declare
+        known = _statics(tname)
+        if not known or member in known:
+            continue
+        print("  MEMBER  %s:%d  '%s.%s' — %s declares no static '%s'"
+              % (os.path.relpath(f), src[:m.start()].count("\n") + 1,
+                 tname, member, tname, member))
+        member_bad += 1
+print("static-member check:", "FAIL" if member_bad else "PASS",
+      "(%d)" % member_bad)
+
+sys.exit(1 if bad or escapes or merged or undeclared or render_bad or member_bad else 0)

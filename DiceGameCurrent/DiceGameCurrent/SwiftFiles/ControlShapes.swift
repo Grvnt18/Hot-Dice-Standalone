@@ -71,8 +71,12 @@ struct RoundedSquareToggleStyle: ToggleStyle {
 // REPLACEMENTS ONLY — a stage that fails is then broken code, never a
 // file somebody forgot to add.
 //
-// This file already owns the shapes controls are drawn from, so a panel
-// and a button belong in it.
+// TAKEN FROM 82abaf2, the LAST commit in the restyle that touches this
+// code — not from ed57f86, where the merge conflict surfaced. That
+// distinction cost three compile errors: a later commit modified a file
+// git had already staged as deleted, so its hunk was dropped with no
+// conflict and no warning. When re-folding, take the final version, not
+// the one that conflicted.
 // ---------------------------------------------------------------------
 
 /// The frame every piece of in-game chrome wears: flat fill, hard outline,
@@ -116,7 +120,15 @@ struct PixelPanel: ViewModifier {
     /// Score cells are small — around 30pt across on a phone — so they take a
     /// thinner outline and a tighter corner than a button does. At the full
     /// 2pt the outline is most of the cell.
+    ///
+    /// That is what this comment always said, and for a while only the
+    /// corner was implemented: the outline stayed at 2pt, so on a 375pt
+    /// phone a ~30pt cell spent 8 of those 30 points on outline and bevel —
+    /// a quarter of it — and the quarter it spent was exactly the die's own
+    /// body colour, which is the thing the cells exist to show.
     static let cellRadius: CGFloat = 2
+    static let cellOutline: CGFloat = 1
+    static let cellBevel: CGFloat = 1
 
     /// Near-black, and shared, so every outline in the app is the same one.
     /// Not pure black: against the tray's dark timber a true black outline
@@ -149,8 +161,11 @@ extension View {
     /// is the one way to put a shadow on it.
     func pixelPanel(fill: PixelPanel.Fill = .none,
                     elevation: Elevation = .resting,
-                    radius: CGFloat = ControlShape.cornerRadius) -> some View {
-        modifier(PixelPanel(fill: fill, elevation: elevation, radius: radius))
+                    radius: CGFloat = ControlShape.cornerRadius,
+                    outline: CGFloat = PixelPanel.outlineWidth,
+                    bevel: CGFloat = PixelPanel.bevelWidth) -> some View {
+        modifier(PixelPanel(fill: fill, elevation: elevation, radius: radius,
+                            outline: outline, bevel: bevel))
     }
 
     /// A panel sunk INTO its surface rather than sitting on it — an empty
@@ -159,14 +174,16 @@ extension View {
     /// The same parts with the light reversed: the bevel runs dark-over-light
     /// instead of light-over-dark, and there is no shadow, because nothing
     /// below the surface throws one.
-    func pixelWell(radius: CGFloat = ControlShape.cornerRadius) -> some View {
+    func pixelWell(radius: CGFloat = ControlShape.cornerRadius,
+                   outline: CGFloat = PixelPanel.outlineWidth,
+                   bevel: CGFloat = PixelPanel.bevelWidth) -> some View {
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         return self
-            .overlay(shape.inset(by: PixelPanel.outlineWidth)
-                .strokeBorder(PieceSheen.bevel, lineWidth: PixelPanel.bevelWidth)
+            .overlay(shape.inset(by: outline)
+                .strokeBorder(PieceSheen.bevel, lineWidth: bevel)
                 .rotationEffect(.degrees(180)))
             .overlay(shape.strokeBorder(PixelPanel.outlineColor.opacity(0.55),
-                                        lineWidth: PixelPanel.outlineWidth))
+                                        lineWidth: outline))
             .clipShape(shape)
     }
 }

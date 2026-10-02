@@ -469,6 +469,15 @@ struct NetResultView: View {
         ZStack {
             NetGrid()
             Color.black.opacity(0.8).ignoresSafeArea()
+                // Rollbots ends on its own screen rather than the shared
+                // host's, so the fireworks are wired here too — otherwise
+                // the one game with a bespoke win view is the one that
+                // falls silent at the win.
+                .onAppear {
+                    VictoryAudio.preload()
+                    VictoryAudio.start()
+                }
+                .onDisappear { VictoryAudio.stop() }
 
             VStack(spacing: 14) {
                 Text(headline)

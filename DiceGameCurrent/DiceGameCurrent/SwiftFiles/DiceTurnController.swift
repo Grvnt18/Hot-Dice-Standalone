@@ -128,7 +128,6 @@ final class DiceTurnController {
         // never becomes true — meaning canConfirmAndRoll would be
         // permanently false and the Roll button would never enable.
         round.rollPool()
-        SoundEngine.shared.play(.diceRoll)
 
         let dice = lifecycle.rollableDice
         DiceRollImpulse.launch(dice: dice)

@@ -201,6 +201,7 @@ struct HogScreen: View {
         if face == HogRules.hogFace {
             // The turn total is lost, not the banked score — and nothing is
             // added to the match, which is the whole of the penalty.
+            DiceAudioEngine.shared.play(set: AudioSet.oink, jitter: false)
             turnTotal = 0
             lastSummary = HogRules.summary(
                 player: match.activeDisplayName,

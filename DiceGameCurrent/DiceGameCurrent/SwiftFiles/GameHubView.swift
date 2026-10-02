@@ -58,7 +58,10 @@ struct GameHubView: View {
                             ForEach(GameCatalog.all) { entry in
                                 GameTile(entry: entry,
                                          side: HubLayout.tileSide(forWidth: geo.size.width)) {
-                                    SoundEngine.shared.play(.buttonTap)
+                                    // Its own cue, not the generic button:
+                                    // picking a game is the one choice on
+                                    // this screen worth marking.
+                                    SoundEngine.shared.play(.menuSelect)
                                     // The scope is entered HERE, before the
                                     // cover presents, not in the game's own
                                     // onAppear: the scene reads

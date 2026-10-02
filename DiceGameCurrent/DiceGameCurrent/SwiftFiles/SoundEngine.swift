@@ -6,14 +6,28 @@ import Combine
 /// be picked up automatically. See SoundEngine.preload() for the extensions
 /// tried.
 enum SFX: String, CaseIterable {
-    case diceRoll      = "sfx_dice_roll"
-    case diceSettle    = "sfx_dice_settle"
     case dieSelect     = "sfx_die_select"
     case dieDeselect   = "sfx_die_deselect"
     case bank          = "sfx_bank"
-    case turnComplete  = "sfx_turn_complete"
     case buttonTap     = "sfx_button_tap"
+    case menuSelect    = "sfx_menu_select"
 }
+
+// `diceRoll`, `diceSettle` and `turnComplete` were here and are gone.
+//
+// The dice already sound: DiceContactAudio plays the impact tiers off the
+// physics as they tumble and land, which is the real thing rather than a
+// stock sample timed to it. A throw cue on top would double it, and a settle
+// cue would land on a sound that is already finishing.
+//
+// Removed rather than left declared-but-fileless: a case with no audio is
+// indistinguishable from a case whose file is missing, and that ambiguity is
+// precisely what let these seven cues ship silent for as long as they did.
+//
+// `turnComplete` is the one with no replacement — no turn-complete sound was
+// supplied. Re-adding it is this line plus a file named sfx_turn_complete;
+// `tools_audio_verify.py` now fails if a cue is declared without one, so it
+// cannot go quiet again.
 
 /// Central audio controller: one looping music track plus fire-and-forget
 /// sound effects, with independently persisted volume + mute for each.

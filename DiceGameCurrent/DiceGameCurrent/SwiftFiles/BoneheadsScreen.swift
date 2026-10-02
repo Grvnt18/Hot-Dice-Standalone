@@ -432,6 +432,12 @@ struct BoneheadsScreen: View {
 
         SoundEngine.shared.play(.buttonTap)
         let strike = state.place(seat: seat, column: column, die: die)
+        // Only when dice actually came off the board. A placement that
+        // strikes nothing is the common case, and sounding it would make
+        // the removal cue meaningless.
+        if strike.destroyed > 0 {
+            DiceAudioEngine.shared.play(set: AudioSet.remove, jitter: false)
+        }
         rolled = nil
         syncScores()
 

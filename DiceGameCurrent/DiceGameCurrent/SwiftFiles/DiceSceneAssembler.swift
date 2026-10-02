@@ -270,7 +270,6 @@ final class DiceTraySession {
         guard !rollController.isRolling else { return false }
         let dice = lifecycle.rollableDice.filter { !keptIDs.contains($0.id) }
         guard !dice.isEmpty else { return false }
-        SoundEngine.shared.play(.diceRoll)
         DiceRollImpulse.launch(dice: dice)
         settledThisRoll.removeAll()
         for die in dice { turnValues.removeValue(forKey: die.id) }

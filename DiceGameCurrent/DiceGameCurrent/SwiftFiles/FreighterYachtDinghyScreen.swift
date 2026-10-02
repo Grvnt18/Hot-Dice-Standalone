@@ -112,6 +112,13 @@ struct FreighterYachtDinghyScreen: View {
         .onAppear {
             AppFonts.registerIfNeeded()
             SoundEngine.shared.startMusic()
+            SeaAudio.preload()
+            SeaAudio.start()
+        }
+        .onDisappear {
+            // Easy to leave out, and leaving it out plays the sea over the
+            // hub for the rest of the session.
+            SeaAudio.stop()
         }
         .onValueChange(of: theme.colorwayIndex) { _ in
             session?.applyTheme()

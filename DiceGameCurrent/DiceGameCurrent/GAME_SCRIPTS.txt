@@ -71,7 +71,7 @@ SETTINGS (the gear, top right of every game)
                              title.
 
 THE HUB
-  "Rolls"  — the wordmark under the app's die mark. Each tile shows only the
+  "Hot Dice"  — the wordmark under the app's die mark. Each tile shows only the
   game's name under its artwork. If a resource is missing, a banner names the
   file rather than failing silently.
 

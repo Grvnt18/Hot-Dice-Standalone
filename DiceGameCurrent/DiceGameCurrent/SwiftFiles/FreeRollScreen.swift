@@ -100,7 +100,7 @@ struct FreeRollScreen: View {
         }
         // Repaints the floor in place when the table colour changes, so the
         // new shade shows the moment Settings closes rather than next launch.
-        .onChange(of: theme.colorwayIndex) { _, _ in
+        .onValueChange(of: theme.colorwayIndex) { _ in
             session?.applyTheme()
         }
     }

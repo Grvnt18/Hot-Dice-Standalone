@@ -76,3 +76,69 @@ extension Color {
         self.init(uiColor: UIColor(hex: hex))
     }
 }
+
+
+// ---------------------------------------------------------------------
+// One spelling of `onChange` for two toolchains — here rather than in a
+// file of its own, for the reason given at the bottom of
+// DiceSceneEnvironment.swift: neither project picks up a new file by
+// itself, and a missing one fails as "no member 'onValueChange'" at
+// twelve call sites.
+//
+// This file's whole job is shared extensions, so it is where a shared
+// extension belongs anyway.
+// ---------------------------------------------------------------------
+
+// One spelling of `onChange` for two toolchains.
+//
+// This project builds in two places that disagree about which `onChange`
+// exists. The iPad runs Swift Playgrounds against a current SDK, where
+// `onChange(of:perform:)` is deprecated. The Mac is Monterey, so Xcode
+// 14.2 and the iOS 16.2 SDK, where the replacement does not exist at
+// all. Writing either one directly is wrong on one machine:
+//
+//   one parameter  ->  twelve deprecation warnings on the iPad
+//   two parameters ->  twelve ERRORS on the Mac
+//
+// Twelve warnings is not a build failure, but it is twelve lines of
+// yellow to scroll past every time the question is "is there a red one
+// in here". That is a real cost on the machine the project is supposed
+// to iterate on, so it is worth removing rather than tolerating.
+//
+// `if #available(iOS 17, *)` CANNOT do this, which is worth stating
+// because it is the obvious reach. Availability is a runtime test: both
+// branches must still type-check, so the two-parameter call has to
+// exist in the SDK being compiled against. On Xcode 14.2 it does not,
+// and the file fails to build.
+//
+// `#if swift(...)` is a compile-time test, and the branch not taken is
+// never type-checked at all — so the Mac never sees the call it has no
+// SDK for.
+//
+// THE JOIN IS APPROXIMATE, AND DELIBERATELY SO. `#if swift(>=5.9)` asks
+// about the COMPILER; the API needs the iOS 17 SDK. Those are separate
+// things. They move together on the two machines this project has —
+// Xcode 14.2 is Swift 5.7 with the iOS 16 SDK, and any Playgrounds new
+// enough to be Swift 5.9 carries iOS 17 or later — so the test is
+// reliable here. A Swift 5.9 compiler pointed at an iOS 16 SDK would
+// break it. That combination does not exist in this project, and if it
+// ever does, this is the one place to fix.
+//
+// The one-parameter closure receives the NEW value, which is exactly
+// what the second parameter of the two-parameter form is. Nothing in
+// the tree reads the old value, so this is a rename rather than a
+// rewrite, and both branches call `action` with the same thing.
+extension View {
+
+    /// Runs `action` with the new value whenever `value` changes.
+    func onValueChange<V: Equatable>(
+        of value: V,
+        perform action: @escaping (V) -> Void
+    ) -> some View {
+        #if swift(>=5.9)
+        return self.onChange(of: value) { _, newValue in action(newValue) }
+        #else
+        return self.onChange(of: value) { newValue in action(newValue) }
+        #endif
+    }
+}

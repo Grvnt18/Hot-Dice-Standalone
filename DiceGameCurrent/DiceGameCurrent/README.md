@@ -1,4 +1,4 @@
-# Rolls — Dice Game
+# Hot Dice — a dice game suite
 
 Full project state. 72 Swift files, 119 resources.
 

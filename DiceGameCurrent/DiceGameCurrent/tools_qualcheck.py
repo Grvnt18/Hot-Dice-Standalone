@@ -215,6 +215,11 @@ KNOWN = {
     # Swift keywords and contextual words that parse as `name(`
     "if", "for", "in", "case", "switch", "return", "init", "private",
     "fileprivate", "escaping",
+    # Compile-time condition directives. `#if swift(>=5.9)` and
+    # `#if targetEnvironment(simulator)` parse as calls and are not: they are
+    # resolved by the compiler before any code exists to declare them. The
+    # same list main carries, for the same reason.
+    "targetEnvironment", "canImport", "compiler", "swift", "os", "arch",
     # standard library and Foundation
     "abs", "min", "max", "ceil", "floor", "round", "sqrt", "sin", "cos",
     "tan", "atan2", "pow", "stride", "zip", "print", "precondition",

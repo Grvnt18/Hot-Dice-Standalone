@@ -173,7 +173,7 @@ struct BaseballDiceScreen: View {
         // from the theme too, and they were only repainted after an
         // at-bat — so the posts changed colour on the next roll rather
         // than when the colour was picked.
-        .onChange(of: theme.colorwayIndex) { _, _ in
+        .onValueChange(of: theme.colorwayIndex) { _ in
             session?.applyTheme()
             refreshField()
         }

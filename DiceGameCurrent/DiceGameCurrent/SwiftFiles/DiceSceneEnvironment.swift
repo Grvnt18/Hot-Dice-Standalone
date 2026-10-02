@@ -115,7 +115,10 @@ enum DiceSceneEnvironment {
         key.intensity = 900
         key.color = UIColor.white
         key.castsShadow = true
-        key.shadowMode = .deferred
+        // Through the enum: .deferred on device, which is exactly what this
+        // line set before, and .forward in the Simulator where the deferred
+        // pass asks for a single-channel mask it cannot allocate.
+        key.shadowMode = SceneShadows.mode
         // Tight, hard-edged shadow rather than the previous radius-4 blur —
         // crisp shadow edges suit the flat-shaded look.
         key.shadowRadius = 1
@@ -602,6 +605,67 @@ enum SceneAntialiasing {
     // expression the solver had to work too hard on. Naming the type
     // costs nothing.
     static var mode: SCNAntialiasingMode { SCNAntialiasingMode.none }
+}
+
+/// Which shadow technique the key light uses.
+///
+/// This is the second Simulator render-target gap in the same tray, and
+/// the pair of them is the reason this file exists rather than a literal
+/// at the call site. `SceneAntialiasing` was a multisampled **depth**
+/// attachment the Simulator cannot resolve; this is a single-channel
+/// **mask** it cannot allocate:
+///
+///     MTLDebugValidateMTLPixelFormat: failed assertion
+///     'pixelFormat (11) is not a valid MTLPixelFormat.'
+///
+/// Format 11 is `R8Unorm_sRGB` — one channel, sRGB. A shadow mask is
+/// naturally single-channel, because all it stores per pixel is how
+/// shadowed that pixel is, and `.deferred` is the mode that renders one:
+/// SceneKit resolves shadows in a screen-space pass into a mask and
+/// composites it, rather than sampling a shadow map inline.
+///
+/// `.forward` needs no such target. It samples a conventional depth-only
+/// shadow map during the main pass, and a depth map is a format the
+/// Simulator has — it is drawing into one already.
+///
+/// **Why the die materials were the wrong suspect.** The colour-space
+/// conversion in the commit before this one is right on its own merits,
+/// but it cannot be what fixes this: the assertion also fires in Free
+/// Roll, which opens with an **empty pool**. With no dice there are no
+/// die materials, so whatever asks for format 11 is present in every
+/// tray with or without dice. The key light is, and it is the only thing
+/// in the tray that asks for a render target of its own.
+///
+/// It fits the rest too — every game builds a tray and every tray gets
+/// this light, and the hub never asserts because the hub builds no
+/// scene at all.
+///
+/// **Low visual risk, which is worth stating rather than assuming.** The
+/// comment at the call site argues for `.deferred` against a *soft area
+/// light*, whose broad shadows read as photographic. The light there now
+/// is directional with `shadowRadius = 1` — a hard edge under either
+/// mode — so forward shadows should be very close to identical, and
+/// where they differ, the Simulator is not what anyone ships.
+///
+/// If the assertion survives this, the next step is `castsShadow = false`
+/// in the Simulator: a flat-lit tray that runs beats a correctly lit one
+/// that aborts, and shadow quality is exactly the kind of judgement the
+/// iPad can make and the Simulator cannot.
+///
+/// Compile-time, like `SceneAntialiasing`, so the device build is
+/// bit-for-bit unchanged and real hardware keeps the deferred pass.
+enum SceneShadows {
+
+    static var mode: SCNShadowMode {
+        #if targetEnvironment(simulator)
+        // Not `.modulated` either — that renders a projected gobo rather
+        // than a real shadow, and it would change the look on the one
+        // platform we are trying to keep merely runnable.
+        return .forward
+        #else
+        return .deferred
+        #endif
+    }
 }
 
 // MARK: - Render resolution

@@ -465,25 +465,46 @@ struct FireworkBurst: View {
 
     private let particleCount = 14
 
+    /// Where particle `i` has travelled to at `t`.
+    ///
+    /// Out of the ViewBuilder and single-typed, and that is not tidiness.
+    /// Swift solves a whole expression at once, weighing every overload of
+    /// every operator in it, and mixing Double with CGFloat roughly doubles
+    /// the branching at each node because both conform to the protocols the
+    /// operators are declared on. This body was fifteen operators and two
+    /// trig calls with both numeric types present — the worst expression in
+    /// the tree, and Xcode 14.2's solver gave up on it with "unable to
+    /// type-check this expression in reasonable time".
+    ///
+    /// EVERY NUMBER IS THE SAME. cos(angle) * reach * t, the gravity term,
+    /// the fade and the shrink are character-for-character what they were;
+    /// they are annotated and moved, not rewritten. "Simplify the
+    /// expression" is exactly how a burst quietly changes shape.
+    private func particleOffset(_ i: Int, t: Double) -> CGSize {
+        let angle: Double = (Double(i) / Double(particleCount)) * 2 * .pi
+        // Varying the reach per particle stops the burst reading as a
+        // perfect ring, which looks mechanical rather than explosive.
+        let reach: Double = 70 + Double((i * 37) % 55)
+        let x: Double = cos(angle) * reach * t
+        // Slight downward bias as the burst expands, so particles arc
+        // under gravity instead of floating.
+        let y: Double = sin(angle) * reach * t + t * t * 26
+        return CGSize(width: x, height: y)
+    }
+
     var body: some View {
-        ZStack {
+        let t: Double = Double(progress)
+        let fade: Double = 1 - t
+        let shrink: CGFloat = CGFloat(1 - t * 0.55)
+
+        return ZStack {
             ForEach(0..<particleCount, id: \.self) { i in
-                let angle = (Double(i) / Double(particleCount)) * 2 * .pi
-                // Varying the reach per particle stops the burst reading as
-                // a perfect ring, which looks mechanical rather than
-                // explosive.
-                let reach: CGFloat = 70 + CGFloat((i * 37) % 55)
                 Circle()
                     .fill(color)
                     .frame(width: 7, height: 7)
-                    .offset(
-                        x: cos(angle) * reach * progress,
-                        // Slight downward bias as the burst expands, so
-                        // particles arc under gravity instead of floating.
-                        y: sin(angle) * reach * progress + (progress * progress * 26)
-                    )
-                    .opacity(Double(1 - progress))
-                    .scaleEffect(1 - progress * 0.55)
+                    .offset(particleOffset(i, t: t))
+                    .opacity(fade)
+                    .scaleEffect(shrink)
             }
         }
         .position(origin)
@@ -859,7 +880,7 @@ struct DiceGameScreen: View {
         // Re-paints the already-assembled floor/text materials in place
         // rather than waiting for the next launch, so picking a new table
         // color in Settings is visible the instant the sheet closes.
-        .onChange(of: theme.colorwayIndex) { _, _ in
+        .onValueChange(of: theme.colorwayIndex) { _ in
             session?.applyTheme()
         }
         // The .playback audio session lets sound continue when the app
@@ -867,7 +888,7 @@ struct DiceGameScreen: View {
         // stops the music on our behalf. In Playgrounds that showed up as
         // a track outliving the app and appearing to play independently
         // of it. Tie it to scene phase explicitly.
-        .onChange(of: scenePhase) { _, phase in
+        .onValueChange(of: scenePhase) { phase in
             switch phase {
             case .active:                SoundEngine.shared.resumeFromForeground()
             case .inactive, .background: SoundEngine.shared.suspendForBackground()

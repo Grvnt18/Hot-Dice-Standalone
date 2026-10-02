@@ -132,7 +132,7 @@ struct SettingsView: View {
                                 Toggle("Music Per Game", isOn: $musicPerGame)
                                     .font(.poppins(15))
                                     .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
-                                    .onChange(of: musicPerGame) { _, now in
+                                    .onValueChange(of: musicPerGame) { now in
                                         GameScope.musicIsPerGame = now
                                     }
                             }

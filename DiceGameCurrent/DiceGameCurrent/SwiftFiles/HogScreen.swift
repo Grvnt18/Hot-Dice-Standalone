@@ -110,7 +110,7 @@ struct HogScreen: View {
             AppFonts.registerIfNeeded()
             SoundEngine.shared.startMusic()
         }
-        .onChange(of: theme.colorwayIndex) { _, _ in
+        .onValueChange(of: theme.colorwayIndex) { _ in
             session?.applyTheme()
         }
     }

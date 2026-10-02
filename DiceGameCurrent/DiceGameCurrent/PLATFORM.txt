@@ -1,0 +1,189 @@
+THE FLOOR — what this project is allowed to use
+
+In one line: write it as if it were 2022. iOS 16, Swift 5.7.
+
+
+WHY
+
+There is one Mac, it runs macOS 12 Monterey, and it cannot be updated any
+further. The last version of Xcode that runs on Monterey is 14.2. Xcode
+14.2 can only build against iOS 16 and only understands Swift 5.7.
+
+That matters because the Messages extension — the whole point of the
+iMessage version — cannot be built in Swift Playgrounds at all. It needs
+Xcode. So Xcode 14.2 is the ceiling for the entire project, not just for
+one corner of it.
+
+The iPad is on iOS 18 and will happily compile things the Mac cannot.
+That is the trap: code written on the iPad against a newer feature builds
+fine there, reaches no Mac, and fails weeks later when Xcode opens. The
+list below exists so that never happens.
+
+
+WHAT NOT TO USE, AND WHAT TO WRITE INSTEAD
+
+  Do not write                  Write instead
+  ---------------------------   ------------------------------------------
+  .onChange(of: x) { ... }      .onValueChange(of: x) { new in ... }
+                                (either spelling of onChange, in any
+                                screen: OnValueChange.swift picks the
+                                right one per toolchain)
+  @Observable                   ObservableObject with @Published
+  @Bindable                     @ObservedObject
+  ContentUnavailableView        a VStack
+  .symbolEffect                 a plain Image
+  .sensoryFeedback              UIImpactFeedbackGenerator
+  .scrollTargetBehavior         a plain ScrollView
+  .scrollPosition               ScrollViewReader
+  .containerRelativeFrame       GeometryReader
+  PhaseAnimator, KeyframeAnimator   withAnimation
+  SwiftData, @Model             Codable and UserDefaults
+  MeshGradient                  LinearGradient
+  #Preview                      nothing — this project has no previews
+  let x = if … / let x = switch …   a var, then an if or switch
+  macros, parameter packs,      plain functions
+    ~Copyable, consuming/borrowing
+
+`tools_platform_verify.py` checks all of these on every sweep and names
+the file and line if one gets in.
+
+
+THE OTHER WAY THE TWO MACHINES DISAGREE
+
+The list above is about which APIs exist. There is a second kind, and it
+does not look like a platform problem at all:
+
+    error: the compiler is unable to type-check this expression in
+           reasonable time
+
+Same source, same SDK, same code that builds on the iPad in a second.
+Swift works out the types of a whole expression at once, weighing every
+possible meaning of every operator in it, and the work climbs steeply
+with how many operators sit in ONE expression. The iPad runs a much
+newer Swift whose solver is faster; Xcode 14.2's gives up.
+
+Two things make it far worse:
+
+  * Mixing CGFloat and Double. The two convert into each other
+    automatically, so every `+` and `*` in the expression gains an extra
+    possibility to weigh. Trigonometry is the usual way it starts —
+    `cos` and `sin` hand back a Double into geometry that is otherwise
+    CGFloat.
+  * Writing the arithmetic inline inside `body`, where it becomes part
+    of one enormous expression rather than its own small one.
+
+Three expressions have hit this: a floor motif in one build, and the
+firework burst and the Boneheads pip face on the first Mac build.
+
+The fix is the same every time, and it never changes what is drawn:
+
+  1. Give every local an explicit type — `let x: CGFloat = ...`
+  2. Keep one numeric type per chain; convert once, at the edge.
+  3. Move the arithmetic into a named function, so `body` calls it
+     instead of containing it.
+
+`tools_typecheck_verify.py` scores every SwiftUI body for this and fails
+above a threshold. It is a heuristic, not a compiler — it cannot prove
+an expression solves, only notice one shaped like the three that did
+not. All three ranked in its top three.
+
+
+AND A THIRD: THE SIMULATOR IS NOT A SMALL iPHONE
+
+The two above are about the compiler. This one is about what runs, and it
+is the category that has cost the most build rounds.
+
+The iOS Simulator's Metal is a REDUCED FEATURE SET. It is missing render
+targets that every real iPhone and iPad has had for years, and SceneKit
+reaches for them without asking. When it does, Metal's validation layer
+aborts the process mid-frame — so it does not present as a graphics
+problem at all. It presents as a blank screen, dice that never appear,
+and back and settings buttons that no longer respond, because the app is
+no longer running to respond to them.
+
+Two have been hit, and they are the same shape:
+
+  * A multisampled DEPTH attachment cannot be resolved, so any
+    antialiasing on an SCNView is fatal.
+        validateRenderPassDescriptor:899 ... MultisampleResolve store
+        action for the depth attachment is not supported by device
+  * R8Unorm_sRGB does not exist, so the single-channel mask a DEFERRED
+    shadow pass renders into cannot be allocated.
+        MTLDebugValidateMTLPixelFormat: pixelFormat (11) is not a valid
+        MTLPixelFormat
+
+Neither is a mistake in the code. Both are correct on hardware.
+
+The fix in both cases is one enum holding the choice behind
+`#if targetEnvironment(simulator)` — `SceneAntialiasing` and
+`SceneShadows`. That test is resolved at compile time, so the device
+build is bit-for-bit unchanged and only the Simulator gets the lesser
+setting. `tools_platform_verify.py` asserts every call site goes through
+those enums, and that the enums still branch.
+
+The practical rule, and it is worth more than the list: THE SIMULATOR IS
+THE WRONG PLACE TO FIRST RUN ANYTHING THAT TOUCHES SceneKit OR METAL.
+Run it on the iPad, where Metal is real and the loop is minutes. The
+Mac's Simulator is needed for exactly one thing the iPad cannot do — the
+Messages extension — and everything before that point is cheaper to
+shake out on hardware.
+
+
+WHAT THIS DOES NOT LIMIT
+
+Almost nothing, which is the part worth saying out loud.
+
+Every one of the eleven games is already built from things far older than
+the floor: SceneKit, the dice physics, the audio engine, the whole turn
+and handover system. None of it is anywhere near iOS 16.
+
+That held through the restyle, which is the real test of it. The animated
+floor is a GLSL shader string compiled by SceneKit at runtime — a
+mechanism that predates iOS 16 by eight years — and the five Poppins
+weights and Lobster are registered with Core Text exactly as the two
+faces before them were. Neither needed anything new.
+
+The floor only bites when reaching for something *new*, and so far
+nothing in the suite has.
+
+In practice it costs one habit — `.onValueChange` rather than
+`.onChange` — and nothing else.
+
+That one is worth a word, because it is the only place the two machines
+needed different SOURCE rather than just different care. SwiftUI renamed
+`onChange`'s closure shape in iOS 17. The iPad deprecates the old
+spelling; the Mac's SDK does not have the new one at all, so either
+literal is wrong somewhere. `OnValueChange.swift` holds a
+`#if swift(>=5.9)` that picks per toolchain, and every screen calls
+`.onValueChange` instead. `tools_platform_verify.py` asserts nothing
+else calls `.onChange` in either form.
+
+
+WHAT IT COSTS AT RUNTIME
+
+Nothing at all. What SDK you build against and what system you run on are
+two different things. An app built with the iOS 16 SDK runs perfectly on
+iOS 18, iOS 26 and whatever comes next. Players will never know.
+
+
+THE TWO THINGS THE OLD MAC CANNOT DO
+
+1. Install onto the iOS 18 iPad. Xcode 14 has no support files for a
+   system that new, and the gap is too wide to work around.
+2. Upload to the App Store. Apple requires builds to be made with a
+   recent SDK, and raises the bar every year; Xcode 14 is years below it.
+
+Both are answered the same way, and it is not a new Mac: a modern Xcode
+running in the cloud (GitHub Actions) does the release build, and
+TestFlight puts it on the iPad. That comes after the Xcode project
+exists. Everything before it — writing the extension and proving a turn
+sends between two simulated conversations — the Monterey Mac does
+perfectly well on its own.
+
+
+WHEN THIS CHANGES
+
+Only if a newer Mac appears. If one does, nothing here needs undoing:
+everything above still compiles on newer systems, and lifting the floor
+is a matter of deleting lines from one list in
+`tools_platform_verify.py`.

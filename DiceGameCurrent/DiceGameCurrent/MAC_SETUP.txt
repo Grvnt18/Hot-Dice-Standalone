@@ -1,0 +1,220 @@
+OPENING THIS PROJECT IN XCODE ON THE MAC
+
+For a Mac running macOS 12 Monterey. Read PLATFORM.txt first if you want
+to know why the versions below are what they are; this file is just the
+steps.
+
+What you are building: the container app — all eleven games, exactly as
+they run on the iPad. The Messages extension comes after this works.
+
+
+===============================================================================
+STEP 1 — GET XCODE 14.2
+===============================================================================
+
+Not from the App Store. The App Store only ever offers the newest Xcode,
+which will refuse to install on Monterey.
+
+  1. Go to  https://developer.apple.com/download/all/
+  2. Sign in with any Apple ID (a free one is fine for this).
+  3. Search for "Xcode 14.2" and download the .xip — about 7 GB.
+  4. Double-click the .xip to unpack it. This takes a while and looks
+     stuck. It is not.
+  5. Drag Xcode.app into /Applications.
+  6. Open it once and let it install the extra components it asks for.
+
+Xcode 14.2 is the last version that runs on Monterey. Do not let it
+update itself.
+
+**Put it in /Applications, not Downloads.** If Xcode lives anywhere
+else, nothing has registered where it is, and parts of the build that
+shell out to the command line cannot find it. It does not fail the
+build, but it fills the log with:
+
+    xcode-select: error: unable to get active developer directory
+
+Run this once from Terminal so the command line knows where Xcode is:
+
+    sudo xcode-select --switch /Applications/Xcode.app
+
+(The build step that used to shout about this was the .dae conversion,
+and those files are no longer shipped — see the count below — so the
+log should be quiet either way now. Set it anyway: the next tool that
+shells out will want it too.)
+
+
+===============================================================================
+STEP 2 — MAKE THE PROJECT
+===============================================================================
+
+  1. Xcode → File → New → Project…
+  2. Choose  iOS → App.  Next.
+  3. Fill in:
+        Product Name:    Hot Dice
+        Interface:       SwiftUI
+        Language:        Swift
+        Storage:         None
+        (leave the test checkboxes off for now)
+  4. Save it somewhere OUTSIDE the cloned repository folder — keeping
+     the project file separate means the repo stays exactly as the iPad
+     expects it.
+
+
+===============================================================================
+STEP 3 — SET THE ONE SETTING THAT MATTERS
+===============================================================================
+
+  1. Click the blue project icon at the top of the file list.
+  2. Select the "Hot Dice" target → General tab.
+  3. Set  Minimum Deployments → iOS 16.0.
+
+That is the only build setting that needs changing.
+
+
+===============================================================================
+STEP 4 — ADD THE CODE AND THE FILES
+===============================================================================
+
+  1. In Finder, open the cloned repo at
+       DiceGameCurrent/DiceGameCurrent/
+  2. Drag the  SwiftFiles  folder into Xcode's file list.
+  3. Drag the  Resources  folder in the same way.
+  4. In the dialog that appears both times, make sure:
+        [x] Copy items if needed
+        (o) Create groups
+        [x] Add to targets: Hot Dice
+  5. Delete the two files Xcode made for you:
+        ContentView.swift
+        HotDiceApp.swift (or whatever it named the one with @main in it)
+
+     This project brings its own entry point in DiceGameApp.swift, and
+     Swift allows only one. If you skip this, the build fails with
+     "'main' attribute can only apply to one type".
+
+
+===============================================================================
+IF YOU EVER PULL A NEW VERSION
+===============================================================================
+
+Replacing CHANGED files is enough. A file that already exists in the
+project updates itself when you overwrite it on disk.
+
+A NEW file does not. Xcode's project holds a reference to every file
+individually, because the folders were dragged in — so a .swift file that
+appears after a git pull is on disk but NOT in the build. Swift
+Playgrounds behaves the same way, since that project is assembled by
+hand too.
+
+  What it looks like:  "cannot find X in scope", often on many lines at
+                       once, sometimes with no usable error at all.
+
+This has broken the build on both machines simultaneously, so the
+project now avoids adding files: a small shared type goes into a file
+that already exists rather than into one of its own. If a pull ever does
+add a .swift file, add it to the project by hand — and check the count
+below.
+
+
+STEP 5 — BUILD IT
+===============================================================================
+
+Press Command-B.
+
+  Expect:  no red errors.
+  Expect:  very little yellow. The twelve onChange deprecation warnings
+           are gone — every screen now calls .onValueChange, and
+           OnValueChange.swift picks the spelling each toolchain has.
+           On this Mac that is the one-parameter form, which the iOS 16
+           SDK does not deprecate.
+
+Those warnings are deliberate — see PLATFORM.txt. They are the price of
+one codebase that builds on both the iPad and this Mac.
+
+
+===============================================================================
+STEP 6 — RUN IT
+===============================================================================
+
+Pick a simulator from the bar at the top — iPhone 14 or iPad (9th
+generation) both work — and press Command-R.
+
+You should get the game selection screen: eleven tiles with artwork, on
+wood, with the Hot Dice mark above them.
+
+
+===============================================================================
+IF SOMETHING IS MISSING, IT WILL NOT TELL YOU
+===============================================================================
+
+This is the one thing worth knowing before you start. There are 119
+resource files, and the app is built to keep running when one is absent
+rather than crash. That is good on a phone and confusing on a first
+build: a missing file produces no error, no warning, and no message in
+the console — just a quiet hole where something should be.
+
+It has already happened once on the iPad, and it presented as four
+unrelated faults at the same time.
+
+So if the app runs but something is wrong, find it here:
+
+  WHAT YOU SEE                          WHAT IS MISSING
+  -----------------------------------   ---------------------------------
+  No dice at all, in any game           the 6 .obj meshes
+  Baseball Dice will not start          the same — no dice means no roll,
+                                        and no roll means no at-bat
+  No music and no sound effects         the 8 .m4a and 66 .wav/.mp3 files
+  Type falls back to the system         the 6 .ttf fonts
+    face, or the script headings
+    look like ordinary text
+  A dashed box with a filename on a     that game's .png
+    game tile
+  A banked Boneheads die is flat        nothing — this one is a real
+    with dots instead of a 3D die       fallback, see below
+
+The fix in every case is the same: find the file in Resources, drag it
+into Xcode, and tick "Add to targets".
+
+The last row is different. A flat pip face means the 3D render did not
+work on that machine rather than that a file is missing — worth
+reporting, not worth chasing.
+
+
+===============================================================================
+WHAT SHOULD BE IN THE PROJECT — THE FULL COUNT
+===============================================================================
+
+Select the Resources group in Xcode and the file count at the bottom
+should come to 113. By kind:
+
+    61   .wav    sound effects — dice impacts, bats, gloves, pistols
+    27   .png    game tile artwork, weapon and swing marks
+     8   .m4a    music tracks
+     6   .obj    dice meshes: d4 d6 d8 d10 d12 d20   <- the important six
+     5   .mp3    the longer effects: the Baseball intro, the four
+                 Rollbots abilities
+     6   .ttf    Poppins in five weights, and Lobster for the script
+                 headings
+
+   113   total
+
+And 70 .swift files in SwiftFiles.
+
+To check from a terminal, in the repo:
+
+    ls DiceGameCurrent/DiceGameCurrent/Resources | wc -l        # 113
+    ls DiceGameCurrent/DiceGameCurrent/SwiftFiles/*.swift | wc -l   # 70
+
+
+===============================================================================
+WHAT COMES AFTER THIS
+===============================================================================
+
+Once the games run in the simulator, the next piece is the Messages
+extension: File → New → Target → iMessage Extension, sharing the same
+source files. That is where the iMessage version actually begins, and
+Xcode 14.2 can build and test all of it — the simulator runs Messages
+with two conversations, which is how Apple intends these to be tested.
+
+The two things this Mac cannot do — installing on your iOS 18 iPad, and
+uploading to the App Store — are handled later by a cloud build. See
+PLATFORM.txt.

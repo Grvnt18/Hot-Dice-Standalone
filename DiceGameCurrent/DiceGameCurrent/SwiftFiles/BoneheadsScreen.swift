@@ -21,16 +21,36 @@ struct PipFace: View {
         6: [0, 2, 3, 5, 6, 8]
     ]
 
+    /// Where pip `index` sits in the 3x3 grid.
+    ///
+    /// Out of the ViewBuilder for the same reason as FireworkBurst's
+    /// particleOffset: fourteen operators derived from Int indices in one
+    /// expression, which Xcode 14.2's solver refused with "unable to
+    /// type-check this expression in reasonable time". Every number is
+    /// unchanged — `inset + step * (index % 3)` and `index / 3` are what
+    /// they were, with the two divisions' types stated.
+    private static func pipOffset(_ index: Int, inset: CGFloat,
+                                  step: CGFloat) -> CGSize {
+        let column: CGFloat = CGFloat(index % 3)
+        let row: CGFloat = CGFloat(index / 3)
+        return CGSize(width: inset + step * column,
+                      height: inset + step * row)
+    }
+
     var body: some View {
         GeometryReader { geo in
-            let side = min(geo.size.width, geo.size.height)
-            let pip = side * 0.19
-            let inset = side * 0.18
-            let step = (side - inset * 2 - pip) / 2
+            let side: CGFloat = min(geo.size.width, geo.size.height)
+            let pip: CGFloat = side * 0.19
+            let inset: CGFloat = side * 0.18
+            let step: CGFloat = (side - inset * 2 - pip) / 2
+            // Named rather than repeated inline below, which is the other
+            // half of the fix: each was its own sub-expression to solve.
+            let corner: CGFloat = side * 0.18
+            let bevel: CGFloat = max(1, side * 0.045)
             let inked = Set(PipFace.layouts[value] ?? [])
 
             ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: side * 0.18)
+                RoundedRectangle(cornerRadius: corner)
                     .fill(tint)
 
                 ForEach(0..<9, id: \.self) { index in
@@ -38,10 +58,8 @@ struct PipFace: View {
                         Circle()
                             .fill(Color.black.opacity(0.75))
                             .frame(width: pip, height: pip)
-                            .offset(
-                                x: inset + step * CGFloat(index % 3),
-                                y: inset + step * CGFloat(index / 3)
-                            )
+                            .offset(PipFace.pipOffset(index, inset: inset,
+                                                      step: step))
                     }
                 }
             }
@@ -54,8 +72,8 @@ struct PipFace: View {
             //
             // Over the pips rather than under them: the highlight is on
             // the die's surface and the pips are in it.
-            .pieceSolid(RoundedRectangle(cornerRadius: side * 0.18),
-                        lineWidth: max(1, side * 0.045))
+            .pieceSolid(RoundedRectangle(cornerRadius: corner),
+                        lineWidth: bevel)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
@@ -303,7 +321,7 @@ struct BoneheadsScreen: View {
             AppFonts.registerIfNeeded()
             SoundEngine.shared.startMusic()
         }
-        .onChange(of: theme.colorwayIndex) { _, _ in
+        .onValueChange(of: theme.colorwayIndex) { _ in
             session?.applyTheme()
         }
     }

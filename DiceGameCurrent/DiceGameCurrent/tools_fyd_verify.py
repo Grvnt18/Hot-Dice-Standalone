@@ -16,7 +16,7 @@ import random
 import tools_swiftconst as swiftconst
 
 QUALIFIERS = [6, 5, 4]
-DICE_COUNT = 5
+DICE_COUNT = 6
 ROLLS_PER_TURN = 4
 CARGO_REROLL_HINT = 6
 
@@ -96,27 +96,29 @@ def main():
     rng = random.Random(20260922)
 
     # Forced order: a hand of 6-6-5-4-4 takes ONE 6, then the 5, then one 4.
+    # The sixth die is a 2 here, so the cargo is the spare 6, the spare 4
+    # and that 2 — three dice now, where it used to be two.
     t = Turn()
-    t.apply([(0, 6), (1, 6), (2, 5), (3, 4), (4, 4)])
+    t.apply([(0, 6), (1, 6), (2, 5), (3, 4), (4, 4), (5, 2)])
     assert t.claimed == [0, 2, 3], t.claimed
-    assert t.score == 10, t.score        # the spare 6 and the spare 4
+    assert t.score == 12, t.score        # the spare 6, the spare 4 and the 2
 
-    # No Captain before a Ship: five 5's claims nothing at all.
+    # No Captain before a Ship: a hand of nothing but 5's claims nothing.
     t = Turn()
-    t.apply([(i, 5) for i in range(5)])
+    t.apply([(i, 5) for i in range(DICE_COUNT)])
     assert t.claimed == [] and t.score == 0
 
     # Claims carry across rolls, and kept dice report themselves again.
     t = Turn()
-    t.apply([(0, 6), (1, 1), (2, 1), (3, 1), (4, 1)])
+    t.apply([(0, 6), (1, 1), (2, 1), (3, 1), (4, 1), (5, 1)])
     assert t.claimed == [0]
-    t.apply([(0, 6), (1, 5), (2, 4), (3, 2), (4, 3)])
-    assert t.claimed == [0, 1, 2] and t.score == 5
+    t.apply([(0, 6), (1, 5), (2, 4), (3, 2), (4, 3), (5, 1)])
+    assert t.claimed == [0, 1, 2] and t.score == 6
 
     # An unqualified turn scores nothing however good the leftovers are.
     t = Turn()
     for _ in range(ROLLS_PER_TURN):
-        t.apply([(0, 6), (1, 6), (2, 6), (3, 6), (4, 6)])
+        t.apply([(i, 6) for i in range(DICE_COUNT)])
     assert t.is_out_of_rolls and not t.is_qualified and t.score == 0
 
     n = 200_000

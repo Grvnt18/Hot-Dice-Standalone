@@ -11,38 +11,50 @@ enum FreighterYachtDinghyRules {
     /// Rounds each player plays. Best of three on cumulative points.
     static let roundsPerPlayer = 3
 
-    /// Five identical d6.
-    static let diceCount = 5
+    /// Six identical d6.
+    ///
+    /// Was five, which left exactly two dice as Cargo once the three
+    /// vessels were claimed. The sixth makes it three, and nothing in the
+    /// scoring had to move for that: `score` already sums whatever Cargo
+    /// holds, and Cargo is already whatever is left unclaimed.
+    static let diceCount = 6
 
     /// Rolls per turn, including the first.
     ///
-    /// Four, not three. At three the game qualified 54.1% of the time and
-    /// 45.9% of rounds scored nothing at all — close to a coin flip on
-    /// whether a turn happened. The fourth roll takes qualifying to 68.8%
-    /// and zero rounds to 31.2%, and best-of-three still resolves without
-    /// sudden death 95.6% of the time.
+    /// Four, not three. At three dice-five it qualified 54.1% of the time
+    /// and 45.9% of rounds scored nothing — close to a coin flip on
+    /// whether a turn happened at all; the fourth roll took that to 68.8%
+    /// qualifying and 31.3% scoring zero.
+    ///
+    /// The sixth die moved it again, measured rather than assumed: 82.3%
+    /// qualify and 17.7% of rounds score nothing. Three wasted rounds in
+    /// ten became fewer than two, which is the point of the extra die —
+    /// the allowance itself did not need to change.
     static let rollsPerTurn = 4
 
     /// Claimed strictly in this order: no Yacht before a Freighter, no
     /// Dinghy before a Yacht. This ordering is the whole game — it is why
-    /// a third of turns still score nothing even with four rolls.
+    /// turns still score nothing even with four rolls and six dice.
     static let qualifiers = [6, 5, 4]
 
-    /// What the two Cargo dice must beat for a reroll to be worth taking.
+    /// What the Cargo dice must beat for a reroll to be worth taking.
     ///
-    /// Two d6 average 7, so a 7 is a wash and anything below it is not:
-    /// rerolling at 6 or less gains, rerolling at 7 breaks even, and
-    /// rerolling above it loses. Used only for the hint under the button —
-    /// the choice stays the player's.
+    /// Two d6 averaged 7, so 7 was a wash: rerolling at 6 or less gained,
+    /// at 7 broke even, above it lost. Three d6 average 10.5, so the
+    /// break-even has moved and 6 is well below it — the hint now fires
+    /// only on a genuinely bad Cargo and stays quiet the rest of the time.
+    ///
+    /// Left at 6 deliberately. It is advice under a button, not a rule,
+    /// and the choice was always the player's.
     static let cargoRerollHint = 6
 
-    /// A fresh set: five d6, each a different colourway so the claimed
+    /// A fresh set: six d6, each a different colourway so the claimed
     /// dice are easy to pick out of the tray.
     static func makeDice() -> [Die] {
         // The palette is refilled rather than exhausted. This asked for a
         // die and got nil once the shuffled colourways ran out, which is
         // the pattern that silently dropped five dice from a twenty-die
-        // Free Roll pool. Safe here at 5 against 15 colourways — but safe
+        // Free Roll pool. Safe here at 6 against 15 colourways — but safe
         // by a margin nobody was watching, which was equally true of Free
         // Roll while its cap was 10.
         var colorways: [DieColorway] = []
@@ -163,15 +175,26 @@ enum FreighterYachtDinghyGame: SuiteGame {
     /// the playfield width would be unreadable under the dice.
     static let floorTitle = "F.Y.D."
 
-    // The one name the tile cannot set: no spaces to wrap on, so it runs
-    // as a single line well past the artwork it is meant to match.
-    static let tileName = "F.Y.D."
+    /// The full name, with the break stated rather than left to chance.
+    ///
+    /// The tile used to read "F.Y.D." because the name has no spaces to
+    /// wrap on, so SwiftUI runs it as one line and truncates: 327pt at the
+    /// iPad's 28pt label against 280pt of tile, and worse proportionally on
+    /// a phone. A newline is the fix, and it has to be explicit — a
+    /// zero-width space would let the layout choose, and the choice is only
+    /// ever this one.
+    ///
+    /// Measured off the real TTF at the narrowest width this app meets:
+    /// "Freighter." is 83pt and "Yacht.Dinghy" 117pt against the iPhone
+    /// SE's 117pt of label. That second line lands exactly on the limit,
+    /// which is why the label also carries a scale floor — see GameHubView.
+    static let tileName = "Freighter.\nYacht.Dinghy"
 
 
     static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Game Overview",
-            body: "Two or more players, alternating turns. The dice pool is five d6. The structure is best of 3 rounds."
+            body: "Two or more players, alternating turns. The dice pool is six d6. The structure is best of 3 rounds."
         ),
         GameRuleSection(
             title: "Turn Mechanics",
@@ -179,7 +202,7 @@ enum FreighterYachtDinghyGame: SuiteGame {
         ),
         GameRuleSection(
             title: "Cargo Scoring and Rerolls",
-            body: "Once all three vessels — the 6, the 5 and the 4 — are claimed, the remaining two dice form your Cargo, and their combined total is your round score. If rolls remain within the four-roll allowance, you may re-roll both cargo dice together, both or neither. Failing to claim all three vessels within four rolls scores 0. The highest cumulative score after 3 rounds wins, and ties trigger a sudden-death round."
+            body: "Once all three vessels — the 6, the 5 and the 4 — are claimed, the remaining three dice form your Cargo, and their combined total is your round score. If rolls remain within the four-roll allowance, you may re-roll all three cargo dice together, all or none. Failing to claim all three vessels within four rolls scores 0. The highest cumulative score after 3 rounds wins, and ties trigger a sudden-death round."
         )
     ]
 }

@@ -332,6 +332,11 @@ private struct GameTile: View {
 
                 Text(entry.tileName)
                     .font(.poppins(HubLayout.labelFont(tile: side), .semibold))
+                    // Freighter.Yacht.Dinghy's second line lands within a
+                    // point of the iPhone SE's label width. Every other name
+                    // has room to spare, so this only ever fires for that
+                    // one — but it fires rather than truncating.
+                    .minimumScaleFactor(0.8)
                     // Black on the timber. The artwork is black line work on
                     // transparency, so a white name beside it was the one
                     // element on the tile not drawn in the same ink.

@@ -31,11 +31,13 @@ screenshot, so it is asserted here instead.
 Same spirit as tools_spawn_verify.py: prove the numbers, rather than
 eyeball the screen and hope.
 """
-import re
+import os
 import re
 import sys
 
-from tools_swiftconst import source, constant
+from tools_swiftconst import source, constant, SWIFT
+
+HERE = os.path.dirname(os.path.abspath(__file__))
 
 HUB = "GameHubView.swift"
 
@@ -126,12 +128,126 @@ def main():
         failed = True
 
     failed |= check_tile_painting(text)
+    failed |= check_label_widths(c)
 
     if failed:
         print("hub layout: FAILED")
         sys.exit(1)
     print("hub layout: PASS (%d widths, icon never below %d%% of its tile)"
           % (len(WIDTHS), round(MIN_ICON_SHARE * 100)))
+
+
+def check_label_widths(c):
+    """Every tile name fits its tile, measured off the real font file.
+
+    The hub label is two lines at `labelFont`, and nothing used to check
+    that a name actually fits them. Freighter.Yacht.Dinghy did not: no
+    spaces to wrap on, so SwiftUI ran it as one line and truncated, which
+    is why that tile read "F.Y.D." instead of the game's name.
+
+    So the names are measured rather than eyeballed — each line of each
+    name, at each width, against the label band the layout leaves it.
+    Pillow renders the same TTF the app bundles, so this is the real
+    advance width and not an estimate.
+
+    A name wraps only where it says it does: a line here is a line in the
+    app, because `tileName` carries its own newline where it needs one.
+    """
+    try:
+        from PIL import ImageFont
+    except ImportError:
+        print("  %-20s skipped (Pillow unavailable)" % "label widths")
+        return False
+
+    names = tile_names()
+    if not names:
+        print("  %-20s no tile names found" % "label widths")
+        return True
+
+    face = os.path.join(HERE, "Resources", "Poppins-SemiBold.ttf")
+    if not os.path.exists(face):
+        print("  %-20s skipped (%s missing)" % ("label widths", face))
+        return False
+
+    # What the label may use: the tile less its inset on both sides. The
+    # scale floor on the label is the last resort, not the budget — a name
+    # that only fits because it shrank is a name that reads smaller than
+    # every other tile's.
+    problems = []
+    widest = ("", 0.0)
+    max_lines = int(c["labelLines"])          # 2.4 of room is two lines
+    for width in (w for _, w in WIDTHS):
+        _, tile, _, font_pt = layout(c, width)
+        available = tile - c["inset"] * 2
+        font = ImageFont.truetype(face, 200)
+
+        def drawn(text):
+            return font.getlength(text) * font_pt / 200
+
+        for name in names:
+            lines = []
+            overflow = None
+            # A name breaks where it says it does, and SwiftUI breaks the
+            # rest on spaces. Greedy wrapping is what SwiftUI does for a
+            # label this short, so it is what gets modelled.
+            for explicit in name.split("\\n"):
+                current = ""
+                for word in explicit.split(" "):
+                    if drawn(word) > available:
+                        overflow = word          # cannot be broken at all
+                    candidate = word if not current else current + " " + word
+                    if current and drawn(candidate) > available:
+                        lines.append(current)
+                        current = word
+                    else:
+                        current = candidate
+                lines.append(current)
+
+            if overflow is not None:
+                problems.append(
+                    "%r has no break and is %.0fpt at %gpt against %.0fpt "
+                    "of tile (%dpt wide)"
+                    % (overflow, drawn(overflow), font_pt, available, width))
+            elif len(lines) > max_lines:
+                problems.append(
+                    "%r needs %d lines at %gpt, and the band holds %d "
+                    "(%dpt wide)"
+                    % (name, len(lines), font_pt, max_lines, width))
+
+            for line in lines:
+                ratio = drawn(line) / available
+                if ratio > widest[1]:
+                    widest = (line, ratio)
+
+    for line in problems:
+        print("  %-20s %s" % ("label widths", line))
+    if problems:
+        return True
+    print("  %-20s ok (%d names, tightest is %r at %d%% of its tile)"
+          % ("label widths", len(names), widest[0], round(widest[1] * 100)))
+    return False
+
+
+def tile_names():
+    """Every name a tile shows, from the games that set one.
+
+    A game without a `tileName` shows its `displayName` — see
+    SuiteGame's default — so both are collected.
+    """
+    names = []
+    for filename in sorted(os.listdir(SWIFT)):
+        if not filename.endswith(".swift"):
+            continue
+        body = source(filename)
+        overrides = set(re.findall(r'static let tileName = "([^"]*)"', body))
+        names.extend(overrides)
+        for match in re.finditer(r'static let displayName = "([^"]*)"', body):
+            # A game that overrides tileName never shows its displayName on
+            # a tile, so measuring it would fail the check for a string no
+            # tile renders.
+            if not overrides:
+                names.append(match.group(1))
+    return names
 
 
 def check_tile_painting(text):

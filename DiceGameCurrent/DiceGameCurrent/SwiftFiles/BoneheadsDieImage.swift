@@ -36,6 +36,21 @@ enum BoneheadsDieImage {
 
     private static var cache: [String: UIImage] = [:]
 
+    /// How many rendered dice to keep.
+    ///
+    /// This used to need no ceiling: a die was one of two colours, so six
+    /// faces times two sides was twelve pictures and the cache could not
+    /// grow past them. Dice take a random colourway per throw now, which
+    /// makes the key space six faces times the whole palette — 90 pictures
+    /// at 0.14 MiB each, or 12.7 MiB, held for the life of the app.
+    ///
+    /// A board holds eighteen dice, so that plus slack is all that is ever
+    /// wanted at once. At the ceiling the cache is emptied rather than
+    /// evicted one by one: the cost is re-rendering what is actually on
+    /// screen, which is at most those eighteen, and it needs no ordering
+    /// bookkeeping to be correct.
+    static let cacheLimit = 24
+
     /// Whether rendering has already been found not to work here.
     ///
     /// One failure is enough: without this, every draw of every slot would
@@ -50,6 +65,7 @@ enum BoneheadsDieImage {
             isUnavailable = true
             return nil
         }
+        if cache.count >= cacheLimit { cache.removeAll(keepingCapacity: true) }
         cache[key] = rendered
         return rendered
     }

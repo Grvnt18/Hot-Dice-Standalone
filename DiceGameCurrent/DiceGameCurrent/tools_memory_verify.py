@@ -41,7 +41,7 @@ POOLS = [
     ("Jackpot", "Jackpot.swift", None, 5, [4, 6, 8, 12, 20]),
     ("Three Thousand", "ThreeThousand.swift", "diceCount", 6, [6] * 6),
     ("Generals", "Generals.swift", "diceCount", 5, [6] * 5),
-    ("F.Y.D.", "FreighterYachtDinghy.swift", "diceCount", 5, [6] * 5),
+    ("F.Y.D.", "FreighterYachtDinghy.swift", "diceCount", 6, [6] * 6),
     ("Royal UR", "RoyalUrRules.swift", "diceCount", 5, [4] * 5),
     ("Baseball Dice", None, None, 3, [12, 12, 12]),
     ("Rollbots", None, None, 2, [10, 12]),
@@ -139,13 +139,31 @@ def main():
     key_pixels = re.search(r'static let pixels: CGFloat = (\d+)', bones)
     assert key_pixels, "no canvas size in BoneheadsDieImage"
     px = int(key_pixels.group(1))
-    faces, sides = 6, 2
-    bones_mib = faces * sides * px * px * 4 / (1024.0 * 1024.0)
-    if bones_mib > 8:
-        failed.append("Boneheads' die images are %.1f MiB at %dpx, over the "
-                      "8 MiB a picture cache is worth" % (bones_mib, px))
-    print("  %-22s %d faces x %d sides at %dpx = %.1f MiB, cached for the match"
-          % ("banked dice", faces, sides, px, bones_mib))
+    # The key space used to be six faces times two seat colours, which
+    # bounded itself at twelve. Dice take a random colourway per throw now,
+    # so it is six faces times the whole palette — and the cache needs a
+    # stated ceiling rather than an arithmetic one.
+    limit = re.search(r'static let cacheLimit = (\d+)', bones)
+    if not limit:
+        failed.append("BoneheadsDieImage has no cacheLimit, and its key is "
+                      "now a face times the whole palette rather than a face "
+                      "times two seat colours")
+        bones_mib = 0.0
+    else:
+        entries = int(limit.group(1))
+        bones_mib = entries * px * px * 4 / (1024.0 * 1024.0)
+        if bones_mib > 8:
+            failed.append("Boneheads' die images are %.1f MiB at %dpx x %d "
+                          "entries, over the 8 MiB a picture cache is worth"
+                          % (bones_mib, px, entries))
+        # A board holds every slot on both sides at once, so the ceiling
+        # has to clear that or it thrashes on a full board.
+        if entries < 18:
+            failed.append("cacheLimit %d is below the 18 dice a full board "
+                          "shows, so drawing it would evict and re-render"
+                          % entries)
+        print("  %-22s %d entries at %dpx = %.1f MiB, cleared at the ceiling"
+              % ("banked dice", entries, px, bones_mib))
     if "isUnavailable" not in bones:
         failed.append("BoneheadsDieImage retries a renderer that has already "
                       "failed, once per slot per draw")

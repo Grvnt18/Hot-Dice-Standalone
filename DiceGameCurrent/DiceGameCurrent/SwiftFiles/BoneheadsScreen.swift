@@ -83,12 +83,12 @@ struct PipFace: View {
 
 /// A player's three columns.
 struct BoneheadsGrid: View {
-    let columns: [[Int]]
-    let tint: Color
+    let columns: [[BoneheadsPlacement]]
 
-    /// The dice this side throws, so a banked die is rendered in the same
-    /// colour it was rolled in.
-    let colorway: DieColorway
+    /// The ink for this side's furniture — its column labels and totals.
+    /// NOT the dice: every die carries its own colour now, so the only
+    /// thing left for a seat tint to do is tell the two scoreboards apart.
+    let tint: Color
     /// Mine fills from the bottom up, theirs from the top down, so new
     /// dice on both sides appear toward the middle of the table.
     let isMine: Bool
@@ -105,12 +105,12 @@ struct BoneheadsGrid: View {
 
     private func column(_ index: Int) -> some View {
         let dice = columns[index]
-        let slots = (0..<BoneheadsRules.slotsPerColumn).map { slot -> Int? in
+        let slots = (0..<BoneheadsRules.slotsPerColumn).map { slot -> BoneheadsPlacement? in
             slot < dice.count ? dice[slot] : nil
         }
         let ordered = isMine ? Array(slots.reversed()) : slots
         let isPlaceable = placeable.contains(index)
-        let total = BoneheadsRules.columnScore(dice)
+        let total = BoneheadsRules.columnScore(dice.map(\.face))
 
         return Button {
             onTapColumn?(index)
@@ -129,9 +129,15 @@ struct BoneheadsGrid: View {
                 RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
                     .fill(Color.black.opacity(isPlaceable ? 0.38 : 0.2))
             )
+            // Neutral, not the seat's colour. The dice in here are every
+            // colour in the palette now, and a frame tinted to the player
+            // would be fighting a different one of them every turn — which
+            // is the clash that got random colours reverted the first time.
+            // White at low opacity reads as a lip on the timber and argues
+            // with nothing.
             .overlay(
                 RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                    .stroke(tint.opacity(isPlaceable ? 0.95 : 0.25),
+                    .stroke(.white.opacity(isPlaceable ? 0.85 : 0.22),
                             lineWidth: isPlaceable ? 2 : 1)
             )
         }
@@ -160,21 +166,24 @@ struct BoneheadsGrid: View {
     /// up. `PipFace` is still here and is what draws if that rendering is
     /// not available on this device: no mesh in the bundle, no Metal
     /// device, or a snapshot that comes back empty.
-    private func slotView(_ die: Int?) -> some View {
+    private func slotView(_ die: BoneheadsPlacement?) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 4)
                 .fill(Color.white.opacity(0.05))
                 .aspectRatio(1, contentMode: .fit)
             if let die {
-                if let rendered = BoneheadsDieImage.image(value: die,
-                                                          colorway: colorway) {
+                if let rendered = BoneheadsDieImage.image(
+                        value: die.face,
+                        colorway: BoneheadsRules.colorway(ink: die.ink)) {
                     Image(uiImage: rendered)
                         .resizable()
                         .aspectRatio(1, contentMode: .fit)
                         .elevated(.piece)
                         .padding(1)
                 } else {
-                    PipFace(value: die, tint: tint)
+                    PipFace(value: die.face,
+                            tint: Color(hex: BoneheadsRules
+                                .colorway(ink: die.ink).bodyHex))
                         .aspectRatio(1, contentMode: .fit)
                         .padding(1)
                 }
@@ -193,6 +202,14 @@ struct BoneheadsScreen: View {
     @State private var state = BoneheadsState()
     @State private var session: DiceTraySession?
     @State private var rolled: Int?
+
+    /// The colour this throw is wearing, as a palette index.
+    ///
+    /// Chosen when the pool is handed to the tray and carried through to
+    /// the placement, so the die in the column is the die you threw. Not
+    /// re-rolled on render: a @State that picked a random value inside
+    /// `body` would change colour on every layout pass.
+    @State private var ink = BoneheadsRules.randomInk()
     @State private var phase: Phase = .ready
     @State private var lastSummary: String?
     @State private var showingSettings = false
@@ -246,7 +263,6 @@ struct BoneheadsScreen: View {
                     BoneheadsGrid(
                         columns: state.grids[1 - seat],
                         tint: tint(for: 1 - seat),
-                        colorway: BoneheadsRules.colorway(for: 1 - seat),
                         isMine: false
                     )
                     .frame(height: boardHeight)
@@ -254,7 +270,7 @@ struct BoneheadsScreen: View {
 
                     DiceTraySceneView(
                         session: $session,
-                        makeInitialDice: { BoneheadsRules.makeDice(for: match.activeIndex) },
+                        makeInitialDice: { BoneheadsRules.makeDice(ink: ink) },
                         floorTitle: BoneheadsGame.floorTitle,
                         arenaStyle: .house,
                         onSessionCreated: { newSession in
@@ -276,7 +292,6 @@ struct BoneheadsScreen: View {
                     BoneheadsGrid(
                         columns: state.grids[seat],
                         tint: tint(for: seat),
-                        colorway: BoneheadsRules.colorway(for: seat),
                         isMine: true,
                         placeable: placeable,
                         onTapColumn: { place(in: $0) }
@@ -332,9 +347,14 @@ struct BoneheadsScreen: View {
     /// so both players saw their own side in the table colour and the two
     /// grids swapped colours at every handover. Tying it to the seat means
     /// player one is the table colour and player two the fixed tone all
-    /// match long — the same split their dice now carry.
+    /// match long.
+    ///
+    /// This is the scoreboard furniture only — the column letters and the
+    /// running totals. The dice no longer follow it: each carries the
+    /// colour it was thrown in, and ownership is read from which side of
+    /// the board a column is on.
     private func tint(for seat: Int) -> Color {
-        seat == 0 ? theme.accentColor : Color(hex: BoneheadsRules.opponentBodyHex)
+        seat == 0 ? theme.accentColor : Color(hex: BoneheadsRules.secondSeatHex)
     }
 
     // MARK: Button
@@ -382,7 +402,7 @@ struct BoneheadsScreen: View {
         (0..<BoneheadsRules.columns)
             .filter { column in state.canPlace(seat: seat, column: column) }
             .map { column in
-                state.column(seat: 1 - seat, column).filter { face in face == die }.count
+                state.faces(seat: 1 - seat, column).filter { face in face == die }.count
             }
             .max() ?? 0
     }
@@ -431,7 +451,8 @@ struct BoneheadsScreen: View {
               state.canPlace(seat: seat, column: column) else { return }
 
         SoundEngine.shared.play(.buttonTap)
-        let strike = state.place(seat: seat, column: column, die: die)
+        let strike = state.place(seat: seat, column: column,
+                                 die: die, ink: ink)
         // Only when dice actually came off the board. A placement that
         // strikes nothing is the common case, and sounding it would make
         // the removal cue meaningless.
@@ -473,9 +494,13 @@ struct BoneheadsScreen: View {
 
     private func beginTurn() {
         rolled = nil
+        // A new colour for the new throw. Picked here rather than in `body`
+        // so it changes once per turn instead of once per layout pass, and
+        // before setPool so the die in the air is already wearing it.
+        ink = BoneheadsRules.randomInk()
         // The pool is rebuilt rather than reused: the die in the air is
-        // the active seat's colour, so it changes hands with the device.
-        session?.setPool(BoneheadsRules.makeDice(for: seat))
+        // the colour this throw drew, and the placement keeps it.
+        session?.setPool(BoneheadsRules.makeDice(ink: ink))
         session?.beginTurn()
         phase = .ready
     }

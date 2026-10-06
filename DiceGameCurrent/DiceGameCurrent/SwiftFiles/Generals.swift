@@ -239,46 +239,22 @@ enum GeneralsGame: SuiteGame {
     static let displayName = "Generals"
     static let tagline = "One scorecard. Claim it first."
 
-    /// The short version, shown from inside the game.
-    static let quickRules: [GameRuleSection] = [
-        GameRuleSection(
-            title: "The Goal",
-            body: "One shared card of twelve categories, claimed once each by whoever takes it first. Six claims apiece, twelve turns in all, highest total wins."
-        ),
-        GameRuleSection(
-            title: "Your Turn",
-            body: "Roll five dice, tap the ones to keep, roll the rest — three rolls — then claim one open category for whatever your hand pays there."
-        ),
-        GameRuleSection(
-            title: "Zeroing",
-            body: "If nothing qualifies you must still claim a category, for zero. It burns that category for your opponent too."
-        )
-    ]
-
     static let rules: [GameRuleSection] = [
         GameRuleSection(
-            title: "One Card, Two Players",
-            body: "There are twelve categories and a single shared scorecard. Each category can be claimed once, by whoever takes it first — so the whole game is twelve turns, six each."
+            title: "Game Overview",
+            body: "Two players. The dice pool is five d6. Twelve total turns, six per player, using a single shared scorecard in a snake turn order: P1, P2, P2, P1 and so on."
         ),
         GameRuleSection(
-            title: "Your Turn",
-            body: "Roll five dice. Tap any dice you want to keep, then roll the rest — up to three rolls in all. Then claim one open category for whatever your hand scores in it."
+            title: "Turn Structure",
+            body: "Roll all 5 dice. Optionally keep any number of dice and re-roll the rest, to a maximum of 3 rolls per turn. Claim one available category on the shared scorecard to end the turn."
         ),
         GameRuleSection(
-            title: "The Categories",
-            body: "Ones through Sixes score the sum of that number and nothing else. Set of 3 needs three dice on the same face and Set of 4 needs four, and both score all five dice added up. Packed House is three of one and a pair of another, for 25. Small Joker is four consecutive faces — 1-2-3-4, 2-3-4-5 or 3-4-5-6 — for 30. Large Joker is five consecutive, 1-2-3-4-5 or 2-3-4-5-6, for 40. Set of 5 is all five on the same face, for 50."
+            title: "Categories and Scoring",
+            body: "There are twelve categories. Ones to Sixes take any dice showing the selected face, 1 to 6, and score the sum of the matching dice. Set of 3 needs three dice of the same face and scores the sum of all 5 dice. Set of 4 needs four of the same face and also scores the sum of all 5 dice. Packed House is three of one face plus a pair of another, for 25 points. Small Joker is four sequential faces, 1-2-3-4 and so on, for 30 points. Large Joker is five sequential faces, for 40 points. Set of 5 is all five dice showing the same face, for 50 points."
         ),
         GameRuleSection(
             title: "Zeroing",
-            body: "If nothing you rolled qualifies, you must still claim a category — for zero. That burns it for your opponent too, so which one you give up is a real decision."
-        ),
-        GameRuleSection(
-            title: "Turn Order",
-            body: "Turns run in a snake: you, them, them, you, you, them, and so on. Six claims each. Going first on a shared card is otherwise worth about ten points, and the snake is what takes that away."
-        ),
-        GameRuleSection(
-            title: "Winning",
-            body: "The game ends when all twelve categories are claimed. Highest total wins."
+            body: "If a hand does not qualify for an open category, or by choice, a player must select an open category to claim for 0 points, permanently removing it for both players."
         )
     ]
 }

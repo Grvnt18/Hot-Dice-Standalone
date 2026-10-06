@@ -170,38 +170,26 @@ enum BoneheadsGame: SuiteGame {
     static let displayName = "Boneheads"
     static let tagline = "Stack yours. Smash theirs."
 
-    /// The short version, shown from inside the game.
-    static let quickRules: [GameRuleSection] = [
-        GameRuleSection(
-            title: "The Goal",
-            body: "Three columns of three each. Fill the ninth slot and the game ends on the spot — highest total wins."
-        ),
-        GameRuleSection(
-            title: "Your Turn",
-            body: "Roll one die and place it in any of your columns with room. That is the whole turn."
-        ),
-        GameRuleSection(
-            title: "Stacking and Smashing",
-            body: "Matching numbers in a column multiply: one 5 is 5, two are 20, three are 45. And placing a die destroys every die of that number in your opponent's column of the same letter."
-        )
-    ]
-
     static let rules: [GameRuleSection] = [
         GameRuleSection(
-            title: "Your Turn",
-            body: "You roll one die and place it in any of your columns that still has room. That is the whole turn — the only question is which column."
+            title: "Game Overview",
+            body: "Two players. The board gives each player 3 columns — A, B and C — of 3 slots each, nine slots in all. Fill every slot while maximising your column scoring multipliers and destroying your opponent's dice."
         ),
         GameRuleSection(
-            title: "Stacking",
-            body: "Every number in a column is multiplied by how many times it appears there. One 5 is 5. Two 5's are 20, not 10. Three 5's are 45. A 5, a 5 and a 2 is 22."
+            title: "Turn Mechanics",
+            body: "Roll one d6 and place it into any available slot in your columns to end the turn."
         ),
         GameRuleSection(
-            title: "Smashing",
-            body: "Place a die and every die of that number in your opponent's column of the same letter is destroyed. Their survivors close the gap. A three-stack they spent three turns building comes apart in one."
+            title: "Column Stacking Multipliers",
+            body: "Matching numbers in the same column multiply their combined value: Column Score = (Die Face x Occurrences) x Occurrences. A single die is its face value, at 1x. A pair is (Face x 2) x 2. A triple is (Face x 3) x 3."
         ),
         GameRuleSection(
-            title: "Winning",
-            body: "There are nine slots a side, and the moment either player fills their ninth the game stops — there is no answering turn. Highest total wins. That rule is what keeps going first from being an advantage."
+            title: "Smashing Mechanic",
+            body: "Placing a die in a column destroys all matching dice in your opponent's directly opposing column. Their remaining dice collapse down to fill the gaps."
+        ),
+        GameRuleSection(
+            title: "Game End",
+            body: "The game ends immediately when either player fills their ninth slot. Highest score wins."
         )
     ]
 }

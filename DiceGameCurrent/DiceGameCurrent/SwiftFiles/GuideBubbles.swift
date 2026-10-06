@@ -68,9 +68,8 @@ struct GuideBubbleCluster: View {
             }
         }
         .sheet(item: $opened) { entry in
-            // The FULL guide. `GameCatalogEntry.rules` is the detailed set;
-            // the short one is `quickRules`, and a game's own Settings is
-            // where that belongs.
+            // The guide. `GameCatalogEntry.rules` is the only one there
+            // is now — a game's own Settings opens this same set.
             HowToPlayView(gameName: entry.displayName,
                           tagline: entry.tagline,
                           sections: entry.rules)

@@ -451,46 +451,18 @@ enum RoyalUrGame: SuiteGame {
     static let displayName = "Royal UR"
     static let tagline = "Race, capture, come home."
 
-    /// The short version, shown from inside the game.
-    static let quickRules: [GameRuleSection] = [
-        GameRuleSection(
-            title: "The Goal",
-            body: "Three pieces each, sixteen squares each, and the first player to bring two of them home wins."
-        ),
-        GameRuleSection(
-            title: "Your Turn",
-            body: "Roll five four-sided dice and count the marked points showing — nought to five. Move one piece that far: tap it to select, tap the ringed square to commit."
-        ),
-        GameRuleSection(
-            title: "The Board",
-            body: "Land on an opponent's piece and it goes back to the start. Land on a rosette and you roll again. Roll nothing, or have nowhere to go, and one of your own pieces goes back four."
-        )
-    ]
-
     static let rules: [GameRuleSection] = [
         GameRuleSection(
-            title: "The Race",
-            body: "Three pieces each, and the first player to bring two of them home wins. Your route runs sixteen squares: out along your own row, up the middle past the bridge, around the far block, and out."
+            title: "Game Overview",
+            body: "Two players. The dice pool is five d4, a marked points system. Three pieces per player on a shared 16-square track. The first player to bring 2 pieces home wins."
         ),
         GameRuleSection(
-            title: "The Dice",
-            body: "Roll five four-sided dice. Two of each die's four points are marked — count the marked points sticking up and that is how far you move, anywhere from nothing to five squares. Half the points are marked, so the count lands on 2 or 3 about five rolls in eight: 0 and 5 come up one roll in 32 each, 1 and 4 five rolls in 32, and 2 and 3 ten rolls in 32."
+            title: "Movement Dice Calculation",
+            body: "Roll five d4 and count the total upward-facing marked points, 0 to 5, for your distance. Zero marked points means 0 squares and triggers the Setback Rule. One to five marked points moves one piece that standard distance."
         ),
         GameRuleSection(
-            title: "Moving",
-            body: "Move one piece the full count. A piece waiting to start enters that many squares along. You cannot land on your own piece, and you cannot overshoot: coming home takes the exact number."
-        ),
-        GameRuleSection(
-            title: "Capture",
-            body: "Land on your opponent's piece and it goes all the way back to the start. Every shared square can be taken, rosettes included — and since you run the final loop in opposite directions, the square one step from home is exactly where they come in."
-        ),
-        GameRuleSection(
-            title: "Rosettes",
-            body: "The five flowered squares fall on the 4th, 8th, 12th and 16th square of both routes. Land on one and you roll again."
-        ),
-        GameRuleSection(
-            title: "The Setback",
-            body: "Roll nothing, or have nowhere legal to go, and you do not simply pass: one of your own pieces goes back four squares — or to the start, if something is already sitting there. You choose which."
+            title: "Movement and Board Mechanics",
+            body: "Move a single piece the full exact count rolled, and an exact count is required to enter or land home. You cannot land on your own pieces. Capture: landing on an opponent's piece sends it back to the start. Rosettes, on squares 4, 8, 12 and 16, grant an extra roll when you land on one. Setback Rule: rolling 0, or having no legal moves, forces you to move one of your own pieces backward 4 squares, or to the start if that square is occupied."
         )
     ]
 }

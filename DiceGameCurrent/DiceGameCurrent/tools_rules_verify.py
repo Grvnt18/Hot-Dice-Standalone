@@ -167,45 +167,34 @@ def main():
             empty.append(filename)
     check("no game ships an empty guide", not empty, ", ".join(empty))
 
-    # --- Two tiers, and the short one is genuinely shorter. -----------
+    # --- One guide, because two tiers meant the short one was wrong. --
     #
-    # The guides split in two: a game's own Settings shows the short
-    # version, the hub's bubbles show the full one. The failure to guard
-    # against is them drifting back into the same thing — a "quick start"
-    # that is the whole manual is worse than no split at all, because a
-    # player mid-match now scrolls past the differential table to find
-    # what their button does.
-    missing, not_short = [], []
+    # The guides used to split in two: a game's own Settings showed
+    # `quickRules`, the hub's bubbles showed `rules`. The reasoning was that
+    # a player mid-match wants "what does my button do", not the
+    # differential table.
+    #
+    # In practice it meant the guide you could reach fastest was the one
+    # that left things out, and the full rules were two taps away on a
+    # screen you have to quit the match to reach. So there is one guide now,
+    # and this is what stops the second tier growing back: the NAME may not
+    # appear in any Swift source at all. Checking the name rather than the
+    # behaviour is deliberate — a reintroduced `quickRules` that nothing
+    # reads yet is still the first half of the same mistake.
+    revived = []
     for filename in sorted(os.listdir(SWIFT)):
         if not filename.endswith(".swift"):
             continue
-        text = source(filename)
-        if "static let rules: [GameRuleSection] = [" not in text:
-            continue
-        full = text.count("static let rules: [GameRuleSection] = [")
-        quick = text.count("static let quickRules: [GameRuleSection] = [")
-        if quick < full:
-            missing.append(filename)
-            continue
-        # Compared per game rather than per file, since SuiteGame.swift
-        # holds two.
-        for block in text.split("static let quickRules: [GameRuleSection] = [")[1:]:
-            short = block.split("\n    ]", 1)[0]
-            after = block.split("static let rules: [GameRuleSection] = [", 1)
-            if len(after) < 2:
-                continue
-            long = after[1].split("\n    ]", 1)[0]
-            if short.count("GameRuleSection(") >= long.count("GameRuleSection("):
-                not_short.append(filename)
-    check("every game has a quick guide", not missing, ", ".join(missing))
-    check("the quick guide is shorter", not not_short,
-          ", ".join(sorted(set(not_short))))
+        if "quickRules" in source(filename):
+            revived.append(filename)
+    check("one guide, not two", not revived,
+          "quickRules is back in " + ", ".join(revived))
 
-    # And each tier reaches the screen it belongs to.
+    # And the one guide reaches both screens that show it.
     settings = source("SettingsView.swift")
-    check("a game's Settings shows the short one",
-          "self.rules = G.quickRules" in settings,
-          "SettingsView(for:) is handing out the full guide again")
+    check("a game's Settings shows the full guide",
+          "self.rules = G.rules" in settings,
+          "SettingsView(for:) is handing out something other than G.rules")
     check("the hub's bubbles show the full one",
           "sections: entry.rules" in source("GuideBubbles.swift"),
           "the cluster is no longer opening the detailed rules")

@@ -26,10 +26,11 @@ struct SettingsView: View {
     init<G: SuiteGame>(for game: G.Type) {
         self.gameName = G.displayName
         self.tagline = G.tagline
-        // The SHORT guide, because this sheet is opened mid-match. The
-        // full one is two taps away on the hub, where a player browsing
-        // the suite actually wants it.
-        self.rules = G.quickRules
+        // The guide — the whole one. This sheet used to show a shorter
+        // array on the grounds that it opens mid-match, which meant the
+        // version missing the detail was the version you could reach
+        // without leaving the game.
+        self.rules = G.rules
     }
 
     /// The hub's sheet: no game open, so no rules and no How to Play.
@@ -218,7 +219,7 @@ struct SettingsView: View {
                             SoundEngine.shared.play(.buttonTap)
                             showingHowToPlay = true
                         } label: {
-                            Text(rules.isEmpty ? "How to Play — Every Game" : "Quick Start")
+                            Text(rules.isEmpty ? "How to Play — Every Game" : "How to Play")
                                 .font(.poppins(15))
                                 .foregroundStyle(theme.accentTextColor)
                                 .frame(maxWidth: .infinity)
@@ -238,7 +239,7 @@ struct SettingsView: View {
                 GuideBubbleCluster()
             } else {
                 HowToPlayView(gameName: gameName, tagline: tagline,
-                              sections: rules, isQuickStart: true)
+                              sections: rules)
             }
         }
     }
@@ -433,13 +434,6 @@ struct HowToPlayView: View {
     let tagline: String?
     let sections: [GameRuleSection]
 
-    /// Whether this is the short guide from inside a game or the full one
-    /// from the hub. It changes the title and adds a line saying where
-    /// the rest of it is — a player who opens the quick guide looking for
-    /// the scoring table should be told it exists rather than concluding
-    /// the game has none.
-    var isQuickStart: Bool = false
-
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var theme = AppTheme.shared
 
@@ -453,9 +447,8 @@ struct HowToPlayView: View {
 
             VStack(spacing: 0) {
                 MenuHeaderBar(
-                    title: gameName.map {
-                        "\($0) — \(isQuickStart ? "Quick Start" : "How to Play")"
-                    } ?? "How to Play"
+                    title: gameName.map { "\($0) — How to Play" }
+                        ?? "How to Play"
                 ) { dismiss() }
 
                 ScrollView {
@@ -491,15 +484,6 @@ struct HowToPlayView: View {
                             }
                         }
 
-                        if isQuickStart {
-                            Text("The full rules — every table, every edge case "
-                                 + "— are on the game selection screen: "
-                                 + "Settings, then How to Play.")
-                                .font(.poppins(12))
-                                .foregroundStyle(MenuInk.dim)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .padding(.horizontal, 2)
-                        }
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 16)

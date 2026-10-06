@@ -168,42 +168,18 @@ enum FreighterYachtDinghyGame: SuiteGame {
     static let tileName = "F.Y.D."
 
 
-    /// The short version, shown from inside the game.
-    static let quickRules: [GameRuleSection] = [
-        GameRuleSection(
-            title: "The Goal",
-            body: "Three rounds each, highest total."
-        ),
-        GameRuleSection(
-            title: "Your Turn",
-            body: "Four rolls of five dice to claim a Freighter (6), then a Yacht (5), then a Dinghy (4) — strictly in that order, and the app sets them aside for you."
-        ),
-        GameRuleSection(
-            title: "Cargo",
-            body: "The two dice left over are your Cargo and their total is your score; with rolls left you may rethrow both together. Miss any of the three and the round scores nothing."
-        )
-    ]
-
     static let rules: [GameRuleSection] = [
         GameRuleSection(
-            title: "Your Turn",
-            body: "You get four rolls of five dice. You are looking for a Freighter (6), a Yacht (5) and a Dinghy (4) — in that order."
+            title: "Game Overview",
+            body: "Two or more players, alternating turns. The dice pool is five d6. The structure is best of 3 rounds."
         ),
         GameRuleSection(
-            title: "Claiming",
-            body: "After each roll, the dice you need are set aside automatically. You cannot take a Yacht before you have a Freighter, or a Dinghy before you have a Yacht — a roll full of 5's is worth nothing until a 6 turns up."
+            title: "Turn Mechanics",
+            body: "Each player receives up to four rolls per round to unlock the cargo sequence. Freighter requires a 6. Yacht requires a 5, and must be claimed after the Freighter. Dinghy requires a 4, and must be claimed after the Yacht. Required dice are set aside automatically as they land."
         ),
         GameRuleSection(
-            title: "Cargo",
-            body: "Once all three are claimed, the two dice left over are your Cargo, and their total is your score. If you have rolls left you may rethrow both together — but it is both or neither, and whatever comes up stands."
-        ),
-        GameRuleSection(
-            title: "Coming Up Short",
-            body: "Fail to claim all three within your four rolls and the turn scores nothing. That still happens about a third of the time, which is why one round is a coin flip and three is a game."
-        ),
-        GameRuleSection(
-            title: "Winning",
-            body: "Three rounds each, played one at a time so you see every result as it happens. Highest total after the third round wins. A tie plays one sudden-death round."
+            title: "Cargo Scoring and Rerolls",
+            body: "Once all three vessels — the 6, the 5 and the 4 — are claimed, the remaining two dice form your Cargo, and their combined total is your round score. If rolls remain within the four-roll allowance, you may re-roll both cargo dice together, both or neither. Failing to claim all three vessels within four rolls scores 0. The highest cumulative score after 3 rounds wins, and ties trigger a sudden-death round."
         )
     ]
 }

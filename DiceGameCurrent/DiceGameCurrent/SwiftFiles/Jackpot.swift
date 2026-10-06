@@ -182,42 +182,22 @@ enum JackpotGame: SuiteGame {
     static let displayName = "Jackpot"
     static let tagline = "Five rounds, or hit the jackpot."
 
-    /// The short version, shown from inside the game.
-    static let quickRules: [GameRuleSection] = [
-        GameRuleSection(
-            title: "The Goal",
-            body: "The highest total over five rounds each — or a Jackpot, which wins on the spot."
-        ),
-        GameRuleSection(
-            title: "Your Turn",
-            body: "Roll all five dice and read seven numbers: the d4's three exposed faces plus the top of the d6, d8, d12 and d20."
-        ),
-        GameRuleSection(
-            title: "Scoring",
-            body: "Any number appearing more than once scores itself times how often it appears. A d20 of 13 or more adds its own value. No sets at all with a d20 of 12 or less is the Jackpot."
-        )
-    ]
-
     static let rules: [GameRuleSection] = [
         GameRuleSection(
-            title: "Your Turn",
-            body: "Roll all five dice together. Read the three exposed faces of the d4 — every number except the one against the table — plus the top face of the d6, d8, d12 and d20. Seven numbers in all."
+            title: "Game Overview",
+            body: "Two players, alternating turns across 5 rounds. The dice pool is one d4, one d6, one d8, one d12 and one d20. Accumulate the highest total points or trigger the instant-win Jackpot."
         ),
         GameRuleSection(
-            title: "Sets",
-            body: "For any number appearing two or more times across your seven, score that number multiplied by how many times it appears. Two 4's = 8. A set of three 3's = 9. The d4's three faces are always different, so they can only match the other dice, never each other."
+            title: "Reading the Roll",
+            body: "Each roll yields seven numbers: the 3 exposed side faces of the d4, and the top face of the d6, d8, d12 and d20."
         ),
         GameRuleSection(
-            title: "The d20 Booster",
-            body: "If the d20 shows 13 or higher, add its face value to your turn score."
+            title: "Scoring and Instant Win",
+            body: "Sets: any number appearing two or more times among the 7 exposed values scores Number Value x Occurrences. Booster: a d20 showing 13 or higher adds its raw face value to the turn score. Jackpot, an instant win, is achieved when there are zero sets across all 7 numbers and the d20 shows 12 or lower."
         ),
         GameRuleSection(
-            title: "Jackpot",
-            body: "If you have no sets at all and the d20 shows 12 or lower, you hit the Jackpot — roughly one roll in 23."
-        ),
-        GameRuleSection(
-            title: "Winning",
-            body: "A Jackpot wins the game outright, but your opponent always finishes the round first. If they Jackpot in that same round, both are cancelled and play continues. If nobody Jackpots across all five rounds, the highest total wins."
+            title: "Match Resolution",
+            body: "An uncancelled Jackpot wins the match instantly. If a player rolls a Jackpot, all other players in the round complete their final turn. If multiple players hit a Jackpot in the same round, they cancel out and play continues. If no Jackpot is hit after 5 rounds, the highest total score wins."
         )
     ]
 }

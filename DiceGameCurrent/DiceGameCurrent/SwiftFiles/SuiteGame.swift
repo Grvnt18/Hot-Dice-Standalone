@@ -22,19 +22,15 @@ protocol SuiteGame {
     /// One-line pitch for the tile, under the name.
     static var tagline: String { get }
 
-    /// The full guide, as titled sections — the one the hub's bubble
-    /// cluster opens.
-    static var rules: [GameRuleSection] { get }
-
-    /// The short version, shown from inside the game.
+    /// The guide, as titled sections.
     ///
-    /// Two tiers because they answer different questions. A player who
-    /// opens Settings mid-match wants "what am I doing on this turn" in
-    /// two sections, not the differential table; a player browsing the
-    /// suite from the hub wants the whole thing. Defaults to the full
-    /// guide, so a game that has not written a short one still shows
-    /// something.
-    static var quickRules: [GameRuleSection] { get }
+    /// One guide, not two. There used to be a second, shorter array for the
+    /// sheet a player opens mid-match, on the reasoning that they want "what
+    /// does my button do" rather than the differential table. What it
+    /// actually produced was a guide that left things out being the one you
+    /// could reach fastest, with the real rules two taps away on a screen
+    /// you have to quit the match to see. Both screens show this now.
+    static var rules: [GameRuleSection] { get }
 
     /// Upper bound on participants. Two for everything except Rolls, which
     /// has no ceiling beyond what a group chat contains.
@@ -83,9 +79,6 @@ extension SuiteGame {
     /// The full name, for the ten games it fits.
     static var tileName: String { displayName }
 
-    /// A game with no short guide of its own shows the full one rather
-    /// than nothing.
-    static var quickRules: [GameRuleSection] { rules }
     static var lowestScoreWins: Bool { false }
     static var isSendable: Bool { true }
 }
@@ -228,57 +221,37 @@ enum BaseballDiceGame: SuiteGame {
     static let displayName = "Baseball Dice"
     static let tagline = "Guess the pitch. Take the extra base."
 
-    /// The short version, shown from inside the game.
-    static let quickRules: [GameRuleSection] = [
-        GameRuleSection(
-            title: "The Goal",
-            body: "Most runs over 3, 6 or 9 innings, three outs to a half-inning. The side batting second is the home side."
-        ),
-        GameRuleSection(
-            title: "Pitching",
-            body: "Pick a style and hide it: Power Pitcher throws mostly fastballs, Crafty mostly changeups, Breaking Ball mostly sliders. The app draws the actual pitch from that mix every at-bat, so nobody knows exactly what is coming."
-        ),
-        GameRuleSection(
-            title: "Batting",
-            body: "Pick a swing without seeing the pitch. Patient beats the Fastball, Contact the Changeup, Power the Slider. Guess right and you throw two of your die and keep the best against the pitcher's d4; guess wrong and the pitcher has the better die."
-        ),
-        GameRuleSection(
-            title: "Reading It",
-            body: "Your roll minus theirs. -5 or worse is a strikeout, -4 to +1 a field out, +2 a walk, +3 or +4 a single, +5 a double, +6 a triple, +7 to +9 caught at the wall, +10 or more a home run."
-        )
-    ]
-
     /// The floor is the ballpark itself, so it carries no wordmark.
     static let floorTitle = ""
 
     static let rules: [GameRuleSection] = [
         GameRuleSection(
-            title: "The Game",
-            body: "Pick a match length first — 3 innings is short, 6 medium, 9 extra long. Three outs to a half-inning, and the side batting last has the advantage it does in real baseball."
+            title: "Game Overview",
+            body: "Two players. Player 1 pitches first; Player 2 bats first, for the home team advantage. Length is selected before the match starts — 3, 6 or 9 innings — with three outs per half-inning. Score the most runs by matching pitch and swing tactics."
         ),
         GameRuleSection(
-            title: "Pitching",
-            body: "At the start of each half-inning the pitcher picks a style and keeps it hidden: Power Pitcher leans on the fastball, Crafty on the changeup, Breaking Ball on the slider. The app throws the actual pitch from that mix every at-bat, so even the pitcher does not know exactly what is coming."
+            title: "Turn Structure",
+            body: "The pitcher secretly selects a Pitching Style for the entire half-inning, confirming their choice to end the step. For each at-bat the batter chooses a Swing without seeing the pitch; the pitch is drawn automatically based on the pitcher's style, and both dice are rolled simultaneously. Upon the third out the half-inning ends, roles swap, and the new pitcher selects their Pitching Style."
         ),
         GameRuleSection(
-            title: "Swinging",
-            body: "The batter picks a swing without seeing the pitch. Patient beats the Fastball, Contact beats the Changeup, Power beats the Slider — and each loses to the pitch it cannot handle. Guess right and you roll two dice and keep the best against the pitcher's d4. Guess wrong and the pitcher has the better die — and against a Fastball he throws two of them and keeps the best."
+            title: "Pitching Styles",
+            body: "Power Pitcher: heavy emphasis on Fastballs, secondary Changeup and Slider. Crafty: heavy emphasis on Changeups, secondary Fastball and Slider. Breaking Ball: heavy emphasis on Sliders, secondary Fastball and Changeup."
         ),
         GameRuleSection(
-            title: "The Dice",
-            body: "Favoured: the batter throws two of their own die and keeps the highest against the pitcher's d4. Even: one of the batter's die against a d8. Unfavoured: a Fastball beaten by a Power Swing is one d12 against the pitcher's two, keeping the highest; a Changeup that fools a Patient Swing is a d8 against a d10; a Slider that ties up a Contact Swing is a d10 against a d12."
+            title: "Strategic Cycle",
+            body: "Fastball beats Power Swing and loses to Patient Swing. Changeup beats Patient Swing and loses to Contact Swing. Slider beats Contact Swing and loses to Power Swing."
         ),
         GameRuleSection(
-            title: "The Result",
-            body: "Subtract the pitcher's roll from the batter's. -5 or worse is a strikeout, -4 to +1 a field out, +2 a walk, +3 to +4 a single, +5 a double, +6 a triple, +7 to +9 caught at the wall, and +10 or better a home run."
+            title: "Dice and Matchup Mechanics",
+            body: "Favoured, where the swing beats the pitch: 2x swing die keeping the high one, against 1d4. Even, a neutral matchup: 1x swing die against 1d8. Unfavoured Fastball against Power: 1d12 against 2d12 keeping the high one. Unfavoured Changeup against Patient: 1d8 against 1d10. Unfavoured Slider against Contact: 1d10 against 1d12. Base swing dice sizes are Patient 1d8, Contact 1d10, Power 1d12."
         ),
         GameRuleSection(
-            title: "Worth Knowing",
-            body: "A favoured swing can never strike out — the worst gap it can produce is -3. Rolling your die's maximum on both dice of a favoured swing is an automatic home run whatever the table says. A deep out still scores a runner from third, and a field out with a runner on first is a double play when the pitcher's roll is even."
+            title: "Scoring Matrix",
+            body: "Take the batter roll minus the pitcher roll. -5 or lower is a Strikeout for 1 out. -4 to +1 is a Field Out for 1 out, triggering a double play if the pitcher roll is even with a runner on 1st. +2 is a Walk, batter to 1st with forced runners advancing 1 base. +3 to +4 is a Single, batter to 1st and all base runners advance 1 base. +5 is a Double, batter to 2nd and all base runners advance 2 bases. +6 is a Triple, batter to 3rd and all base runners score. +7 to +9 is a Deep Out for 1 out, and the runner on 3rd scores unless it is the third out. +10 or higher is a Home Run, batter and all base runners score."
         ),
         GameRuleSection(
-            title: "Winning",
-            body: "Most runs when the innings run out. A tie plays extra innings, in pairs, until someone leads at the end of one."
+            title: "Special Rules",
+            body: "Favoured Immunity: a favoured swing cannot strike out, as its minimum net value is -3. Double Maximum: rolling the maximum value on both dice during a favoured swing results in an automatic Home Run regardless of differential. Third-Out Catch: a Deep Out recorded as the third out immediately ends the half-inning, and no run scores."
         )
     ]
 }
@@ -295,45 +268,18 @@ enum RollsGame: SuiteGame {
     /// Points are penalties here — rolling a die's highest face scores 0.
     static let lowestScoreWins = true
 
-    /// The short version, shown from inside the game.
-    static let quickRules: [GameRuleSection] = [
-        GameRuleSection(
-            title: "The Goal",
-            body: "The lowest total once all fifteen dice are banked. Points are penalties here."
-        ),
-        GameRuleSection(
-            title: "Your Turn",
-            body: "Roll the pool, tap at least one settled die to bank it, then roll everything left. Repeat until nothing is loose."
-        ),
-        GameRuleSection(
-            title: "Scoring",
-            body: "A die's highest face costs nothing, every step below it costs a point, and a 1 costs the die's full number of sides — 6 on a d6, 12 on a d12."
-        )
-    ]
-
-    /// Moved here verbatim from HowToPlayView, which hardcoded them. The
-    /// wording was fine; it was living in the settings sheet, which meant
-    /// every game showed Rolls' rules.
     static let rules: [GameRuleSection] = [
         GameRuleSection(
-            title: "The Pool",
-            body: "You start with 15 dice: twelve 6-sided, one 8-sided, one 10-sided, and one 12-sided."
+            title: "Game Overview",
+            body: "Two or more players, group play compatible. The dice pool is 15 total: twelve d6, one d8, one d10 and one d12. Bank all 15 dice; lowest cumulative score wins."
         ),
         GameRuleSection(
-            title: "Rolling",
-            body: "Tap Begin to roll every die still in the pool. Tap any settled die to select it, then tap Roll again to bank your selection and re-roll everything left."
+            title: "Player Turn",
+            body: "Roll all remaining active dice in the pool. Select and bank at least one die. Re-roll all unbanked dice, and repeat until all 15 dice are banked to finish the turn."
         ),
         GameRuleSection(
-            title: "Scoring",
-            body: "Lower is better. Banking a die scores it against its own best face: its highest number scores 0, and every face below that costs one point per step down — except a 1, which always costs the die's full number of sides, its worst possible result. So a 1 costs 6 on a d6, 8 on a d8, 10 on a d10 and 12 on a d12, and those four are the worst results in the game."
-        ),
-        GameRuleSection(
-            title: "Banking",
-            body: "You must bank at least one die from a roll before rerolling the rest. Selecting every remaining die turns the Roll button into Finish — confirming then banks everything and ends the turn."
-        ),
-        GameRuleSection(
-            title: "Winning",
-            body: "The game ends once every die has been banked. Add up the points from every die you banked — the lowest total wins."
+            title: "Scoring Structure",
+            body: "A banked die scores based on its differential from its highest face value, and lower scores are better. The formula is Score = Max Value - Rolled Face, so a d6 rolling 6 scores 0, a d8 rolling 8 scores 0, and so on. The exception is rolling a 1, which scores penalty points equal to the die's total sides: 6 points on a d6, 8 on a d8, 10 on a d10 and 12 on a d12."
         )
     ]
 }

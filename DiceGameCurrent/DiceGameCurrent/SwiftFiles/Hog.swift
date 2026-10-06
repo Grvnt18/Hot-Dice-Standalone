@@ -46,38 +46,14 @@ enum HogGame: SuiteGame {
     static let displayName = "Hog"
     static let tagline = "Push your luck to 75."
 
-    /// The short version, shown from inside the game.
-    static let quickRules: [GameRuleSection] = [
-        GameRuleSection(
-            title: "The Goal",
-            body: "First to bank 75 wins immediately — there is no answering turn."
-        ),
-        GameRuleSection(
-            title: "Your Turn",
-            body: "Roll one die as often as you dare, adding each face to your turn total, then hold to bank it and pass."
-        ),
-        GameRuleSection(
-            title: "The Hog",
-            body: "Roll a 1 and the whole turn total is gone. What you have already banked is safe."
-        )
-    ]
-
     static let rules: [GameRuleSection] = [
         GameRuleSection(
-            title: "Your Turn",
-            body: "Roll one die as many times as you dare. Every face adds to your turn total — and you keep none of it until you hold."
+            title: "Game Overview",
+            body: "Two or more players, alternating turns. The dice pool is one d6. The first player to bank 75 points wins instantly."
         ),
         GameRuleSection(
-            title: "The Hog",
-            body: "Roll a 1 and the turn ends immediately with nothing. Everything you built up that turn is gone; your banked score is safe."
-        ),
-        GameRuleSection(
-            title: "Holding",
-            body: "Hold at any time to add your turn total to your score and pass the die. Holding is never wrong, only expensive."
-        ),
-        GameRuleSection(
-            title: "Winning",
-            body: "First to bank 75 wins on the spot — there is no answering turn, so a lead you can see is a lead you have to catch before they hold."
+            title: "Turn Mechanics",
+            body: "Roll the die. On a roll of 2 to 6, add the value to your running turn total, then choose to roll again or hold. On a roll of 1, the Hog, the turn ends immediately and all points accumulated during that turn are lost — your banked score is unaffected. Hold to bank the running turn total into your overall score and end the turn."
         )
     ]
 }

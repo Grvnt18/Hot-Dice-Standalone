@@ -127,42 +127,22 @@ enum ThreeThousandGame: SuiteGame {
     static let displayName = "Three Thousand"
     static let tagline = "Bank it or lose it."
 
-    /// The short version, shown from inside the game.
-    static let quickRules: [GameRuleSection] = [
-        GameRuleSection(
-            title: "The Goal",
-            body: "First to bank 3,000. Your opponent then gets one last turn to beat it."
-        ),
-        GameRuleSection(
-            title: "Your Turn",
-            body: "Roll, set aside at least one scoring die — every die you take has to be part of a combination — then roll on or bank."
-        ),
-        GameRuleSection(
-            title: "Busted, and Hot Dice",
-            body: "A roll with nothing scoring in it ends the turn and loses everything from it. Set all six aside and you roll all six again with the total intact."
-        )
-    ]
-
     static let rules: [GameRuleSection] = [
         GameRuleSection(
-            title: "Your Turn",
-            body: "Roll all six dice. Tap the dice that score to set them aside — you must set aside at least one, and every die you take has to be part of a scoring combination. Then roll what is left, or bank."
+            title: "Game Overview",
+            body: "Two or more players, alternating turns. The dice pool is six d6. The first player to reach or exceed 3,000 points wins."
         ),
         GameRuleSection(
-            title: "Scoring",
-            body: "Each 1 is 100 and each 5 is 50. Three of a kind scores the face times 100 — three 1's are 1,000. Four of a kind is 1,000, five is 2,000, six is 3,000. A 1-2-3-4-5-6 straight is 1,500 and three pairs are 750."
+            title: "Turn Mechanics",
+            body: "Roll all active dice. Set aside at least one scoring die or valid scoring combination — every set-aside die must contribute to a valid score. Then choose to bank the accumulated points, ending the turn, or roll the remaining dice."
         ),
         GameRuleSection(
-            title: "Busted",
-            body: "Roll and find nothing that scores and you are Busted: the turn ends and everything you had going that turn is gone. About half of all turns end this way."
+            title: "Scoring Combinations",
+            body: "A single 1 is 100 and a single 5 is 50. Three 1s are 1,000, and three of a kind of 2s to 6s is the face value x 100. Four of a kind is 1,000, five of a kind 2,000 and six of a kind 3,000. A full straight of 1-2-3-4-5-6 is 1,500, and three pairs are 750."
         ),
         GameRuleSection(
-            title: "Hot Dice",
-            body: "Set aside all six and you roll all six again with your running total intact. There is no limit to how far a turn can run — and no safety in it either."
-        ),
-        GameRuleSection(
-            title: "Winning",
-            body: "Bank 3,000 and your opponent gets one last turn to beat it. If they cannot, you win — a tie goes to whoever got there first."
+            title: "Turn Rules",
+            body: "Busted: roll zero scoring dice and the turn ends immediately, with the turn points lost. Hot Dice: set aside all 6 dice into scoring combinations and re-roll all 6 dice to continue accumulating points in the same turn. Match End: when a player reaches 3,000 points, all other players receive one final turn in the round to attempt to beat the highest score."
         )
     ]
 }

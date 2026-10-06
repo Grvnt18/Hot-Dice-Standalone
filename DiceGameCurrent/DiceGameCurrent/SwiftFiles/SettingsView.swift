@@ -481,6 +481,11 @@ struct HowToPlayView: View {
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(12)
                                     .pixelPanel(fill: .solid(MenuInk.panel), elevation: .resting)
+
+                                // Three sections carry one — see GuideFigure.
+                                if let figure = section.figure {
+                                    GuideFigureView(figure: figure)
+                                }
                             }
                         }
 

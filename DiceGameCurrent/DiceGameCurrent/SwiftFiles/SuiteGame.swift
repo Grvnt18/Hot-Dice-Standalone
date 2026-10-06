@@ -92,6 +92,24 @@ struct GameRuleSection: Identifiable {
     let title: String
     let body: String
 
+    /// A diagram under the text, where prose is the wrong medium.
+    ///
+    /// Three rules in the suite are shapes rather than sentences: what a
+    /// rosette looks like and what standing on one does, the route a piece
+    /// walks around the Royal UR board, and how a Boneheads column
+    /// multiplies. Each was a paragraph that readers had to rebuild into a
+    /// picture in their head, and the Boneheads one is arithmetic nobody
+    /// should have to run by hand to understand the rule.
+    ///
+    /// Nil for the other fifty-odd sections, which say what they mean.
+    var figure: GuideFigure? = nil
+
+    init(title: String, body: String, figure: GuideFigure? = nil) {
+        self.title = title
+        self.body = body
+        self.figure = figure
+    }
+
     /// Titles are unique within a game, which is all ForEach needs.
     var id: String { title }
 }

@@ -89,6 +89,79 @@ def check_retired_wording():
           "%d string(s) still show a renamed term" % len(hits))
 
 
+def check_figures():
+    """A diagram must be generated from the rule, not drawn beside it.
+
+    Three sections carry a figure: the rosette, Royal UR's route, and the
+    Boneheads multiplier worked out. Each illustrates a rule, which means
+    each has the same failure mode the rules text had before this file
+    existed — the code moves and the picture does not, and a picture is
+    harder to proofread than a sentence.
+
+    So none of the three may hold its own copy of the facts. The route
+    comes from the board's path array, the rosette from the board's own
+    marking routine, and the Boneheads numbers from the scoring function
+    the game actually scores with.
+
+    The Boneheads total is also recomputed here, by this file, from the
+    columns the figure declares. That is a second opinion on the rule
+    rather than a restatement of it: if `columnScore` and the published
+    formula ever disagree, this fails even though the Swift still compiles.
+    """
+    art = source("GuideBubbles.swift")
+
+    for label, token in (
+        ("the route reads the board", "RoyalUrBoard.path(for:"),
+        ("the flowers read the board", "RoyalUrBoard.rosettes"),
+        ("the squares read the board", "RoyalUrBoard.squares"),
+        ("the rosette is the board's own",
+         "RoyalUrArt.draw(.rosette, in: context"),
+        ("the multiplier reads the scorer",
+         "BoneheadsRules.columnScore("),
+    ):
+        check("figure: %s" % label, token in art,
+              "GuideBubbles.swift no longer calls %s" % token)
+
+    # The worked columns, read out of the Swift so the two cannot drift.
+    match = re.search(r'columns: \[\[Int\]\] = (.+)\n', art)
+    if not match:
+        check("figure: the worked columns are readable", False,
+              "BoneheadsScoringFigure.columns is no longer a literal array")
+        return
+
+    columns = [[int(n) for n in re.findall(r'\d+', group)]
+               for group in re.findall(r'\[([^\[\]]+)\]', match.group(1))]
+
+    def column_score(dice):
+        """(face x occurrences) x occurrences, summed over distinct faces."""
+        counts = {}
+        for die in dice:
+            counts[die] = counts.get(die, 0) + 1
+        return sum(face * n * n for face, n in counts.items())
+
+    subtotals = [column_score(c) for c in columns]
+    total = sum(subtotals)
+
+    # No total may be typed. The figure prints what `columnScore` returns,
+    # and the reason that matters is on record: the worked chart this figure
+    # was drawn from had correct per-column subtotals of 21, 27 and 11 and
+    # printed their sum as 49. It is 59. A hand-added total is exactly the
+    # thing a reader trusts and cannot check, so the Swift adds it up and
+    # this asserts nothing typed can shadow that.
+    typed = re.findall(r'TOTAL: (\d+)', art)
+    check("figure: no total is typed into the figure", not typed,
+          "a literal total %s is printed instead of the computed one"
+          % ", ".join(typed))
+    print("  %-34s %s -> %s, total %d"
+          % ("figure: worked example", columns, subtotals, total))
+
+    # All three multipliers, or the figure demonstrates less than it claims.
+    shapes = {max(len([d for d in c if d == face]) for face in set(c))
+              for c in columns}
+    check("figure: it shows a single, a pair and a triple",
+          shapes == {1, 2, 3}, "largest group per column: %s" % sorted(shapes))
+
+
 def main():
     print("rules text against the constants:")
 
@@ -199,6 +272,7 @@ def main():
           "sections: entry.rules" in source("GuideBubbles.swift"),
           "the cluster is no longer opening the detailed rules")
 
+    check_figures()
     check_retired_wording()
 
     if check.failed:

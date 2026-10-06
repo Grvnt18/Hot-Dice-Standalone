@@ -162,3 +162,202 @@ enum GuideBubbleLayout {
     /// Between one bubble arriving and the next.
     static let popInterval: Double = 0.045
 }
+
+// MARK: - Figures
+
+/// A diagram a rule section can carry.
+///
+/// Three, and only three, because a figure earns its place by showing
+/// something the sentence cannot. Everything here is drawn from the same
+/// values the game plays by — the board's own path array, the board's own
+/// rosette art, the real scoring function — so a rule change moves the
+/// picture with it. A diagram that has to be redrawn by hand when the code
+/// changes is a diagram that will eventually be wrong.
+enum GuideFigure: String {
+    /// What a rosette is, and what landing on one does.
+    case rosette
+    /// The sixteen squares each player walks, and where the routes meet.
+    case royalUrPath
+    /// A Boneheads board scored out, multiplier by multiplier.
+    case boneheadsScoring
+}
+
+/// Renders a section's figure under its text.
+struct GuideFigureView: View {
+    let figure: GuideFigure
+
+    var body: some View {
+        content
+            .frame(maxWidth: .infinity)
+            .padding(10)
+            .pixelWell(radius: ControlShape.cornerRadius)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch figure {
+        case .rosette:         RosetteFigure()
+        case .royalUrPath:     RoyalUrPathFigure()
+        case .boneheadsScoring: BoneheadsScoringFigure()
+        }
+    }
+}
+
+// MARK: The rosette
+
+/// One square, drawn by the board's own marking routine.
+///
+/// `RoyalUrArt.draw(.rosette:)` is what paints the five flowered squares on
+/// the real board, so the guide cannot show a rosette the board does not.
+private struct RosetteFigure: View {
+    private let side: CGFloat = 92
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Canvas { context, size in
+                let rect = CGRect(origin: .zero, size: size)
+                context.fill(Path(rect), with: .color(Color(RoyalUrArt.tileBase)))
+                RoyalUrArt.draw(.rosette, in: context, rect: rect)
+            }
+            .frame(width: side, height: side)
+
+            Text("Land here and you roll again.")
+                .font(.poppins(13))
+                .foregroundStyle(MenuInk.text)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+// MARK: The route
+
+/// The board, with both routes numbered.
+///
+/// Squares come from `RoyalUrBoard.squares`, the route from
+/// `RoyalUrBoard.path(for:)` and the flowers from `RoyalUrBoard.rosettes` —
+/// the three facts the rule depends on, read rather than redrawn.
+private struct RoyalUrPathFigure: View {
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Canvas { context, size in
+                RoyalUrPathFigure.draw(in: context, size: size)
+            }
+            .frame(height: 112)
+
+            Text("Your route is numbered 1 to 16. The middle row is shared — that is the only place a piece can be captured.")
+                .font(.poppins(12))
+                .foregroundStyle(MenuInk.dim)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    /// Out of the ViewBuilder: a Canvas closure doing this much arithmetic
+    /// is exactly the shape Xcode 14.2's solver gives up on.
+    private static func draw(in context: GraphicsContext, size: CGSize) {
+        let cell = min(size.width / CGFloat(RoyalUrBoard.columns),
+                       size.height / CGFloat(RoyalUrBoard.rows))
+        let originX = (size.width - cell * CGFloat(RoyalUrBoard.columns)) / 2
+        let originY = (size.height - cell * CGFloat(RoyalUrBoard.rows)) / 2
+
+        func frame(_ square: RoyalUrBoard.Square) -> CGRect {
+            CGRect(x: originX + cell * CGFloat(square.column - 1),
+                   y: originY + cell * CGFloat(square.row - 1),
+                   width: cell, height: cell)
+        }
+
+        for square in RoyalUrBoard.squares {
+            let rect = frame(square).insetBy(dx: 1, dy: 1)
+            context.fill(Path(rect), with: .color(Color(RoyalUrArt.tileBase)))
+            if RoyalUrBoard.rosettes.contains(square) {
+                RoyalUrArt.draw(.rosette, in: context, rect: rect)
+            }
+            context.stroke(Path(rect), with: .color(RoyalUrArt.ink.opacity(0.5)),
+                           lineWidth: 1)
+        }
+
+        // Seat 0's numbers only. Seat 1 walks the mirror of this, so two
+        // sets of numerals would say the same thing twice and leave no room
+        // in a cell this size.
+        let path = RoyalUrBoard.path(for: RoyalUrBoard.bottomSeat)
+        for (offset, square) in path.enumerated() {
+            let rect = frame(square)
+            let text = Text("\(offset + 1)")
+                .font(.poppins(9, .bold))
+                .foregroundColor(RoyalUrArt.ink)
+            context.draw(context.resolve(text),
+                         at: CGPoint(x: rect.midX, y: rect.midY))
+        }
+    }
+}
+
+// MARK: The multiplier
+
+/// A worked board, scored by `BoneheadsRules.columnScore`.
+///
+/// The numbers are not typed in. Each row's product and each column's
+/// subtotal are computed by the same function the game scores with, so the
+/// worked example cannot disagree with the rule it is demonstrating.
+private struct BoneheadsScoringFigure: View {
+
+    /// Three columns that between them show all three multipliers: a pair,
+    /// a triple, and three singles.
+    private static let columns: [[Int]] = [[5, 5, 1], [3, 3, 3], [2, 5, 4]]
+
+    private var total: Int {
+        BoneheadsScoringFigure.columns
+            .reduce(0) { $0 + BoneheadsRules.columnScore($1) }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(BoneheadsScoringFigure.columns.enumerated()), id: \.offset) { index, column in
+                BoneheadsColumnRow(label: BoneheadsRules.name(of: index),
+                                   dice: column)
+            }
+
+            Divider().overlay(MenuInk.dim)
+
+            Text("TOTAL: \(total)")
+                .font(.poppins(14, .bold))
+                .foregroundStyle(MenuInk.text)
+        }
+    }
+}
+
+/// One column of the worked example: its dice, each die's contribution, and
+/// the column's score.
+private struct BoneheadsColumnRow: View {
+    let label: String
+    let dice: [Int]
+
+    /// How many times `value` appears — the multiplier the rule applies.
+    private func occurrences(of value: Int) -> Int {
+        dice.filter { $0 == value }.count
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(label)
+                .font(.poppins(12, .bold))
+                .foregroundStyle(MenuInk.dim)
+                .frame(width: 16, alignment: .leading)
+
+            ForEach(Array(dice.enumerated()), id: \.offset) { _, die in
+                PipFace(value: die, tint: MenuInk.text)
+                    .frame(width: 22, height: 22)
+                Text("x\(occurrences(of: die))")
+                    .font(.poppins(11))
+                    .foregroundStyle(MenuInk.dim)
+            }
+
+            Spacer(minLength: 4)
+
+            Text("= \(BoneheadsRules.columnScore(dice))")
+                .font(.poppins(13, .bold))
+                .foregroundStyle(MenuInk.text)
+        }
+    }
+}

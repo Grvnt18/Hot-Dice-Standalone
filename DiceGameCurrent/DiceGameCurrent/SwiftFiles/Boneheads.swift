@@ -181,7 +181,8 @@ enum BoneheadsGame: SuiteGame {
         ),
         GameRuleSection(
             title: "Column Stacking Multipliers",
-            body: "Matching numbers in the same column multiply their combined value: Column Score = (Die Face x Occurrences) x Occurrences. A single die is its face value, at 1x. A pair is (Face x 2) x 2. A triple is (Face x 3) x 3."
+            body: "Matching numbers in the same column multiply their combined value: Column Score = (Die Face x Occurrences) x Occurrences. A single die is its face value, at 1x. A pair is (Face x 2) x 2. A triple is (Face x 3) x 3.",
+            figure: .boneheadsScoring
         ),
         GameRuleSection(
             title: "Smashing Mechanic",

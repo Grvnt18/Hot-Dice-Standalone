@@ -454,7 +454,8 @@ enum RoyalUrGame: SuiteGame {
     static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Game Overview",
-            body: "Two players. The dice pool is five d4, a marked points system. Three pieces per player on a shared 16-square track. The first player to bring 2 pieces home wins."
+            body: "Two players. The dice pool is five d4, a marked points system. Three pieces per player on a shared 16-square track. The first player to bring 2 pieces home wins.",
+            figure: .royalUrPath
         ),
         GameRuleSection(
             title: "Movement Dice Calculation",
@@ -462,7 +463,8 @@ enum RoyalUrGame: SuiteGame {
         ),
         GameRuleSection(
             title: "Movement and Board Mechanics",
-            body: "Move a single piece the full exact count rolled, and an exact count is required to enter or land home. You cannot land on your own pieces. Capture: landing on an opponent's piece sends it back to the start. Rosettes, on squares 4, 8, 12 and 16, grant an extra roll when you land on one. Setback Rule: rolling 0, or having no legal moves, forces you to move one of your own pieces backward 4 squares, or to the start if that square is occupied."
+            body: "Move a single piece the full exact count rolled, and an exact count is required to enter or land home. You cannot land on your own pieces. Capture: landing on an opponent's piece sends it back to the start. Rosettes, on squares 4, 8, 12 and 16, grant an extra roll when you land on one. Setback Rule: rolling 0, or having no legal moves, forces you to move one of your own pieces backward 4 squares, or to the start if that square is occupied.",
+            figure: .rosette
         )
     ]
 }

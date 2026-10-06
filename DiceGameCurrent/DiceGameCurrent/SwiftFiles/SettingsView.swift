@@ -61,6 +61,22 @@ struct SettingsView: View {
     /// the toggle would not move when tapped.
     @State private var musicPerGame = GameScope.musicIsPerGame
 
+    /// What the track button reads when it is closed.
+    ///
+    /// A plain `if let` rather than `selectedTrackIndex.map { ... } ?? "Shuffle"`
+    /// on purpose: a closure inside an optional chain inside a view body is
+    /// the exact shape that took the Playgrounds build down silently once,
+    /// and `tools_qualcheck.py` flags it for that reason. The index is also
+    /// range-checked, since `tracks` is a literal that has changed length
+    /// before and a stale stored index would otherwise trap.
+    private var trackLabel: String {
+        if let idx = sound.selectedTrackIndex,
+           idx >= 0, idx < SoundEngine.tracks.count {
+            return SoundEngine.tracks[idx].displayName
+        }
+        return "Shuffle"
+    }
+
     var body: some View {
         // No NavigationStack and no Form. Both were the system's own
         // chrome — a grey grouped list under a translucent nav bar — on a
@@ -97,23 +113,49 @@ struct SettingsView: View {
                             .opacity(sound.musicEnabled ? 1 : 0.4)
                             .disabled(!sound.musicEnabled)
 
-                            // tag(nil as Int?) is required: the selection
-                            // binding is Int?, and a plain tag(nil) cannot
-                            // infer that, which silently breaks matching for
-                            // the Shuffle row.
+                            // A Menu rather than a Picker, because every
+                            // built-in picker style draws system chrome the
+                            // restyle replaced: .menu is a capsule button,
+                            // .segmented a rounded bar. The capsule is drawn
+                            // by the picker's OWN button, so no amount of
+                            // framing from outside squares it off — the
+                            // control has to be the app's own.
                             //
-                            // .menu style shows the current track title inline
-                            // rather than pushing to a separate list screen,
-                            // which there is no navigation stack for any more.
-                            Picker("Track", selection: $sound.selectedTrackIndex) {
-                                Text("Shuffle").font(.poppins(14)).tag(nil as Int?)
+                            // Same nine choices, same order, and the same
+                            // side effect: assigning selectedTrackIndex
+                            // restarts playback through its didSet, which is
+                            // exactly what the selection binding did.
+                            //
+                            // This also retires the tag(nil as Int?) note —
+                            // there is no tag matching left to get wrong.
+                            Menu {
+                                Button("Shuffle") { sound.selectedTrackIndex = nil }
                                 ForEach(Array(SoundEngine.tracks.enumerated()), id: \.offset) { idx, track in
-                                    Text(track.displayName).font(.poppins(14)).tag(idx as Int?)
+                                    Button(track.displayName) { sound.selectedTrackIndex = idx }
                                 }
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Text("Track")
+                                        .font(.poppins(15))
+                                        .foregroundStyle(MenuInk.text)
+
+                                    Spacer(minLength: 8)
+
+                                    Text(trackLabel)
+                                        .font(.poppins(14))
+                                        .foregroundStyle(theme.accentColor)
+                                        .lineLimit(1)
+
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(MenuInk.dim)
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 7)
+                                .frame(maxWidth: .infinity)
+                                .pixelPanel(fill: .solid(MenuInk.panel),
+                                            elevation: .resting)
                             }
-                            .pickerStyle(.menu)
-                            .font(.poppins(15))
-                            .tint(theme.accentColor)
                             .opacity(sound.musicEnabled ? 1 : 0.4)
                             .disabled(!sound.musicEnabled)
                         }

@@ -271,9 +271,28 @@ private struct HubTitle: View {
             // The SUITE's name. Rolls is still a game in it — see
             // RollsGame.displayName, which keeps that title — but it stopped
             // being the name of the thing holding the other ten.
-            ScriptText("Hot Dice", size: 52)
-                .foregroundStyle(.white)
-                .elevated(.lifted)
+            //
+            // Not ScriptText any more, and that is a trade rather than a
+            // slip: the mark is wanted in the heaviest weight the app has,
+            // and the script face ships Regular only. Poppins-Black is the
+            // boldest thing in Resources, so the mark moved to it. The
+            // script face keeps its other two jobs — the turn-complete
+            // caption and the floor wordmark — so nothing about
+            // AppFonts.swift changes.
+            //
+            // 245pt wide at 52, measured off the actual TTF, against the
+            // 320pt of the narrowest phone this app meets less its gutters.
+            // It fits; the scale floor is there because "it fits" was
+            // measured once and fonts get swapped.
+            Text("HOT DICE")
+                .font(.poppins(52, .black))
+                .foregroundStyle(.black)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                // Pale, like everything else on the hub — see Elevation.Ink.
+                // Black glyphs with a black shadow are not lifted, they are
+                // just thicker.
+                .elevated(.lifted, ink: .light)
         }
     }
 }
@@ -301,7 +320,12 @@ private struct GameTile: View {
                     // Through Elevation, which is the app's one shadow
                     // system — four hand-picked values were collapsed into
                     // it precisely so a twelfth could not be added here.
-                    .elevated(.lifted)
+                    //
+                    // Pale, matching the wordmark above: the artwork is
+                    // black line work, and the hub is the one screen where
+                    // the ink and the shadow would otherwise be the same
+                    // colour.
+                    .elevated(.lifted, ink: .light)
 
                 Text(entry.tileName)
                     .font(.poppins(HubLayout.labelFont(tile: side), .semibold))

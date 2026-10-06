@@ -55,6 +55,30 @@ def main():
         if "case %s" % height not in elevation:
             failed.append("Elevation lost its .%s height" % height)
 
+    # --- and the two inks come off ONE ladder. ----------------------
+    #
+    # A dark mark on mid-tone timber cannot throw a dark shadow: the offset
+    # stops reading as depth and reads as a thickened edge instead. So
+    # Elevation signs its shadow in TONE as well as in direction, and the
+    # hub's black wordmark and its icons throw the pale one.
+    #
+    # The risk that buys is two ladders — a light ink that quietly grows its
+    # own opacities, at which point "one shadow system" is a comment rather
+    # than a fact. Both inks must therefore be written against the SHARED
+    # `opacity`, not against numbers of their own.
+    if "enum Ink" not in elevation:
+        failed.append("Elevation has no Ink, so a shadow cannot be signed "
+                      "for the tone it falls on")
+    else:
+        for ink in ("dark", "light"):
+            if "case %s" % ink not in elevation:
+                failed.append("Elevation.Ink lost its .%s tone" % ink)
+        for base, ink in (("black", "dark"), ("white", "light")):
+            if not re.search(r'\.%s\.opacity\(opacity\)' % base, elevation):
+                failed.append("Elevation's .%s ink does not derive from the "
+                              "shared opacity ladder — two inks with their "
+                              "own numbers are two shadow systems" % ink)
+
     # --- 3. The materials are actually used. -------------------------
     generals = strip_comments(source("GeneralsScreen.swift"))
     if "LowPolyTextures.paperSurface" not in generals:
@@ -202,6 +226,10 @@ def main():
                                              "pixelPanel"),
         ("Capsule()", "a pill is the one shape the restyle replaced "
                       "everywhere else, so one here reads as another app"),
+        (".pickerStyle(", "every built-in picker style draws system "
+                          "chrome the restyle replaced — .menu is a "
+                          "capsule button, .segmented a rounded bar. A "
+                          "Menu with a pixelPanel label is the square one"),
     ):
         if token in menus:
             where = [f for f in MENU_FILES if token in strip_comments(source(f))]
@@ -215,7 +243,8 @@ def main():
     if failed:
         sys.exit("cohesion: FAILED (%d problem(s))" % len(failed))
 
-    print("  %-26s ok (direction shared, three heights)" % "one light")
+    print("  %-26s ok (direction shared, three heights, two inks on one ladder)"
+          % "one light")
     print("  %-26s ok (paper + ink, solid placements)" % "materials in use")
     print("  %-26s ok (no strokeBorder on a bare Shape)" % "shape constraints")
     print("  %-26s ok (every plain Button fills its own tap target)"

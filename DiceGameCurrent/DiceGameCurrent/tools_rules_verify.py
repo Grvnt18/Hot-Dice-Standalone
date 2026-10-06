@@ -162,6 +162,87 @@ def check_figures():
           shapes == {1, 2, 3}, "largest group per column: %s" % sorted(shapes))
 
 
+def strip_comments(text):
+    """Comments here legitimately discuss `1 - seat` and the rest; code may
+    not. Same stripping `_user_facing_strings` does, for the same reason."""
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    text = re.sub(r"///[^\n]*", "", text)
+    return re.sub(r"(?<!:)//[^\n]*", "", text)
+
+
+def check_seats():
+    """The games that say "two or more" must not count to two.
+
+    GAME_RULES.txt describes Rolls, HOG, Three Thousand and
+    Freighter.Yacht.Dinghy as two or more players. Rolls already had no
+    ceiling; the other three declared the protocol default of 2 while
+    their screens were, in fact, already seat-based — TurnMatch handles
+    any number, advanceTurn wraps on participants.count, and scores are
+    keyed by participant.
+
+    So raising the ceiling was a one-line change per game, and the risk is
+    not that it breaks today. It is that someone later reaches for the
+    shortcut that two players make available — `1 - seat` for "the other
+    one", `participants[1]` for "them", a count check — in a screen that
+    now claims to take five. Each of those is correct for two and silently
+    wrong for three, which is the worst way to be wrong.
+
+    This fails them by name, in the screens that claim the ceiling.
+    """
+    claimants = {
+        "ThreeThousand.swift": "ThreeThousandScreen.swift",
+        "Hog.swift": "HogScreen.swift",
+        "FreighterYachtDinghy.swift": "FreighterYachtDinghyScreen.swift",
+    }
+
+    for model, screen in sorted(claimants.items()):
+        body = strip_comments(source(model))
+        if "static let maxPlayers = Int.max" not in body:
+            check("seats: %s has no ceiling" % model, False,
+                  "GAME_RULES.txt says two or more players")
+            continue
+
+        code = strip_comments(source(screen))
+        found = []
+        for label, pattern in (
+            ("1 - seat", r'\b1 - seat\b'),
+            ("1 - activeIndex", r'\b1 - match\.activeIndex\b'),
+            ("participants[1]", r'participants\[1\]'),
+            ("a count of two", r'participants\.count == 2'),
+            ("localTwoPlayer with a literal pair",
+             r'TurnMatch\(participants: \["[^"]*", "[^"]*"\]\)'),
+        ):
+            if re.search(pattern, code):
+                found.append(label)
+        check("seats: %s is seat-based" % screen, not found,
+              "uses %s, which is correct for two players and wrong for three"
+              % ", ".join(found))
+
+    # And the factory that used to be the only thing saying "two".
+    turns = strip_comments(source("TurnMatch.swift"))
+    check("seats: a match can be made for any number",
+          "static func local(playerCount: Int" in turns,
+          "TurnMatch still only builds two-player matches")
+
+    # Compiling at N and being CORRECT at N are different claims, so the
+    # turn order is simulated rather than read. A mirror of advanceTurn:
+    # wrap on participants.count, advance the round on wrap, and close the
+    # round on the last seat.
+    for seats in (2, 3, 5, 8):
+        active, rnd, closes = 0, 1, []
+        for turn in range(seats * 4):
+            if active == seats - 1:
+                closes.append(turn)
+            active += 1
+            if active >= seats:
+                active = 0
+                rnd += 1
+        check("seats: %d players take even turns" % seats,
+              rnd == 5 and len(closes) == 4,
+              "%d rounds and %d round-closings over %d turns"
+              % (rnd, len(closes), seats * 4))
+
+
 def main():
     print("rules text against the constants:")
 
@@ -273,6 +354,7 @@ def main():
           "the cluster is no longer opening the detailed rules")
 
     check_figures()
+    check_seats()
     check_retired_wording()
 
     if check.failed:

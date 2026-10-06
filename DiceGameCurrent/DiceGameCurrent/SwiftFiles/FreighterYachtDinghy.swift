@@ -171,6 +171,12 @@ enum FreighterYachtDinghyGame: SuiteGame {
     static let displayName = "Freighter.Yacht.Dinghy"
     static let tagline = "Freighter, yacht, dinghy. Best of three."
 
+    /// Two or more, per GAME_RULES.txt. The turns alternate and the state
+    /// is per seat, so nothing here is counting to two — see
+    /// TurnMatch.local(playerCount:).
+    static let maxPlayers = Int.max
+
+
     /// The full name is three words and two full stops, which at 45% of
     /// the playfield width would be unreadable under the dice.
     static let floorTitle = "F.Y.D."

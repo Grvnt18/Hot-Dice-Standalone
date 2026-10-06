@@ -46,6 +46,12 @@ enum HogGame: SuiteGame {
     static let displayName = "Hog"
     static let tagline = "Push your luck to 75."
 
+    /// Two or more, per GAME_RULES.txt. The turns alternate and the state
+    /// is per seat, so nothing here is counting to two — see
+    /// TurnMatch.local(playerCount:).
+    static let maxPlayers = Int.max
+
+
     static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Game Overview",

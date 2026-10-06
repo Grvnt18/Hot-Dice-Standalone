@@ -127,6 +127,12 @@ enum ThreeThousandGame: SuiteGame {
     static let displayName = "Three Thousand"
     static let tagline = "Bank it or lose it."
 
+    /// Two or more, per GAME_RULES.txt. The turns alternate and the state
+    /// is per seat, so nothing here is counting to two — see
+    /// TurnMatch.local(playerCount:).
+    static let maxPlayers = Int.max
+
+
     static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Game Overview",

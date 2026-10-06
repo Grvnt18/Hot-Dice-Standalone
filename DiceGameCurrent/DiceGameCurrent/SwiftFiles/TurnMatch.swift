@@ -188,6 +188,29 @@ extension TurnMatch {
     /// A local two-player match. Ids are arbitrary but stable within the
     /// match, which is all anything here needs.
     static func localTwoPlayer(seatSequence: [Int]? = nil) -> TurnMatch {
-        TurnMatch(participants: ["local.1", "local.2"], seatSequence: seatSequence)
+        local(playerCount: 2, seatSequence: seatSequence)
+    }
+
+    /// A local match for any number of seats.
+    ///
+    /// Everything above this line already handles N: `advanceTurn` wraps on
+    /// `participants.count`, `activeIsLastInRound` compares against it, and
+    /// scores are keyed by participant rather than by a player-one and a
+    /// player-two. The only thing that ever said "two" was the factory.
+    ///
+    /// Which is what this is for. Three Thousand, HOG and
+    /// Freighter.Yacht.Dinghy are all described as two or more players in
+    /// GAME_RULES.txt, and none of their screens contains a two-player
+    /// assumption — no `1 - seat`, no `participants[1]`, no count check.
+    /// They are seat-based already. When the Messages extension supplies
+    /// real participant ids, it calls `TurnMatch(participants:)` directly
+    /// and these games need no further change.
+    ///
+    /// Clamped at one, because a match with no seats has no active
+    /// participant and every read here would be answering about nobody.
+    static func local(playerCount: Int, seatSequence: [Int]? = nil) -> TurnMatch {
+        let seats = max(1, playerCount)
+        return TurnMatch(participants: (1...seats).map { "local.\($0)" },
+                         seatSequence: seatSequence)
     }
 }

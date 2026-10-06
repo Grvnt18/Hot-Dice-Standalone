@@ -247,6 +247,7 @@ struct ThreeThousandScreen: View {
         }
 
         // Busted. The running total goes, the banked score does not.
+        DiceAudioEngine.shared.play(set: AudioSet.bust, jitter: false)
         lastSummary = ThreeThousandRules.summary(
             player: match.activeDisplayName,
             banked: 0,

@@ -46,7 +46,12 @@ def main():
     audio = source("GameAudio.swift")
 
     # --- 1. Every set named in the code has files. --------------------
-    sets = dict(re.findall(r'static let (\w+)\s*=\s*"(sfx_[a-z_]+)"', audio))
+    # [a-z0-9_], not [a-z_]: "sfx_3k_bust" has a digit in it, and with the
+    # narrower class the set simply did not register — so its seven files
+    # were reported as shipped-but-unplayed while the call site existed all
+    # along. A check that silently stops seeing a whole set is worse than no
+    # check, so this is deliberately permissive.
+    sets = dict(re.findall(r'static let (\w+)\s*=\s*"(sfx_[a-z0-9_]+)"', audio))
     if not sets:
         sys.exit("audio: FAILED (no sample sets found in GameAudio.swift)")
 
@@ -148,11 +153,41 @@ def main():
                               % (labels, order))
         print("  %-22s ok (%s)" % ("call order", ", ".join(order)))
 
+    # --- 6b. Every SFX cue has a file. --------------------------------
+    #
+    # The check whose absence let all SEVEN UI cues ship with no audio at
+    # all — including buttonTap, which 37 call sites play. SoundEngine
+    # resolves a cue by trying each extension and silently skips the ones it
+    # cannot find, by design, so a missing file is not an error anywhere:
+    # it is simply a button that never clicks. Nothing else was ever going
+    # to catch that.
+    cues = re.findall(r'case \w+\s*=\s*"(sfx_[a-z_]+)"', source("SoundEngine.swift"))
+    if not cues:
+        failed.append("no SFX cases found in SoundEngine.swift — the cue "
+                      "list moved and this check is now blind")
+    extensions = ("mp3", "m4a", "wav", "caf", "aiff")
+    print("\nUI cues:")
+    for cue in cues:
+        found = [e for e in extensions if os.path.exists(RES + "/%s.%s" % (cue, e))]
+        print("  %-24s %s" % (cue, found[0] if found else "MISSING"))
+        if not found:
+            failed.append("%s has no audio file — the cue is declared, every "
+                          "call to it is silent, and nothing reports it"
+                          % cue)
+
     # --- 7. The sets are actually reached from the screens. -----------
     for screen, call in (("BaseballDiceScreen.swift", "BaseballAudio.play("),
                          ("BaseballDiceScreen.swift", "BaseballAudio.playIntro()"),
                          ("RollbotsScreen.swift", "RollbotsAudio.fire("),
-                         ("RollbotsScreen.swift", "RollbotsAudio.activate(")):
+                         ("RollbotsScreen.swift", "RollbotsAudio.activate("),
+                         ("ThreeThousandScreen.swift", "AudioSet.bust"),
+                         ("HogScreen.swift", "AudioSet.oink"),
+                         ("BoneheadsScreen.swift", "AudioSet.remove"),
+                         ("RoyalUrScreen.swift", "AudioSet.urMove"),
+                         ("FreighterYachtDinghyScreen.swift", "SeaAudio.start()"),
+                         ("FreighterYachtDinghyScreen.swift", "SeaAudio.stop()"),
+                         ("PassAndPlayHost.swift", "VictoryAudio.start()"),
+                         ("RollbotsArt.swift", "VictoryAudio.start()")):
         if call not in source(screen):
             failed.append("%s never calls %s" % (screen, call))
 

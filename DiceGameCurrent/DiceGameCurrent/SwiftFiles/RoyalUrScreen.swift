@@ -361,7 +361,10 @@ struct RoyalUrScreen: View {
     }
 
     private func move(piece: Int, to destination: Int) {
-        SoundEngine.shared.play(.buttonTap)
+        // The piece landing, sliced from one take of the real thing. Not
+        // the button cue: a move is a thing happening on the board, and the
+        // tap that started it already sounded.
+        DiceAudioEngine.shared.play(set: AudioSet.urMove, jitter: false)
         let outcome = state.apply(seat: seat, piece: piece, destination: destination)
 
         if outcome.cameHome {

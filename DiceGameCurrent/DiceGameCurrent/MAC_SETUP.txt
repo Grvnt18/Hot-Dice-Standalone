@@ -162,7 +162,7 @@ So if the app runs but something is wrong, find it here:
   No dice at all, in any game           the 6 .obj meshes
   Baseball Dice will not start          the same — no dice means no roll,
                                         and no roll means no at-bat
-  No music and no sound effects         the 8 .m4a and 66 .wav/.mp3 files
+  No music and no sound effects         the 8 .m4a and 109 .wav/.mp3 files
   Type falls back to the system         the 6 .ttf fonts
     face, or the script headings
     look like ordinary text
@@ -184,18 +184,22 @@ WHAT SHOULD BE IN THE PROJECT — THE FULL COUNT
 ===============================================================================
 
 Select the Resources group in Xcode and the file count at the bottom
-should come to 113. By kind:
+should come to 162. By kind:
 
-    61   .wav    sound effects — dice impacts, bats, gloves, pistols
+    70   .wav    sound effects — dice impacts, bats, gloves, pistols,
+                 and the nine Royal UR piece moves sliced out of one take
+    39   .mp3    the longer effects: the Baseball intro, the Rollbots
+                 abilities, and the supplied sets — Three Thousand busts,
+                 Boneheads removals, Hog oinks, the Freighter Yacht Dinghy
+                 waves, the victory fireworks, and the five single UI
+                 sounds (button, select, deselect, bank, menu)
     27   .png    game tile artwork, weapon and swing marks
      8   .m4a    music tracks
      6   .obj    dice meshes: d4 d6 d8 d10 d12 d20   <- the important six
-     5   .mp3    the longer effects: the Baseball intro, the four
-                 Rollbots abilities
      6   .ttf    Poppins in five weights, and Lobster for the script
                  headings
 
-   113   total
+   162   total
 
 And 70 .swift files in SwiftFiles.
 

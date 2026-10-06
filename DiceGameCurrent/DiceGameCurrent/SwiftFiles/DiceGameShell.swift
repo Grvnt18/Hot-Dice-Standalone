@@ -906,7 +906,8 @@ struct DiceGameScreen: View {
         guard let session else { return }
         SoundEngine.shared.play(.buttonTap)
         session.turnController.confirmSelectionAndRoll {
-            SoundEngine.shared.play(.turnComplete)
+            // No turn-complete sound was supplied, so the cue is gone rather
+            // than declared-and-silent. Restore both together when one is.
             finishedScore = session.turnController.currentScore
         }
     }

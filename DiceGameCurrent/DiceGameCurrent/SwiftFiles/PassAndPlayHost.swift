@@ -240,6 +240,14 @@ struct MatchResultView: View {
 
             FireworksView()
                 .allowsHitTesting(false)
+                // The sky this view already draws, now with the bangs. One
+                // opener then the bodies cycling, so it keeps going for as
+                // long as the screen is up rather than firing once.
+                .onAppear {
+                    VictoryAudio.preload()
+                    VictoryAudio.start()
+                }
+                .onDisappear { VictoryAudio.stop() }
 
             VStack(spacing: 16) {
                 // "<name> Wins" — dynamic, decides the match, and also

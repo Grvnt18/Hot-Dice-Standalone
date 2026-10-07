@@ -175,6 +175,27 @@ extension JackpotRules {
     }
 }
 
+/// Jackpot as it travels in a message.
+///
+/// The round's unresolved Jackpots. They cannot be settled when they are
+/// rolled — a Jackpot only wins once everyone else in the round has had
+/// their turn, and two in the same round cancel — so the list has to
+/// survive the handover or the Equalizer silently stops working.
+///
+/// Scores live in `TurnMatch`, and the five dice are re-read from the seed,
+/// so this is the whole of what Jackpot adds to the wire.
+struct JackpotState: Codable, Equatable {
+
+    /// Participants who have hit a Jackpot in the round now being played.
+    var jackpotsThisRound: [String] = []
+
+    private enum CodingKeys: String, CodingKey { case jackpotsThisRound = "j" }
+
+    init(jackpotsThisRound: [String] = []) {
+        self.jackpotsThisRound = jackpotsThisRound
+    }
+}
+
 // MARK: - Suite entry
 
 enum JackpotGame: SuiteGame {

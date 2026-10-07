@@ -39,6 +39,27 @@ extension HogRules {
     }
 }
 
+/// HOG as it travels in a message.
+///
+/// Almost nothing, and that is the game rather than an oversight: every
+/// point HOG keeps is banked into `TurnMatch.scores`, and a turn total is
+/// the only thing that exists outside it. Carried anyway so a turn can be
+/// handed over mid-push rather than only at a hold — the receiver sees
+/// what is riding on the next roll.
+///
+/// The die in the air does not travel. A roll is resolved on the device
+/// that threw it and the face is already folded into `turnTotal`.
+struct HogState: Codable, Equatable {
+
+    /// Points accumulated this turn and not yet banked. Zero at a handover
+    /// that followed a hold or a Hog.
+    var turnTotal: Int = 0
+
+    private enum CodingKeys: String, CodingKey { case turnTotal = "t" }
+
+    init(turnTotal: Int = 0) { self.turnTotal = turnTotal }
+}
+
 // MARK: - Suite entry
 
 enum HogGame: SuiteGame {

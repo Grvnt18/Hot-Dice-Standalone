@@ -232,6 +232,28 @@ extension GeneralsRules {
     }
 }
 
+/// Generals as it travels in a message.
+///
+/// The shared scorecard, which is the entire point of the game: twelve
+/// categories claimed once each by whoever takes them first. Nothing else
+/// in the suite has state this load-bearing — a lost card is a lost match,
+/// and both devices must agree on every claim already made.
+///
+/// `GeneralsCard` was already Codable; what was missing was a state type to
+/// put it in, which is why Generals could not be sent while its card could.
+///
+/// The five dice and the rolls used do not travel: a turn is three rolls on
+/// one device and arrives as a claim.
+struct GeneralsState: Codable, Equatable {
+
+    /// Who has claimed what, and for how much.
+    var card: GeneralsCard = GeneralsCard()
+
+    private enum CodingKeys: String, CodingKey { case card = "c" }
+
+    init(card: GeneralsCard = GeneralsCard()) { self.card = card }
+}
+
 // MARK: - Suite entry
 
 enum GeneralsGame: SuiteGame {

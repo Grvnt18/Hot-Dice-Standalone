@@ -120,6 +120,46 @@ extension ThreeThousandRules {
     }
 }
 
+/// Three Thousand as it travels in a message.
+///
+/// The turn total rides along for the same reason HOG's does: a turn can be
+/// handed over mid-push, and what is at risk is the whole decision.
+///
+/// The two end-game fields are the ones that would be easy to leave out and
+/// expensive to miss. Reaching 3,000 does not end the match — every other
+/// player gets one more turn — so the countdown and who got there first
+/// both have to cross. Without them the receiving device would either end
+/// the match early or never end it.
+///
+/// The dice on the table do not travel. A turn is resolved where it is
+/// played and arrives as points.
+struct ThreeThousandState: Codable, Equatable {
+
+    /// Set aside this turn and not yet banked.
+    var turnTotal: Int = 0
+
+    /// Turns still owed before the match is decided, once someone has
+    /// passed the target. Nil while nobody has.
+    var turnsLeftAfterTarget: Int? = nil
+
+    /// Who reached the target first, which is who a tie goes to.
+    var firstToTarget: String? = nil
+
+    private enum CodingKeys: String, CodingKey {
+        case turnTotal = "t"
+        case turnsLeftAfterTarget = "l"
+        case firstToTarget = "f"
+    }
+
+    init(turnTotal: Int = 0,
+         turnsLeftAfterTarget: Int? = nil,
+         firstToTarget: String? = nil) {
+        self.turnTotal = turnTotal
+        self.turnsLeftAfterTarget = turnsLeftAfterTarget
+        self.firstToTarget = firstToTarget
+    }
+}
+
 // MARK: - Suite entry
 
 enum ThreeThousandGame: SuiteGame {

@@ -164,6 +164,27 @@ extension FreighterYachtDinghyRules {
     }
 }
 
+/// Freighter.Yacht.Dinghy as it travels in a message.
+///
+/// The match length, because it is chosen before the first round and every
+/// device has to agree on when the match ends.
+///
+/// `Turn` deliberately does not travel, and could not as written: its cargo
+/// is an array of tuples, which Swift cannot synthesise Codable for. That
+/// is the right shape anyway — a round is four rolls resolved on one
+/// device, and what crosses is the score it produced.
+struct FreighterYachtDinghyState: Codable, Equatable {
+
+    /// Rounds each player takes this match.
+    var roundsThisMatch: Int = FreighterYachtDinghyRules.roundsPerPlayer
+
+    private enum CodingKeys: String, CodingKey { case roundsThisMatch = "r" }
+
+    init(roundsThisMatch: Int = FreighterYachtDinghyRules.roundsPerPlayer) {
+        self.roundsThisMatch = roundsThisMatch
+    }
+}
+
 // MARK: - Suite entry
 
 enum FreighterYachtDinghyGame: SuiteGame {

@@ -211,3 +211,198 @@ extension GameTransport {
         )
     }
 }
+
+// MARK: - What a turn actually carries
+
+/// The body of every turn: the bookkeeping and the game's own state.
+///
+/// These were always going to travel together and never had a type saying
+/// so. `TurnMatch` holds who is playing, whose turn it is and every score;
+/// `State` holds whatever that game needs on top. Sending one without the
+/// other is not a thing any game wants, so the pair is the unit.
+///
+/// Keys are one letter for the same reason everything else here is: this
+/// rides in an `MSMessage` URL against a 4 KB budget.
+struct MatchPayload<State: Codable & Equatable>: Codable, Equatable {
+    var match: TurnMatch
+    var state: State
+
+    private enum CodingKeys: String, CodingKey {
+        case match = "m"
+        case state = "d"
+    }
+
+    init(match: TurnMatch, state: State) {
+        self.match = match
+        self.state = state
+    }
+}
+
+// MARK: - Sending and receiving a turn
+
+extension GameTransport {
+
+    /// Packs a turn for sending.
+    ///
+    /// The one call a game makes. Everything underneath — the envelope, the
+    /// version, the JSON, the base64url, the query item — is this file's
+    /// business and no screen's.
+    static func send<State: Codable & Equatable>(
+        game: String,
+        version: Int,
+        seed: UInt64,
+        match: TurnMatch,
+        state: State
+    ) throws -> URL {
+        let body = MatchPayload(match: match, state: state)
+        return try url(for: GameEnvelope(game: game, version: version,
+                                         seed: seed, state: body))
+    }
+
+    /// Unpacks a received turn.
+    ///
+    /// Routes through `decode`, so an unknown game and a newer schema both
+    /// come back as a `GamePayloadError` the receiver can show rather than
+    /// as a decoding failure it cannot explain.
+    static func receive<State: Codable & Equatable>(
+        _ type: State.Type,
+        from url: URL,
+        expecting game: String,
+        supportedVersion: Int
+    ) throws -> (seed: UInt64, match: TurnMatch, state: State) {
+        let envelope = try decode(MatchPayload<State>.self, from: url,
+                                  expecting: game,
+                                  supportedVersion: supportedVersion)
+        return (envelope.seed, envelope.state.match, envelope.state.state)
+    }
+}
+
+// MARK: - Proving it on the device
+
+/// A round trip per game, run on the iPad.
+///
+/// The transport was written, documented and budgeted long before anything
+/// used it, and nothing had ever encoded a real turn — the whole of it was
+/// correct by inspection. This is what makes it correct by demonstration,
+/// and it runs in Swift Playgrounds, where the Messages extension itself
+/// cannot be built at all.
+///
+/// Each probe packs a representative turn, sends it through the real URL
+/// path, reads it back, and compares. A payload that does not survive its
+/// own round trip is a turn that would arrive wrong; a payload over budget
+/// is one that might not arrive.
+enum GameWireCheck {
+
+    struct Result: Identifiable {
+        let game: String
+        let bytes: Int
+        let fits: Bool
+        /// Nil when the turn came back equal to the one that was sent.
+        let failure: String?
+
+        var id: String { game }
+        var ok: Bool { failure == nil && fits }
+    }
+
+    /// Packs, sends, reads back and compares one game.
+    ///
+    /// Generic rather than existential: Swift 5.7 cannot hold a protocol
+    /// with an associated type in an array without ceremony that buys
+    /// nothing here, so the games are listed explicitly in `runAll` and
+    /// each one calls this.
+    static func probe<State: Codable & Equatable>(
+        game: String,
+        version: Int,
+        seed: UInt64 = 0xD1CE_D1CE,
+        match: TurnMatch,
+        state: State
+    ) -> Result {
+        do {
+            let url = try GameTransport.send(game: game, version: version,
+                                             seed: seed, match: match,
+                                             state: state)
+            let bytes = url.absoluteString.utf8.count
+            let back = try GameTransport.receive(State.self, from: url,
+                                                 expecting: game,
+                                                 supportedVersion: version)
+            var problem: String?
+            if back.seed != seed {
+                problem = "seed came back \(back.seed), sent \(seed)"
+            } else if back.match != match {
+                problem = "the match did not survive the round trip"
+            } else if back.state != state {
+                problem = "the game state did not survive the round trip"
+            }
+            return Result(game: game, bytes: bytes,
+                          fits: bytes <= GameTransport.safeByteBudget,
+                          failure: problem)
+        } catch {
+            return Result(game: game, bytes: 0, fits: false,
+                          failure: "\(error)")
+        }
+    }
+
+    /// Every sendable game, each with a turn shaped like a real one.
+    ///
+    /// Free Roll is absent on purpose: it is solo and `isSendable` is false,
+    /// so it has no turn to send and no state to carry.
+    static func runAll() -> [Result] {
+        let two = TurnMatch.localTwoPlayer()
+        let group = TurnMatch.local(playerCount: 6)
+
+        var results: [Result] = []
+
+        // Rolls: the biggest payload in the suite by a distance — fifteen
+        // landed faces per player, and no turn order, so a whole group chat
+        // can be mid-round at once. If anything breaks the budget it is this.
+        results.append(probe(game: RollsGameState.gameID, version: 1,
+                             match: group,
+                             state: RollsGameState(startedBy: "local.1")))
+
+        results.append(probe(game: "generals", version: 1,
+                             match: two, state: GeneralsState()))
+        results.append(probe(game: "three_thousand", version: 1,
+                             match: group, state: ThreeThousandState(
+                                turnTotal: 850, turnsLeftAfterTarget: 2,
+                                firstToTarget: "local.1")))
+        results.append(probe(game: "hog", version: 1,
+                             match: group, state: HogState(turnTotal: 23)))
+        results.append(probe(game: "fyd", version: 1,
+                             match: group, state: FreighterYachtDinghyState()))
+        results.append(probe(game: "jackpot", version: 1,
+                             match: two, state: JackpotState(
+                                jackpotsThisRound: ["local.1"])))
+        results.append(probe(game: "boneheads", version: 1,
+                             match: two, state: filledBoneheads()))
+        results.append(probe(game: "royal_ur", version: 1,
+                             match: two, state: RoyalUrState()))
+        results.append(probe(game: "rollbots", version: 1,
+                             match: two,
+                             state: RollbotsState(
+                                weapons: [.monoBlade, .railRifle],
+                                ware: [.neuralOverclock, .quantumPhase])))
+        // Nine innings: the longest match the game offers, and so the
+        // most base state a turn can carry.
+        results.append(probe(game: "baseball_dice", version: 1,
+                             match: two, state: BaseballDiceState(innings: 9)))
+
+        return results
+    }
+
+    /// A Boneheads board with every slot taken, which is its largest state
+    /// — eighteen placements, each a face and an ink. Measuring an empty
+    /// board would measure nothing.
+    private static func filledBoneheads() -> BoneheadsState {
+        var state = BoneheadsState()
+        for slot in 0..<BoneheadsRules.slotsPerColumn {
+            for column in 0..<BoneheadsRules.columns {
+                for seat in 0...1 {
+                    state.place(seat: seat, column: column,
+                                die: (slot + column + seat) % 6 + 1,
+                                ink: (slot * 3 + column + seat) % 15)
+                }
+            }
+        }
+        return state
+    }
+}

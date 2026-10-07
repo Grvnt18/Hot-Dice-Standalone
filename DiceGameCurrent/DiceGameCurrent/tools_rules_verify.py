@@ -243,6 +243,74 @@ def check_seats():
               % (rnd, len(closes), seats * 4))
 
 
+def check_wire():
+    """Every game that can be sent is actually exercised.
+
+    The transport was written, documented and budgeted long before anything
+    used it: GameEnvelope, the versioned header, base64url, a 4 KB budget
+    and a size report — and not one line of it had ever encoded a real
+    turn. It was correct by inspection, which is the weakest kind of
+    correct.
+
+    GameWireCheck packs a turn per game, sends it through the real URL
+    path, reads it back and compares. The failure this guards is the quiet
+    one: a game joins the suite, declares itself sendable, and nobody adds
+    a probe — so it ships having never survived a round trip.
+
+    Free Roll is the one game legitimately absent, because it is solo and
+    says so with isSendable = false.
+    """
+    payload = strip_comments(source("GamePayload.swift"))
+
+    if "static func runAll()" not in payload:
+        check("wire: there is a round-trip check", False,
+              "GameWireCheck.runAll is gone")
+        return
+
+    probed = set(re.findall(r'probe\(game: "([^"]+)"', payload))
+    if "RollsGameState.gameID" in payload:
+        probed.add("rolls")
+
+    # Every game's id, read from the games themselves.
+    declared = {}
+    for filename in sorted(os.listdir(SWIFT)):
+        if not filename.endswith(".swift"):
+            continue
+        body = strip_comments(source(filename))
+        for match in re.finditer(r'static let id = "([^"]+)"', body):
+            declared[match.group(1)] = filename
+        if "static let id = RollsGameState.gameID" in body:
+            declared["rolls"] = filename
+
+    # A game opts out by saying so, not by being forgotten.
+    optedOut = set()
+    for filename in sorted(os.listdir(SWIFT)):
+        if not filename.endswith(".swift"):
+            continue
+        body = strip_comments(source(filename))
+        if "static let isSendable = false" in body:
+            for match in re.finditer(r'static let id = "([^"]+)"', body):
+                optedOut.add(match.group(1))
+
+    missing = sorted(set(declared) - probed - optedOut)
+    check("wire: every sendable game is probed", not missing,
+          "no round trip for %s" % ", ".join(missing))
+
+    stray = sorted(probed - set(declared))
+    check("wire: no probe for a game that does not exist", not stray,
+          "probes name %s" % ", ".join(stray))
+
+    check("wire: a turn carries the match and the state",
+          "struct MatchPayload" in payload,
+          "the bookkeeping and the game state are no longer sent together")
+    check("wire: the budget is still stated",
+          "safeByteBudget" in payload,
+          "nothing says how big a turn may be")
+
+    print("  %-34s %d probed, %d opted out"
+          % ("wire: games", len(probed), len(optedOut)))
+
+
 def main():
     print("rules text against the constants:")
 
@@ -355,6 +423,7 @@ def main():
 
     check_figures()
     check_seats()
+    check_wire()
     check_retired_wording()
 
     if check.failed:

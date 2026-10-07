@@ -210,6 +210,25 @@ struct SettingsView: View {
                                 .padding(.vertical, 4)
                         }
 
+                        // The hub only, and only until the Messages
+                        // extension exists. The transport is written and
+                        // budgeted but cannot be exercised in Playgrounds
+                        // any other way — the extension itself needs Xcode
+                        // — so this is where a turn gets packed, sent
+                        // through the real URL path and read back, on the
+                        // device, before any of it reaches a Mac.
+                        if rules.isEmpty {
+                            panel("Message Payloads",
+                                  footer: AnyView(
+                                    Text("Each game packs a turn, sends it "
+                                         + "through the real URL path and "
+                                         + "reads it back. Budget is "
+                                         + "\(GameTransport.safeByteBudget) bytes.")
+                                        .font(.poppins(11)))) {
+                                WirePayloadCheck()
+                            }
+                        }
+
                         // Inside a game this opens that game's guide. On the
                         // hub there is no game to explain, so it opens the
                         // whole set as a cluster of bubbles — the one place a
@@ -498,3 +517,74 @@ struct HowToPlayView: View {
     }
 }
 
+
+// MARK: - Message payloads
+
+/// Runs `GameWireCheck` on demand and shows what each game costs.
+///
+/// On demand rather than on appear: it encodes every game in the suite, and
+/// a settings sheet should not do that work for someone who opened it to
+/// change the volume.
+private struct WirePayloadCheck: View {
+
+    @State private var results: [GameWireCheck.Result] = []
+    @ObservedObject private var theme = AppTheme.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                SoundEngine.shared.play(.buttonTap)
+                results = GameWireCheck.runAll()
+            } label: {
+                Text(results.isEmpty ? "Run the check" : "Run it again")
+                    .font(.poppins(14))
+                    .foregroundStyle(theme.accentTextColor)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 38)
+                    .contentShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
+            }
+            .buttonStyle(.plain)
+            .pixelPanel(fill: .solid(theme.accentColor), elevation: .resting)
+
+            ForEach(results) { result in
+                row(result)
+            }
+
+            if let worst = results.map(\.bytes).max(), !results.isEmpty {
+                Text("Largest turn: \(worst) B of \(GameTransport.safeByteBudget) B")
+                    .font(.poppins(11))
+                    .foregroundStyle(MenuInk.dim)
+            }
+        }
+    }
+
+    private func row(_ result: GameWireCheck.Result) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
+                Text(result.ok ? "OK" : "FAIL")
+                    .font(.poppins(11, .bold))
+                    .foregroundStyle(result.ok ? Color.green : Color.red)
+                    .frame(width: 34, alignment: .leading)
+
+                Text(result.game)
+                    .font(.poppins(12))
+                    .foregroundStyle(MenuInk.text)
+
+                Spacer(minLength: 4)
+
+                Text("\(result.bytes) B")
+                    .font(.poppins(12))
+                    .foregroundStyle(result.fits ? MenuInk.dim : Color.red)
+            }
+
+            // Only when something is wrong. A list of ten passing rows that
+            // each explain themselves is a list nobody reads.
+            if let failure = result.failure {
+                Text(failure)
+                    .font(.poppins(10))
+                    .foregroundStyle(Color.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}

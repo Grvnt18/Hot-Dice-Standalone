@@ -26,3 +26,8 @@ dice-dither.png
 dice-dither-scale.png
 scoreboard-*.png
 surfaces.png
+
+# Icon slots built by tools_icon_export.py from the masters in Icons/.
+# Derived files: sixteen PNGs that must be rebuilt whenever a master
+# changes, which is exactly what a committed copy would stop happening.
+DiceGameCurrent/DiceGameCurrent/Icons/export/

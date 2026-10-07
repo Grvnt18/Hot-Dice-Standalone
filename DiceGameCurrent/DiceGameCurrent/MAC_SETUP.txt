@@ -231,9 +231,19 @@ channel fails App Store validation rather than looking wrong, so flatten it.
   2. In the Attributes inspector set  Single Size.
   3. Drop the 1024 in.
 
-The source artwork is Resources/icon-app.png, which is black line work on a
-transparent background. It cannot be used as-is for the reason above — it
-needs a background colour behind it first.
+The masters live in Icons/, and the exported slots are built from them:
+
+    python3 tools_icon_export.py
+
+That writes Icons/export/ — the 1024 app icon and every Messages slot,
+all flattened, all square-cornered, none carrying alpha. Run it again
+whenever a master changes; the exports are derived files and are not
+meant to be edited.
+
+Icons/ also holds Dark and Clear masters. They are NOT exported and
+cannot be used here: dark, tinted and clear app icons are an iOS 18
+feature that Xcode 16 reads, and Xcode 14.2's asset catalogs have no slot
+for them. They are kept for the day that ceiling moves.
 
 THE MESSAGES EXTENSION IS DIFFERENT. Its icon is a separate asset type
 ("iMessage App Icon"), it is NOT square, and it does NOT support Single
@@ -265,8 +275,12 @@ identical to the last frame the system drew.
 
 Match these or the handoff reads as a jump:
 
-  * Background: the same timber the hub uses. A flat fill is fine; the
-    grain is behind the mark and the eye does not catch it in 300 ms.
+  * Background: #AE7B5B — LowPolyTextures.woodBaseHex, the tone the hub's
+    timber is generated from. A flat fill, not a picture of the grain:
+    the hub's wood is generated at runtime and no static image will match
+    it pixel for pixel, so matching the BASE TONE and letting the grain
+    appear with the first drawn frame reads as the texture arriving, while
+    a near-miss photograph reads as the whole screen changing.
   * The mark: Resources/icon-app.png, centred HORIZONTALLY and VERTICALLY
     on the screen.
   * Its size: HubLayout.headerMark(forWidth:), which is the same size as a

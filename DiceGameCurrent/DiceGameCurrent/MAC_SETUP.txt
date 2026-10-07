@@ -205,8 +205,81 @@ And 70 .swift files in SwiftFiles.
 
 To check from a terminal, in the repo:
 
-    ls DiceGameCurrent/DiceGameCurrent/Resources | wc -l        # 113
+    ls DiceGameCurrent/DiceGameCurrent/Resources | wc -l        # 162
     ls DiceGameCurrent/DiceGameCurrent/SwiftFiles/*.swift | wc -l   # 70
+
+
+===============================================================================
+THE APP ICON AND THE LAUNCH SCREEN
+===============================================================================
+
+Neither of these exists in the repo, because neither can: Swift Playgrounds
+keeps them in its own project settings, which do not travel. Both are made
+once, in Xcode.
+
+THE ICON
+
+Xcode 14 added "Single Size" app icons, so the container app needs exactly
+one file:
+
+    1024 x 1024 PNG, sRGB, NO alpha channel, square, no rounded corners
+
+iOS draws the rounded corners and the mask itself. An icon with an alpha
+channel fails App Store validation rather than looking wrong, so flatten it.
+
+  1. In the asset catalog select AppIcon.
+  2. In the Attributes inspector set  Single Size.
+  3. Drop the 1024 in.
+
+The source artwork is Resources/icon-app.png, which is black line work on a
+transparent background. It cannot be used as-is for the reason above — it
+needs a background colour behind it first.
+
+THE MESSAGES EXTENSION IS DIFFERENT. Its icon is a separate asset type
+("iMessage App Icon"), it is NOT square, and it does NOT support Single
+Size — the whole ladder is required:
+
+    1024 x 768      Messages App Store
+    27 x 20         Messages      (@1x @2x @3x)
+    32 x 24         Messages      (@1x @2x @3x)
+    29 x 29         Settings      (@1x @2x @3x)
+    60 x 45         Messages, iPhone   (@2x @3x)
+    67 x 50         Messages, iPad     (@1x @2x)
+    74 x 55         Messages, iPad Pro (@2x)
+
+The 1024 x 768 is the one that is easy to miss and fails validation late,
+with a complaint about a missing Large App Icon in the Messages extension.
+Xcode's asset catalog lists every slot with its exact pixel size — fill
+them all.
+
+THE LAUNCH SCREEN
+
+An iOS launch screen is a static storyboard, rendered before any code runs.
+It cannot animate, and no amount of wanting it to will change that.
+
+The hub's opening — the mark sitting in the middle, then travelling up to
+its place at the top as the games appear — is therefore done IN THE APP,
+by HubIntro in GameHubView.swift. The storyboard's only job is to draw the
+frame the animation starts from, so that the first frame the app draws is
+identical to the last frame the system drew.
+
+Match these or the handoff reads as a jump:
+
+  * Background: the same timber the hub uses. A flat fill is fine; the
+    grain is behind the mark and the eye does not catch it in 300 ms.
+  * The mark: Resources/icon-app.png, centred HORIZONTALLY and VERTICALLY
+    on the screen.
+  * Its size: HubLayout.headerMark(forWidth:), which is the same size as a
+    game tile's icon — 96pt on a 393pt-wide phone, 207pt on an iPad.
+    In the storyboard use a width constraint proportional to the superview,
+    not a fixed number, so it tracks across devices.
+  * Nothing else. No wordmark, no games, no spinner. The wordmark is part
+    of the title block that travels; drawing it on the launch screen would
+    make it jump when the app takes over.
+
+  1. File → New → File → Launch Screen.
+  2. Set it as the target's Launch Screen File (General tab).
+  3. Add a UIImageView with icon-app.png, centred, aspect fit.
 
 
 ===============================================================================

@@ -435,6 +435,29 @@ def check_documents():
     if str(swift) not in setup:
         failures.append("MAC_SETUP.txt's Swift count is not %d" % swift)
 
+    # --- 3. And the numbers beside the commands that print them -------
+    #
+    # The two checks above are "does this number appear anywhere in the
+    # file", which is weaker than it looks and let a real error through:
+    # MAC_SETUP told the reader to run `ls Resources | wc -l` and
+    # annotated it `# 113`, four lines under a prose total of 162. The
+    # prose satisfied the substring test, so this file passed while the
+    # document said two different things about the same command.
+    #
+    # 113 was right before the sound effects landed. That is how these go
+    # wrong — not typed wrong, but true once.
+    #
+    # So the annotation on each command is read as the claim it is, and
+    # compared against what the command would actually print.
+    expected = {"Resources": len(resources), "SwiftFiles": swift}
+    for folder, claimed in re.findall(
+            r'ls \S*?(Resources|SwiftFiles)\S*?\s*\|\s*wc -l\s*#\s*(\d+)',
+            setup):
+        if int(claimed) != expected[folder]:
+            failures.append(
+                "MAC_SETUP.txt annotates its %s count command `# %s`, but "
+                "that command prints %d" % (folder, claimed, expected[folder]))
+
     for line in failures:
         print("  %-18s FAILED  %s" % ("documents", line))
     if failures:

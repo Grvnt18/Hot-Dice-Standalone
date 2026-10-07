@@ -18,6 +18,34 @@ struct FreighterYachtDinghyScreen: View {
 
     @ObservedObject private var theme = AppTheme.shared
 
+
+    // MARK: Sending a turn
+
+    /// This screen's turn, packed the way the Messages extension will send
+    /// it — the bookkeeping and the game's own state together, which is
+    /// what MatchPayload exists to say.
+    ///
+    /// Assembled from the screen's own properties rather than the screen
+    /// being rebuilt around the state type. The dice mid-turn are not in
+    /// here on purpose: a turn is resolved on the device that threw it and
+    /// arrives as a result.
+    var wireTurn: MatchPayload<FreighterYachtDinghyState> {
+        MatchPayload(match: match, state: FreighterYachtDinghyState(roundsThisMatch: roundsThisMatch))
+    }
+
+    /// Adopts a turn that arrived from another device.
+    ///
+    /// Phase goes back to `.ready` rather than being carried: a phase is
+    /// what THIS device is doing with the dice in front of it, and the
+    /// sender's is meaningless here.
+    func adopt(_ incoming: MatchPayload<FreighterYachtDinghyState>) {
+        match = incoming.match
+        roundsThisMatch = incoming.state.roundsThisMatch
+        // A round is four rolls on one device; the arriving turn starts a new one.
+        turn = FreighterYachtDinghyRules.Turn()
+        phase = .ready
+    }
+
     private enum Phase {
         /// Waiting for the active player to throw.
         case ready

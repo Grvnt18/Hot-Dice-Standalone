@@ -215,6 +215,29 @@ struct BoneheadsScreen: View {
     @State private var showingSettings = false
     @ObservedObject private var theme = AppTheme.shared
 
+
+    // MARK: Sending a turn
+
+    /// This screen's turn, packed the way the Messages extension will send
+    /// it — the bookkeeping and the game's own state together, which is
+    /// what MatchPayload exists to say.
+    var wireTurn: MatchPayload<BoneheadsState> {
+        MatchPayload(match: match, state: state)
+    }
+
+    /// Adopts a turn that arrived from another device.
+    ///
+    /// Phase goes back to `.ready` rather than being carried: a phase is
+    /// what THIS device is doing with the dice in front of it, and the
+    /// sender's is meaningless here. The ink is re-drawn for the same
+    /// reason — the next throw is this device's, so it gets its own colour.
+    func adopt(_ incoming: MatchPayload<BoneheadsState>) {
+        match = incoming.match
+        state = incoming.state
+        ink = BoneheadsRules.randomInk()
+        phase = .ready
+    }
+
     private enum Phase {
         /// Waiting for the active player to throw.
         case ready

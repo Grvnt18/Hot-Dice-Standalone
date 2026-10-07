@@ -307,6 +307,53 @@ def check_wire():
           "safeByteBudget" in payload,
           "nothing says how big a turn may be")
 
+    # --- and a live game can actually produce one --------------------
+    #
+    # A round trip proves the TYPE survives the wire. It says nothing about
+    # whether a game being played can hand one over, and for a while
+    # nothing could: five games had a state type that only the probe ever
+    # constructed, from values invented for the test. Shipping that would
+    # have meant an extension with ten states it could encode and no game
+    # that could fill one in.
+    #
+    # So each screen states both directions — what it would send, and what
+    # it does with one that arrives.
+    SCREENS = {
+        "hog": "HogScreen.swift",
+        "jackpot": "JackpotScreen.swift",
+        "three_thousand": "ThreeThousandScreen.swift",
+        "fyd": "FreighterYachtDinghyScreen.swift",
+        "generals": "GeneralsScreen.swift",
+        "royal_ur": "RoyalUrScreen.swift",
+        "rollbots": "RollbotsScreen.swift",
+        "baseball_dice": "BaseballDiceScreen.swift",
+        "boneheads": "BoneheadsScreen.swift",
+    }
+    unbridged = []
+    for game, filename in sorted(SCREENS.items()):
+        code = strip_comments(source(filename))
+        if "var wireTurn: MatchPayload<" not in code:
+            unbridged.append("%s cannot pack a turn" % game)
+        if "func adopt(_ incoming: MatchPayload<" not in code:
+            unbridged.append("%s cannot take one" % game)
+    check("wire: a live game can pack and take a turn", not unbridged,
+          "; ".join(unbridged))
+
+    # Rolls is the exception and needs naming rather than excusing: it has
+    # no TurnMatch and no per-screen state — a single round, no turn order,
+    # which is why it is the one game a whole group chat can play at once.
+    # Its result is packed off the controller that owns the live round,
+    # because DiceGameSession.round goes stale the moment a new game begins
+    # and that type's own comment says so.
+    turns = strip_comments(source("DiceTurnController.swift"))
+    check("wire: Rolls can pack its round",
+          "var wireResult: RollsPlayerResult" in turns,
+          "DiceTurnController no longer exposes a packed result")
+    check("wire: Rolls packs from the live round",
+          "private var round: DiceGameRound" in turns,
+          "the round is no longer private, so the packed result is not the "
+          "only way out of it")
+
     print("  %-34s %d probed, %d opted out"
           % ("wire: games", len(probed), len(optedOut)))
 

@@ -30,6 +30,41 @@ struct ThreeThousandScreen: View {
     @State private var showingSettings = false
     @ObservedObject private var theme = AppTheme.shared
 
+
+    // MARK: Sending a turn
+
+    /// This screen's turn, packed the way the Messages extension will send
+    /// it — the bookkeeping and the game's own state together, which is
+    /// what MatchPayload exists to say.
+    ///
+    /// Assembled from the screen's own properties rather than the screen
+    /// being rebuilt around the state type. The dice mid-turn are not in
+    /// here on purpose: a turn is resolved on the device that threw it and
+    /// arrives as a result.
+    var wireTurn: MatchPayload<ThreeThousandState> {
+        MatchPayload(match: match, state: ThreeThousandState(
+            turnTotal: turnTotal,
+            turnsLeftAfterTarget: turnsLeftAfterTarget,
+            firstToTarget: firstToTarget))
+    }
+
+    /// Adopts a turn that arrived from another device.
+    ///
+    /// Phase goes back to `.ready` rather than being carried: a phase is
+    /// what THIS device is doing with the dice in front of it, and the
+    /// sender's is meaningless here.
+    func adopt(_ incoming: MatchPayload<ThreeThousandState>) {
+        match = incoming.match
+        turnTotal = incoming.state.turnTotal
+        turnsLeftAfterTarget = incoming.state.turnsLeftAfterTarget
+        firstToTarget = incoming.state.firstToTarget
+        // The dice on the table belong to the turn that threw them.
+        hand = []
+        selected = []
+        locked = []
+        phase = .ready
+    }
+
     private enum Phase {
         /// Waiting for the active player to throw.
         case ready

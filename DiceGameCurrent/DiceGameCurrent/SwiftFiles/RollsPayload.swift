@@ -44,6 +44,46 @@ struct RollsPlayerResult: Codable, Equatable {
     }
 }
 
+extension RollsPlayerResult {
+
+    /// A finished round, packed for sending.
+    ///
+    /// `originalPool` rather than `pool`: dice travel as indices into the
+    /// dealt order, and by the time a round is finished `pool` is empty.
+    /// That property exists for exactly this, and its own comment says so.
+    ///
+    /// The index map is built with a plain loop rather than
+    /// `Dictionary(uniqueKeysWithValues: pool.enumerated().map { ... })`,
+    /// which is the closure-inside-an-inference-chain shape that took the
+    /// Playgrounds build down once and that tools_qualcheck.py flags.
+    init(round: DiceGameRound) {
+        let dealt = round.originalPool
+
+        var positions: [UUID: Int] = [:]
+        for (index, die) in dealt.enumerated() {
+            positions[die.id] = index
+        }
+
+        var faces: [Int] = []
+        for die in dealt {
+            // A die with no settled value cannot have been banked, so zero
+            // is unreachable in a finished round. It is here rather than a
+            // force-unwrap because an unfinished round is a programming
+            // error, not a crash the player should take.
+            faces.append(die.currentValue ?? 0)
+        }
+
+        var banked: [Int] = []
+        for die in round.bankedOrder {
+            if let index = positions[die.id] { banked.append(index) }
+        }
+
+        self.values = faces
+        self.order = banked
+        self.score = round.bankedScore
+    }
+}
+
 // MARK: - The game
 
 struct RollsGameState: Codable, Equatable {

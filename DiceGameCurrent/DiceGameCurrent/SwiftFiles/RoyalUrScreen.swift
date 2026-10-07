@@ -45,6 +45,27 @@ struct RoyalUrScreen: View {
 
     private var seat: Int { match.activeIndex }
 
+
+    // MARK: Sending a turn
+
+    /// This screen's turn, packed the way the Messages extension will send
+    /// it — the bookkeeping and the game's own state together, which is
+    /// what MatchPayload exists to say.
+    var wireTurn: MatchPayload<RoyalUrState> {
+        MatchPayload(match: match, state: state)
+    }
+
+    /// Adopts a turn that arrived from another device.
+    ///
+    /// Phase goes back to `.ready` rather than being carried: a phase is
+    /// what THIS device is doing with the dice in front of it, and the
+    /// sender's is meaningless here.
+    func adopt(_ incoming: MatchPayload<RoyalUrState>) {
+        match = incoming.match
+        state = incoming.state
+        phase = .ready
+    }
+
     var body: some View {
         ZStack {
             // The floor's own darkest tone, so the board sits on the table

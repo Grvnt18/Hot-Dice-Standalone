@@ -535,4 +535,150 @@ for f in SOURCES:
         scale_bad += 1
 print("render-scale check:", "FAIL" if scale_bad else "PASS", "(%d)" % scale_bad)
 
-sys.exit(1 if bad or escapes or merged or undeclared or render_bad or member_bad or nested_bad or aa_bad or scale_bad else 0)
+# ---------------------------------------------------------------------------
+# INITIALISER ARITY
+#
+# There is no Swift toolchain in this container, so every check here reads
+# spellings rather than asking a compiler. That leaves one gap with a known
+# cost: a type constructed with arguments it does not take compiles nowhere
+# and is caught by nothing until a real build.
+#
+# It has already happened. Three probes were written as RollsGameState(),
+# RollbotsState() and BaseballDiceState() — all three take required
+# arguments, and all three were found by reading the initialisers rather
+# than by any check. The static-member check could not see them: the type
+# exists and the call is well-formed, it just does not match any init.
+#
+# So the declared initialisers of this project's own structs are collected,
+# and a call with an argument LABEL SET that matches none of them is
+# reported. Label sets rather than counts, because that is what Swift
+# actually overloads on and what a typo in a label produces.
+#
+# Deliberately narrow, to stay quiet rather than be clever:
+#   * only types declared in this project, so no stdlib or SwiftUI
+#   * only types whose every init this file can see, so a type with an
+#     init built by a macro or an extension elsewhere is skipped
+#   * memberwise initialisers are allowed for any struct that declares no
+#     init of its own, since Swift synthesises one from the stored
+#     properties and matching that exactly is not worth the false alarms
+init_bad = 0
+
+_DECL = re.compile(r'\b(?:struct|final class|class|enum)\s+(\w+)')
+# Generic and failable initialisers are still initialisers: `init<G>(` and
+# `init?(` both have to be seen, or a type looks like it declares fewer than
+# it does and every call to the missing one is reported.
+_INIT = re.compile(r'\binit\??\s*(?:<[^>]*>)?\s*\(')
+
+
+def _split_top(text):
+    """Comma-separated pieces at paren depth zero."""
+    out, depth, current = [], 0, ""
+    for ch in text:
+        if ch in "([<{": depth += 1
+        elif ch in ")]>}": depth -= 1
+        if ch == "," and depth == 0:
+            out.append(current); current = ""
+        else:
+            current += ch
+    if current.strip():
+        out.append(current)
+    return out
+
+
+def _params(arglist):
+    """(label, has_default) per declared parameter."""
+    result = []
+    for piece in _split_top(arglist):
+        piece = piece.strip()
+        if not piece:
+            continue
+        has_default = "=" in piece.split(":", 1)[-1]
+        head = piece.split(":", 1)[0].strip() if ":" in piece else piece
+        words = head.split()
+        label = words[0] if words else ""
+        result.append(("_" if label == "_" else label, has_default))
+    return result
+
+
+def _call_labels(arglist):
+    """Argument labels at a call site, or None if this is not readable."""
+    labels = []
+    for piece in _split_top(arglist):
+        piece = piece.strip()
+        if not piece:
+            continue
+        if ":" not in piece:
+            return None               # unlabelled, or something cleverer
+        head = piece.split(":", 1)[0].strip()
+        if not re.fullmatch(r'\w+', head):
+            return None               # a ternary, a cast, a dictionary
+        labels.append(head)
+    return labels
+
+
+def _accepts(declared, used):
+    """Whether a call with these labels could match this initialiser.
+
+    Defaults are the whole difficulty: Swift lets a caller leave out any
+    parameter that has one, so a valid call is an ordered SUBSEQUENCE of
+    the declared labels in which every parameter without a default appears.
+    Comparing label sets outright reports a correct call every time an
+    initialiser grows an optional parameter, which is noise rather than a
+    check.
+    """
+    if any(label == "_" for label, _ in declared):
+        return True                   # unlabelled parameters, not read here
+    position = 0
+    for label in used:
+        while position < len(declared) and declared[position][0] != label:
+            if not declared[position][1]:
+                return False          # skipped a required parameter
+            position += 1
+        if position >= len(declared):
+            return False              # label not found, or out of order
+        position += 1
+    return all(default for _, default in declared[position:])
+
+
+_inits = {}
+for f in SOURCES:
+    src_f = strip(open(f).read())
+    for decl in _DECL.finditer(src_f):
+        tname = decl.group(1)
+        body = body_after(src_f, decl.end())
+        if body is None:
+            continue
+        for init in _INIT.finditer(body):
+            _, close = paren_span(body, init.end() - 1)
+            if close < init.end():
+                continue
+            _inits.setdefault(tname, []).append(_params(body[init.end():close]))
+
+for f in SOURCES:
+    name = os.path.relpath(f)
+    src_f = strip(open(f).read())
+    for call in re.finditer(r'(?<![.\w])([A-Z]\w+)\(', src_f):
+        tname = call.group(1)
+        if tname not in _inits:
+            continue                  # not ours, or memberwise-only
+        _, close = paren_span(src_f, call.end() - 1)
+        if close < call.end():
+            continue
+        used = _call_labels(src_f[call.end():close])
+        if used is None:
+            continue
+        if any(_accepts(declared, used) for declared in _inits[tname]):
+            continue
+        shapes = " | ".join(
+            "(" + ", ".join(l + ("=" if d else "") for l, d in declared) + ")"
+            for declared in _inits[tname])
+        print("  INIT %s:%d  %s(%s) matches none of its %d declared "
+              "initialiser(s): %s"
+              % (name, src_f[:call.start()].count("\n") + 1, tname,
+                 ", ".join("%s:" % l for l in used), len(_inits[tname]), shapes))
+        init_bad += 1
+print("initialiser-arity check:", "FAIL" if init_bad else "PASS",
+      "(%d, %d project types with declared inits)"
+      % (init_bad, len(_inits)))
+
+sys.exit(1 if bad or escapes or merged or undeclared or render_bad or member_bad or nested_bad or aa_bad or scale_bad or init_bad else 0)

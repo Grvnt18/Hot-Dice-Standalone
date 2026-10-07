@@ -12,6 +12,15 @@ struct GameHubView: View {
     @State private var showingSettings = false
     @State private var openGame: GameCatalogEntry?
 
+    /// Whether the mark has finished travelling from the middle of the
+    /// screen to its place at the top.
+    @State private var hasSettled = HubIntro.hasPlayed
+
+    /// Honoured rather than ignored: this animation moves a large element
+    /// most of the way down the screen, which is exactly what Reduce Motion
+    /// is asked to stop.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         // The width is measured rather than negotiated.
         //
@@ -38,6 +47,21 @@ struct GameHubView: View {
                 ScrollView {
                     VStack(spacing: 18) {
                         HubTitle(width: geo.size.width)
+                            // The same HubTitle in both states, moved rather
+                            // than duplicated: a second copy drawn centred
+                            // would have to be kept identical to this one
+                            // forever, and would drift the first time either
+                            // changed.
+                            .offset(y: hasSettled
+                                    ? 0
+                                    : HubIntro.travel(in: geo.size,
+                                                      width: geo.size.width))
+
+                        // Everything below the mark arrives with it. One
+                        // opacity on the group rather than one per element,
+                        // so nothing can be forgotten and left visible
+                        // behind the intro.
+                        Group {
 
                         // Says what is absent rather than letting four
                         // separate features fail quietly — see BundleCheck.
@@ -76,6 +100,9 @@ struct GameHubView: View {
                         }
                         .frame(width: HubLayout.gridWidth(forWidth: geo.size.width))
                         .padding(.horizontal, HubLayout.gutter)
+
+                        }
+                        .opacity(hasSettled ? 1 : 0)
                     }
                     .padding(.vertical, 22)
                 }
@@ -105,6 +132,7 @@ struct GameHubView: View {
             SettingsView()
         }
         .onAppear {
+            HubIntro.play(reduceMotion: reduceMotion) { hasSettled = true }
             // Belt and braces, not a move.
             //
             // Registration also happens at the top of
@@ -371,5 +399,69 @@ private struct GameTile: View {
             .contentShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - The mark arriving
+
+/// The hub's opening move: the mark sits in the middle of the screen, then
+/// travels up to its place at the top and the games appear under it.
+///
+/// **This is not the launch screen, and cannot be.** An iOS launch screen is
+/// a static storyboard rendered before any code runs — it has no animation
+/// and never will. What makes the two read as one thing is that the
+/// storyboard draws the same mark, the same size, in the same place, so the
+/// first frame the app draws is identical to the last frame the system drew.
+/// The travel then starts from there. Get the storyboard wrong and this
+/// reads as a jump, not as a continuation — the numbers it has to match are
+/// in MAC_SETUP.txt.
+enum HubIntro {
+
+    /// Seconds the mark holds in the middle before setting off, so the
+    /// handoff from the launch screen is seen as a still rather than as a
+    /// stutter.
+    static let hold: Double = 0.35
+
+    /// Seconds of travel.
+    static let travelDuration: Double = 0.62
+
+    /// Once per launch, not once per appearance.
+    ///
+    /// `onAppear` on the hub fires again every time a game is dismissed, and
+    /// replaying the intro on the way back from a match would be an
+    /// animation nobody asked for in the middle of using the app.
+    private(set) static var hasPlayed = false
+
+    /// How far the mark starts below its resting place.
+    ///
+    /// The mark's natural home is `padding(.vertical, 22)` down the scroll
+    /// view; its own height is `headerMark`, and the wordmark sits under it
+    /// with 6pt of spacing. Centring the ARTWORK — not the title block — is
+    /// what matches a launch screen, which has only the artwork on it.
+    static func travel(in size: CGSize, width: CGFloat) -> CGFloat {
+        let mark = HubLayout.headerMark(forWidth: width)
+        let restingCentre = 22 + mark / 2
+        return max(0, size.height / 2 - restingCentre)
+    }
+
+    /// Runs the intro, or skips straight to the end.
+    ///
+    /// Skipped entirely under Reduce Motion: this moves a large element most
+    /// of the way down the screen, which is the exact thing that setting
+    /// exists to stop.
+    static func play(reduceMotion: Bool, settle: @escaping () -> Void) {
+        guard !hasPlayed else { return }
+        hasPlayed = true
+
+        guard !reduceMotion else {
+            settle()
+            return
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + hold) {
+            withAnimation(.easeInOut(duration: travelDuration)) {
+                settle()
+            }
+        }
     }
 }

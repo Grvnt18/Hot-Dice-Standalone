@@ -92,13 +92,18 @@ struct RollbotsScreen: View {
 
     /// Adopts a turn that arrived from another device.
     ///
-    /// Phase goes back to `.ready` rather than being carried: a phase is
-    /// what THIS device is doing with the dice in front of it, and the
-    /// sender's is meaningless here.
+    /// Phase is not carried: a phase is what THIS device is doing with the
+    /// dice in front of it, and the sender's is meaningless here.
+    ///
+    /// `.action` rather than a roll state, because an arriving turn makes
+    /// this seat the attacker and that is where an attacker starts. There
+    /// is no half-finished exchange to resume: RollbotsState carries
+    /// integrity, loadouts and which abilities are armed — all of which are
+    /// true between exchanges, never during one.
     func adopt(_ incoming: MatchPayload<RollbotsState>) {
         match = incoming.match
         state = incoming.state
-        phase = .ready
+        phase = .action
     }
 
     var body: some View {

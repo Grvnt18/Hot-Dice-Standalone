@@ -87,13 +87,18 @@ struct BaseballDiceScreen: View {
 
     /// Adopts a turn that arrived from another device.
     ///
-    /// Phase goes back to `.ready` rather than being carried: a phase is
-    /// what THIS device is doing with the dice in front of it, and the
-    /// sender's is meaningless here.
+    /// Phase is not carried: a phase is what THIS device is doing with the
+    /// dice in front of it, and the sender's is meaningless here.
+    ///
+    /// `.handover` rather than a first-roll state, because that is this
+    /// screen's own name for the device changing hands. There is no
+    /// mid-at-bat position to resume into — BaseballDiceState holds the
+    /// inning, the half, the outs and the diamond, all of which are true
+    /// between at-bats.
     func adopt(_ incoming: MatchPayload<BaseballDiceState>) {
         match = incoming.match
         state = incoming.state
-        phase = .ready
+        phase = .handover
     }
 
     var body: some View {

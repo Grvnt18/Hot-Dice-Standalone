@@ -681,4 +681,167 @@ print("initialiser-arity check:", "FAIL" if init_bad else "PASS",
       "(%d, %d project types with declared inits)"
       % (init_bad, len(_inits)))
 
-sys.exit(1 if bad or escapes or merged or undeclared or render_bad or member_bad or nested_bad or aa_bad or scale_bad or init_bad else 0)
+# ---------------------------------------------------------------------------
+# ENUM CASES THAT EXIST
+#
+# Three compile errors reached the iPad at once, and two were the same
+# mistake: `phase = .ready` written into BaseballDiceScreen and
+# RollbotsScreen, neither of which has a `.ready`. Nine screens share a
+# shape and a template was applied to all of them, so the two with their
+# own phase machines — Baseball runs setup/pickingStyle/handover/swinging,
+# Rollbots an attack-and-defence exchange — got a case that does not exist.
+#
+# A leading-dot case is inferred from the target's type, so it cannot be
+# checked in general without one. It CAN be checked where the type is
+# written down a few lines away, which is the common case and the one that
+# broke: a property declared `var x: SomeEnum` or `var x: SomeEnum = ...`
+# assigned a `.case` in the same file as that enum's declaration.
+case_bad = 0
+
+_ENUM = re.compile(r'\benum\s+(\w+)\s*[:{]')
+_CASE_LINE = re.compile(r'^\s*case\s+([A-Za-z_]\w*(?:\s*,\s*[A-Za-z_]\w*)*)',
+                        re.M)
+
+for f in SOURCES:
+    name = os.path.relpath(f)
+    src_f = strip(open(f).read())
+
+    # Enums declared in this file, and the cases each one declares.
+    cases = {}
+    for decl in _ENUM.finditer(src_f):
+        ename = decl.group(1)
+        body = body_after(src_f, decl.end() - 1)
+        if body is None:
+            continue
+        found = set()
+        for line in _CASE_LINE.finditer(body):
+            for piece in line.group(1).split(","):
+                found.add(piece.strip())
+        if found:
+            cases[ename] = found
+    if not cases:
+        continue
+
+    # Properties in this file whose type is one of those enums.
+    typed = {}
+    for m in re.finditer(r'\bvar\s+(\w+)\s*:\s*(\w+)', src_f):
+        if m.group(2) in cases:
+            typed[m.group(1)] = m.group(2)
+    if not typed:
+        continue
+
+    for m in re.finditer(r'\b(\w+)\s*=\s*\.(\w+)', src_f):
+        prop, case = m.group(1), m.group(2)
+        if prop not in typed:
+            continue
+        ename = typed[prop]
+        if case in cases[ename]:
+            continue
+        print("  CASE %s:%d  %s = .%s — %s declares no case %r (has: %s)"
+              % (name, src_f[:m.start()].count("\n") + 1, prop, case, ename,
+                 case, ", ".join(sorted(cases[ename]))))
+        case_bad += 1
+print("enum-case check:", "FAIL" if case_bad else "PASS", "(%d)" % case_bad)
+
+
+# ---------------------------------------------------------------------------
+# MEMBERS REACHED THROUGH AN ENUM CASE
+#
+# The third error that reached the iPad: `Elevation.piece.color` passed
+# where a Color was wanted, months after `var color: Color` became
+# `func color(_ ink:)`. The static-member check could not see it — that one
+# is statics-only by design, and `piece` is a case while `color` is an
+# instance member.
+#
+# What actually let it through is worth recording, because it was not the
+# checker's fault. The grep that found the other call sites was piped
+# through `head -20` and this line was past the cut. A truncated search read
+# as a complete one.
+#
+# So: where a project enum is reached through one of its own cases, the
+# member on the far side has to be something that enum declares.
+member_hop_bad = 0
+
+# Members nobody writes but every enum may have: rawValue comes from a raw
+# type, allCases from CaseIterable, the rest from Hashable, Identifiable and
+# friends. Reporting these would fail correct code, which is worse than
+# missing the occasional typo.
+_SYNTHESIZED = {
+    "rawValue", "allCases", "hashValue", "description", "debugDescription",
+    "id", "self", "init", "hash", "encode",
+}
+
+_ENUM_DECL = re.compile(r'\benum\s+(\w+)\s*[:{]')
+_MEMBER = re.compile(r'\b(var|func)\s+(\w+)')
+
+enum_cases = {}
+enum_members = {}
+enum_methods = {}
+for f in SOURCES:
+    src_f = strip(open(f).read())
+    for decl in _ENUM_DECL.finditer(src_f):
+        ename = decl.group(1)
+        body = body_after(src_f, decl.end() - 1)
+        if body is None:
+            continue
+        found = set()
+        for line in _CASE_LINE.finditer(body):
+            for piece in line.group(1).split(","):
+                found.add(piece.strip())
+        if found:
+            enum_cases.setdefault(ename, set()).update(found)
+        for decl_m in _MEMBER.finditer(body):
+            enum_members.setdefault(ename, set()).add(decl_m.group(2))
+            if decl_m.group(1) == "func":
+                enum_methods.setdefault(ename, set()).add(decl_m.group(2))
+
+# Extensions add members too, and missing them would report correct code.
+for f in SOURCES:
+    src_f = strip(open(f).read())
+    for ext in re.finditer(r'\bextension\s+(\w+)\s*[:{]', src_f):
+        ename = ext.group(1)
+        if ename not in enum_cases:
+            continue
+        body = body_after(src_f, ext.end() - 1)
+        if body is None:
+            continue
+        for decl_m in _MEMBER.finditer(body):
+            enum_members.setdefault(ename, set()).add(decl_m.group(2))
+            if decl_m.group(1) == "func":
+                enum_methods.setdefault(ename, set()).add(decl_m.group(2))
+
+for f in SOURCES:
+    name = os.path.relpath(f)
+    src_f = strip(open(f).read())
+    for m in re.finditer(r'\b([A-Z]\w+)\.(\w+)\.(\w+)\b', src_f):
+        ename, case, member = m.group(1), m.group(2), m.group(3)
+        if ename not in enum_cases or case not in enum_cases[ename]:
+            continue
+
+        # A method named but not called. This is what actually shipped:
+        # `Elevation.piece.color` long after `var color: Color` became
+        # `func color(_ ink:)`, so the expression is a function value where
+        # a Color was wanted. The member EXISTS, which is why checking only
+        # that it exists missed it entirely.
+        if member in enum_methods.get(ename, set()):
+            if not src_f[m.end():].lstrip().startswith("("):
+                print("  HOP %s:%d  %s.%s.%s is a method used as a value — "
+                      "call it, or this is a function where its result was "
+                      "wanted"
+                      % (name, src_f[:m.start()].count("\n") + 1,
+                         ename, case, member))
+                member_hop_bad += 1
+            continue
+        if member in enum_members.get(ename, set()):
+            continue
+        if member in _SYNTHESIZED:
+            continue
+        print("  HOP %s:%d  %s.%s.%s — %s declares no member %r (has: %s)"
+              % (name, src_f[:m.start()].count("\n") + 1, ename, case, member,
+                 ename, member,
+                 ", ".join(sorted(enum_members.get(ename, set()))) or "none"))
+        member_hop_bad += 1
+print("enum-member check:", "FAIL" if member_hop_bad else "PASS",
+      "(%d, %d project enums with cases)" % (member_hop_bad, len(enum_cases)))
+
+sys.exit(1 if bad or escapes or merged or undeclared or render_bad or member_bad or nested_bad or aa_bad or scale_bad or init_bad or case_bad or member_hop_bad else 0)

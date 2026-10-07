@@ -683,7 +683,7 @@ extension RoyalUrArt {
         // component added when shadows went to zero blur.
         context.fill(Path(ellipseIn: body.offsetBy(dx: Elevation.piece.dx,
                                                    dy: Elevation.piece.dy)),
-                     with: .color(Elevation.piece.color))
+                     with: .color(Elevation.piece.color(.dark)))
         context.fill(Path(ellipseIn: body), with: .color(seatColor(seat)))
         // The same sheen the placed dice carry, so a piece on this board
         // and a die on the tray read as the same material. See PieceSheen.

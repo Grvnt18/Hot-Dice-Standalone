@@ -392,26 +392,23 @@ private struct GameTile: View {
             // phone width there is room for artwork or for a sentence, and
             // the artwork says more.
             VStack(spacing: HubLayout.gap) {
-                // The effect FOLLOWS THE ARTWORK, and there is no box and
-                // no shadow.
-                //
-                // Both of the previous attempts put something rectangular
-                // behind a drawing that is not rectangular. A drop shadow
-                // under black line work on wood was either invisible or a
-                // smudge; the translucent plate that replaced it gave the
-                // icon a surface by drawing a box around it, which is the
-                // thing it was meant to avoid.
-                //
-                // So the silhouette does the work instead. The art is black
-                // line work on transparency, so rendering the same image as
-                // a template fills its alpha — the lines themselves — with
-                // a colour, and drawing that copy very slightly larger
-                // behind the original traces the drawing rather than
-                // boxing it. The outline is the floor's own darkest tone,
-                // the same ink the rest of the chrome uses.
-                GameIconHalo(id: entry.id)
+                GameIconView(id: entry.id)
                     .frame(width: HubLayout.iconSide(tile: side),
                            height: HubLayout.iconSide(tile: side))
+                    // Through Elevation, which is the app's one shadow
+                    // system — four hand-picked values were collapsed into
+                    // it precisely so a twelfth could not be added here.
+                    //
+                    // Pale, matching the wordmark above: the artwork is
+                    // black line work, and the hub is the one screen where
+                    // the ink and the shadow would otherwise be the same
+                    // colour.
+                    //
+                    // This is the treatment the hub shipped with, restored.
+                    // It was replaced twice — first by a translucent plate,
+                    // then by a traced silhouette — and both replacements
+                    // were solving for something that did not need solving.
+                    .elevated(.lifted, ink: .light)
 
                 Text(entry.tileName.uppercased())
                     // Black, the heaviest face in Resources — these sit on

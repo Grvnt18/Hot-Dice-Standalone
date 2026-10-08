@@ -37,16 +37,23 @@ enum FreighterYachtDinghyRules {
     /// turns still score nothing even with four rolls and six dice.
     static let qualifiers = [6, 5, 4]
 
-    /// What the Cargo dice must beat for a reroll to be worth taking.
+    /// What a single Cargo die must beat for throwing it again to be
+    /// worth it.
     ///
-    /// Two d6 averaged 7, so 7 was a wash: rerolling at 6 or less gained,
-    /// at 7 broke even, above it lost. Three d6 average 10.5, so the
-    /// break-even has moved and 6 is well below it — the hint now fires
-    /// only on a genuinely bad Cargo and stays quiet the rest of the time.
+    /// This was `cargoRerollHint = 6`, a threshold on the cargo's TOTAL,
+    /// because the cargo could only be rethrown whole — "both or neither",
+    /// in the document's own words. The cargo is now picked a die at a
+    /// time, so a threshold on the total is the wrong unit and this is the
+    /// right one: a d6 averages 3.5, so a die showing 1, 2 or 3 gains by
+    /// going back in the cup and one showing 4, 5 or 6 loses by it. There
+    /// is no judgement in the number at all — it is where the average
+    /// falls.
     ///
-    /// Left at 6 deliberately. It is advice under a button, not a rule,
-    /// and the choice was always the player's.
-    static let cargoRerollHint = 6
+    /// Still advice under a button rather than a rule. The rule is "any,
+    /// all, or none" and the choice is the player's; this only names how
+    /// many dice the arithmetic is against, and tools_fyd_verify.py uses
+    /// it as the policy it measures the change with.
+    static let cargoRethrowFloor = 4
 
     /// A fresh set: six d6, each a different colourway so the claimed
     /// dice are easy to pick out of the tray.
@@ -221,7 +228,7 @@ enum FreighterYachtDinghyGame: SuiteGame {
     static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Game Overview",
-            body: "  * Players: 2 or more (alternating turns).\n  * Dice Pool: 5x d6.\n  * Structure: Best of 3 rounds."
+            body: "  * Players: 2 or more (alternating turns).\n  * Dice Pool: 6x d6.\n  * Structure: Best of 3 rounds."
         ),
         GameRuleSection(
             title: "Turn Mechanics",
@@ -229,7 +236,7 @@ enum FreighterYachtDinghyGame: SuiteGame {
         ),
         GameRuleSection(
             title: "Cargo Scoring & Rerolls",
-            body: "  * Once all three vessels (6, 5, and 4) are claimed, remaining two dice form Cargo.\n  * Combined total of remaining two dice is your round score.\n  * If rolls remain within 4-roll allowance, player may re-roll both cargo dice\n    together (both or neither).\n  * Failure to Qualify: Failing to claim all three vessels within 4 rolls scores 0.\n  * Resolution: Highest cumulative score after 3 rounds wins. Ties trigger\n    sudden-death round."
+            body: "  * Once all three vessels (6, 5, and 4) are claimed, remaining three dice form\n    Cargo.\n  * Combined total of remaining three dice is your round score.\n  * If rolls remain within 4-roll allowance, player may select any cargo dice to\n    re-roll (any, all, or none).\n  * Failure to Qualify: Failing to claim all three vessels within 4 rolls scores 0.\n  * Resolution: Highest cumulative score after 3 rounds wins. Ties trigger\n    sudden-death round."
         )
     ]
 }

@@ -11,6 +11,19 @@ struct FreighterYachtDinghyScreen: View {
     @State private var lastSummary: String?
     @State private var showingSettings = false
 
+    /// Cargo dice the player has picked to throw again.
+    ///
+    /// Mirrored out of the session's `selectedIDs` rather than read from it,
+    /// because the session is a plain class and publishes nothing — the
+    /// same reason Settings mirrors `GameScope`'s statics.
+    ///
+    /// Note what a selection MEANS here: these are the dice that WILL be
+    /// rethrown, not the ones that will be kept. The rule is "any, all, or
+    /// none", so the natural gesture is to point at the ones you are
+    /// unhappy with, and the pulse marks what the button is about to do —
+    /// which is the same thing it means in Rolls.
+    @State private var rethrowIDs: Set<UUID> = []
+
     /// Normally three. A tie at the end pushes this out by one and the
     /// match plays a sudden-death round — which happens about 1 game in 20,
     /// often enough to need handling and rare enough to stay a moment.
@@ -43,6 +56,7 @@ struct FreighterYachtDinghyScreen: View {
         roundsThisMatch = incoming.state.roundsThisMatch
         // A round is four rolls on one device; the arriving turn starts a new one.
         turn = FreighterYachtDinghyRules.Turn()
+        endCargoChoice()
         phase = .ready
     }
 
@@ -88,6 +102,9 @@ struct FreighterYachtDinghyScreen: View {
                         onSessionCreated: { newSession in
                             newSession.onRollSettled = { results in
                                 applyRoll(results)
+                            }
+                            newSession.onSelectionChanged = { picked in
+                                rethrowIDs = picked
                             }
                         }
                     )
@@ -159,7 +176,13 @@ struct FreighterYachtDinghyScreen: View {
         switch phase {
         case .ready:    return turn.rollsUsed == 0 ? "Roll" : "Roll Again"
         case .rolling:  return "Rolling"
-        case .decide:   return "Reroll Cargo"
+        // Says how many, because "any, all, or none" means the count is
+        // the decision. Nothing picked is not a rethrow — it is Set Sail,
+        // which is the other button.
+        case .decide:
+            return rethrowIDs.isEmpty
+                ? "Pick Cargo"
+                : "Rethrow \(rethrowIDs.count)"
         case .scored:   return isFinalTurn ? "Finish" : "Pass"
         case .handover: return "Pass"
         case .finished: return "Done"
@@ -176,7 +199,20 @@ struct FreighterYachtDinghyScreen: View {
         case .decide:
             let total = turn.score
             let left = turn.rollsRemaining
-            return "Cargo \(total) — \(left) roll\(left == 1 ? "" : "s") left"
+            guard !rethrowIDs.isEmpty else {
+                // The quiet advice cargoRethrowFloor was always for and
+                // was never wired to: how many cargo dice the arithmetic
+                // is against. Silent when none are, so a good cargo is not
+                // nagged at.
+                guard poorCargoCount > 0 else {
+                    return "Cargo \(total) — tap cargo to rethrow, "
+                        + "\(left) roll\(left == 1 ? "" : "s") left"
+                }
+                return "Cargo \(total) — \(poorCargoCount) below average, "
+                    + "\(left) roll\(left == 1 ? "" : "s") left"
+            }
+            return "Cargo \(total) — \(rethrowIDs.count) picked, "
+                + "\(left) roll\(left == 1 ? "" : "s") left"
         case .scored:
             return lastSummary ?? ""
         default:
@@ -210,21 +246,40 @@ struct FreighterYachtDinghyScreen: View {
     /// the same reason Jackpot gates it.
     private var isPrimaryEnabled: Bool {
         switch phase {
-        case .ready, .decide: return session != nil
-        case .scored:         return true
-        default:              return false
+        case .ready:  return session != nil
+        // Nothing picked, nothing to throw: `roll(keeping:)` would return
+        // false and leave the turn in a phase the button cannot exit,
+        // which is the failure primaryAction's own note records.
+        case .decide: return session != nil && !rethrowIDs.isEmpty
+        case .scored: return true
+        default:      return false
         }
     }
 
     private func primaryAction() {
         SoundEngine.shared.play(.buttonTap)
         switch phase {
-        case .ready, .decide:
+        case .ready:
             // Phase follows the roll rather than leading it: roll() reports
             // false when it threw nothing, and moving first meant a no-op
             // left the game stuck in a phase nothing could leave.
             if session?.roll(keeping: turn.keptIDs) == true {
                 phase = .rolling
+            }
+        case .decide:
+            // Everything but the dice the player picked. The three claimed
+            // vessels are in keptIDs and are locked out of selection, so
+            // this can only ever rethrow cargo.
+            let kept = allDiceIDs.subtracting(rethrowIDs)
+            // Selection off BEFORE the throw, so nothing is left pulsing
+            // while it is in the air — and the set is already captured
+            // above, because turning it off clears it.
+            endCargoChoice()
+            if session?.roll(keeping: kept) == true {
+                phase = .rolling
+            } else {
+                phase = .decide
+                beginCargoChoice()
             }
         case .scored:
             endTurn()
@@ -253,6 +308,7 @@ struct FreighterYachtDinghyScreen: View {
 
         if turn.isQualified && !turn.isOutOfRolls {
             phase = .decide
+            beginCargoChoice()
         } else if turn.isQualified || turn.isOutOfRolls {
             settleTurn()
         } else {
@@ -264,7 +320,46 @@ struct FreighterYachtDinghyScreen: View {
     private func setSail() {
         SoundEngine.shared.play(.buttonTap)
         guard phase == .decide else { return }
+        endCargoChoice()
         settleTurn()
+    }
+
+    /// Cargo dice showing less than a d6's own average.
+    ///
+    /// Out of the ViewBuilder and named rather than inlined into
+    /// `subtitle`: a filter with a comparison inside a string
+    /// interpolation inside a switch is the shape Xcode 14.2's solver
+    /// gives up on, which is the same reason PipFace.pipOffset exists.
+    private var poorCargoCount: Int {
+        // Not named `floor` — that shadows the global function, which
+        // compiles and then reads as a bug to the next person.
+        let threshold = FreighterYachtDinghyRules.cargoRethrowFloor
+        return turn.cargo.filter { $0.value < threshold }.count
+    }
+
+    /// Every die on the table, claimed and cargo alike.
+    ///
+    /// Out of `turn` rather than out of the session: the turn is what knows
+    /// which dice are vessels and which are cargo, and the two sets
+    /// together are the hand.
+    private var allDiceIDs: Set<UUID> {
+        turn.keptIDs.union(turn.cargo.map(\.id))
+    }
+
+    /// Opens the cargo choice: taps select, the vessels do not.
+    private func beginCargoChoice() {
+        rethrowIDs = []
+        session?.isSelectionEnabled = true
+        // `lockOnly`, not `lockSelection`: the vessels are not a selection
+        // the player made, they are the three dice that are not the choice.
+        session?.lockOnly(turn.keptIDs)
+    }
+
+    /// Closes it, which also clears the pulses — `isSelectionEnabled`'s
+    /// didSet calls clearSelection().
+    private func endCargoChoice() {
+        session?.isSelectionEnabled = false
+        rethrowIDs = []
     }
 
     /// Banks the turn's points. The one place the score is added, so no

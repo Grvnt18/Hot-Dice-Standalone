@@ -46,7 +46,7 @@ GAIN = 0.5
 
 WARP_A = 2.4            # how far the first warp drags the field
 WARP_B = 1.8            # and the second — this pair is what curls it
-LOOP_SECONDS = 30.0     # one full cycle, after which the field is EXACTLY
+LOOP_SECONDS = 37.5     # one full cycle, after which the field is EXACTLY
                         # where it started — not approximately.
 
 # Time enters the field only as a point travelling a circle. That is the whole
@@ -218,6 +218,20 @@ RAMP_SPREAD_MIN = 0.12  # ...and at the dark end, where there is less room
 RAMP_FLOOR = 0.045      # no tone may sit below this brightness
 RAMP_CEIL = 0.94        # nor above this
 RAMP_SAT_LIFT = 0.05    # brightest tone desaturates slightly, as both GIFs do
+RAMP_MEAN_LEVEL = 0.689 # where the AVERAGE tone sits in the band. Measured:
+                        # the field spends 13.9/8.9/11.7/18.4/25.0/22.2 per
+                        # cent of its area in the six levels, and weighting
+                        # pow(i/5, RAMP_BIAS) by that gives 0.689.
+RAMP_LIFT = 0.8         # how much of the gap between that mean and the top of
+                        # the band to close. The band used to hang straight
+                        # down from the swatch, so every tone on screen was
+                        # darker than the colour picked and #006B38 came back
+                        # as #045D33 — a dE of 7.3. Lifting it puts the MEAN
+                        # on the swatch (dE 2.4) and leaves the L* span and
+                        # every step size alone, so the posterised look is
+                        # untouched. Onyx is pinned by RAMP_FLOOR and does not
+                        # move, which is why the olive-grey regression noted
+                        # in ramp() cannot return through this.
 RAMP_BIAS = 0.55        # spacing of the four steps. NOT even, deliberately.
                         # Sorted by luminance, red-wave.gif runs #CD0000 then
                         # #FF0000 #FF3535 #FF4F4F, and reggie.gif runs #F0243C
@@ -252,15 +266,24 @@ def hsb_to_rgb(h, s, v):
 
 
 def ramp(hexcode):
-    """Four tones, hung DOWNWARD from the chosen swatch.
+    """Six tones, in a band whose AVERAGE is the chosen swatch.
 
-    The brightest of the four is the swatch itself, and the other three shade
-    away beneath it. Centring the band on the swatch instead — the obvious
-    first try — quietly betrays the picker at the dark end: #14140F "Onyx"
-    came back as a legible but unmistakably olive-grey floor, because the
-    clamp that stops four near-blacks from merging had slid the whole band
-    upward. Anchoring the top instead means the colour you picked is the
-    colour you mostly see, at every swatch.
+    It used to hang straight downward, with the brightest tone being the
+    swatch itself. That is one reading of "the colour you picked is the
+    colour you see" and it is the wrong one: every tone on screen was then
+    darker than the swatch, and the floor read duller than the picker
+    promised — #006B38 came back as #045D33, a dE of 7.3.
+
+    So the band is LIFTED by RAMP_LIFT until its area-weighted mean lands on
+    the swatch instead of its ceiling. This slides the band; it does not
+    squeeze it, so the L* span and every step size are what they were and
+    the posterised look is unchanged.
+
+    Centring it was the other obvious try, and it quietly betrays the picker
+    at the dark end: #14140F "Onyx" came back as a legible but unmistakably
+    olive-grey floor, because the clamp that stops six near-blacks from
+    merging had slid the whole band upward. That is NOT what this does —
+    Onyx is pinned by RAMP_FLOOR and the lift moves it by nothing at all.
 
     The spread narrows as the swatch darkens, since there is less brightness
     room underneath it to spend.
@@ -269,7 +292,11 @@ def ramp(hexcode):
     r, g, b = (int(hexcode[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
     h, s, v = rgb_to_hsb(r, g, b)
 
-    hi = min(RAMP_CEIL, v)
+    # The band's width at the swatch's own brightness, which sets how far
+    # the lift may travel.
+    top = min(RAMP_CEIL, v)
+    band = RAMP_SPREAD_MIN + (RAMP_SPREAD - RAMP_SPREAD_MIN) * top
+    hi = min(RAMP_CEIL, v + band * RAMP_LIFT * (1.0 - RAMP_MEAN_LEVEL))
     spread = RAMP_SPREAD_MIN + (RAMP_SPREAD - RAMP_SPREAD_MIN) * hi
     lo = hi - spread
     if lo < RAMP_FLOOR:

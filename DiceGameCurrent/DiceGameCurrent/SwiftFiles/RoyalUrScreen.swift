@@ -291,8 +291,17 @@ struct RoyalUrScreen: View {
             guard selectedPiece == nil else {
                 return "Tap the ringed square to move, or pick another piece"
             }
-            let count = moves.count
-            return "Rolled \(steps) — \(count) piece\(count == 1 ? "" : "s") can move"
+            // How far the roll MOVES, not how many pieces could take it.
+            // The four binary dice give a distance, and that distance is
+            // the same for every piece — the piece count was answering a
+            // question the player had not asked, and the one they had
+            // (how far does this get me?) was only on the board.
+            //
+            // And without "Rolled N —" in front of it: the four dice are on
+            // screen above this line, so repeating their total here only
+            // made room for the number that matters to be read as the
+            // second one.
+            return "Move \(steps) space\(steps == 1 ? "" : "s")"
         case .setback:
             guard selectedPiece == nil else {
                 return "Tap the ringed square to send it back, or pick another"

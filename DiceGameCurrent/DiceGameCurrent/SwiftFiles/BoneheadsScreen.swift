@@ -10,6 +10,13 @@ import SwiftUI
 struct PipFace: View {
     let value: Int
     let tint: Color
+    /// Drops the sheen, the bevel and the shadow.
+    ///
+    /// The board wants all three — see the note on `.pieceSolid` below —
+    /// but a diagram of a rule does not. In the guide the shadow read as a
+    /// second, offset die behind the first: a ghost image on every face of
+    /// the worked example.
+    var flat: Bool = false
 
     /// Which of the nine positions are inked, for each face.
     private static let layouts: [Int: [Int]] = [
@@ -72,9 +79,24 @@ struct PipFace: View {
             //
             // Over the pips rather than under them: the highlight is on
             // the die's surface and the pips are in it.
-            .pieceSolid(RoundedRectangle(cornerRadius: corner),
-                        lineWidth: bevel)
+            .pipFaceSolid(flat: flat, corner: corner, bevel: bevel)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
+
+private extension View {
+    /// The board's solid treatment, or nothing at all for a diagram.
+    ///
+    /// Split out because the two branches are different types, which a
+    /// bare `if` inside a modifier chain cannot be.
+    @ViewBuilder
+    func pipFaceSolid(flat: Bool, corner: CGFloat, bevel: CGFloat) -> some View {
+        if flat {
+            self
+        } else {
+            self.pieceSolid(RoundedRectangle(cornerRadius: corner),
+                            lineWidth: bevel)
         }
     }
 }

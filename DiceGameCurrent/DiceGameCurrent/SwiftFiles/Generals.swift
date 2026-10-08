@@ -173,6 +173,21 @@ struct GeneralsCard: Codable, Equatable {
     struct Claim: Codable, Equatable {
         let participant: String
         let points: Int
+
+        /// One letter each, because there are twelve of these in a full
+        /// card and the names were being spelled out twelve times over.
+        /// "participant" and "points" cost 19 bytes per claim in key names
+        /// alone, 228 across the card — against a 4096-byte budget that
+        /// Generals was already using 42% of, making it the heaviest of the
+        /// two-player games by a wide margin.
+        ///
+        /// Every other type on the wire already does this (`TurnMatch`,
+        /// `RollsPlayerResult`, `GeneralsCard` itself); this one was simply
+        /// missed.
+        private enum CodingKeys: String, CodingKey {
+            case participant = "w"
+            case points = "p"
+        }
     }
 
     private(set) var claims: [GeneralsCategory: Claim] = [:]

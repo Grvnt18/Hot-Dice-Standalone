@@ -74,7 +74,7 @@ final class AppTheme: ObservableObject {
     @Published var colorwayIndex: Int {
         didSet {
             guard Self.swatches.indices.contains(colorwayIndex) else { return }
-            GameScope.set(colorwayIndex, Keys.colorwayIndex)
+            GameScope.setColor(colorwayIndex, Keys.colorwayIndex)
         }
     }
 
@@ -97,7 +97,7 @@ final class AppTheme: ObservableObject {
     }
 
     private static func storedIndex() -> Int {
-        let stored = GameScope.int(Keys.colorwayIndex)
+        let stored = GameScope.colorInt(Keys.colorwayIndex)
         return swatches.indices.contains(stored) ? stored : 0
     }
 

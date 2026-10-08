@@ -272,21 +272,57 @@ struct DieSlot: Shape {
         }
     }
 
-    /// A regular polygon with a point at the top.
+    /// A polygon with a point at the top, filling `rect` exactly.
     ///
     /// Out of the switch above and written as a loop for the usual reason:
     /// the vertices are trigonometry over an Int index, which is the shape
     /// of expression Xcode 14.2's solver gives up on inside a ViewBuilder.
+    ///
+    /// **Stretched to the box, not inscribed in a circle.** It used to put
+    /// the vertices on a circle of `min(width, height) / 2`, which is a
+    /// regular polygon — and a regular polygon does not fill a square.
+    /// Measured on the unit circle, the triangle's own bounds came to 87%
+    /// of the slot's width by 75% of its height and the pentagon's to 95%
+    /// by 90%, so three of Rolls' banking slots read as visibly smaller
+    /// spaces than the twelve squares beside them. These are the same slot
+    /// in a different outline, so they take the same footprint.
+    ///
+    /// The ink follows: the triangle now covers 50% of its box where it
+    /// covered 32%, and the pentagon 69% where it covered 59%.
+    ///
+    /// Filling a square means scaling the two axes by different amounts, so
+    /// these are not quite regular — the triangle is a third taller than an
+    /// equilateral one. That is the trade, and it is the right way round: a
+    /// row of slots that are not the same size is the error a player sees.
+    ///
+    /// The diamond is the one that comes out exactly regular anyway, since
+    /// its four vertices already sit on the box's edge midpoints.
     private func polygon(in rect: CGRect, sides: Int) -> Path {
-        let centre = CGPoint(x: rect.midX, y: rect.midY)
-        let radius = min(rect.width, rect.height) / 2
-        var path = Path()
+        var points: [CGPoint] = []
         for index in 0..<sides {
             let turn = (Double(index) / Double(sides)) * 2 * Double.pi
             let angle = turn - Double.pi / 2
-            let point = CGPoint(x: centre.x + radius * CGFloat(cos(angle)),
-                                y: centre.y + radius * CGFloat(sin(angle)))
-            if index == 0 { path.move(to: point) } else { path.addLine(to: point) }
+            points.append(CGPoint(x: CGFloat(cos(angle)),
+                                  y: CGFloat(sin(angle))))
+        }
+
+        // The unit polygon's own bounds, which is what gets mapped onto the
+        // rect. Computed rather than tabulated so adding a sixth side needs
+        // nothing here.
+        let xs = points.map { $0.x }
+        let ys = points.map { $0.y }
+        let minX = xs.min() ?? -1
+        let minY = ys.min() ?? -1
+        let spanX = (xs.max() ?? 1) - minX
+        let spanY = (ys.max() ?? 1) - minY
+        guard spanX > 0, spanY > 0 else { return Path(rect) }
+
+        var path = Path()
+        for (index, point) in points.enumerated() {
+            let mapped = CGPoint(
+                x: rect.minX + (point.x - minX) / spanX * rect.width,
+                y: rect.minY + (point.y - minY) / spanY * rect.height)
+            if index == 0 { path.move(to: mapped) } else { path.addLine(to: mapped) }
         }
         path.closeSubpath()
         return path

@@ -94,11 +94,19 @@ struct GuideBubbleCluster: View {
             // the player reads them to pick whose rules to open — and at a
             // minimumScaleFactor of 0.5 a 24pt name can end up 12pt, which
             // is where a display script stops being readable first.
-            Text(entry.tileName)
+            // Full caps, like the hub tiles. These are the same eleven
+            // names in the same role two screens apart, and only one of
+            // them was shouting. Uppercased here rather than in
+            // GameCatalog for the same reason as the hub's: the catalogue
+            // holds the name, the view decides how to set it.
+            Text(entry.tileName.uppercased())
                 .font(.poppins(GuideBubbleLayout.nameSize, .semibold))
                 .lineLimit(2)
                 .minimumScaleFactor(0.5)
                 .multilineTextAlignment(.center)
+                // nil, not .uppercase: the case is already in the string
+                // above, and letting a container impose one would mean two
+                // places deciding it.
                 .textCase(nil)
                 .foregroundStyle(theme.accentTextColor)
                 .padding(.horizontal, 14)
@@ -382,7 +390,7 @@ private struct BoneheadsColumnStack: View {
                     // rule is a diagram, and the drop shadow that makes a
                     // die read as a physical object on the board makes it
                     // read as blur at this size.
-                    PipFace(value: die, tint: MenuInk.text)
+                    PipFace(value: die, tint: MenuInk.text, flat: true)
                         .frame(width: 24, height: 24)
                     Text("x\(occurrences(of: die))")
                         .font(.poppins(11))
@@ -447,6 +455,13 @@ enum GuideBody {
         /// told from a new row: the document indents a continuation under
         /// the column it belongs to, far past the first.
         var tableIndent = 0
+        /// Set by a blank line inside a table. The document separates the
+        /// Rollbots abilities with one between every row, so a blank line
+        /// cannot end a table on its own — the line after it decides.
+        var blankInTable = false
+        /// Where each of the table's columns begins in the header line, used
+        /// to rescue a row the spacing rule cannot split.
+        var offsets: [Int] = []
 
         func closeTable() {
             if inTable, !columns.isEmpty {
@@ -454,7 +469,9 @@ enum GuideBody {
             }
             pending = []
             columns = []
+            offsets = []
             inTable = false
+            blankInTable = false
         }
 
         for raw in body.components(separatedBy: "\n") {
@@ -462,7 +479,7 @@ enum GuideBody {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
 
             if trimmed.isEmpty {
-                closeTable()
+                if inTable { blankInTable = true } else { closeTable() }
                 continue
             }
 
@@ -471,12 +488,30 @@ enum GuideBody {
                 if case .plain(let header)? = out.last {
                     out.removeLast()
                     columns = cells(header)
+                    offsets = columnOffsets(header, columns)
                     inTable = true
                 }
                 continue
             }
 
             let indent = line.prefix(while: { $0 == " " }).count
+
+            // A blank line inside a table is a row separator only if what
+            // follows it is another row of that same table: starting in the
+            // table's own first column, with no bullet or step marker of its
+            // own, and splitting into no more cells than there are columns.
+            // Anything else — a heading back at the margin, the bullet list
+            // that follows every other table in the document — ends it.
+            if inTable, blankInTable {
+                let width = cells(trimmed).count
+                var looksLikeRow = indent == tableIndent
+                if trimmed.hasPrefix("* ") { looksLikeRow = false }
+                if stepMarker(trimmed) != nil { looksLikeRow = false }
+                if width < 2 { looksLikeRow = false }
+                if width > columns.count { looksLikeRow = false }
+                if !looksLikeRow { closeTable() }
+                blankInTable = false
+            }
 
             if inTable {
                 // A row's last cell wrapping, not a new row. Without this
@@ -485,12 +520,30 @@ enum GuideBody {
                 // rule of its own.
                 if indent >= tableIndent + 4, !pending.isEmpty,
                    var last = pending.popLast() {
-                    let tail = (last.popLast() ?? "") + " " + trimmed
-                    last.append(tail)
+                    // The wrap can cover several columns at once, and each
+                    // piece belongs to the column it sits under. Taking the
+                    // whole line as one tail is what glued the Rollbots
+                    // effects and drawbacks into a single sentence.
+                    let pieces = cells(trimmed)
+                    let reach = min(pieces.count, last.count)
+                    for (offset, piece) in pieces.suffix(reach).enumerated() {
+                        let slot = last.count - reach + offset
+                        last[slot] = last[slot] + " " + piece
+                    }
                     pending.append(last)
                 } else {
                     if tableIndent == 0 { tableIndent = indent }
-                    pending.append(cells(trimmed))
+                    var row = cells(trimmed)
+                    // Generals' Score column sits one space after the
+                    // requirement, not two, so the spacing rule reads the
+                    // pair as one cell. The header's own column positions
+                    // settle it.
+                    if row.count < columns.count,
+                       let rescued = cells(trimmed, at: offsets),
+                       rescued.count == columns.count {
+                        row = rescued
+                    }
+                    pending.append(row)
                 }
                 continue
             }
@@ -560,6 +613,72 @@ enum GuideBody {
         }
         if !current.isEmpty {
             out.append(current.trimmingCharacters(in: .whitespaces))
+        }
+        return out
+    }
+
+    /// Every index in `text` that starts a word.
+    private static func wordStarts(_ text: String) -> [Int] {
+        var out: [Int] = []
+        var previousWasSpace = true
+        for (offset, character) in Array(text).enumerated() {
+            if character != " ", previousWasSpace { out.append(offset) }
+            previousWasSpace = character == " "
+        }
+        return out
+    }
+
+    /// Where each header cell begins, so a row can be cut at the same places.
+    private static func columnOffsets(_ header: String, _ columns: [String]) -> [Int] {
+        let characters = Array(header)
+        var out: [Int] = []
+        var search = 0
+        for column in columns {
+            let first = Array(column).first ?? " "
+            var found = -1
+            var index = search
+            while index < characters.count {
+                if characters[index] == first, index == 0 || characters[index - 1] == " " {
+                    found = index
+                    break
+                }
+                index += 1
+            }
+            if found < 0 { return [] }
+            out.append(found)
+            search = found + column.count
+        }
+        return out
+    }
+
+    /// How far a row's column may sit from the header's, in characters.
+    private static let columnSlack = 2
+
+    /// Re-splits a row at the header's column positions. Nil when the row
+    /// does not line up, in which case the spacing rule stands.
+    private static func cells(_ text: String, at offsets: [Int]) -> [String]? {
+        guard offsets.count >= 2 else { return nil }
+        let characters = Array(text)
+        let starts = wordStarts(text)
+        var cuts = [0]
+        for want in offsets.dropFirst() {
+            var best = -1
+            for start in starts where abs(start - want) <= columnSlack {
+                if best < 0 || abs(start - want) < abs(best - want) { best = start }
+            }
+            if best < 0 { return nil }
+            cuts.append(best)
+        }
+        cuts.append(characters.count)
+        var out: [String] = []
+        for index in 0..<offsets.count {
+            let lower = min(cuts[index], characters.count)
+            let upper = min(cuts[index + 1], characters.count)
+            if lower > upper { return nil }
+            let slice = String(characters[lower..<upper])
+            let cell = slice.trimmingCharacters(in: .whitespaces)
+            if cell.isEmpty { return nil }
+            out.append(cell)
         }
         return out
     }

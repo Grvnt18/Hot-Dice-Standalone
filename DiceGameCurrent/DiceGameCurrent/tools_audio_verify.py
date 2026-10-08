@@ -41,6 +41,104 @@ def files_for(name):
     return out
 
 
+# The four audio values one switch has to cover, and the scope accessor
+# each must go through.
+AUDIO_KEYS = ("musicEnabled", "musicVolume", "sfxEnabled", "sfxVolume")
+
+
+def check_scope(failed):
+    """One switch covers all of the audio, and the colour has its own.
+
+    The toggle read "Music Per Game" and moved half the audio: the track
+    and its volume went through `GameScope`, while `sfxEnabled` and
+    `sfxVolume` were written straight to `UserDefaults` and so stayed
+    global whatever the switch said. A player who turned it off found their
+    track followed them from game to game and their effects volume did not,
+    and nothing anywhere said that was the design.
+
+    So: every one of the four goes through the audio accessors, the reload
+    picks up all four, and the switch is named for what it governs. The
+    table colour gets the same treatment, by its own switch.
+    """
+    engine = source("SoundEngine.swift")
+    scope = source("GameScope.swift")
+    settings = source("SettingsView.swift")
+    theme = source("AppTheme.swift")
+
+    # 1. Nothing in SoundEngine writes a setting behind GameScope's back.
+    for match in re.finditer(r'defaults\.set\((\w+), forKey: Keys\.(\w+)\)',
+                             engine):
+        failed.append("SoundEngine writes %s straight to UserDefaults — it "
+                      "has to go through GameScope.setAudio, or the Audio "
+                      "Per Game switch does not reach it" % match.group(2))
+
+    # 2. All four are written and read through the audio accessors...
+    for key in AUDIO_KEYS:
+        if "GameScope.setAudio(%s, Keys.%s)" % (key, key) not in engine:
+            failed.append("SoundEngine does not store %s through "
+                          "GameScope.setAudio" % key)
+        if not re.search(r'GameScope\.audio(?:Bool|Double|Int)\(Keys\.%s\)'
+                         % key, engine):
+            failed.append("SoundEngine does not read %s through a "
+                          "GameScope.audio accessor" % key)
+
+    # 3. ...and all four are picked up when the scope changes, or entering
+    #     a game would leave the previous one's effects playing.
+    reload_body = engine.split("func reloadForScope()", 1)[-1]
+    reload_body = reload_body.split("\n    }", 1)[0]
+    for key in AUDIO_KEYS:
+        if "Keys.%s" % key not in reload_body:
+            failed.append("SoundEngine.reloadForScope does not re-read %s — "
+                          "it would keep the previous game's value" % key)
+
+    # 4. The switch is one switch, and it is named for all of it.
+    if "audioIsPerGame" not in scope:
+        failed.append("GameScope no longer has audioIsPerGame")
+    if "musicIsPerGame" in scope or "musicIsPerGame" in settings:
+        failed.append("GameScope still exposes musicIsPerGame — the switch "
+                      "covers the effects too and the name has to say so")
+    if 'Toggle("Audio Per Game"' not in settings:
+        failed.append('Settings no longer offers "Audio Per Game"')
+
+    # 5. The colour has the same switch, through its own accessors.
+    if "colorIsPerGame" not in scope:
+        failed.append("GameScope has no colorIsPerGame — the table colour is "
+                      "per game with no way to say otherwise")
+    if 'Toggle("Color Per Game"' not in settings:
+        failed.append('Settings no longer offers "Color Per Game"')
+    if "GameScope.setColor(colorwayIndex" not in theme:
+        failed.append("AppTheme does not store the colorway through "
+                      "GameScope.setColor, so Color Per Game cannot reach it")
+    if "GameScope.colorInt(Keys.colorwayIndex)" not in theme:
+        failed.append("AppTheme does not read the colorway through "
+                      "GameScope.colorInt")
+
+    # 6. Both switches are on the hub only. Inside a game either would be a
+    #    control that changes what every OTHER game does.
+    hub_only = settings.split("if gameName == nil {", 1)
+    if len(hub_only) < 2:
+        failed.append("SettingsView no longer gates anything on the hub")
+    else:
+        for label in ('Toggle("Audio Per Game"', 'Toggle("Color Per Game"'):
+            if label not in hub_only[1]:
+                failed.append("%s is outside the `gameName == nil` branch — "
+                              "it would appear inside a game" % label)
+
+    # 7. And the scope note says nothing when the scope is off.
+    if "The same in every game." in settings:
+        failed.append('SettingsView still prints "The same in every game." — '
+                      "that line only ever appears once the player has just "
+                      "said that is what they want")
+    note = settings.split("func scopeNote(perGame: Bool)", 1)[-1]
+    note = note.split("\n    }", 1)[0]
+    if "if let gameName, perGame {" not in note:
+        failed.append("scopeNote no longer drops out when the scope is off")
+
+    if not failed:
+        print("  %-22s ok (one switch over %s; colour on its own)"
+              % ("audio scope", ", ".join(AUDIO_KEYS)))
+
+
 def main():
     failed = []
     audio = source("GameAudio.swift")
@@ -190,6 +288,10 @@ def main():
                          ("RollbotsArt.swift", "VictoryAudio.start()")):
         if call not in source(screen):
             failed.append("%s never calls %s" % (screen, call))
+
+    print()
+    print("scope:")
+    check_scope(failed)
 
     if failed:
         for line in failed:

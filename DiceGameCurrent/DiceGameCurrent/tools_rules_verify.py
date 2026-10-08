@@ -6,6 +6,8 @@ connection. Where a number could be interpolated from its constant it now
 is, and this asserts the rest.
 
 Run it after touching any rules array or any tuning constant."""
+import base64
+import json
 import os
 import re
 import sys
@@ -160,6 +162,22 @@ def check_figures():
               for c in columns}
     check("figure: it shows a single, a pair and a triple",
           shapes == {1, 2, 3}, "largest group per column: %s" % sorted(shapes))
+
+    # And the dice in it are flat. `PipFace` carries the board's own
+    # treatment — sheen, bevel and `.elevated(.piece)` — and at 24 points
+    # that shadow read as a second die offset behind the first. The comment
+    # beside the figure claimed "no plate, no bevel, no shadow" while the
+    # component added all three, so the claim is now asserted.
+    screen = source("BoneheadsScreen.swift")
+    check("figure: the dice can be drawn flat",
+          "var flat: Bool = false" in screen,
+          "PipFace has no flat option")
+    check("figure: the figure's dice are flat",
+          "PipFace(value: die, tint: MenuInk.text, flat: true)" in art,
+          "the Boneheads figure is drawing board dice, shadow and all")
+    check("figure: the board's dice are not",
+          "PipFace(value: die.face," in screen,
+          "the board is no longer drawing solid dice")
 
 
 def strip_comments(text):
@@ -358,6 +376,326 @@ def check_wire():
           % ("wire: games", len(probed), len(optedOut)))
 
 
+# ---------------------------------------------------------------------------
+# The guide tables
+#
+# GuideBody.parse in GuideBubbles.swift turns the document's column-aligned
+# blocks back into real rows. Two things went wrong there and neither was
+# visible to any check: a blank line ended the table, so only the first of
+# Rollbots' four cyberware abilities rendered inside the box; and a wrapped
+# cell was appended whole to the last column, gluing each ability's effect
+# and drawback into one sentence.
+#
+# This mirrors the parser and asserts the shape of what it produces. Run
+# against the old rule (a blank line closes the table) the Rollbots table
+# comes back with one row of four, which is what shipped.
+# ---------------------------------------------------------------------------
+
+COLUMN_SLACK = 2
+
+
+def _cells(text):
+    """Columns are separated by two or more spaces."""
+    out, current, spaces = [], "", 0
+    for character in text:
+        if character == " ":
+            spaces += 1
+            continue
+        if spaces >= 2 and current:
+            out.append(current.strip())
+            current = ""
+        elif spaces > 0 and current:
+            current += " "
+        spaces = 0
+        current += character
+    if current:
+        out.append(current.strip())
+    return out
+
+
+def _word_starts(text):
+    return [i for i, c in enumerate(text)
+            if c != " " and (i == 0 or text[i - 1] == " ")]
+
+
+def _column_offsets(header, columns):
+    out, search = [], 0
+    for column in columns:
+        found = header.find(column, search)
+        if found < 0:
+            return []
+        out.append(found)
+        search = found + len(column)
+    return out
+
+
+def _cells_at(text, offsets):
+    """Re-split a row at the header's own column positions."""
+    if len(offsets) < 2:
+        return None
+    starts = _word_starts(text)
+    cuts = [0]
+    for want in offsets[1:]:
+        near = [p for p in starts if abs(p - want) <= COLUMN_SLACK]
+        if not near:
+            return None
+        cuts.append(min(near, key=lambda p: abs(p - want)))
+    cuts.append(len(text))
+    out = []
+    for index in range(len(offsets)):
+        cell = text[cuts[index]:cuts[index + 1]].strip()
+        if not cell:
+            return None
+        out.append(cell)
+    return out
+
+
+def _step_marker(text):
+    digits = ""
+    for character in text:
+        if character.isdigit():
+            digits += character
+        elif character == "." and digits:
+            return digits + "."
+        else:
+            return None
+    return None
+
+
+def guide_tables(body, blank_ends_table=False):
+    """Every table in one rules body, as (columns, rows)."""
+    found, pending, columns, offsets = [], [], [], []
+    in_table, indent0, blank, header = False, 0, False, None
+
+    def close():
+        if in_table and columns:
+            found.append((columns, pending))
+
+    for raw in body.split("\n"):
+        line = raw.replace("\u00a0", " ")
+        trimmed = line.strip()
+        if not trimmed:
+            if in_table and not blank_ends_table:
+                blank = True
+            else:
+                close()
+                pending, columns, offsets, in_table, blank = [], [], [], False, False
+            continue
+        if set(trimmed) == {"-"} and len(trimmed) >= 5:
+            if header is not None:
+                columns = _cells(header)
+                offsets = _column_offsets(header, columns)
+                in_table, header = True, None
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        if in_table and blank:
+            width = len(_cells(trimmed))
+            row_like = indent == indent0
+            if trimmed.startswith("* ") or _step_marker(trimmed):
+                row_like = False
+            if width < 2 or width > len(columns):
+                row_like = False
+            if not row_like:
+                close()
+                pending, columns, offsets, in_table = [], [], [], False
+            blank = False
+        if in_table:
+            if indent >= indent0 + 4 and pending:
+                last = pending[-1]
+                pieces = _cells(trimmed)
+                reach = min(len(pieces), len(last))
+                for offset, piece in enumerate(pieces[len(pieces) - reach:]):
+                    slot = len(last) - reach + offset
+                    last[slot] = last[slot] + " " + piece
+            else:
+                if indent0 == 0:
+                    indent0 = indent
+                row = _cells(trimmed)
+                if len(row) < len(columns):
+                    rescued = _cells_at(trimmed, offsets)
+                    if rescued and len(rescued) == len(columns):
+                        row = rescued
+                pending.append(row)
+            continue
+        if trimmed.startswith("* ") or _step_marker(trimmed) or indent >= 4:
+            header = None
+            continue
+        header = trimmed
+    close()
+    return found
+
+
+def _guide_bodies():
+    """Every rules body in every game, with the file it came from."""
+    for filename in sorted(os.listdir(SWIFT)):
+        if not filename.endswith(".swift"):
+            continue
+        text = source(filename)
+        for match in re.finditer(r'body: "((?:[^"\\]|\\.)*)"', text):
+            raw = match.group(1)
+            raw = raw.replace("\\n", "\n").replace('\\"', '"')
+            yield filename, raw.replace("\\\\", "\\")
+
+
+# What the document holds: six three-column tables and Three Thousand's
+# two-column one. A table that loses rows, or a row that loses a column,
+# is a parser fault rather than a change to the text.
+TABLE_SHAPE = {
+    ("Generals.swift", "Category"): (3, 7),
+    ("Rollbots.swift", "Ability"): (3, 4),
+    ("RoyalUrScreen.swift", "Marked Points"): (3, 2),
+    ("SuiteGame.swift", "Matchup Type"): (3, 5),
+    ("SuiteGame.swift", "Differential"): (3, 8),
+    ("SuiteGame.swift", "Die Type"): (3, 4),
+    ("ThreeThousand.swift", "Combination"): (2, 9),
+}
+
+
+def check_tables():
+    print("guide tables")
+    seen = {}
+    ragged = []
+    for filename, body in _guide_bodies():
+        for columns, rows in guide_tables(body):
+            seen[(filename, columns[0])] = (len(columns), len(rows))
+            for row in rows:
+                if len(row) != len(columns):
+                    ragged.append("%s/%s: %r" % (filename, columns[0], row))
+
+    check("every table is found", seen == TABLE_SHAPE,
+          "got %r" % (sorted(set(seen) ^ set(TABLE_SHAPE)) or
+                      [(k, seen[k], TABLE_SHAPE[k]) for k in TABLE_SHAPE
+                       if seen.get(k) != TABLE_SHAPE[k]],))
+    check("no row loses a column", not ragged,
+          "; ".join(ragged[:3]))
+
+    # And the two fixes are in the parser the app actually runs, not only
+    # in the mirror above.
+    guides = source("GuideBubbles.swift")
+    check("a blank line separates rows", "blankInTable" in guides,
+          "GuideBody.parse still ends a table on a blank line")
+    check("a wrap keeps its column", "cells(trimmed, at: offsets)" in guides,
+          "GuideBody.parse no longer rescues a row from the header offsets")
+
+
+# ---------------------------------------------------------------------------
+# The byte budget
+#
+# The device panel reported 442 bytes across ten games and every row green,
+# which was false comfort twice over. The probes used pass-and-play ids —
+# `local.1`, seven characters — where Messages hands out 36-character
+# `MSConversation` UUIDs, and each participant is spelled TWICE in an
+# encoded match. And the Rolls probe sent `RollsGameState(startedBy:)`,
+# whose `results` are EMPTY: the one game in the suite that scales with the
+# size of the chat was being measured with none of the thing that scales.
+#
+# This models Rolls' encoding here, so the ceiling is a number in the repo
+# rather than something to find out on a stranger's phone.
+# ---------------------------------------------------------------------------
+
+# The URL is built by URLComponents from one query item and nothing else,
+# so this is the whole of it: "?s=" before the base64url.
+URL_PREFIX = len("?s=")
+
+# 12 d6, 1 d8, 1 d10, 1 d12 — the pool DiceGameRound(seed:) deals.
+ROLLS_POOL = [6] * 12 + [8, 10, 12]
+
+# The smallest group chat Rolls must still fit in. Measured at 14 seats
+# today; this is the floor under that, so a change which makes the payload
+# heavier is caught here rather than by someone whose message fails to send.
+ROLLS_MIN_SEATS = 12
+
+
+def _rolls_url_bytes(seats, budget_seed=0xD1CED1CE):
+    """What one Rolls turn costs at `seats` players, in URL bytes.
+
+    Mirrors the encoding exactly: `GameEnvelope`'s four one-letter keys,
+    `MatchPayload`'s two, `TurnMatch`'s short keys with the nil `outcome`
+    and nil `seatSequence` omitted (the synthesized encoder uses
+    encodeIfPresent), and `RollsPlayerResult`'s three.
+    """
+    ids = ["00000000-0000-4000-8000-%012d" % (i + 1) for i in range(seats)]
+    results = {}
+    for seat, participant in enumerate(ids):
+        values, score = [], 0
+        for index, sides in enumerate(ROLLS_POOL):
+            value = (index + seat) % sides + 1
+            values.append(value)
+            score += sides if value == 1 else sides - value
+        results[participant] = {"o": list(reversed(range(len(ROLLS_POOL)))),
+                                "s": score, "v": values}
+    match = {"a": 0, "n": 0, "p": ids, "r": 1,
+             "s": {participant: 0 for participant in ids}}
+    envelope = {"d": {"d": {"b": ids[0], "c": False, "r": results},
+                      "m": match},
+                "g": "rolls", "s": budget_seed, "v": 1}
+    raw = json.dumps(envelope, separators=(",", ":"),
+                     sort_keys=True).encode()
+    return URL_PREFIX + len(base64.urlsafe_b64encode(raw).rstrip(b"="))
+
+
+def check_budget():
+    print("byte budget")
+    payload = strip_comments(source("GamePayload.swift"))
+    turn = strip_comments(source("TurnMatch.swift"))
+
+    try:
+        budget = int(constant(source("GamePayload.swift"), "safeByteBudget"))
+    except AssertionError:
+        check("the budget is readable", False,
+              "GameTransport.safeByteBudget is no longer a readable literal")
+        return
+
+    # 1. The probes measure a real message, not a pass-and-play one.
+    check("probes use Messages-sized ids",
+          "TurnMatch.messagesShaped(" in payload
+          and not re.search(r'TurnMatch\.local(?:TwoPlayer)?\(', payload),
+          "GameWireCheck still builds its matches with local ids, so every "
+          "number it reports is short by 29 bytes per participant mention")
+    check("an id is the length Messages gives",
+          "static let messagesIDLength = 36" in turn
+          and turn.count('"00000000-0000-4000-8000-"') == 1,
+          "TurnMatch.messagesShaped is not producing 36-character ids")
+    check("no probe state names a short id",
+          "local." not in payload,
+          "a probe state still carries a `local.N` literal, which is 29 "
+          "bytes shorter than the id it stands for")
+
+    # 2. ...and the game that scales is measured with its state full.
+    check("the Rolls probe sends a finished round",
+          "filledRolls(match:" in payload
+          and not re.search(r'state: RollsGameState\(startedBy: "', payload),
+          "the Rolls probe is back on an empty RollsGameState, which "
+          "measures the envelope and none of the game")
+
+    # 3. The heaviest two-player game is not spelling its keys out.
+    generals = source("Generals.swift")
+    check("a Generals claim has short keys",
+          'case participant = "w"' in generals
+          and 'case points = "p"' in generals,
+          "GeneralsCard.Claim has no CodingKeys, so it spells "
+          "\"participant\" and \"points\" out once per claim — twelve times "
+          "in a full card, and Generals is already the heaviest of the "
+          "two-player games")
+
+    # 4. The ceiling, modelled.
+    ceiling = 0
+    for seats in range(1, 64):
+        if _rolls_url_bytes(seats) <= budget:
+            ceiling = seats
+        else:
+            break
+    for seats in (2, 6, ROLLS_MIN_SEATS, ceiling, ceiling + 1):
+        used = _rolls_url_bytes(seats)
+        print("  %-34s %2d seats  %5d B  %5.1f%%%s"
+              % ("Rolls against %d B" % budget, seats, used,
+                 used / budget * 100, "  OVER" if used > budget else ""))
+    check("Rolls fits a group chat", ceiling >= ROLLS_MIN_SEATS,
+          "a Rolls turn stops fitting at %d seats, and %d is the floor"
+          % (ceiling + 1, ROLLS_MIN_SEATS))
+    print("  %-34s %d seats" % ("largest Rolls match that fits", ceiling))
+
+
 def main():
     print("rules text against the constants:")
 
@@ -520,6 +858,8 @@ def main():
           "the cluster is no longer opening the detailed rules")
 
     check_figures()
+    check_tables()
+    check_budget()
     check_seats()
     check_wire()
     check_retired_wording()

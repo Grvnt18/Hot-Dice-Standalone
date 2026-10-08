@@ -41,26 +41,33 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showingHowToPlay = false
 
-    /// Says whose settings these are.
+    /// Says whose settings these are, when they are anyone's in particular.
     ///
-    /// The colour and the music are kept per game, so without this a player
-    /// who sets a table colour in one game and finds another unchanged has
-    /// every reason to read it as a bug rather than as the feature.
+    /// The colour and the audio are kept per game by default, so without
+    /// this a player who sets a table colour in one game and finds another
+    /// unchanged has every reason to read it as a bug rather than as the
+    /// feature.
+    ///
+    /// Nothing at all when the scope is off. It used to say "The same in
+    /// every game." there, which is a line that appears only once the
+    /// player has already told the app that is what they want — the answer
+    /// to a question they have just finished answering.
     @ViewBuilder private func scopeNote(perGame: Bool) -> some View {
-        if let gameName {
-            Text(perGame
-                 ? "Saved for \(gameName). Each game keeps its own."
-                 : "The same in every game.")
+        if let gameName, perGame {
+            Text("Saved for \(gameName). Each game keeps its own.")
                 .font(.poppins(11))
         }
     }
 
-    /// Whether music follows the game or the app.
+    /// Whether audio follows the game or the app.
     ///
-    /// Mirrored into `@State` because `GameScope.musicIsPerGame` is a
+    /// Mirrored into `@State` because `GameScope.audioIsPerGame` is a
     /// UserDefaults-backed static, which publishes nothing — without this
     /// the toggle would not move when tapped.
-    @State private var musicPerGame = GameScope.musicIsPerGame
+    @State private var audioPerGame = GameScope.audioIsPerGame
+
+    /// And the same for the table colour, for the same reason.
+    @State private var colorPerGame = GameScope.colorIsPerGame
 
     /// What the track button reads when it is closed.
     ///
@@ -97,7 +104,7 @@ struct SettingsView: View {
 
                 ScrollView {
                     VStack(spacing: 14) {
-                        panel("Music", footer: AnyView(scopeNote(perGame: musicPerGame))) {
+                        panel("Music", footer: AnyView(scopeNote(perGame: audioPerGame))) {
                             Toggle("Music", isOn: $sound.musicEnabled)
                                 .font(.poppins(15))
                                 .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
@@ -166,22 +173,44 @@ struct SettingsView: View {
                         // exactly the kind of setting people cannot find again
                         // afterwards.
                         if gameName == nil {
-                            panel("Music Scope",
+                            // "Audio", not "Music": this governs the
+                            // effects and their volume as well now, which
+                            // is what the label promised and what the
+                            // switch did not do.
+                            panel("Audio Scope",
                                   footer: AnyView(
-                                    Text(musicPerGame
-                                         ? "Each game remembers its own track and volume."
-                                         : "One track and volume across every game.")
+                                    Text(audioPerGame
+                                         ? "Each game remembers its own track, volume and effects."
+                                         : "One track, volume and effects across every game.")
                                         .font(.poppins(11)))) {
-                                Toggle("Music Per Game", isOn: $musicPerGame)
+                                Toggle("Audio Per Game", isOn: $audioPerGame)
                                     .font(.poppins(15))
                                     .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
-                                    .onValueChange(of: musicPerGame) { now in
-                                        GameScope.musicIsPerGame = now
+                                    .onValueChange(of: audioPerGame) { now in
+                                        GameScope.audioIsPerGame = now
+                                    }
+                            }
+
+                            // The colour gets the same switch in the same
+                            // shape. It was per game unconditionally, which
+                            // is the right default and was not a choice.
+                            panel("Color Scope",
+                                  footer: AnyView(
+                                    Text(colorPerGame
+                                         ? "Each game remembers its own table color."
+                                         : "One table color across every game.")
+                                        .font(.poppins(11)))) {
+                                Toggle("Color Per Game", isOn: $colorPerGame)
+                                    .font(.poppins(15))
+                                    .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
+                                    .onValueChange(of: colorPerGame) { now in
+                                        GameScope.colorIsPerGame = now
                                     }
                             }
                         }
 
-                        panel("Sound Effects") {
+                        panel("Sound Effects",
+                              footer: AnyView(scopeNote(perGame: audioPerGame))) {
                             Toggle("Sound Effects", isOn: $sound.sfxEnabled)
                                 .font(.poppins(15))
                                 .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
@@ -200,10 +229,9 @@ struct SettingsView: View {
                               footer: AnyView(
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("Changes the playing surface and this menu's own accent color.")
-                                    // Always per game, whatever the music is
-                                    // set to — a floor is part of a game's look
-                                    // in a way a backing track is not.
-                                    scopeNote(perGame: true)
+                                    // Per game by default and now by
+                                    // choice — Color Scope, on the hub.
+                                    scopeNote(perGame: colorPerGame)
                                 }
                                 .font(.poppins(11)))) {
                             ColorwayPicker(theme: theme)

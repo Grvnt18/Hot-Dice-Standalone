@@ -161,7 +161,8 @@ struct GameHubView: View {
                 .font(.system(size: 18))
                 .foregroundStyle(.white.opacity(0.9))
                 .padding(9)
-                .pixelPanel(fill: .solid(SmokeFloor.backdropColor.opacity(0.85)),
+                .pixelPanel(fill: .solid(SmokeFloor.backdropColor
+                                            .opacity(HubLayout.chromePlate)),
                             elevation: .piece)
         }
         .padding(10)
@@ -279,6 +280,37 @@ enum HubLayout {
     static func iconSide(tile: CGFloat) -> CGFloat {
         max(40, tile - inset * 2 - labelHeight(tile: tile) - gap)
     }
+
+    // MARK: Chrome over timber
+    //
+    // The in-game back and settings buttons wear the field's darkest tone
+    // at 0.85 (DiceGameShell). The hub wears the SAME control over the
+    // timber instead of over the field, and 0.85 of a near-black tone on
+    // light timber is not translucent — it is a dark block. Matching the
+    // in-game button means matching how it READS, which is a lower number
+    // here, not the same number.
+    //
+    // Measured, compositing SmokeFloor.backdrop over the #AE7B5B timber
+    // and taking the WCAG ratio against the glyph:
+    //
+    //            white glyph        black artwork
+    //   0.10     4.1 : 1  (fails)   5.1 : 1
+    //   0.20     4.7 : 1            4.4 : 1
+    //   0.30     5.3 : 1            3.8 : 1
+    //   0.55     7.3 : 1            2.6 : 1
+    //
+    // (Green, Midnight Navy and Crimson all within 0.2 of each other, so
+    // the choice holds for every swatch.)
+
+    /// Behind the settings gear: white on it, so it cannot go below 0.20.
+    /// 0.30 leaves seven tenths of the grain showing and clears AA on all
+    /// eleven swatches.
+    static let chromePlate: Double = 0.30
+
+    /// Behind a tile's artwork, which is BLACK line work — so the plate is
+    /// there to give the drawing a surface, not to carry a light glyph, and
+    /// it can be as faint as the eye still reads as glass.
+    static let artworkPlate: Double = 0.10
 }
 
 // MARK: - Title
@@ -329,10 +361,11 @@ private struct HubTitle: View {
                 .foregroundStyle(.black)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
-                // Pale, like everything else on the hub — see Elevation.Ink.
-                // Black glyphs with a black shadow are not lifted, they are
-                // just thicker.
-                .elevated(.lifted, ink: .light)
+                // No shadow. It had a pale one, which is what made it read
+                // as a different KIND of text from the eleven names below
+                // it — those sit flat on the timber in the same ink and the
+                // same weight, and the mark is now one of them rather than
+                // a sign hung above them.
         }
     }
 }
@@ -367,19 +400,34 @@ private struct GameTile: View {
                 GameIconView(id: entry.id)
                     .frame(width: HubLayout.iconSide(tile: side),
                            height: HubLayout.iconSide(tile: side))
-                    .pixelPanel(fill: .solid(SmokeFloor.backdropColor.opacity(0.55)),
+                    .pixelPanel(fill: .solid(SmokeFloor.backdropColor
+                                                .opacity(HubLayout.artworkPlate)),
                                 elevation: .piece)
 
-                Text(entry.tileName)
+                Text(entry.tileName.uppercased())
                     // Black, the heaviest face in Resources — these sit on
                     // timber under a plate and semibold was losing to both.
-                    // Capitalisation is the catalogue's own: a name is a
-                    // name, and GameCatalog already writes them as one.
+                    //
+                    // Uppercased at the view, not in GameCatalog: the
+                    // catalogue's names are the names (Freighter.Yacht.Dinghy
+                    // keeps its stops, Rolls keeps its spelling) and this is
+                    // only how the hub sets them. Anything else reading
+                    // `tileName` — the guide nameplates aside, which do the
+                    // same thing for the same reason — still gets the name.
                     .font(.poppins(HubLayout.labelFont(tile: side), .black))
-                    // Freighter.Yacht.Dinghy's second line lands within a
-                    // point of the iPhone SE's label width. Every other name
-                    // has room to spare, so this only ever fires for that
-                    // one — but it fires rather than truncating.
+                    // One size across the grid, with the longest names
+                    // shrinking to fit — FREIGHTER.YACHT.DINGHY is the only
+                    // one that ever does, and it fires rather than
+                    // truncating. Scaling every name to fill its own width
+                    // instead would leave a page of tiles carrying visibly
+                    // different type sizes.
+                    //
+                    // ONE of these, and only one. There were two — 0.8 here
+                    // and 0.6 further down the chain — and only the inner
+                    // one ever applied, because this is an environment
+                    // value and the modifier nearest the Text wins. The 0.6
+                    // was dead, and tools_hublayout_verify.py was reading
+                    // whichever it found first.
                     .minimumScaleFactor(0.8)
                     // Black on the timber. The artwork is black line work on
                     // transparency, so a white name beside it was the one
@@ -387,11 +435,6 @@ private struct GameTile: View {
                     .foregroundStyle(.black)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
-                    // One size across the grid, with the longest names
-                    // shrinking to fit. Scaling every name to fill its own
-                    // width instead would leave a page of tiles carrying
-                    // visibly different type sizes.
-                    .minimumScaleFactor(0.6)
                     // Stack Sans overhangs its advance width, so a trailing
                     // glyph can clip against a tight frame.
                     .padding(.trailing, 3)

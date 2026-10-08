@@ -347,31 +347,55 @@ enum GameWireCheck {
     /// Free Roll is absent on purpose: it is solo and `isSendable` is false,
     /// so it has no turn to send and no state to carry.
     static func runAll() -> [Result] {
-        let two = TurnMatch.localTwoPlayer()
-        let group = TurnMatch.local(playerCount: 6)
+        // `messagesShaped`, not `localTwoPlayer`. This panel existed to
+        // report the real byte cost and was reporting the cost of
+        // pass-and-play instead: `local.1` is seven characters where an
+        // `MSConversation` participant is a 36-character UUID, and each
+        // participant is spelled twice in an encoded match. At two seats
+        // that alone is 154 bytes. Measuring the short ids understated
+        // every game on the list.
+        let two = TurnMatch.messagesShaped(playerCount: 2)
+        let group = TurnMatch.messagesShaped(playerCount: 6)
 
         var results: [Result] = []
 
         // Rolls: the biggest payload in the suite by a distance — fifteen
         // landed faces per player, and no turn order, so a whole group chat
         // can be mid-round at once. If anything breaks the budget it is this.
+        //
+        // And a FINISHED round for every seat. The probe used to send
+        // `RollsGameState(startedBy:)`, whose `results` are empty — so the
+        // one game that scales with the size of the chat was being measured
+        // with none of the thing that scales. It reported 351 bytes at six
+        // seats; a real six-seat round is 1861.
         results.append(probe(game: RollsGameState.gameID, version: 1,
                              match: group,
-                             state: RollsGameState(startedBy: "local.1")))
+                             state: filledRolls(match: group,
+                                                seed: 0xD1CE_D1CE)))
 
+        // With its snake order, which is what GeneralsScreen builds and
+        // which is twelve more entries on the wire. Generals is the
+        // heaviest of the alternating games and the probe was leaving its
+        // own seat sequence out.
         results.append(probe(game: "generals", version: 1,
-                             match: two, state: GeneralsState()))
+                             match: TurnMatch.messagesShaped(
+                                playerCount: 2,
+                                seatSequence: GeneralsRules.snakeOrder),
+                             state: GeneralsState()))
         results.append(probe(game: "three_thousand", version: 1,
                              match: group, state: ThreeThousandState(
                                 turnTotal: 850, turnsLeftAfterTarget: 2,
-                                firstToTarget: "local.1")))
+                                firstToTarget: group.participants[0])))
         results.append(probe(game: "hog", version: 1,
                              match: group, state: HogState(turnTotal: 23)))
         results.append(probe(game: "fyd", version: 1,
                              match: group, state: FreighterYachtDinghyState()))
+        // Participant ids taken FROM the match, not written as literals:
+        // a state that names a player has to name one of the real,
+        // full-length ones or it measures a shorter message than it sends.
         results.append(probe(game: "jackpot", version: 1,
                              match: two, state: JackpotState(
-                                jackpotsThisRound: ["local.1"])))
+                                jackpotsThisRound: [two.participants[0]])))
         results.append(probe(game: "boneheads", version: 1,
                              match: two, state: filledBoneheads()))
         results.append(probe(game: "royal_ur", version: 1,
@@ -387,6 +411,43 @@ enum GameWireCheck {
                              match: two, state: BaseballDiceState(innings: 9)))
 
         return results
+    }
+
+    /// Every seat with a finished round, which is Rolls' largest state.
+    ///
+    /// Built from the probe's own seed so the dice are the dice that seed
+    /// deals and every value is a face that die can physically show — which
+    /// means the result would also pass `validate(againstSeed:)`, not merely
+    /// encode to the right size.
+    ///
+    /// The faces are spread by seat rather than repeated, so no two seats
+    /// encode to the same bytes. JSON has no back-reference, so that would
+    /// not have changed the size — but a probe whose seats are identical is
+    /// one that cannot tell a per-seat bug from a shared one.
+    private static func filledRolls(match: TurnMatch, seed: UInt64)
+        -> RollsGameState {
+        let pool = DiceGameRound(seed: seed).originalPool
+        var results: [String: RollsPlayerResult] = [:]
+
+        for (seat, participant) in match.participants.enumerated() {
+            var values: [Int] = []
+            var score = 0
+            for (index, die) in pool.enumerated() {
+                let value = (index + seat) % die.sides + 1
+                values.append(value)
+                score += RollsPlayerResult.points(sides: die.sides,
+                                                  value: value)
+            }
+            // Any permutation of the pool's indices is a legal bank order,
+            // and reversed is a permutation that is the same every run.
+            let order = Array(pool.indices.reversed())
+            results[participant] = RollsPlayerResult(values: values,
+                                                     order: order,
+                                                     score: score)
+        }
+
+        return RollsGameState(startedBy: match.participants.first ?? "",
+                              results: results)
     }
 
     /// A Boneheads board with every slot taken, which is its largest state

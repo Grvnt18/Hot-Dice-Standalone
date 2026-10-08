@@ -20,6 +20,7 @@ looks alive at a glance and is half dead. That shipped once.
 
     python3 tools_smoke_verify.py
 """
+import math
 import os
 import re
 import sys
@@ -55,6 +56,18 @@ CONSTANTS = {
     "phaseR": "PHASE_R",
     "phaseN": "PHASE_N",
     "loopSeconds": "LOOP_SECONDS",
+    # The ramp was mirrored in both files and compared in neither, which is
+    # exactly the drift this map exists to stop. It is also the half that
+    # decides the floor's COLOUR rather than its shape, so a difference here
+    # is the most visible kind there is.
+    "rampSpread": "RAMP_SPREAD",
+    "rampSpreadMin": "RAMP_SPREAD_MIN",
+    "rampFloor": "RAMP_FLOOR",
+    "rampCeil": "RAMP_CEIL",
+    "rampSatLift": "RAMP_SAT_LIFT",
+    "rampBias": "RAMP_BIAS",
+    "rampMeanLevel": "RAMP_MEAN_LEVEL",
+    "rampLift": "RAMP_LIFT",
 }
 
 # Lines the GLSL must still contain. Not a transcription of the shader — just
@@ -108,6 +121,23 @@ OPENGL_ONLY = [
 ]
 
 
+# The floor's band must average within this of the swatch, in CIE dE76.
+#
+# Measured over all twenty-four swatches after the lift: eighteen come in
+# under 3, and the worst that the lift can reach at all is Royal Blue at
+# 4.9. The four it cannot reach are excluded by computation, not by name —
+# see `pinned` in check_swatch_match.
+MATCH_TOLERANCE = 5.5
+
+# ...and the lift may not pay for that match by closing the band up. It is
+# meant to SLIDE the band. Measured BEFORE the lift, over the same
+# twenty-four: the narrowest band was 10.6 of L* (Espresso) and the
+# tightest step 1.25 (Deep Indigo). After it, 11.2 and 1.24 — so these are
+# the old figures, and the lift has to keep clearing them.
+MIN_SPAN = 10.5
+MIN_STEP = 1.20
+
+
 def shader_source(text):
     """Just the shader string, with its comments removed.
 
@@ -138,6 +168,141 @@ def swift_constants(text):
     for m in re.finditer(r'static let (\w+)(?::\s*\w+)? = (-?[\d.]+)', text):
         found[m.group(1)] = float(m.group(2))
     return found
+
+
+def check_swatch_match(failed):
+    """The floor reads as the colour that was picked.
+
+    The band used to hang straight down from the swatch, so every tone on
+    screen was darker than it and the floor read duller than the picker
+    promised — #006B38 came back as #045D33, which is a dE of 7.3 and a
+    visibly different green. `RAMP_LIFT` slides the band up until its mean
+    lands on the swatch instead of its ceiling.
+
+    Two things are asserted, because fixing the first by sacrificing the
+    second would be no fix at all:
+
+    1. Every swatch the lift can MOVE averages within `MATCH_TOLERANCE` of
+       it. Four cannot be moved, and they are found by asking whether the
+       lift changed the band's top rather than by listing them: `RAMP_FLOOR`
+       pins Onyx at the dark end — which is also what stops the olive-grey
+       regression recorded in `ramp()` from coming back — and `RAMP_CEIL`
+       pins Electric Blue, Hot Rose and Spring Green, which are already at
+       full brightness. Those are printed with their dE rather than hidden.
+    2. No swatch may end up FURTHER from its colour than it was with no
+       lift at all.
+    3. The L* span of each band, and its tightest step, are no smaller than
+       they were before the lift. The lift SLIDES the band; a change that
+       squeezed it would match the swatch by flattening the posterised look
+       the six levels exist for.
+    """
+    swatches = re.findall(r'Swatch\(hex: "(#[0-9A-Fa-f]{6})", name: "([^"]+)"',
+                          source("AppTheme.swift"))
+    if not swatches:
+        failed.append("AppTheme.swift lists no swatches to check the floor "
+                      "against")
+        return
+
+    def lab(rgb):
+        def linear(u):
+            return u / 12.92 if u <= 0.04045 else ((u + 0.055) / 1.055) ** 2.4
+        r, g, b = (linear(c) for c in rgb)
+        x = 0.4124 * r + 0.3576 * g + 0.1805 * b
+        y = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        z = 0.0193 * r + 0.1192 * g + 0.9505 * b
+        def cube(t):
+            return t ** (1 / 3.0) if t > 0.008856 else 7.787 * t + 16 / 116.0
+        fx, fy, fz = cube(x / 0.95047), cube(y), cube(z / 1.08883)
+        return (116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz))
+
+    def distance(a, b):
+        return math.sqrt(sum((p - q) ** 2 for p, q in zip(lab(a), lab(b))))
+
+    def band(hexcode, lift):
+        """The band's tones and the mean the lift is aiming at."""
+        keep = preview.RAMP_LIFT
+        preview.RAMP_LIFT = lift
+        try:
+            tones = [tuple(c / 255.0 for c in t) for t in preview.ramp(hexcode)]
+        finally:
+            preview.RAMP_LIFT = keep
+        want = tuple(int(hexcode.lstrip("#")[i:i + 2], 16) / 255.0
+                     for i in (0, 2, 4))
+        hue, sat, _ = preview.rgb_to_hsb(*want)
+        lo = preview.rgb_to_hsb(*tones[0])[2]
+        hi = preview.rgb_to_hsb(*tones[-1])[2]
+        # The band's mean tone, straight from the constant that defines
+        # where the mean sits rather than by re-rendering the field.
+        mean = preview.hsb_to_rgb(
+            hue,
+            max(0.0, sat - preview.RAMP_SAT_LIFT * preview.RAMP_MEAN_LEVEL),
+            lo + (hi - lo) * preview.RAMP_MEAN_LEVEL)
+        return tones, mean, want, hi
+
+    worst, tightest, narrowest = ("", 0.0), ("", 99.0), ("", 99.0)
+    pinned, regressed = [], []
+    if preview.RAMP_LIFT <= 0.0:
+        failed.append("RAMP_LIFT is %g — the band hangs straight down from "
+                      "the swatch again, so every tone on screen is darker "
+                      "than the colour the player picked"
+                      % preview.RAMP_LIFT)
+    for hexcode, name in swatches:
+        tones, mean, want, _ = band(hexcode, preview.RAMP_LIFT)
+        _, was, _, flat = band(hexcode, 0.0)
+        # Pinned is a property of the SWATCH, judged at a full lift — not
+        # of whatever RAMP_LIFT happens to be. Asking whether the current
+        # lift moved the band would call every swatch pinned the moment the
+        # lift went back to zero, and pass on a floor with the fault still
+        # in it.
+        _, _, _, reachable = band(hexcode, 1.0)
+
+        off = distance(mean, want)
+        before = distance(was, want)
+        if off > before + 0.05:
+            regressed.append("%s (%s) dE %.1f -> %.1f"
+                             % (name, hexcode, before, off))
+
+        # A swatch the clamps hold cannot be lifted at all: RAMP_FLOOR
+        # pins the dark end (Onyx) and RAMP_CEIL pins anything already at
+        # full brightness (Electric Blue, Hot Rose, Spring Green). Those
+        # are reported, not failed — and derived here rather than listed,
+        # so adding a swatch to the picker cannot quietly skip the check.
+        if reachable <= flat + 1e-9:
+            pinned.append("%s dE %.1f" % (name, off))
+        elif off > worst[1]:
+            worst = ("%s (%s)" % (name, hexcode), off)
+
+        lightness = [lab(t)[0] for t in tones]
+        span = max(lightness) - min(lightness)
+        step = min(abs(lightness[i + 1] - lightness[i])
+                   for i in range(len(lightness) - 1))
+        if span < narrowest[1]:
+            narrowest = (hexcode, span)
+        if step < tightest[1]:
+            tightest = (hexcode, step)
+
+    for line in regressed:
+        failed.append("the lift moved %s FURTHER from its swatch — it is "
+                      "meant to close that gap, not open it" % line)
+
+    if worst[1] > MATCH_TOLERANCE:
+        failed.append("the floor averages dE %.1f from %s — the band is not "
+                      "centred on the colour the player picked"
+                      % (worst[1], worst[0]))
+    if narrowest[1] < MIN_SPAN:
+        failed.append("%s's band spans only %.1f of L* — the lift is meant "
+                      "to SLIDE the band, and squeezing it flattens the "
+                      "posterised look" % (narrowest[0], narrowest[1]))
+    if tightest[1] < MIN_STEP:
+        failed.append("%s's tightest step is %.2f of L* — two of its six "
+                      "tones will not read apart"
+                      % (tightest[0], tightest[1]))
+    else:
+        print("  %-24s ok (%d swatches, worst dE %.1f at %s, narrowest band "
+              "%.1f L*, tightest step %.2f)"
+              % ("swatch match", len(swatches), worst[1], worst[0],
+                 narrowest[1], tightest[1]))
+        print("  %-24s %s" % ("clamp-pinned", ", ".join(pinned) or "none"))
 
 
 def main():
@@ -185,6 +350,9 @@ def main():
         failed.append("some region of the floor holds one tone for a whole "
                       "cycle — it is static on screen, whatever the numbers "
                       "elsewhere say")
+
+    # --- 3b. And it is the colour that was picked. --------------------
+    check_swatch_match(failed)
 
     # --- 4. Nothing paints black behind the tray. ---------------------
     #

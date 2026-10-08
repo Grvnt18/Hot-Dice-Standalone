@@ -11,6 +11,7 @@ anything that goes around them. It also pins the two materials that were
 added to close the survey's gaps, because a material nobody uses is the
 same as no material.
 """
+import math
 import os
 import re
 import sys
@@ -24,6 +25,89 @@ SWIFT = os.path.join(HERE, "SwiftFiles")
 def strip_comments(text):
     text = re.sub(r'/\*.*?\*/', '', text, flags=re.S)
     return "\n".join(re.sub(r'//.*$', '', line) for line in text.splitlines())
+
+
+def check_slot_shapes():
+    """Rolls' four banking slots take the same footprint.
+
+    Twelve of the sixteen slots are squares, and three — the triangle for
+    the d8, the diamond for the d10, the pentagon for the d12 — are
+    polygons. They were put on a circle of `min(width, height) / 2`, which
+    makes them regular and makes them SMALLER: a regular polygon does not
+    fill a square, so three slots read as narrower, shorter spaces than the
+    twelve beside them.
+
+    `DieSlot.polygon` maps the unit polygon's own bounds onto the rect
+    instead. This mirrors that mapping and asserts what it is for — each
+    outline reaches all four edges of its slot — and that the slots have
+    not simply become squares, which would reach the edges too.
+
+    Run against the inscribed version the triangle comes back 87% as wide
+    and 75% as tall as its slot, and this fails on both.
+    """
+    art = source("ControlShapes.swift")
+    kinds = dict(re.findall(r'case \.(\w+):\s*\n\s*return polygon\(in: rect, '
+                            r'sides: (\d+)\)', art))
+    if not kinds:
+        print("  %-26s FAILED  DieSlot no longer builds its slots from "
+              "polygon(in:sides:)" % "slot footprints")
+        return True
+
+    failed = False
+    summary = []
+
+    # The mirror below is Python, so first: the Swift must be doing the
+    # mapping it mirrors. Without this the check would pass on the
+    # inscribed version it was written to catch.
+    if re.search(r'radius\s*=\s*min\(rect\.width, rect\.height\) / 2', art):
+        print("  %-26s FAILED  DieSlot.polygon is back on a circle of "
+              "min(width, height) / 2 — that is a regular polygon, and a "
+              "regular polygon does not fill a square"
+              % "slot footprints")
+        failed = True
+    for token in ("let spanX = (xs.max() ?? 1) - minX",
+                  "(point.x - minX) / spanX * rect.width",
+                  "(point.y - minY) / spanY * rect.height"):
+        if token not in art:
+            print("  %-26s FAILED  DieSlot.polygon no longer maps the unit "
+                  "polygon's bounds onto the slot (missing `%s`)"
+                  % ("slot footprints", token))
+            failed = True
+    for name, sides in sorted(kinds.items(), key=lambda kv: int(kv[1])):
+        count = int(sides)
+        points = [(math.cos(i / count * 2 * math.pi - math.pi / 2),
+                   math.sin(i / count * 2 * math.pi - math.pi / 2))
+                  for i in range(count)]
+        xs = [p[0] for p in points]
+        ys = [p[1] for p in points]
+        span_x, span_y = max(xs) - min(xs), max(ys) - min(ys)
+        mapped = [((p[0] - min(xs)) / span_x, (p[1] - min(ys)) / span_y)
+                  for p in points]
+
+        # Reaches every edge of a unit slot.
+        reach = (min(p[0] for p in mapped), max(p[0] for p in mapped),
+                 min(p[1] for p in mapped), max(p[1] for p in mapped))
+        if reach != (0.0, 1.0, 0.0, 1.0):
+            print("  %-26s FAILED  the %s spans x %.3f..%.3f and y "
+                  "%.3f..%.3f of its slot, not the whole of it"
+                  % ("slot footprints", name, *reach))
+            failed = True
+
+        # ...and is still a polygon, not the square it sits beside.
+        area = abs(sum(mapped[i][0] * mapped[(i + 1) % count][1]
+                       - mapped[(i + 1) % count][0] * mapped[i][1]
+                       for i in range(count))) / 2
+        if area > 0.95:
+            print("  %-26s FAILED  the %s now fills %.0f%% of its slot — it "
+                  "has become the square it is meant to differ from"
+                  % ("slot footprints", name, area * 100))
+            failed = True
+        summary.append("%s %.0f%%" % (name, area * 100))
+
+    if not failed:
+        print("  %-26s ok (%s of its slot, each reaching all four edges)"
+              % ("slot footprints", ", ".join(summary)))
+    return failed
 
 
 def main():
@@ -249,6 +333,9 @@ def main():
     print("  %-26s ok (no strokeBorder on a bare Shape)" % "shape constraints")
     print("  %-26s ok (every plain Button fills its own tap target)"
           % "tap targets")
+    if check_slot_shapes():
+        print("cohesion: FAILED")
+        sys.exit(1)
     print("cohesion: PASS")
 
 

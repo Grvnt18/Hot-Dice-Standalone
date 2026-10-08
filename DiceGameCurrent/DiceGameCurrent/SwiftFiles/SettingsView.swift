@@ -98,12 +98,26 @@ struct SettingsView: View {
         // strings, same bindings, same scope notes. This is paint.
         ZStack {
             WoodTiledBackground(fraction: MenuTimber.fraction).ignoresSafeArea()
+                // Squares off the card this sheet is presented in. See
+                // SheetCorners — the rounding is UIKit's, not this view's,
+                // so it cannot be set from SwiftUI on the iOS 16 floor.
+                .background(SheetCorners(radius: ControlShape.cornerRadius))
 
             VStack(spacing: 0) {
                 MenuHeaderBar(title: "Settings") { dismiss() }
 
                 ScrollView {
                     VStack(spacing: 14) {
+                        // FIRST, not last. Inside a game this opens that
+                        // game's guide; on the hub there is no game to
+                        // explain, so it opens the whole set as a cluster
+                        // of bubbles — the one place a player browsing the
+                        // suite can read the rules before deciding to
+                        // play. Either way it is the thing most likely to
+                        // be wanted from this sheet, and it was below a
+                        // scroll.
+                        howToPlayButton
+
                         panel("Music", footer: AnyView(scopeNote(perGame: audioPerGame))) {
                             Toggle("Music", isOn: $sound.musicEnabled)
                                 .font(.poppins(15))
@@ -191,22 +205,6 @@ struct SettingsView: View {
                                     }
                             }
 
-                            // The colour gets the same switch in the same
-                            // shape. It was per game unconditionally, which
-                            // is the right default and was not a choice.
-                            panel("Color Scope",
-                                  footer: AnyView(
-                                    Text(colorPerGame
-                                         ? "Each game remembers its own table color."
-                                         : "One table color across every game.")
-                                        .font(.poppins(11)))) {
-                                Toggle("Color Per Game", isOn: $colorPerGame)
-                                    .font(.poppins(15))
-                                    .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
-                                    .onValueChange(of: colorPerGame) { now in
-                                        GameScope.colorIsPerGame = now
-                                    }
-                            }
                         }
 
                         panel("Sound Effects",
@@ -223,6 +221,28 @@ struct SettingsView: View {
                             }
                             .opacity(sound.sfxEnabled ? 1 : 0.4)
                             .disabled(!sound.sfxEnabled)
+                        }
+
+                        // Below the effects and beside the colour it
+                        // governs, rather than stacked under the audio
+                        // switch it has nothing to do with. Still hub-only,
+                        // for the same reason Audio Scope is: inside a game
+                        // it would be a control that changes what every
+                        // OTHER game does.
+                        if gameName == nil {
+                            panel("Color Scope",
+                                  footer: AnyView(
+                                    Text(colorPerGame
+                                         ? "Each game remembers its own table color."
+                                         : "One table color across every game.")
+                                        .font(.poppins(11)))) {
+                                Toggle("Color Per Game", isOn: $colorPerGame)
+                                    .font(.poppins(15))
+                                    .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
+                                    .onValueChange(of: colorPerGame) { now in
+                                        GameScope.colorIsPerGame = now
+                                    }
+                            }
                         }
 
                         panel("Table Color",
@@ -257,24 +277,6 @@ struct SettingsView: View {
                             }
                         }
 
-                        // Inside a game this opens that game's guide. On the
-                        // hub there is no game to explain, so it opens the
-                        // whole set as a cluster of bubbles — the one place a
-                        // player browsing the suite can read the rules of a
-                        // game before deciding to play it.
-                        Button {
-                            SoundEngine.shared.play(.buttonTap)
-                            showingHowToPlay = true
-                        } label: {
-                            Text(rules.isEmpty ? "How to Play — Every Game" : "How to Play")
-                                .font(.poppins(15))
-                                .foregroundStyle(theme.accentTextColor)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 48)
-                                .contentShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
-                        }
-                        .buttonStyle(.plain)
-                        .pixelPanel(fill: .solid(theme.accentColor), elevation: .lifted)
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 16)
@@ -289,6 +291,27 @@ struct SettingsView: View {
                               sections: rules)
             }
         }
+    }
+
+    /// The guide, opened from wherever this sheet was opened.
+    ///
+    /// A property rather than inline, so the stack above stays a plain list
+    /// of subviews — the same reason `panel` calls its ViewBuilder once and
+    /// stores the result.
+    private var howToPlayButton: some View {
+        Button {
+            SoundEngine.shared.play(.buttonTap)
+            showingHowToPlay = true
+        } label: {
+            Text(rules.isEmpty ? "How to Play — Every Game" : "How to Play")
+                .font(.poppins(15))
+                .foregroundStyle(theme.accentTextColor)
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .contentShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
+        }
+        .buttonStyle(.plain)
+        .pixelPanel(fill: .solid(theme.accentColor), elevation: .lifted)
     }
 
     /// One titled group of controls, as a pixel panel on the timber.
@@ -614,5 +637,56 @@ private struct WirePayloadCheck: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+}
+
+// MARK: - Squaring off the sheet
+
+/// Sets the presented sheet's corner radius.
+///
+/// Every control in this app is cut square or very nearly so —
+/// `ControlShape.cornerRadius` is 4 — and the one shape that ignored that
+/// was the biggest one on screen: the card the Settings sheet is presented
+/// in, which arrives with UIKit's own generous rounding.
+///
+/// It has to be done through UIKit. SwiftUI gained
+/// `.presentationCornerRadius` in iOS 17 and this app's floor is iOS 16,
+/// so the only way in is `UISheetPresentationController.preferredCornerRadius`
+/// (iOS 15+), reached by walking the responder chain from a zero-sized view
+/// planted in the sheet's own hierarchy.
+///
+/// Fails quietly and on purpose. A presentation that is not a sheet — a
+/// popover on a wide iPad, a full-screen cover — has no
+/// `sheetPresentationController`, and the right behaviour there is to leave
+/// the system's shape alone rather than to force one.
+private struct SheetCorners: UIViewRepresentable {
+    let radius: CGFloat
+
+    func makeUIView(context: Context) -> UIView {
+        UIView(frame: .zero)
+    }
+
+    func updateUIView(_ view: UIView, context: Context) {
+        // Deferred by one runloop turn: on the first `updateUIView` the
+        // view is not yet in the window, so the responder chain has no
+        // controller on it and the radius would silently not apply.
+        let wanted = radius
+        DispatchQueue.main.async { [weak view] in
+            guard let sheet = view?.owningController?.sheetPresentationController
+            else { return }
+            sheet.preferredCornerRadius = wanted
+        }
+    }
+}
+
+private extension UIView {
+    /// The nearest controller up the responder chain.
+    var owningController: UIViewController? {
+        var responder: UIResponder? = self
+        while let next = responder?.next {
+            if let controller = next as? UIViewController { return controller }
+            responder = next
+        }
+        return nil
     }
 }

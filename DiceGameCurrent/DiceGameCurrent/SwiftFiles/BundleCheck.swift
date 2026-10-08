@@ -61,9 +61,26 @@ enum BundleCheck {
 
     /// A single line naming what to look for, or nil when all is well.
     static var summary: String? {
-        guard !isComplete else { return nil }
-        let names = missing.prefix(4).joined(separator: ", ")
-        let more = missing.count > 4 ? " and \(missing.count - 4) more" : ""
-        return "Missing from the project: \(names)\(more)."
+        // A font that is in the bundle but failed to REGISTER is a
+        // different failure from one that is absent, and it is the worse
+        // of the two: the file is there, nothing is missing, and the text
+        // renders in a system fallback at a weight nobody chose. The hub's
+        // game names are set in Poppins-Black and came back not reading
+        // black, which is precisely what that looks like — and there was
+        // no way, from a screenshot, to tell it from the weight simply
+        // being wrong.
+        let fallbacks = AppFonts.unresolvedFaces
+        var notes: [String] = []
+        if !isComplete {
+            let names = missing.prefix(4).joined(separator: ", ")
+            let more = missing.count > 4 ? " and \(missing.count - 4) more" : ""
+            notes.append("Missing from the project: \(names)\(more).")
+        }
+        if !fallbacks.isEmpty {
+            notes.append("Not rendering in their own face, so the system "
+                         + "font is standing in: "
+                         + fallbacks.joined(separator: ", ") + ".")
+        }
+        return notes.isEmpty ? nil : notes.joined(separator: " ")
     }
 }

@@ -65,6 +65,55 @@ struct GameIconView: View {
     }
 }
 
+/// A game's mark with its own silhouette traced behind it.
+///
+/// The hub needs the artwork to read against timber without being put in a
+/// box. The art is black line work on transparency, so `.renderingMode(
+/// .template)` fills its alpha — the strokes — with a flat colour, and
+/// four offset copies of that, one per diagonal, make an outline that
+/// follows the drawing instead of enclosing it.
+///
+/// Four diagonals rather than a blur: a blur of line work on wood is the
+/// smudge the drop shadow already was, and SwiftUI's `.shadow(radius:)`
+/// on a template image costs an offscreen pass per tile. Offset copies are
+/// cheap and read as a hard pixel outline, which is the house style.
+struct GameIconHalo: View {
+    let id: String
+
+    /// How far the outline sits off the line work, as a fraction of the
+    /// icon's side. Small: this traces the drawing, it does not bloom
+    /// around it.
+    private static let spread: CGFloat = 0.018
+
+    var body: some View {
+        GeometryReader { geo in
+            let step = min(geo.size.width, geo.size.height) * Self.spread
+            ZStack {
+                if let image = GameIcons.game(id) {
+                    ForEach(Array(Self.diagonals.enumerated()), id: \.offset) { _, corner in
+                        Image(uiImage: image)
+                            .renderingMode(.template)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .foregroundStyle(SmokeFloor.backdropColor.opacity(0.55))
+                            .offset(x: corner.x * step, y: corner.y * step)
+                    }
+                }
+                GameIconView(id: id)
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+        }
+    }
+
+    /// Out of the ViewBuilder: a literal array of tuples inside a ForEach
+    /// inside a GeometryReader is the shape Xcode 14.2's solver gives up
+    /// on, which is the same reason PipFace.pipOffset exists.
+    private static let diagonals: [CGPoint] = [
+        CGPoint(x: -1, y: -1), CGPoint(x: 1, y: -1),
+        CGPoint(x: -1, y: 1), CGPoint(x: 1, y: 1)
+    ]
+}
+
 /// The visible stand-in for a resource that would not load.
 private struct MissingIconView: View {
     let filename: String

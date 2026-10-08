@@ -302,15 +302,20 @@ enum HubLayout {
     // (Green, Midnight Navy and Crimson all within 0.2 of each other, so
     // the choice holds for every swatch.)
 
-    /// Behind the settings gear: white on it, so it cannot go below 0.20.
-    /// 0.30 leaves seven tenths of the grain showing and clears AA on all
-    /// eleven swatches.
-    static let chromePlate: Double = 0.30
-
-    /// Behind a tile's artwork, which is BLACK line work — so the plate is
-    /// there to give the drawing a surface, not to carry a light glyph, and
-    /// it can be as faint as the eye still reads as glass.
-    static let artworkPlate: Double = 0.10
+    /// Behind the settings gear.
+    ///
+    /// **The same number as the in-game button, deliberately.** This was
+    /// 0.30 for a measured reason — 0.85 of a near-black tone over light
+    /// timber is a dark block rather than a translucent plate — but
+    /// "matches the in-game button" was the actual requirement and 0.30
+    /// did not match it. Two controls that are the same control have to
+    /// look the same; the tone is the thing being matched, not the
+    /// translucency, and at 0.85 the white glyph sits at 10.4:1 rather
+    /// than 5.3:1, so nothing is lost on legibility either.
+    ///
+    /// If this ever moves, the in-game buttons in DiceGameShell move with
+    /// it or they stop matching again.
+    static let chromePlate: Double = 0.85
 }
 
 // MARK: - Title
@@ -387,22 +392,26 @@ private struct GameTile: View {
             // phone width there is room for artwork or for a sentence, and
             // the artwork says more.
             VStack(spacing: HubLayout.gap) {
-                // Sitting ON something rather than casting a shadow onto
-                // it. The same translucent plate the back and settings
-                // buttons wear over a playfield — the floor's own darkest
-                // tone at low opacity, with the pixelPanel bevel — so the
-                // hub's artwork reads as part of the same chrome instead of
-                // as line work floating above timber.
+                // The effect FOLLOWS THE ARTWORK, and there is no box and
+                // no shadow.
                 //
-                // This replaces a pale Elevation shadow. A drop shadow under
-                // black line work on wood was always going to be either
-                // invisible or a smudge; a plate gives the icon a surface.
-                GameIconView(id: entry.id)
+                // Both of the previous attempts put something rectangular
+                // behind a drawing that is not rectangular. A drop shadow
+                // under black line work on wood was either invisible or a
+                // smudge; the translucent plate that replaced it gave the
+                // icon a surface by drawing a box around it, which is the
+                // thing it was meant to avoid.
+                //
+                // So the silhouette does the work instead. The art is black
+                // line work on transparency, so rendering the same image as
+                // a template fills its alpha — the lines themselves — with
+                // a colour, and drawing that copy very slightly larger
+                // behind the original traces the drawing rather than
+                // boxing it. The outline is the floor's own darkest tone,
+                // the same ink the rest of the chrome uses.
+                GameIconHalo(id: entry.id)
                     .frame(width: HubLayout.iconSide(tile: side),
                            height: HubLayout.iconSide(tile: side))
-                    .pixelPanel(fill: .solid(SmokeFloor.backdropColor
-                                                .opacity(HubLayout.artworkPlate)),
-                                elevation: .piece)
 
                 Text(entry.tileName.uppercased())
                     // Black, the heaviest face in Resources — these sit on

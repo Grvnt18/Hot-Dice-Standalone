@@ -389,7 +389,17 @@ struct DiceScoreBar: View {
                         .stroke(PixelPanel.outlineColor,
                                 lineWidth: PixelPanel.cellOutline)
                 )
-                .elevated(.piece)
+                // No `.elevated(.piece)`.
+                //
+                // Elevation's offsets were doubled when the main menu
+                // asked for a shadow that read as a shadow rather than as
+                // noise, and that is a global ladder — so these small
+                // slots got the long offset too. On a shape that now fills
+                // its whole box it lands as a hard-edged copy sitting
+                // behind the die rather than as depth under it, which is
+                // the double image reported here. The fill and the outline
+                // are what make a banked die read as solid; the shadow was
+                // only ever helping.
         } else {
             // An empty slot is a hole in the panel, not a thing on it, so the
             // light runs the other way — see .pixelWell. The hairline dashed

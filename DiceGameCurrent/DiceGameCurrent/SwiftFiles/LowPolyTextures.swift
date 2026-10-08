@@ -375,7 +375,15 @@ extension LowPolyTextures {
     private static let woodGrainThick = 2
     private static let woodGrainAmplitude: CGFloat = 6.0
     private static let woodGrainCycles: CGFloat = 1.3
-    private static let woodKnotChance = 45
+    /// Per cent of planks that get a knot. **Zero.**
+    ///
+    /// The note further down said that if the knots ever read as screws
+    /// rather than grain, this is the one number to take to zero. They
+    /// did — as dots on the home page's background — so it is zero. The
+    /// drawing code below stays, because the knot is the only irregular
+    /// thing the timber has and taking it out entirely would mean
+    /// reinventing it to put one back.
+    private static let woodKnotChance = 0
     private static let woodKnotRadius: CGFloat = 5
 
     /// Boards are told apart by the WIDTH of their chamfer bands, not by

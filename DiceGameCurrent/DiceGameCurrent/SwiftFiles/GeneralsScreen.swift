@@ -374,7 +374,10 @@ struct GeneralsCardView: View {
                                 .clipShape(RoundedRectangle(
                                     cornerRadius: ControlShape.cornerRadius))
                         )
-                        .elevated(.resting)
+                        // No elevation. The card is the surface the game
+                        // is played on, not an object resting on one, and
+                        // with the doubled offsets its shadow read as a
+                        // second card behind it.
                         .padding(.horizontal, 12)
 
                     if GeneralsCardLayout.fits(in: geo.size.height) {

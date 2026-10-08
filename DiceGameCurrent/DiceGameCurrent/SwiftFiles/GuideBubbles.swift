@@ -218,10 +218,40 @@ struct GuideFigureView: View {
 /// `RoyalUrArt.draw(.rosette:)` is what paints the five flowered squares on
 /// the real board, so the guide cannot show a rosette the board does not.
 private struct RosetteFigure: View {
-    private let side: CGFloat = 92
+    /// 56, not 92. One tile is a small thing on a real board and the
+    /// figure was drawing it at the size of a playing card, which gave the
+    /// caption beside it barely a third of the row.
+    private let side: CGFloat = 56
+
+    /// Which path steps the flowers sit on, counted off the board rather
+    /// than typed.
+    ///
+    /// `RoyalUrBoard.rosettes` holds squares; a player counts STEPS. So
+    /// this walks player one's own route and reports the positions that
+    /// are marked, which is both what the rule means and what the other
+    /// figure draws. Both players share these indices — the note on
+    /// `rosettes` says so, and it is why "every fourth square" is a rule
+    /// and not a coincidence.
+    private var markedSteps: [Int] {
+        let path = RoyalUrBoard.path(for: 0)
+        var steps: [Int] = []
+        for (index, square) in path.enumerated()
+        where RoyalUrBoard.rosettes.contains(square) {
+            steps.append(index + 1)
+        }
+        return steps
+    }
+
+    private var stepList: String {
+        let steps = markedSteps.map(String.init)
+        guard let last = steps.last, steps.count > 1 else {
+            return steps.first ?? ""
+        }
+        return steps.dropLast().joined(separator: ", ") + " and " + last
+    }
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(alignment: .top, spacing: 12) {
             Canvas { context, size in
                 let rect = CGRect(origin: .zero, size: size)
                 context.fill(Path(rect), with: .color(Color(RoyalUrArt.tileBase)))
@@ -229,10 +259,22 @@ private struct RosetteFigure: View {
             }
             .frame(width: side, height: side)
 
-            Text("Land here and you roll again.")
-                .font(.poppins(13))
-                .foregroundStyle(MenuInk.text)
-                .fixedSize(horizontal: false, vertical: true)
+            // The detail a player actually needs, and all of it read from
+            // the board rather than written down beside it: WHERE the
+            // flowers are, that both players count to the same places, and
+            // that the extra roll is a whole extra turn rather than a
+            // bonus added to this one.
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Squares \(stepList) of your route are rosettes, and "
+                     + "both players count to the same four.")
+                Text("Land exactly on one and you roll again — a second "
+                     + "full turn, not an extra step on this one.")
+                Text("The last square before home is one, so a piece "
+                     + "leaving the board earns a roll on its way out.")
+            }
+            .font(.poppins(12))
+            .foregroundStyle(MenuInk.text)
+            .fixedSize(horizontal: false, vertical: true)
 
             Spacer(minLength: 0)
         }

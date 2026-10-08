@@ -336,10 +336,37 @@ struct DiceScoreBar: View {
         // Removed for instant, immediate updates.
     }
 
+    /// Which die, if any, belongs in this slot.
+    ///
+    /// The last three are RESERVED, one each for the d8, d10 and d12, and
+    /// the twelve before them take the d6s in banking order. Without that
+    /// the shapes would mean nothing: slots fill in the order dice are
+    /// banked, so a d10 banked first would land in a square and the diamond
+    /// at the end would sit empty all game.
+    private func die(at index: Int) -> Die? {
+        let reserved = [8, 10, 12]
+        if index >= totalSlots - reserved.count {
+            let sides = reserved[index - (totalSlots - reserved.count)]
+            return bankedOrder.first { $0.sides == sides }
+        }
+        var sixes = 0
+        for die in bankedOrder where die.sides == 6 {
+            if sixes == index { return die }
+            sixes += 1
+        }
+        return nil
+    }
+
+    /// The outline this slot wears — its reserved die's face, or a square.
+    private func shape(at index: Int) -> DieSlotShape {
+        let reserved = [8, 10, 12]
+        guard index >= totalSlots - reserved.count else { return .square }
+        return DieSlotShape.forSides(reserved[index - (totalSlots - reserved.count)])
+    }
+
     @ViewBuilder
     private func cell(at index: Int, width: CGFloat, height: CGFloat) -> some View {
-        if index < bankedOrder.count {
-            let die = bankedOrder[index]
+        if let die = die(at: index) {
             Text("\(die.currentValue ?? 0)")
                 .font(.poppins(17, .semibold))
                 // The die's own paired number color, not a hardcoded
@@ -351,12 +378,18 @@ struct DiceScoreBar: View {
                 .foregroundStyle(Color(hex: die.colorway.numberHex))
                 .frame(width: width, height: height)
                 // A banked die is a solid thing sitting on the panel, so it
-                // gets the panel treatment the rest of the chrome has.
-                .pixelPanel(fill: .solid(Color(hex: die.colorway.bodyHex)),
-                            elevation: .piece,
-                            radius: PixelPanel.cellRadius,
-                            outline: PixelPanel.cellOutline,
-                            bevel: PixelPanel.cellBevel)
+                // gets the panel treatment the rest of the chrome has —
+                // cut to its own face for the three that are not d6.
+                .background(
+                    DieSlot(kind: shape(at: index))
+                        .fill(Color(hex: die.colorway.bodyHex))
+                )
+                .overlay(
+                    DieSlot(kind: shape(at: index))
+                        .stroke(PixelPanel.outlineColor,
+                                lineWidth: PixelPanel.cellOutline)
+                )
+                .elevated(.piece)
         } else {
             // An empty slot is a hole in the panel, not a thing on it, so the
             // light runs the other way — see .pixelWell. The hairline dashed
@@ -365,9 +398,11 @@ struct DiceScoreBar: View {
             // device the app runs on, which is the opposite of pixel art.
             Color.clear
                 .frame(width: width, height: height)
-                .pixelWell(radius: PixelPanel.cellRadius,
-                           outline: PixelPanel.cellOutline,
-                           bevel: PixelPanel.cellBevel)
+                .overlay(
+                    DieSlot(kind: shape(at: index))
+                        .stroke(PixelPanel.outlineColor.opacity(0.55),
+                                lineWidth: PixelPanel.cellOutline)
+                )
         }
     }
 }

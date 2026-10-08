@@ -26,6 +26,33 @@ struct RoyalUrScreen: View {
     @State private var showingSettings = false
     @ObservedObject private var theme = AppTheme.shared
 
+    /// How tall the board should be so that it fills the width it is given.
+    ///
+    /// It was a flat 0.34 of the screen height, which on a phone happens to
+    /// leave the WIDTH binding — the board spans the screen and nothing
+    /// looks wrong. Turn an iPad to landscape and the height binds instead:
+    /// the board shrinks to 865pt inside 1354pt and sits in the middle of
+    /// 489pt of empty timber.
+    ///
+    /// 9.04 x 3.64 tiles is the board's own aspect — see RoyalUrLayout — so
+    /// the first term is the height at which the width is exactly used up.
+    /// It is clamped so the tray below never drops under `minimumTray`,
+    /// because a board that fills the screen by squeezing the dice out of it
+    /// is not an improvement.
+    ///
+    /// Out of the ViewBuilder because it has to be: inline, this body scored
+    /// 12 operators against a threshold of 12, which is the arithmetic
+    /// Xcode 14.2's solver gives up on.
+    static func boardHeight(in size: CGSize) -> CGFloat {
+        let minimumTray: CGFloat = 220
+        let buttonRow: CGFloat = 104
+        let usableWidth = size.width - 12
+        let fillsWidth = usableWidth / 9.04 * 3.64
+        let header = size.height * 0.15
+        let spare = size.height - header - buttonRow - minimumTray
+        return min(fillsWidth, max(spare, size.height * 0.30))
+    }
+
     private enum Phase {
         /// Waiting for the active player to throw.
         case ready
@@ -35,7 +62,7 @@ struct RoyalUrScreen: View {
         case choosing
         /// A roll with nowhere to go: pick the piece that goes backwards.
         case setback
-        /// Move made; waiting to hand over.
+        /// Move made; waiting to send the turn on.
         case scored
         /// Handover gate between turns.
         case handover
@@ -89,7 +116,7 @@ struct RoyalUrScreen: View {
                 // tiles become 92.2pt on an 11-inch iPad. The tray still
                 // keeps more height than the board at every size, which
                 // it has to: five d4s are thrown in it.
-                let boardHeight = geo.size.height * 0.34
+                let boardHeight = RoyalUrScreen.boardHeight(in: geo.size)
                 let buttonHeight: CGFloat = 104
                 let trayHeight = max(geo.size.height - headerHeight - boardHeight - buttonHeight, 0)
 
@@ -475,17 +502,16 @@ enum RoyalUrGame: SuiteGame {
     static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Game Overview",
-            body: "Two players. The dice pool is five d4, a marked points system. Three pieces per player on a shared 16-square track. The first player to bring 2 pieces home wins.",
-            figure: .royalUrPath
+            body: "  * Players: 2.\n  * Dice Pool: 5x d4 (marked points system).\n  * Pieces: 3 pieces per player on shared 16-square track.\n  * Objective: First player to bring 2 pieces home wins."
         ),
         GameRuleSection(
             title: "Movement Dice Calculation",
-            body: "Roll five d4 and count the total upward-facing marked points, 0 to 5, for your distance. Zero marked points means 0 squares and triggers the Setback Rule. One to five marked points moves one piece that standard distance."
+            body: "  Roll 5x d4. Count total upward-facing marked points (0 to 5) for distance.\n\n  Marked Points   Movement Distance   Special Effect\n  -----------------------------------------------------------------------------\n  0               0 Squares           Triggers Setback Rule\n  1 to 5          1 to 5 Squares      Move one piece standard distance"
         ),
         GameRuleSection(
-            title: "Movement and Board Mechanics",
-            body: "Move a single piece the full exact count rolled, and an exact count is required to enter or land home. You cannot land on your own pieces. Capture: landing on an opponent's piece sends it back to the start. Rosettes, on squares 4, 8, 12 and 16, grant an extra roll when you land on one. Setback Rule: rolling 0, or having no legal moves, forces you to move one of your own pieces backward 4 squares, or to the start if that square is occupied.",
-            figure: .rosette
+            title: "Movement & Board Mechanics",
+            body: "  * Move a single piece full exact count rolled. Exact count to enter/land home.\n  * Cannot land on your own pieces.\n  * Capture: Landing on opponent's piece sends it back to start.\n  * Rosettes (Squares 4, 8, 12, 16): Landing on a Rosette grants extra roll.\n  * Setback Rule: Rolling 0 or having no legal moves forces player to move one of\n    their own pieces backward 4 squares (or to start if occupied).",
+            figures: [.royalUrPath, .rosette]
         )
     ]
 }

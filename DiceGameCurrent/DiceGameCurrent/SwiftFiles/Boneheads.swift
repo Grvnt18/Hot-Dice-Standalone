@@ -219,24 +219,24 @@ enum BoneheadsGame: SuiteGame {
     static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Game Overview",
-            body: "Two players. The board gives each player 3 columns — A, B and C — of 3 slots each, nine slots in all. Fill every slot while maximising your column scoring multipliers and destroying your opponent's dice."
+            body: "  * Players: 2.\n  * Board Layout: 3 columns per player (A, B, C), 3 slots each (9 slots total).\n  * Objective: Fill all slots while maximizing column scoring multipliers and\n    destroying opponent dice."
         ),
         GameRuleSection(
             title: "Turn Mechanics",
-            body: "Roll one d6 and place it into any available slot in your columns to end the turn."
+            body: "  Roll 1x d6 and place it into any available slot in your columns to end turn."
         ),
         GameRuleSection(
             title: "Column Stacking Multipliers",
-            body: "Matching numbers in the same column multiply their combined value: Column Score = (Die Face x Occurrences) x Occurrences. A single die is its face value, at 1x. A pair is (Face x 2) x 2. A triple is (Face x 3) x 3.",
-            figure: .boneheadsScoring
+            body: "  Matching numbers in same column multiply combined value:\n    Column Score = (Die Face x Occurrences) x Occurrences\n    * Single Die: Face Value (1x)\n    * Pair: (Face x 2) x 2\n    * Triple: (Face x 3) x 3",
+            figures: [.boneheadsScoring]
         ),
         GameRuleSection(
             title: "Smashing Mechanic",
-            body: "Placing a die in a column destroys all matching dice in your opponent's directly opposing column. Their remaining dice collapse down to fill the gaps."
+            body: "  Placing a die in a column destroys all matching dice in opponent's directly\n  opposing column. Remaining opponent dice collapse down to fill gaps."
         ),
         GameRuleSection(
             title: "Game End",
-            body: "The game ends immediately when either player fills their ninth slot. Highest score wins."
+            body: "  Game ends immediately when either player fills their 9th slot. Highest score wins."
         )
     ]
 }

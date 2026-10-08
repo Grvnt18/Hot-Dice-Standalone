@@ -283,10 +283,12 @@ Match these or the handoff reads as a jump:
     a near-miss photograph reads as the whole screen changing.
   * The mark: Resources/icon-app.png, centred HORIZONTALLY and VERTICALLY
     on the screen.
-  * Its size: HubLayout.headerMark(forWidth:), which is the same size as a
-    game tile's icon — 96pt on a 393pt-wide phone, 207pt on an iPad.
+  * Its size: HubLayout.headerMark(forWidth:), which is TWICE a tile
+    icon across — 191pt on a 393pt-wide phone, 414pt on an iPad, and
+    clamped so it never exceeds the grid's own width.
     In the storyboard use a width constraint proportional to the superview,
-    not a fixed number, so it tracks across devices.
+    not a fixed number, so it tracks across devices. On a 393pt phone that
+    is about 49% of the width.
   * Nothing else. No wordmark, no games, no spinner. The wordmark is part
     of the title block that travels; drawing it on the launch screen would
     make it jump when the app takes over.

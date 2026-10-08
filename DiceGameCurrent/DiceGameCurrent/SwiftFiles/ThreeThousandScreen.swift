@@ -72,7 +72,7 @@ struct ThreeThousandScreen: View {
         case rolling
         /// A roll that scores something: set dice aside, then roll on or bank.
         case choosing
-        /// Turn over — banked or busted; waiting to hand over.
+        /// Turn over — banked or busted; waiting to send it on.
         case scored
         /// Handover gate between turns.
         case handover

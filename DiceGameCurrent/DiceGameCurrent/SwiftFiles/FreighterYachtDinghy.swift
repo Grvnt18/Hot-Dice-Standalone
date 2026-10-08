@@ -221,15 +221,15 @@ enum FreighterYachtDinghyGame: SuiteGame {
     static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Game Overview",
-            body: "Two or more players, alternating turns. The dice pool is six d6. The structure is best of 3 rounds."
+            body: "  * Players: 2 or more (alternating turns).\n  * Dice Pool: 5x d6.\n  * Structure: Best of 3 rounds."
         ),
         GameRuleSection(
             title: "Turn Mechanics",
-            body: "Each player receives up to four rolls per round to unlock the cargo sequence. Freighter requires a 6. Yacht requires a 5, and must be claimed after the Freighter. Dinghy requires a 4, and must be claimed after the Yacht. Required dice are set aside automatically as they land."
+            body: "  Each player receives up to 4 rolls per round to unlock cargo sequence:\n    1. Freighter: Requires a 6.\n    2. Yacht: Requires a 5 (Must be claimed after Freighter).\n    3. Dinghy: Requires a 4 (Must be claimed after Yacht).\n  (Required dice are set aside automatically as they land)."
         ),
         GameRuleSection(
-            title: "Cargo Scoring and Rerolls",
-            body: "Once all three vessels — the 6, the 5 and the 4 — are claimed, the remaining three dice form your Cargo, and their combined total is your round score. If rolls remain within the four-roll allowance, you may re-roll all three cargo dice together, all or none. Failing to claim all three vessels within four rolls scores 0. The highest cumulative score after 3 rounds wins, and ties trigger a sudden-death round."
+            title: "Cargo Scoring & Rerolls",
+            body: "  * Once all three vessels (6, 5, and 4) are claimed, remaining two dice form Cargo.\n  * Combined total of remaining two dice is your round score.\n  * If rolls remain within 4-roll allowance, player may re-roll both cargo dice\n    together (both or neither).\n  * Failure to Qualify: Failing to claim all three vessels within 4 rolls scores 0.\n  * Resolution: Highest cumulative score after 3 rounds wins. Ties trigger\n    sudden-death round."
         )
     ]
 }

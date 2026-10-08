@@ -49,7 +49,7 @@ struct JackpotScreen: View {
         case ready
         /// Dice in the air.
         case rolling
-        /// Roll scored; waiting to hand over or finish.
+        /// Roll scored; waiting to send the turn on or finish.
         case scored
         /// Handover gate between turns.
         case handover

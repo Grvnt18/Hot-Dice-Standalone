@@ -158,7 +158,7 @@ CATEGORIES & SCORING
   Packed House      Three of one face + pair of another 25 Points
   Small Joker       Four sequential faces (1-2-3-4 etc) 30 Points
   Large Joker       Five sequential faces (1-2-3-4-5)   40 Points
-  Set of 5          All five dice showing same face     50 Points
+  General           All five dice showing same face     50 Points
 
 ZEROING
   If a hand does not qualify for an open category (or by choice), a player 

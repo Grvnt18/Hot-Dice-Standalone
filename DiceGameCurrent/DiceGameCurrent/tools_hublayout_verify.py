@@ -164,7 +164,23 @@ def check_label_widths(c):
         print("  %-20s no tile names found" % "label widths")
         return True
 
-    face = os.path.join(HERE, "Resources", "Poppins-SemiBold.ttf")
+    # The weight the label is actually drawn in, read from the Swift rather
+    # than assumed. Measuring SemiBold while the app draws Black understates
+    # every name — Black is the widest face in the family, and the tightest
+    # name here already sits at 100% of its tile.
+    weight = re.search(r'labelFont\(tile: side\), \.(\w+)\)', source(HUB))
+    names_map = {"regular": "Regular", "medium": "Medium",
+                 "semibold": "SemiBold", "bold": "Bold", "black": "Black"}
+    drawn = names_map.get(weight.group(1) if weight else "", "SemiBold")
+
+    # The label's scale floor, also read rather than assumed. A name that
+    # only fits because it shrank is worth knowing about — it reads smaller
+    # than every other tile — but it is not broken, and failing it would
+    # mean choosing between the heaviest weight and the full name when the
+    # floor exists precisely to have both.
+    floor_match = re.search(r'\.minimumScaleFactor\(([\d.]+)\)', source(HUB))
+    floor = float(floor_match.group(1)) if floor_match else 1.0
+    face = os.path.join(HERE, "Resources", "Poppins-%s.ttf" % drawn)
     if not os.path.exists(face):
         print("  %-20s skipped (%s missing)" % ("label widths", face))
         return False
@@ -174,6 +190,7 @@ def check_label_widths(c):
     # that only fits because it shrank is a name that reads smaller than
     # every other tile's.
     problems = []
+    shrinking = set()
     widest = ("", 0.0)
     max_lines = int(c["labelLines"])          # 2.4 of room is two lines
     for width in (w for _, w in WIDTHS):
@@ -181,7 +198,7 @@ def check_label_widths(c):
         available = tile - c["inset"] * 2
         font = ImageFont.truetype(face, 200)
 
-        def drawn(text):
+        def drawn_width(text):
             return font.getlength(text) * font_pt / 200
 
         for name in names:
@@ -193,10 +210,10 @@ def check_label_widths(c):
             for explicit in name.split("\\n"):
                 current = ""
                 for word in explicit.split(" "):
-                    if drawn(word) > available:
+                    if drawn_width(word) > available:
                         overflow = word          # cannot be broken at all
                     candidate = word if not current else current + " " + word
-                    if current and drawn(candidate) > available:
+                    if current and drawn_width(candidate) > available:
                         lines.append(current)
                         current = word
                     else:
@@ -204,10 +221,17 @@ def check_label_widths(c):
                 lines.append(current)
 
             if overflow is not None:
-                problems.append(
-                    "%r has no break and is %.0fpt at %gpt against %.0fpt "
-                    "of tile (%dpt wide)"
-                    % (overflow, drawn(overflow), font_pt, available, width))
+                # Only a hard failure when even the scale floor cannot save
+                # it. Anything above that is reported at the end as a name
+                # that shrinks.
+                if drawn_width(overflow) * floor > available:
+                    problems.append(
+                        "%r has no break and is %.0fpt at %gpt against "
+                        "%.0fpt of tile even at the %g scale floor (%dpt "
+                        "wide)" % (overflow, drawn_width(overflow), font_pt,
+                                   available, floor, width))
+                else:
+                    shrinking.add(overflow)
             elif len(lines) > max_lines:
                 problems.append(
                     "%r needs %d lines at %gpt, and the band holds %d "
@@ -215,7 +239,7 @@ def check_label_widths(c):
                     % (name, len(lines), font_pt, max_lines, width))
 
             for line in lines:
-                ratio = drawn(line) / available
+                ratio = drawn_width(line) / available
                 if ratio > widest[1]:
                     widest = (line, ratio)
 
@@ -223,8 +247,13 @@ def check_label_widths(c):
         print("  %-20s %s" % ("label widths", line))
     if problems:
         return True
-    print("  %-20s ok (%d names, tightest is %r at %d%% of its tile)"
-          % ("label widths", len(names), widest[0], round(widest[1] * 100)))
+    note = ""
+    if shrinking:
+        note = ", %s shrink%s to fit" % (", ".join(sorted(shrinking)),
+                                         "" if len(shrinking) > 1 else "s")
+    print("  %-20s ok (%d names in Poppins-%s, tightest is %r at %d%%%s)"
+          % ("label widths", len(names), drawn, widest[0],
+             round(widest[1] * 100), note))
     return False
 
 

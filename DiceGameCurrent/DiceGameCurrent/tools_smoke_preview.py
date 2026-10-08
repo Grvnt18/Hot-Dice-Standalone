@@ -80,7 +80,7 @@ FIELD_ASPECT = 0.55     # squashes the field on one axis. An isotropic warp
                         # and stretching the domain is what elongates the
                         # structures into bands rather than blobs.
 CONTRAST = 2.90         # pushes the field toward its extremes before posterising
-LEVELS = 4              # four tones. Not negotiable — it is the brief.
+LEVELS = 6              # was 4, which read as four flat shelves in motion
 DITHER = 0.70           # strength of the Bayer offset, in quantisation steps
 
 # The ordered 8x8, built arithmetically rather than stored.

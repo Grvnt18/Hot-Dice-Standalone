@@ -247,7 +247,7 @@ private struct RoyalUrPathFigure: View {
             }
             .frame(height: 112)
 
-            Text("Your route is numbered 1 to 16. The middle row is shared — that is the only place a piece can be captured.")
+            Text("Your route runs from START to END. The middle row is shared — that is the only place a piece can be captured.")
                 .font(.poppins(12))
                 .foregroundStyle(MenuInk.dim)
                 .fixedSize(horizontal: false, vertical: true)
@@ -278,18 +278,43 @@ private struct RoyalUrPathFigure: View {
                            lineWidth: 1)
         }
 
-        // Seat 0's numbers only. Seat 1 walks the mirror of this, so two
-        // sets of numerals would say the same thing twice and leave no room
-        // in a cell this size.
+        // The route as a route, rather than as sixteen numerals.
+        //
+        // Numbering every square asked the reader to find 1, then 2, then 3
+        // — which is the work the diagram was supposed to do for them. A
+        // line does it at a glance, and the only labels left are the two
+        // that matter: where a piece comes on, and where it leaves.
         let path = RoyalUrBoard.path(for: RoyalUrBoard.bottomSeat)
+        var route = Path()
         for (offset, square) in path.enumerated() {
-            let rect = frame(square)
-            let text = Text("\(offset + 1)")
-                .font(.poppins(9, .bold))
-                .foregroundColor(RoyalUrArt.ink)
-            context.draw(context.resolve(text),
-                         at: CGPoint(x: rect.midX, y: rect.midY))
+            let centre = CGPoint(x: frame(square).midX, y: frame(square).midY)
+            if offset == 0 { route.move(to: centre) } else { route.addLine(to: centre) }
         }
+        context.stroke(
+            route,
+            with: .color(RoyalUrArt.seatColor(RoyalUrBoard.bottomSeat)),
+            style: StrokeStyle(lineWidth: max(2, cell * 0.10),
+                               lineCap: .round, lineJoin: .round,
+                               dash: [cell * 0.22, cell * 0.16]))
+
+        guard let first = path.first, let last = path.last else { return }
+        marker("START", at: frame(first), in: context, cell: cell)
+        marker("END", at: frame(last), in: context, cell: cell)
+    }
+
+    /// A label over the square it names, dark on the seat's colour so it
+    /// reads against both the tile and a rosette.
+    private static func marker(_ text: String, at rect: CGRect,
+                               in context: GraphicsContext, cell: CGFloat) {
+        let seat = RoyalUrArt.seatColor(RoyalUrBoard.bottomSeat)
+        let pill = CGRect(x: rect.midX - cell * 0.44, y: rect.midY - cell * 0.20,
+                          width: cell * 0.88, height: cell * 0.40)
+        context.fill(Path(roundedRect: pill, cornerRadius: 2), with: .color(seat))
+        let label = Text(text)
+            .font(.poppins(8, .black))
+            .foregroundColor(.white)
+        context.draw(context.resolve(label),
+                     at: CGPoint(x: pill.midX, y: pill.midY))
     }
 }
 
@@ -312,10 +337,18 @@ private struct BoneheadsScoringFigure: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(Array(BoneheadsScoringFigure.columns.enumerated()), id: \.offset) { index, column in
-                BoneheadsColumnRow(label: BoneheadsRules.name(of: index),
-                                   dice: column)
+        VStack(alignment: .leading, spacing: 10) {
+            // Columns across, dice DOWN — which is how a Boneheads column
+            // is actually stacked, and how the worked chart this came from
+            // is laid out. The first version ran each column's dice
+            // left-to-right, so the picture disagreed with the board it was
+            // explaining.
+            HStack(alignment: .top, spacing: 14) {
+                ForEach(Array(BoneheadsScoringFigure.columns.enumerated()), id: \.offset) { index, column in
+                    BoneheadsColumnStack(label: BoneheadsRules.name(of: index),
+                                         dice: column)
+                }
+                Spacer(minLength: 0)
             }
 
             Divider().overlay(MenuInk.dim)
@@ -327,9 +360,8 @@ private struct BoneheadsScoringFigure: View {
     }
 }
 
-/// One column of the worked example: its dice, each die's contribution, and
-/// the column's score.
-private struct BoneheadsColumnRow: View {
+/// One column of the worked example, stacked the way the board stacks it.
+private struct BoneheadsColumnStack: View {
     let label: String
     let dice: [Int]
 
@@ -339,25 +371,293 @@ private struct BoneheadsColumnRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 6) {
+        VStack(spacing: 5) {
             Text(label)
-                .font(.poppins(12, .bold))
+                .font(.poppins(11, .bold))
                 .foregroundStyle(MenuInk.dim)
-                .frame(width: 16, alignment: .leading)
 
             ForEach(Array(dice.enumerated()), id: \.offset) { _, die in
-                PipFace(value: die, tint: MenuInk.text)
-                    .frame(width: 22, height: 22)
-                Text("x\(occurrences(of: die))")
-                    .font(.poppins(11))
-                    .foregroundStyle(MenuInk.dim)
+                HStack(spacing: 4) {
+                    // Flat: no plate, no bevel, no shadow. A diagram of a
+                    // rule is a diagram, and the drop shadow that makes a
+                    // die read as a physical object on the board makes it
+                    // read as blur at this size.
+                    PipFace(value: die, tint: MenuInk.text)
+                        .frame(width: 24, height: 24)
+                    Text("x\(occurrences(of: die))")
+                        .font(.poppins(11))
+                        .foregroundStyle(MenuInk.dim)
+                }
             }
-
-            Spacer(minLength: 4)
 
             Text("= \(BoneheadsRules.columnScore(dice))")
                 .font(.poppins(13, .bold))
                 .foregroundStyle(MenuInk.text)
+                .padding(.top, 2)
         }
+    }
+}
+
+// MARK: - Laying out the document's own lines
+
+/// One line of a guide section, as the rules document wrote it.
+///
+/// The guides are generated verbatim from GAME_RULES.txt — bullets, numbered
+/// steps, sub-lists and column-aligned tables included. Flattening that into
+/// paragraphs is what the first attempt did, and it lost the shape of every
+/// rule that is a list or a table.
+///
+/// So the structure is kept in the text and read back here. Nothing is
+/// reworded, reordered or summarised; the only thing this decides is how a
+/// line is drawn.
+enum GuideLine: Identifiable {
+    case heading(String)
+    case bullet(depth: Int, text: String)
+    case step(marker: String, text: String)
+    case plain(String)
+    /// A column-aligned block: the document's header row, then its rows.
+    case table(columns: [String], rows: [[String]])
+
+    var id: String {
+        switch self {
+        case .heading(let s):             return "h:" + s
+        case .bullet(let d, let s):       return "b:\(d):" + s
+        case .step(let m, let s):         return "s:" + m + s
+        case .plain(let s):               return "p:" + s
+        case .table(let c, let r):        return "t:" + c.joined() + "\(r.count)"
+        }
+    }
+}
+
+enum GuideBody {
+
+    /// Reads a section body back into lines.
+    ///
+    /// The document's conventions, and nothing cleverer: `*` starts a
+    /// bullet and its indent sets the depth, `1.` starts a numbered step, a
+    /// run of dashes turns the line above it into a table header, and a more
+    /// deeply indented line with no marker of its own continues the item
+    /// above it — which is how the document wraps long sentences.
+    static func parse(_ body: String) -> [GuideLine] {
+        var out: [GuideLine] = []
+        var pending: [[String]] = []
+        var columns: [String] = []
+        var inTable = false
+        /// Where the table's own columns start, so a wrapped cell can be
+        /// told from a new row: the document indents a continuation under
+        /// the column it belongs to, far past the first.
+        var tableIndent = 0
+
+        func closeTable() {
+            if inTable, !columns.isEmpty {
+                out.append(.table(columns: columns, rows: pending))
+            }
+            pending = []
+            columns = []
+            inTable = false
+        }
+
+        for raw in body.components(separatedBy: "\n") {
+            let line = raw.replacingOccurrences(of: "\u{00A0}", with: " ")
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+            if trimmed.isEmpty {
+                closeTable()
+                continue
+            }
+
+            // A rule of dashes promotes the line above it to a header.
+            if trimmed.allSatisfy({ $0 == "-" }), trimmed.count >= 5 {
+                if case .plain(let header)? = out.last {
+                    out.removeLast()
+                    columns = cells(header)
+                    inTable = true
+                }
+                continue
+            }
+
+            let indent = line.prefix(while: { $0 == " " }).count
+
+            if inTable {
+                // A row's last cell wrapping, not a new row. Without this
+                // the Baseball matrix grows a row reading only "even with a
+                // runner on 1st)", which is half a sentence presented as a
+                // rule of its own.
+                if indent >= tableIndent + 4, !pending.isEmpty,
+                   var last = pending.popLast() {
+                    let tail = (last.popLast() ?? "") + " " + trimmed
+                    last.append(tail)
+                    pending.append(last)
+                } else {
+                    if tableIndent == 0 { tableIndent = indent }
+                    pending.append(cells(trimmed))
+                }
+                continue
+            }
+
+            if trimmed.hasPrefix("* ") {
+                out.append(.bullet(depth: indent >= 4 ? 1 : 0,
+                                   text: String(trimmed.dropFirst(2))))
+                continue
+            }
+            if let marker = stepMarker(trimmed) {
+                out.append(.step(marker: marker,
+                                 text: String(trimmed.dropFirst(marker.count + 1))
+                                        .trimmingCharacters(in: .whitespaces)))
+                continue
+            }
+            // A continuation of whatever came before it.
+            if indent >= 4, let last = out.last {
+                out.removeLast()
+                out.append(extend(last, with: trimmed))
+                continue
+            }
+            out.append(.plain(trimmed))
+        }
+        closeTable()
+        return out
+    }
+
+    /// `  1.` and friends. Nil when the line does not start with one.
+    private static func stepMarker(_ text: String) -> String? {
+        var digits = ""
+        for character in text {
+            if character.isNumber { digits.append(character) }
+            else if character == "." && !digits.isEmpty { return digits + "." }
+            else { return nil }
+        }
+        return nil
+    }
+
+    private static func extend(_ line: GuideLine, with text: String) -> GuideLine {
+        switch line {
+        case .bullet(let depth, let body): return .bullet(depth: depth, text: body + " " + text)
+        case .step(let marker, let body):  return .step(marker: marker, text: body + " " + text)
+        case .plain(let body):             return .plain(body + " " + text)
+        case .heading, .table:             return line
+        }
+    }
+
+    /// Columns are separated by two or more spaces, which is what the
+    /// document's alignment actually means.
+    private static func cells(_ text: String) -> [String] {
+        var out: [String] = []
+        var current = ""
+        var spaces = 0
+        for character in text {
+            if character == " " {
+                spaces += 1
+                continue
+            }
+            if spaces >= 2, !current.isEmpty {
+                out.append(current.trimmingCharacters(in: .whitespaces))
+                current = ""
+            } else if spaces > 0, !current.isEmpty {
+                current += " "
+            }
+            spaces = 0
+            current.append(character)
+        }
+        if !current.isEmpty {
+            out.append(current.trimmingCharacters(in: .whitespaces))
+        }
+        return out
+    }
+}
+
+/// Draws a section's lines: bullets as bullets, steps as steps, tables as
+/// rows. Nothing here changes a word.
+struct GuideBodyView: View {
+    let body0: String
+
+    private var lines: [GuideLine] { GuideBody.parse(body0) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            ForEach(lines) { line in
+                row(line)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func row(_ line: GuideLine) -> some View {
+        switch line {
+        case .heading(let text), .plain(let text):
+            Text(text)
+                .font(.poppins(14))
+                .foregroundStyle(MenuInk.text)
+                .fixedSize(horizontal: false, vertical: true)
+
+        case .bullet(let depth, let text):
+            marked("•", text, indent: CGFloat(depth) * 14)
+
+        case .step(let marker, let text):
+            marked(marker, text, indent: 0)
+
+        case .table(let columns, let rows):
+            GuideTableView(columns: columns, rows: rows)
+        }
+    }
+
+    /// A marker in its own column so the wrapped text lines up under itself
+    /// rather than under the bullet.
+    private func marked(_ marker: String, _ text: String,
+                        indent: CGFloat) -> some View {
+        HStack(alignment: .top, spacing: 6) {
+            Text(marker)
+                .font(.poppins(14, .semibold))
+                .foregroundStyle(MenuInk.dim)
+                .frame(minWidth: 16, alignment: .leading)
+            Text(text)
+                .font(.poppins(14))
+                .foregroundStyle(MenuInk.text)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.leading, indent)
+    }
+}
+
+/// A table from the document, as rows rather than as aligned columns.
+///
+/// The document aligns with spaces, which needs a fixed-width face and more
+/// width than a phone has. The words and their order are the document's; the
+/// fitting is this view's. Each row leads with its first cell — the thing
+/// being looked up — and the rest follow it.
+private struct GuideTableView: View {
+    let columns: [String]
+    let rows: [[String]]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if columns.count > 1 {
+                Text(columns.joined(separator: " · "))
+                    .font(.poppins(10, .semibold))
+                    .foregroundStyle(MenuInk.dim)
+                    .padding(.bottom, 4)
+            }
+
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, cells in
+                HStack(alignment: .top, spacing: 8) {
+                    Text(cells.first ?? "")
+                        .font(.poppins(12, .semibold))
+                        .foregroundStyle(MenuInk.text)
+                        .frame(width: 96, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text(cells.dropFirst().joined(separator: " — "))
+                        .font(.poppins(12))
+                        .foregroundStyle(MenuInk.dim)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.vertical, 3)
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .pixelWell(radius: ControlShape.cornerRadius)
     }
 }

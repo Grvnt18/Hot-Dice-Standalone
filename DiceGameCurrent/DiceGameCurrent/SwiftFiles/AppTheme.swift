@@ -37,7 +37,7 @@ final class AppTheme: ObservableObject {
     /// whole set, at ~11) — genuinely hard to tell apart in the picker,
     /// unlike everything that remains.
     static let swatches: [Swatch] = [
-        Swatch(hex: "#36F422", name: "Green"),
+        Swatch(hex: "#006B38", name: "Green"),
         Swatch(hex: "#1B2A4A", name: "Midnight Navy"),
         Swatch(hex: "#2952CC", name: "Royal Blue"),
         Swatch(hex: "#5B2C91", name: "Deep Violet"),

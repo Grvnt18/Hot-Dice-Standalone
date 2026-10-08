@@ -76,11 +76,11 @@ enum HogGame: SuiteGame {
     static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Game Overview",
-            body: "Two or more players, alternating turns. The dice pool is one d6. The first player to bank 75 points wins instantly."
+            body: "  * Players: 2 or more (alternating turns).\n  * Dice Pool: 1x d6.\n  * Objective: First player to bank 75 points wins instantly."
         ),
         GameRuleSection(
             title: "Turn Mechanics",
-            body: "Roll the die. On a roll of 2 to 6, add the value to your running turn total, then choose to roll again or hold. On a roll of 1, the Hog, the turn ends immediately and all points accumulated during that turn are lost — your banked score is unaffected. Hold to bank the running turn total into your overall score and end the turn."
+            body: "  1. Roll the die.\n  2. Roll 2-6: Add value to running turn total. Choose to roll again or hold.\n  3. Roll 1 (The Hog): Turn ends immediately and all points accumulated during\n     that turn are lost. Banked score is unaffected.\n  4. Hold: Bank running turn total into overall score and end turn."
         )
     ]
 }

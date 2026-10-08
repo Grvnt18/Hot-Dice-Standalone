@@ -53,7 +53,7 @@ struct GeneralsScreen: View {
         case rolling
         /// A hand on the table: keep dice and roll again, or go and claim.
         case decide
-        /// Category claimed; waiting to hand over or finish.
+        /// Category claimed; waiting to send the turn on or finish.
         case scored
         /// Handover gate between turns.
         case handover

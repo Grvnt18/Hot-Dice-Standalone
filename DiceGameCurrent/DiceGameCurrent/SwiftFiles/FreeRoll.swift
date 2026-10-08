@@ -115,11 +115,7 @@ enum FreeRollGame: SuiteGame {
     static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Overview",
-            body: "One player. The pool limit is up to \(FreeRollPool.maxDice) total dice, a selectable mix of d4, d6, d8, d10, d12 and d20. This is an open sandbox mode without scoring, win conditions or turn limits."
-        ),
-        GameRuleSection(
-            title: "Totals",
-            body: "There is an optional subtotals toggle per die type. Totals is off by default."
+            body: "  * Players: 1.\n  * Pool Limit: Up to 20 total dice (Selectable mix of d4, d6, d8, d10, d12, d20).\n  * Function: Open sandbox mode without scoring, win conditions, or turn limits.\n    Includes optional subtotals toggle per die type."
         )
     ]
 }

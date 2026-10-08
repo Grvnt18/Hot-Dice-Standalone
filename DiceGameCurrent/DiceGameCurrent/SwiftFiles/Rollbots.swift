@@ -413,19 +413,19 @@ enum RollbotsGame: SuiteGame {
     static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Game Overview",
-            body: "Two players. Starting health is \(RollbotsRules.startingIP) Integrity Points each, and Player 2 starts with \(RollbotsState.startingIP(1)) IP. Reduce your opponent's IP to zero."
+            body: "  * Players: 2.\n  * Starting Health: 16 Integrity Points (IP) each (Player 2 starts with 17 IP).\n  * Objective: Reduce opponent's IP to zero."
         ),
         GameRuleSection(
             title: "Loadout Selection",
-            body: "Each player selects 1 Weapon and 1 Cyberware Ability at match start. Mono-Blade, a d8, bypasses 50% of the target's Firewall. Smart Pistol, a d6, doubles damage if the Accuracy roll is 7 or higher, and that critical damage bypasses 50% of Firewall. Rail Rifle, a d12, bypasses Firewall completely but requires 1 turn to charge before firing. Sidearm, a d4, is the default fallback weapon when the primary weapon is disabled."
+            body: "  Each player selects 1 Weapon and 1 Cyberware Ability at match start.\n\n  Weapons:\n    * Mono-Blade (d8): Bypasses 50% of target's Firewall.\n    * Smart Pistol (d6): Damage doubles if Accuracy roll is 7+; critical\n      damage bypasses 50% of Firewall.\n    * Rail Rifle (d12): Bypasses Firewall completely. Requires 1 turn to\n      charge before firing.\n    * Sidearm (d4): Default fallback weapon when primary weapon is disabled."
         ),
         GameRuleSection(
             title: "Combat Cycle",
-            body: "The attacker rolls the Accuracy die, a d10, and the assigned Weapon Damage die together, confirming the attack to resolve it. The defender then chooses: Dodge, a d6, must roll higher than the attacker's Accuracy to negate all damage, where ties or lower take full damage; or Firewall, a d8, subtracts the Firewall roll from incoming damage, and a natural 8, a Hard Lockdown, negates all damage completely."
+            body: "  1. Attacker: Rolls Accuracy die (d10) and assigned Weapon Damage die together,\n     confirming attack to resolve.\n  2. Defender Choice:\n       * Dodge (d6): Roll higher than attacker's Accuracy to negate all damage.\n         Ties or lower take full damage.\n       * Firewall (d8): Subtract Firewall roll from incoming damage. Natural 8\n         (Hard Lockdown) negates all damage completely."
         ),
         GameRuleSection(
-            title: "Cyberware Abilities",
-            body: "One-time use per match. Neural Overclock: the next attack deals forced Accuracy 10, bypasses Firewall and lets the Rail fire without charging — the drawback is that it disables defence options on your opponent's next turn. Corrosive Virus: deals 3 IP damage per turn at the start of your opponent's next 3 turns — roll a d6 on activation, and on a 1 or 2 the virus turns back on you. Quantum Phase: defence uses a d12, and beating the accuracy negates the damage and counter-attacks for 4 IP — failing the roll means taking double damage from the attack. Emergency Sub-Routine: immediately repairs 8 IP, and downgrades your weapon to the Sidearm, a d4, for 4 turns."
+            title: "Cyberware Abilities (One-Time Use per Match)",
+            body: "  Ability                 Effect                              Drawback / Cost\n  -----------------------------------------------------------------------------\n  Neural Overclock        Next attack deals forced Acc 10,    Disables defense\n                          bypasses Firewall, Rail fires       options on opponent's\n                          without charging.                   next turn.\n\n  Corrosive Virus         Deals 3 IP damage/turn at start     Roll d6 on activation:\n                          of opponent's next 3 turns.         1 or 2 turns virus\n                                                              back on self.\n\n  Quantum Phase           Defense uses d12. Beating           Failing roll causes\n                          accuracy negates damage and         taking double damage\n                          counter-attacks for 4 IP.           from attack.\n\n  Emergency Sub-Routine   Immediately repairs 8 IP.           Downgrades weapon to\n                                                              Sidearm (d4) for 4\n                                                              turns."
         )
     ]
 }

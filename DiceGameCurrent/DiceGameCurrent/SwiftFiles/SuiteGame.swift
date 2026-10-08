@@ -101,13 +101,16 @@ struct GameRuleSection: Identifiable {
     /// picture in their head, and the Boneheads one is arithmetic nobody
     /// should have to run by hand to understand the rule.
     ///
-    /// Nil for the other fifty-odd sections, which say what they mean.
-    var figure: GuideFigure? = nil
+    /// Empty for the other fifty-odd sections, which say what they mean.
+    ///
+    /// A list rather than one: Royal UR's movement rule needs the route AND
+    /// what a rosette does, and they illustrate the same paragraph.
+    var figures: [GuideFigure] = []
 
-    init(title: String, body: String, figure: GuideFigure? = nil) {
+    init(title: String, body: String, figures: [GuideFigure] = []) {
         self.title = title
         self.body = body
-        self.figure = figure
+        self.figures = figures
     }
 
     /// Titles are unique within a game, which is all ForEach needs.
@@ -245,31 +248,27 @@ enum BaseballDiceGame: SuiteGame {
     static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Game Overview",
-            body: "Two players. Player 1 pitches first; Player 2 bats first, for the home team advantage. Length is selected before the match starts — 3, 6 or 9 innings — with three outs per half-inning. Score the most runs by matching pitch and swing tactics."
+            body: "  * Players: 2. Player 1 pitches first; Player 2 bats first (Home Team advantage).\n  * Length: Selected before match start (3, 6, or 9 innings). Three outs per half-inning.\n  * Objective: Score the most runs by matching pitch and swing tactics."
         ),
         GameRuleSection(
             title: "Turn Structure",
-            body: "The pitcher secretly selects a Pitching Style for the entire half-inning, confirming their choice to end the step. For each at-bat the batter chooses a Swing without seeing the pitch; the pitch is drawn automatically based on the pitcher's style, and both dice are rolled simultaneously. Upon the third out the half-inning ends, roles swap, and the new pitcher selects their Pitching Style."
+            body: "  1. Pitcher Style Selection: The pitcher secretly selects a Pitching Style for\n     the entire half-inning, confirming their choice to end the step.\n  2. At-Bat Execution: For each at-bat, the batter chooses a Swing without seeing\n     the pitch. The pitch is drawn automatically based on the pitcher’s\n     style, and both dice are rolled simultaneously.\n  3. Inning Handover: Upon the third out, the half-inning ends. Roles swap,\n     and the new pitcher selects their Pitching Style."
         ),
         GameRuleSection(
-            title: "Pitching Styles",
-            body: "Power Pitcher: heavy emphasis on Fastballs, secondary Changeup and Slider. Crafty: heavy emphasis on Changeups, secondary Fastball and Slider. Breaking Ball: heavy emphasis on Sliders, secondary Fastball and Changeup."
+            title: "Pitching Styles & Swing Matchups",
+            body: "  Pitching Styles:\n    * Power Pitcher: Heavy emphasis on Fastballs; secondary Changeup and Slider.\n    * Crafty: Heavy emphasis on Changeups; secondary Fastball and Slider.\n    * Breaking Ball: Heavy emphasis on Sliders; secondary Fastball and Changeup.\n\n  Strategic Cycle:\n    * Fastball beats Power Swing | Loses to Patient Swing\n    * Changeup beats Patient Swing | Loses to Contact Swing\n    * Slider beats Contact Swing | Loses to Power Swing"
         ),
         GameRuleSection(
-            title: "Strategic Cycle",
-            body: "Fastball beats Power Swing and loses to Patient Swing. Changeup beats Patient Swing and loses to Contact Swing. Slider beats Contact Swing and loses to Power Swing."
+            title: "Dice & Matchup Mechanics",
+            body: "  Matchup Type                        Batter Dice               Pitcher Dice\n  -----------------------------------------------------------------------------\n  Favoured (Swing Beats Pitch)        2x Swing Die (Keep High)  1d4\n  Even (Neutral Matchup)              1x Swing Die              1d8\n  Unfavoured: Fastball vs. Power      1d12                      2d12 (Keep High)\n  Unfavoured: Changeup vs. Patient    1d8                       1d10\n  Unfavoured: Slider vs. Contact      1d10                      1d12\n\n  * Base Swing Dice Sizes: Patient (1d8), Contact (1d10), Power (1d12)."
         ),
         GameRuleSection(
-            title: "Dice and Matchup Mechanics",
-            body: "Favoured, where the swing beats the pitch: 2x swing die keeping the high one, against 1d4. Even, a neutral matchup: 1x swing die against 1d8. Unfavoured Fastball against Power: 1d12 against 2d12 keeping the high one. Unfavoured Changeup against Patient: 1d8 against 1d10. Unfavoured Slider against Contact: 1d10 against 1d12. Base swing dice sizes are Patient 1d8, Contact 1d10, Power 1d12."
-        ),
-        GameRuleSection(
-            title: "Scoring Matrix",
-            body: "Take the batter roll minus the pitcher roll. -5 or lower is a Strikeout for 1 out. -4 to +1 is a Field Out for 1 out, triggering a double play if the pitcher roll is even with a runner on 1st. +2 is a Walk, batter to 1st with forced runners advancing 1 base. +3 to +4 is a Single, batter to 1st and all base runners advance 1 base. +5 is a Double, batter to 2nd and all base runners advance 2 bases. +6 is a Triple, batter to 3rd and all base runners score. +7 to +9 is a Deep Out for 1 out, and the runner on 3rd scores unless it is the third out. +10 or higher is a Home Run, batter and all base runners score."
+            title: "Scoring Matrix (Batter Roll Minus Pitcher Roll)",
+            body: "  Differential    Result        Effect\n  -----------------------------------------------------------------------------\n  -5 or lower     Strikeout     1 Out\n  -4 to +1        Field Out     1 Out (Triggers Double Play if Pitcher roll is\n                                even with a runner on 1st)\n  +2              Walk          Batter to 1st; forced runners advance 1 base\n  +3 to +4        Single        Batter to 1st; all base runners advance 1 base\n  +5              Double        Batter to 2nd; all base runners advance 2 bases\n  +6              Triple        Batter to 3rd; all base runners score\n  +7 to +9        Deep Out      1 Out; runner on 3rd scores (Unless 3rd out)\n  +10 or higher   Home Run      Batter and all base runners score"
         ),
         GameRuleSection(
             title: "Special Rules",
-            body: "Favoured Immunity: a favoured swing cannot strike out, as its minimum net value is -3. Double Maximum: rolling the maximum value on both dice during a favoured swing results in an automatic Home Run regardless of differential. Third-Out Catch: a Deep Out recorded as the third out immediately ends the half-inning, and no run scores."
+            body: "  * Favoured Immunity: A favoured swing cannot strike out (minimum net value is -3).\n  * Double Maximum: Rolling the maximum value on both dice during a favoured swing\n    results in an automatic Home Run regardless of differential.\n  * Third-Out Catch: A Deep Out recorded as the third out immediately ends\n    the half-inning; no run scores."
         )
     ]
 }
@@ -289,15 +288,15 @@ enum RollsGame: SuiteGame {
     static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Game Overview",
-            body: "Two or more players, group play compatible. The dice pool is 15 total: twelve d6, one d8, one d10 and one d12. Bank all 15 dice; lowest cumulative score wins."
+            body: "  * Players: 2 or more (group play compatible).\n  * Dice Pool: 15 total (12x d6, 1x d8, 1x d10, 1x d12).\n  * Objective: Bank all 15 dice; lowest cumulative score wins."
         ),
         GameRuleSection(
             title: "Player Turn",
-            body: "Roll all remaining active dice in the pool. Select and bank at least one die. Re-roll all unbanked dice, and repeat until all 15 dice are banked to finish the turn."
+            body: "  1. Roll all remaining active dice in the pool.\n  2. Select and bank at least one die.\n  3. Re-roll all unbanked dice. Repeat until all 15 dice are banked to\n     finish the turn."
         ),
         GameRuleSection(
             title: "Scoring Structure",
-            body: "A banked die scores based on its differential from its highest face value, and lower scores are better. The formula is Score = Max Value - Rolled Face, so a d6 rolling 6 scores 0, a d8 rolling 8 scores 0, and so on. The exception is rolling a 1, which scores penalty points equal to the die's total sides: 6 points on a d6, 8 on a d8, 10 on a d10 and 12 on a d12."
+            body: "  A banked die scores based on its differential from its highest face value.\n  Lower scores are better.\n\n  Die Type    Highest Face (0 Pts)    Penalty for Rolling a 1\n  -----------------------------------------------------------------------------\n  d6          6                       6 Points\n  d8          8                       8 Points\n  d10         10                      10 Points\n  d12         12                      12 Points\n\n  * Formula: Score = Max Value - Rolled Face\n  * Exception: Rolling a 1 scores penalty points equal to the die's total sides."
         )
     ]
 }

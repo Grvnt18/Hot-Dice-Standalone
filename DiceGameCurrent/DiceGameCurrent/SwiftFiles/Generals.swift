@@ -59,6 +59,13 @@ enum GeneralsRules {
 enum GeneralsCategory: String, CaseIterable, Codable, Identifiable {
     case ones, twos, threes, fours, fives, sixes
     case setOfThree, setOfFour, packedHouse
+    /// `setOfFive` shows as "General" and keeps its old spelling as a case.
+    ///
+    /// The raw value is the wire format: GeneralsCategory is the key type of
+    /// GeneralsCard.claims, which is Codable and travels between devices in
+    /// a turn. Renaming the case renames the key, and a card sent by one
+    /// build would not decode in the other. What a player reads is
+    /// `displayName`, and that is what changed.
     case smallJoker, largeJoker, setOfFive
 
     var id: String { rawValue }
@@ -76,7 +83,7 @@ enum GeneralsCategory: String, CaseIterable, Codable, Identifiable {
         case .packedHouse: return "Packed House"
         case .smallJoker:  return "Small Joker"
         case .largeJoker:  return "Large Joker"
-        case .setOfFive:   return "Set of 5"
+        case .setOfFive:   return "General"
         }
     }
 
@@ -264,19 +271,19 @@ enum GeneralsGame: SuiteGame {
     static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Game Overview",
-            body: "Two players. The dice pool is five d6. Twelve total turns, six per player, using a single shared scorecard in a snake turn order: P1, P2, P2, P1 and so on."
+            body: "  * Players: 2.\n  * Dice Pool: 5x d6.\n  * Structure: 12 total turns (6 per player) using a single shared scorecard\n    in a snake turn order (P1, P2, P2, P1...)."
         ),
         GameRuleSection(
             title: "Turn Structure",
-            body: "Roll all 5 dice. Optionally keep any number of dice and re-roll the rest, to a maximum of 3 rolls per turn. Claim one available category on the shared scorecard to end the turn."
+            body: "  1. Roll all 5 dice.\n  2. Optionally keep any number of dice and re-roll the rest. Max 3 rolls per turn.\n  3. Claim one available category on the shared scorecard to end turn."
         ),
         GameRuleSection(
-            title: "Categories and Scoring",
-            body: "There are twelve categories. Ones to Sixes take any dice showing the selected face, 1 to 6, and score the sum of the matching dice. Set of 3 needs three dice of the same face and scores the sum of all 5 dice. Set of 4 needs four of the same face and also scores the sum of all 5 dice. Packed House is three of one face plus a pair of another, for 25 points. Small Joker is four sequential faces, 1-2-3-4 and so on, for 30 points. Large Joker is five sequential faces, for 40 points. Set of 5 is all five dice showing the same face, for 50 points."
+            title: "Categories & Scoring",
+            body: "  Category          Qualification Requirement           Score\n  -----------------------------------------------------------------------------\n  Ones to Sixes     Any dice showing selected face (1-6) Sum of matching dice\n  Set of 3          Three dice of same face             Sum of all 5 dice\n  Set of 4          Four dice of same face              Sum of all 5 dice\n  Packed House      Three of one face + pair of another 25 Points\n  Small Joker       Four sequential faces (1-2-3-4 etc) 30 Points\n  Large Joker       Five sequential faces (1-2-3-4-5)   40 Points\n  General           All five dice showing same face     50 Points"
         ),
         GameRuleSection(
             title: "Zeroing",
-            body: "If a hand does not qualify for an open category, or by choice, a player must select an open category to claim for 0 points, permanently removing it for both players."
+            body: "  If a hand does not qualify for an open category (or by choice), a player\n  must select an open category to claim for 0 points, permanently removing it\n  for both players."
         )
     ]
 }

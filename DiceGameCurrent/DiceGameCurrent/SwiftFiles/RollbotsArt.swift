@@ -428,7 +428,7 @@ struct NetHandoverGate: View {
                         .padding(.horizontal, 28)
                 }
 
-                Text("Hand over to")
+                Text("Over to")
                     .font(.poppins(13))
                     .foregroundStyle(NetArt.text.opacity(0.6))
 

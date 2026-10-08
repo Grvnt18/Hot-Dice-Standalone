@@ -153,14 +153,16 @@ struct GameHubView: View {
             SoundEngine.shared.play(.buttonTap)
             showingSettings = true
         } label: {
+            // The same control as the one in a game — see DiceGameShell's
+            // back and settings buttons. It was a plain black wash on a
+            // rounded rectangle, which is the only chrome in the app that
+            // was neither a pixelPanel nor the floor's own tone.
             Image(systemName: "gearshape.fill")
                 .font(.system(size: 18))
-                .foregroundStyle(.white.opacity(0.75))
+                .foregroundStyle(.white.opacity(0.9))
                 .padding(9)
-                .background(
-                    Color.black.opacity(0.45),
-                    in: RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                )
+                .pixelPanel(fill: .solid(SmokeFloor.backdropColor.opacity(0.85)),
+                            elevation: .piece)
         }
         .padding(10)
     }
@@ -252,15 +254,20 @@ enum HubLayout {
         labelFont(tile: tile) * 2.4
     }
 
-    /// The suite mark above the wordmark: exactly the size of a tile's icon.
+    /// The suite mark above the wordmark: twice a tile icon across.
     ///
-    /// This was `min(max(width * 0.22, 72), 120)`, which approximated the
-    /// tiles and undershot them — 86pt on a 393pt phone where a tile's icon
-    /// is 95. Derived from the grid instead, so "the same size as the other
-    /// icons" is what the code says rather than what a constant happens to
-    /// land near, and it stays true if the grid's spacing ever moves.
+    /// It was `min(max(width * 0.22, 72), 120)`, which approximated the
+    /// tiles and undershot them, and then exactly one tile icon — which
+    /// made the suite's own mark read as a twelfth game sitting above the
+    /// eleven. At twice the width it covers about the area of the icons it
+    /// sits over and reads as the thing they belong to.
+    ///
+    /// Still derived from the grid rather than typed, so it stays true if
+    /// the spacing moves, and clamped to the grid's own width so it can
+    /// never be wider than the tiles below it.
     static func headerMark(forWidth width: CGFloat) -> CGFloat {
-        iconSide(tile: tileSide(forWidth: width))
+        let doubled = iconSide(tile: tileSide(forWidth: width)) * 2
+        return min(doubled, gridWidth(forWidth: width))
     }
 
     /// What is left for the artwork once the name has its room.
@@ -295,7 +302,9 @@ private struct HubTitle: View {
         VStack(spacing: 6) {
             GameIconView(id: "app")
                 // Proportional, like the tiles, so the mark keeps its weight
-                // against them on a phone and on an iPad alike.
+                // against them on a phone and on an iPad alike — and now
+                // about twice the area of one, so the suite's own mark is
+                // not just another tile at the top of the grid.
                 .frame(width: HubLayout.headerMark(forWidth: width),
                        height: HubLayout.headerMark(forWidth: width))
 
@@ -345,21 +354,28 @@ private struct GameTile: View {
             // phone width there is room for artwork or for a sentence, and
             // the artwork says more.
             VStack(spacing: HubLayout.gap) {
+                // Sitting ON something rather than casting a shadow onto
+                // it. The same translucent plate the back and settings
+                // buttons wear over a playfield — the floor's own darkest
+                // tone at low opacity, with the pixelPanel bevel — so the
+                // hub's artwork reads as part of the same chrome instead of
+                // as line work floating above timber.
+                //
+                // This replaces a pale Elevation shadow. A drop shadow under
+                // black line work on wood was always going to be either
+                // invisible or a smudge; a plate gives the icon a surface.
                 GameIconView(id: entry.id)
                     .frame(width: HubLayout.iconSide(tile: side),
                            height: HubLayout.iconSide(tile: side))
-                    // Through Elevation, which is the app's one shadow
-                    // system — four hand-picked values were collapsed into
-                    // it precisely so a twelfth could not be added here.
-                    //
-                    // Pale, matching the wordmark above: the artwork is
-                    // black line work, and the hub is the one screen where
-                    // the ink and the shadow would otherwise be the same
-                    // colour.
-                    .elevated(.lifted, ink: .light)
+                    .pixelPanel(fill: .solid(SmokeFloor.backdropColor.opacity(0.55)),
+                                elevation: .piece)
 
                 Text(entry.tileName)
-                    .font(.poppins(HubLayout.labelFont(tile: side), .semibold))
+                    // Black, the heaviest face in Resources — these sit on
+                    // timber under a plate and semibold was losing to both.
+                    // Capitalisation is the catalogue's own: a name is a
+                    // name, and GameCatalog already writes them as one.
+                    .font(.poppins(HubLayout.labelFont(tile: side), .black))
                     // Freighter.Yacht.Dinghy's second line lands within a
                     // point of the iPhone SE's label width. Every other name
                     // has room to spare, so this only ever fires for that

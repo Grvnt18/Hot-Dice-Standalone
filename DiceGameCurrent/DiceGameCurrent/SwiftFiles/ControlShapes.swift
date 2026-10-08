@@ -224,3 +224,71 @@ struct OverlayChromeButton: View {
         .padding(10)
     }
 }
+
+// MARK: - Die-shaped slots
+
+/// The outline a banking slot wears, by the kind of die it holds.
+///
+/// Rolls' pool is twelve d6 and one each of d8, d10 and d12, and the history
+/// grid used to draw fifteen identical rounded cells — so the three dice
+/// that are not d6 were invisible until you read their numbers. The last
+/// three slots are now reserved for them and cut to the shape of their own
+/// face: a triangle for the d8, a diamond for the d10, a pentagon for the
+/// d12.
+///
+/// Flat geometry, no curves beyond the square's existing corner: these are
+/// drawn at about 30pt and a rounded polygon at that size is mush.
+enum DieSlotShape: Equatable {
+    case square
+    case triangle
+    case diamond
+    case pentagon
+
+    /// Which shape a die of this many sides lands in.
+    static func forSides(_ sides: Int) -> DieSlotShape {
+        switch sides {
+        case 8:  return .triangle
+        case 10: return .diamond
+        case 12: return .pentagon
+        default: return .square
+        }
+    }
+}
+
+/// `DieSlotShape` as something SwiftUI can fill and stroke.
+struct DieSlot: Shape {
+    let kind: DieSlotShape
+
+    func path(in rect: CGRect) -> Path {
+        switch kind {
+        case .square:
+            return Path(roundedRect: rect, cornerRadius: PixelPanel.cellRadius)
+        case .triangle:
+            return polygon(in: rect, sides: 3)
+        case .diamond:
+            return polygon(in: rect, sides: 4)
+        case .pentagon:
+            return polygon(in: rect, sides: 5)
+        }
+    }
+
+    /// A regular polygon with a point at the top.
+    ///
+    /// Out of the switch above and written as a loop for the usual reason:
+    /// the vertices are trigonometry over an Int index, which is the shape
+    /// of expression Xcode 14.2's solver gives up on inside a ViewBuilder.
+    private func polygon(in rect: CGRect, sides: Int) -> Path {
+        let centre = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height) / 2
+        var path = Path()
+        for index in 0..<sides {
+            let turn = (Double(index) / Double(sides)) * 2 * Double.pi
+            let angle = turn - Double.pi / 2
+            let point = CGPoint(x: centre.x + radius * CGFloat(cos(angle)),
+                                y: centre.y + radius * CGFloat(sin(angle)))
+            if index == 0 { path.move(to: point) } else { path.addLine(to: point) }
+        }
+        path.closeSubpath()
+        return path
+    }
+}

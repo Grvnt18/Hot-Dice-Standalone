@@ -55,7 +55,7 @@ struct BaseballDiceScreen: View {
         case setup
         /// The pitching seat picks a style, screen turned away.
         case pickingStyle
-        /// Handing the device to the batter.
+        /// The turn is the batter's now.
         case handover
         /// The batter picks a swing, blind to the pitch.
         case swinging

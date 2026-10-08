@@ -245,7 +245,7 @@ struct BoneheadsScreen: View {
         case rolling
         /// A face is up: choose a column.
         case placing
-        /// Placed; waiting to hand over.
+        /// Placed; waiting to send the turn on.
         case placed
         /// Handover gate between turns.
         case handover

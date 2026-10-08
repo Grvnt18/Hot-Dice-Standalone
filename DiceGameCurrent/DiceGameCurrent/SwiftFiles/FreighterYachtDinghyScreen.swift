@@ -53,7 +53,7 @@ struct FreighterYachtDinghyScreen: View {
         case rolling
         /// Qualified with rolls left: rethrow the cargo, or sail.
         case decide
-        /// Turn over; waiting to hand over or finish.
+        /// Turn over; waiting to send it on or finish.
         case scored
         /// Handover gate between turns.
         case handover

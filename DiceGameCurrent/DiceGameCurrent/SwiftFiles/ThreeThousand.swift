@@ -176,19 +176,19 @@ enum ThreeThousandGame: SuiteGame {
     static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Game Overview",
-            body: "Two or more players, alternating turns. The dice pool is six d6. The first player to reach or exceed 3,000 points wins."
+            body: "  * Players: 2 or more (alternating turns).\n  * Dice Pool: 6x d6.\n  * Objective: First player to reach or exceed 3,000 points."
         ),
         GameRuleSection(
             title: "Turn Mechanics",
-            body: "Roll all active dice. Set aside at least one scoring die or valid scoring combination — every set-aside die must contribute to a valid score. Then choose to bank the accumulated points, ending the turn, or roll the remaining dice."
+            body: "  1. Roll all active dice.\n  2. Set aside at least one scoring die or valid scoring combination.\n     Every set-aside die must contribute to a valid score.\n  3. Choose to bank accumulated points (ending turn) or roll remaining dice."
         ),
         GameRuleSection(
             title: "Scoring Combinations",
-            body: "A single 1 is 100 and a single 5 is 50. Three 1s are 1,000, and three of a kind of 2s to 6s is the face value x 100. Four of a kind is 1,000, five of a kind 2,000 and six of a kind 3,000. A full straight of 1-2-3-4-5-6 is 1,500, and three pairs are 750."
+            body: "  Combination                     Points\n  -----------------------------------------------------------------------------\n  Single 1                        100\n  Single 5                        50\n  Three 1s                        1,000\n  Three-of-a-Kind (2s-6s)          Face Value x 100\n  Four-of-a-Kind                  1,000\n  Five-of-a-Kind                  2,000\n  Six-of-a-Kind                   3,000\n  Full Straight (1-2-3-4-5-6)     1,500\n  Three Pairs                     750"
         ),
         GameRuleSection(
             title: "Turn Rules",
-            body: "Busted: roll zero scoring dice and the turn ends immediately, with the turn points lost. Hot Dice: set aside all 6 dice into scoring combinations and re-roll all 6 dice to continue accumulating points in the same turn. Match End: when a player reaches 3,000 points, all other players receive one final turn in the round to attempt to beat the highest score."
+            body: "  * Bust: Roll zero scoring dice, turn ends immediately and turn points are lost.\n  * Hot Dice: Set aside all 6 dice into scoring combinations, re-roll all 6 dice\n    to continue accumulating points in the same turn.\n  * Match End: When a player reaches 3,000 points, all other players receive one\n    final turn in the round to attempt to beat the highest score."
         )
     ]
 }

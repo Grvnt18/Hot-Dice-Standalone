@@ -875,7 +875,17 @@ enum SmokeFloor {
     static let fieldScale: Float = 1.5
     static let fieldAspect: Float = 0.55
     static let contrast: Float = 2.90
-    static let levels = 4
+
+    /// Tones the floor is posterised to.
+    ///
+    /// Was four, which was the original brief and reads as four flat shelves
+    /// once the smoke is moving — the animation has somewhere to go between
+    /// them and nothing to show for it. Six keeps the posterised look while
+    /// giving the drift a wider range to travel through.
+    ///
+    /// Mirrored in tools_smoke_preview.py, which renders the same field, so
+    /// both move together or tools_smoke_verify.py says so.
+    static let levels = 6
     static let dither: Float = 0.70
 
     static let warpA: Float = 2.4
@@ -1111,5 +1121,63 @@ enum SmokeFloor {
         n += (limit - 0.5) * (dither / Float(levels - 1))
         let i = Int(n * Float(levels))
         return i < 0 ? 0 : (i > levels - 1 ? levels - 1 : i)
+    }
+}
+
+// MARK: - A pixel-block surface
+
+extension LowPolyTextures {
+
+    /// A surface of square cells, each one tone off a posterised ramp.
+    ///
+    /// `facetedSurface` builds triangles, which is the low-poly look the rest
+    /// of the suite left behind: the timber, the steel, the floor and the
+    /// dice are all pixel grids now, and the ballpark was the last surface
+    /// still made of facets. A diamond drawn in triangles reads as a
+    /// different game's art on the same screen.
+    ///
+    /// Same inputs as `facetedSurface` so the call sites barely move, and the
+    /// same `SmokeFloor.ramp` the floor posterises against — so the pitch is
+    /// lit by the same handful of tones as everything else.
+    static func pixelSurface(baseColor: UIColor,
+                             cell: CGFloat,
+                             pixelSize: CGFloat,
+                             pixelHeight: CGFloat,
+                             seed: UInt64) -> UIImage {
+        let tones = SmokeFloor.ramp(from: baseColor)
+        let columns = max(1, Int((pixelSize / cell).rounded(.up)))
+        let rows = max(1, Int((pixelHeight / cell).rounded(.up)))
+
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        format.opaque = true
+        let renderer = UIGraphicsImageRenderer(
+            size: CGSize(width: pixelSize, height: pixelHeight), format: format)
+
+        var generator = SeededGenerator(seed: seed)
+        // Drawn ahead of the render so the loop below is a fill per cell and
+        // nothing else — a renderer closure doing arithmetic is the shape
+        // Xcode 14.2's solver struggles with.
+        var picks: [Int] = []
+        picks.reserveCapacity(columns * rows)
+        for _ in 0..<(columns * rows) {
+            picks.append(Int(generator.next() % UInt64(max(1, tones.count))))
+        }
+
+        return renderer.image { context in
+            let cg = context.cgContext
+            cg.setShouldAntialias(false)
+            cg.interpolationQuality = .none
+            var index = 0
+            for row in 0..<rows {
+                for column in 0..<columns {
+                    cg.setFillColor(tones[picks[index]].cgColor)
+                    cg.fill(CGRect(x: CGFloat(column) * cell,
+                                   y: CGFloat(row) * cell,
+                                   width: cell, height: cell))
+                    index += 1
+                }
+            }
+        }
     }
 }

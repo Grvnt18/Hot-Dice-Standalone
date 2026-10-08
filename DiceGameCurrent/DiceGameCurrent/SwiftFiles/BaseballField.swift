@@ -312,19 +312,29 @@ enum BaseballField {
     /// the rest of the suite rather than merely resembling it. Portrait, so
     /// the cell counts follow the canvas and the triangles stay roughly
     /// equilateral instead of stretching into slivers.
+    /// Every surface on the pitch, as a pixel grid.
+    ///
+    /// This used to be `facetedSurface` — triangles, 22 columns wide — which
+    /// was the suite's look when the ballpark was drawn and is not any more.
+    /// The timber, the steel, the floor and the dice are all pixel grids, so
+    /// a diamond built out of facets was the one surface in the app still
+    /// speaking the old language.
+    ///
+    /// The cell is a fraction of the width rather than a fixed count, so the
+    /// blocks are the same size on a phone and an iPad instead of growing
+    /// with the canvas.
+    ///
+    /// `posterised` is gone with it: pixelSurface always draws off
+    /// SmokeFloor's ramp, because posterising some surfaces and not others
+    /// is what made the clay the one smooth thing on the pitch.
     private static func faceted(_ colour: UIColor, size: CGSize,
                                 seed: UInt64,
                                 posterised: Bool = false) -> UIImage {
-        let columns = 22
-        let rows = Int((CGFloat(columns) * size.height / size.width).rounded())
-        return LowPolyTextures.facetedSurface(
+        return LowPolyTextures.pixelSurface(
             baseColor: colour,
-            variation: 0.085,
-            columns: columns,
-            rows: rows,
+            cell: max(3, (size.width / 64).rounded()),
             pixelSize: size.width,
             pixelHeight: size.height,
-            tones: posterised ? SmokeFloor.ramp(from: colour) : nil,
             seed: seed
         )
     }

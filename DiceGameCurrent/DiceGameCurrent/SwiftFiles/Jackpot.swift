@@ -206,19 +206,19 @@ enum JackpotGame: SuiteGame {
     static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Game Overview",
-            body: "Two players, alternating turns across 5 rounds. The dice pool is one d4, one d6, one d8, one d12 and one d20. Accumulate the highest total points or trigger the instant-win Jackpot."
+            body: "  * Players: 2 (alternating turns across 5 rounds).\n  * Dice Pool: 1x d4, 1x d6, 1x d8, 1x d12, 1x d20.\n  * Objective: Accumulate highest total points or trigger instant-win Jackpot."
         ),
         GameRuleSection(
             title: "Reading the Roll",
-            body: "Each roll yields seven numbers: the 3 exposed side faces of the d4, and the top face of the d6, d8, d12 and d20."
+            body: "  Each roll yields seven numbers:\n    * The 3 exposed side faces of the d4.\n    * The top face of the d6, d8, d12, and d20."
         ),
         GameRuleSection(
-            title: "Scoring and Instant Win",
-            body: "Sets: any number appearing two or more times among the 7 exposed values scores Number Value x Occurrences. Booster: a d20 showing 13 or higher adds its raw face value to the turn score. Jackpot, an instant win, is achieved when there are zero sets across all 7 numbers and the d20 shows 12 or lower."
+            title: "Scoring & Instant Win Conditions",
+            body: "  * Sets: Any number appearing two or more times among the 7 exposed values scores:\n      Score = Number Value x Occurrences\n  * Booster: A d20 showing 13 or higher adds its raw face value to turn score.\n  * Jackpot (Instant Win): Achieved when there are ZERO sets across all 7 numbers\n    AND the d20 shows 12 or lower."
         ),
         GameRuleSection(
             title: "Match Resolution",
-            body: "An uncancelled Jackpot wins the match instantly. If a player rolls a Jackpot, all other players in the round complete their final turn. If multiple players hit a Jackpot in the same round, they cancel out and play continues. If no Jackpot is hit after 5 rounds, the highest total score wins."
+            body: "  * An uncancelled Jackpot wins the match instantly.\n  * If a player rolls a Jackpot, all other players in the round complete their final\n    turn. If multiple players hit a Jackpot in the same round, they cancel\n    out and play continues.\n  * If no Jackpot is hit after 5 rounds, the highest total score wins."
         )
     ]
 }

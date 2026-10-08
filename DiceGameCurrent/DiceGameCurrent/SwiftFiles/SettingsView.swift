@@ -493,16 +493,16 @@ struct HowToPlayView: View {
                                     .foregroundStyle(MenuInk.dim)
                                     .padding(.leading, 2)
 
-                                Text(section.body)
-                                    .font(.poppins(14))
-                                    .foregroundStyle(MenuInk.text)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                // The document's own lines — bullets,
+                                // numbered steps and tables — rather than a
+                                // paragraph made out of them.
+                                GuideBodyView(body0: section.body)
                                     .padding(12)
                                     .pixelPanel(fill: .solid(MenuInk.panel), elevation: .resting)
 
-                                // Three sections carry one — see GuideFigure.
-                                if let figure = section.figure {
+                                // A couple of sections carry one or two —
+                                // see GuideFigure.
+                                ForEach(section.figures, id: \.rawValue) { figure in
                                     GuideFigureView(figure: figure)
                                 }
                             }

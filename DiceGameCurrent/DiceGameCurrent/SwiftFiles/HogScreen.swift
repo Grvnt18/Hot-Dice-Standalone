@@ -45,7 +45,7 @@ struct HogScreen: View {
         case rolling
         /// A face is up and it was not a 1: roll on, or hold.
         case decide
-        /// Turn over; waiting to hand over.
+        /// Turn over; waiting to send it on.
         case scored
         /// Handover gate between turns.
         case handover

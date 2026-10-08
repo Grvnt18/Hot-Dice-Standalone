@@ -49,7 +49,7 @@ struct RollbotsScreen: View {
         case rollingAttack
         /// Both dice have settled and the attacker is reading them.
         ///
-        /// The game stops here rather than handing over the moment the dice
+        /// The game stops here rather than moving on the moment the dice
         /// stop moving. A roll you did not get to look at might as well have
         /// been made for you.
         case readingAttack
@@ -59,7 +59,7 @@ struct RollbotsScreen: View {
         case rollingDefence
         /// The defence die has settled and the defender is reading it.
         case readingDefence
-        /// Exchange resolved; waiting to hand over.
+        /// Exchange resolved; waiting to send the turn on.
         case resolved
         /// Match decided.
         case finished

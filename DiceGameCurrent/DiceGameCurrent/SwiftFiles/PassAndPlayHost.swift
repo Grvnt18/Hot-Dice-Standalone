@@ -175,11 +175,12 @@ struct HandoverGate: View {
                         .padding(.horizontal, 28)
                 }
 
-                // Tells the next human to pick up the device, and names
-                // them. Note this whole view is under .textCase(.uppercase),
-                // so the script's lowercase forms — most of what gives a
-                // script its character — were being discarded here anyway.
-                Text("Pass to \(match.activeDisplayName)")
+                // Names whose turn it is now. It used to read "Pass to",
+                // which describes handing a physical device across a table —
+                // true of this screen today and wrong about the game this is
+                // becoming, where a turn arrives in a message. Note the view
+                // is under .textCase(.uppercase).
+                Text("Over to \(match.activeDisplayName)")
                     .font(.poppins(46, .semibold))
                     .lineLimit(2)
                     .multilineTextAlignment(.center)

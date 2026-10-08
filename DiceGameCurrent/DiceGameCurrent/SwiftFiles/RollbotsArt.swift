@@ -69,7 +69,12 @@ enum NetArt {
     static func die(sides: Int, seat: Int) -> Die {
         Die(
             sides: sides,
-            colorway: DieColorway(bodyHex: seatHex(seat), numberHex: "#05070E")
+            // Derived rather than typed, like every other die. Both seat
+            // colours are bright, so this picks the dark ink either way —
+            // 11.07:1 on the cyan and 4.84:1 on the rose, against 12.94
+            // and 5.65 for the near-black it replaces. A shade less
+            // contrast for one rule instead of three.
+            colorway: DieColorway(bodyHex: seatHex(seat))
         )
     }
 }

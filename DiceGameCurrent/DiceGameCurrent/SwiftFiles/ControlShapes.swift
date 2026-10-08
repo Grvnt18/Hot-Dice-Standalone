@@ -256,10 +256,37 @@ enum DieSlotShape: Equatable {
 }
 
 /// `DieSlotShape` as something SwiftUI can fill and stroke.
-struct DieSlot: Shape {
+struct DieSlot: InsettableShape {
     let kind: DieSlotShape
 
-    func path(in rect: CGRect) -> Path {
+    /// How far in from the given rect to draw.
+    ///
+    /// `InsettableShape` rather than `Shape`, because a slot has to take
+    /// the same three-layer edge every other panel wears — fill, a lit
+    /// bevel inset inside the outline, then the outline — and both
+    /// `strokeBorder` and `inset(by:)` need this conformance.
+    /// `tools_cohesion_verify.py` fails a `strokeBorder` on a bare Shape
+    /// precisely so this is not worked around with a plain `stroke`, which
+    /// straddles the edge instead of sitting inside it.
+    ///
+    /// Shrinking the rect is the right inset for every shape here. For the
+    /// square it is exactly what `insetBy` means; for the three polygons it
+    /// is not a true mitred offset, but these are 1pt insets on a ~30pt
+    /// slot and the difference is below a device pixel.
+    var inset: CGFloat = 0
+
+    func inset(by amount: CGFloat) -> DieSlot {
+        var copy = self
+        copy.inset += amount
+        return copy
+    }
+
+    func path(in outer: CGRect) -> Path {
+        let rect = outer.insetBy(dx: inset, dy: inset)
+        return slotPath(in: rect)
+    }
+
+    private func slotPath(in rect: CGRect) -> Path {
         switch kind {
         case .square:
             return Path(roundedRect: rect, cornerRadius: PixelPanel.cellRadius)

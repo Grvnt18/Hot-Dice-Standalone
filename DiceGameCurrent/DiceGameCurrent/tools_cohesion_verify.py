@@ -110,6 +110,40 @@ def check_slot_shapes():
     return failed
 
 
+def check_button_chrome():
+    """No screen draws a system button.
+
+    Rolls' roll button is `.plain` + `.pixelPanel(elevation:)` — the app's
+    own chrome. The other ten games' action bar was
+    `.buttonStyle(.borderedProminent)` with a tint: a system shape, a
+    system fill, no pixel outline, no bevel and no Elevation shadow. They
+    were never going to match by tuning, because they were two different
+    button systems, and the restyle replaced that one everywhere except
+    the file nothing pointed at.
+
+    `.borderedProminent` and `.bordered` also draw their own rounded shape
+    that no amount of framing from outside can square off — the same
+    reason DiceRollButton's own note gives for not using them.
+    """
+    offenders = []
+    for filename in sorted(os.listdir(SWIFT)):
+        if not filename.endswith(".swift"):
+            continue
+        body = strip_comments(source(filename))
+        for style in (".borderedProminent", ".bordered"):
+            if "buttonStyle(%s)" % style in body:
+                offenders.append("%s uses buttonStyle(%s)"
+                                 % (filename, style))
+
+    if offenders:
+        for line in offenders:
+            print("  %-26s FAILED  %s" % ("button chrome", line))
+        return True
+    print("  %-26s ok (every button is .plain under a pixelPanel)"
+          % "button chrome")
+    return False
+
+
 def main():
     failed = []
     names = sorted(f for f in os.listdir(SWIFT) if f.endswith(".swift"))
@@ -333,7 +367,8 @@ def main():
     print("  %-26s ok (no strokeBorder on a bare Shape)" % "shape constraints")
     print("  %-26s ok (every plain Button fills its own tap target)"
           % "tap targets")
-    if check_slot_shapes():
+    failed_chrome = check_button_chrome()
+    if check_slot_shapes() or failed_chrome:
         print("cohesion: FAILED")
         sys.exit(1)
     print("cohesion: PASS")

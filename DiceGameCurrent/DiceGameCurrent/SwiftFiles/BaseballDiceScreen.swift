@@ -663,10 +663,18 @@ enum BaseballArt {
     static func die(sides: Int, isBatter: Bool) -> Die {
         Die(
             sides: sides,
+            // The ink is derived, not chosen — see DieColorway.numberHex.
+            //
+            // It was `#1B1B1F` for the batter, whose body is WHATEVER
+            // SWATCH THE PLAYER PICKED. On Onyx that is near-black
+            // numerals on a near-black die at 1.08:1, which is not a
+            // contrast problem so much as an invisible die; on Green it is
+            // 2.58:1. Twenty-four swatches against one typed ink was never
+            // going to hold, and deriving it takes the worst case to
+            // 6.10:1 and Onyx to 16.95:1.
             colorway: DieColorway(
                 bodyHex: isBatter ? AppTheme.swatches[AppTheme.shared.colorwayIndex].hex
-                                 : "#0A0A0C",
-                numberHex: isBatter ? "#1B1B1F" : "#C9B18A"
+                                 : "#0A0A0C"
             )
         )
     }

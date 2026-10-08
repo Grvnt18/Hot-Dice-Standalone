@@ -17,26 +17,95 @@ import Foundation
 /// freely chosen.
 struct DieColorway: Codable, Equatable {
     let bodyHex: String
-    let numberHex: String
+
+    /// The numeral's ink, DERIVED from the body rather than stored.
+    ///
+    /// It used to be a second hex typed beside the first, and nothing
+    /// checked the pair. Six of the fifteen colourways failed WCAG AA as a
+    /// result and five of those were plain backwards — teal `#00ADB4` and
+    /// rose `#CB7D94` carried white at 2.52:1 and 2.79:1 where the dark ink
+    /// gives 6.26:1 and 5.66:1.
+    ///
+    /// So it is computed: whichever of the two inks has more contrast
+    /// against this body wins. That makes "white numerals on a very dark
+    /// die" true by construction rather than by diligence — white always
+    /// wins on a dark body — and it cannot drift when a colourway is added.
+    ///
+    /// `#DB362C` is the one body neither ink clears 4.5:1 on; white takes
+    /// it at 4.21:1. These are large numerals, where 3:1 is the bar, and
+    /// every pairing clears that comfortably. tools_dice_verify.py asserts
+    /// both thresholds.
+    var numberHex: String {
+        DiePalette.ink(on: bodyHex)
+    }
+
+    init(bodyHex: String) {
+        self.bodyHex = bodyHex
+    }
+
+    /// Only `bodyHex` travels; the ink is recomputed on arrival.
+    private enum CodingKeys: String, CodingKey {
+        case bodyHex = "b"
+    }
 }
 
 enum DiePalette {
+
+    /// The two inks a numeral is ever drawn in.
+    static let lightInk = "#F5F5F5"
+    static let darkInk = "#1B1B1B"
+
+    /// Whichever ink reads better on this body.
+    static func ink(on bodyHex: String) -> String {
+        contrast(bodyHex, lightInk) >= contrast(bodyHex, darkInk)
+            ? lightInk
+            : darkInk
+    }
+
+    /// WCAG relative luminance, the same formula AppTheme uses to decide
+    /// black-or-white text on the accent colour. One rule for ink on a
+    /// colour, in two places that both needed it.
+    static func relativeLuminance(_ hex: String) -> Double {
+        let value = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
+        var channels: [Double] = []
+        for offset in stride(from: 0, to: 6, by: 2) {
+            let start = value.index(value.startIndex, offsetBy: offset)
+            let end = value.index(start, offsetBy: 2)
+            let byte = Int(value[start..<end], radix: 16) ?? 0
+            let raw = Double(byte) / 255.0
+            channels.append(raw <= 0.03928
+                            ? raw / 12.92
+                            : pow((raw + 0.055) / 1.055, 2.4))
+        }
+        guard channels.count == 3 else { return 0 }
+        return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
+    }
+
+    /// WCAG contrast ratio between two hex colours.
+    static func contrast(_ one: String, _ other: String) -> Double {
+        let a = relativeLuminance(one)
+        let b = relativeLuminance(other)
+        let lighter = max(a, b)
+        let darker = min(a, b)
+        return (lighter + 0.05) / (darker + 0.05)
+    }
+
     static let colorways: [DieColorway] = [
-        DieColorway(bodyHex: "#6E6456", numberHex: "#F5F5F5"),
-        DieColorway(bodyHex: "#CCDB48", numberHex: "#1B1B1B"),
-        DieColorway(bodyHex: "#CB7D94", numberHex: "#F5F5F5"),
-        DieColorway(bodyHex: "#9A593A", numberHex: "#F5F5F5"),
-        DieColorway(bodyHex: "#FDE558", numberHex: "#1B1B1B"),
-        DieColorway(bodyHex: "#A1CFDD", numberHex: "#1B1B1B"),
-        DieColorway(bodyHex: "#DB362C", numberHex: "#F5F5F5"),
-        DieColorway(bodyHex: "#FFA23F", numberHex: "#1B1B1B"),
-        DieColorway(bodyHex: "#D33AFD", numberHex: "#F5F5F5"),
-        DieColorway(bodyHex: "#7CBD7B", numberHex: "#1B1B1B"),
-        DieColorway(bodyHex: "#A88E65", numberHex: "#F5F5F5"),
-        DieColorway(bodyHex: "#D2735F", numberHex: "#F5F5F5"),
-        DieColorway(bodyHex: "#FBD365", numberHex: "#1B1B1B"),
-        DieColorway(bodyHex: "#FCFBF9", numberHex: "#1B1B1B"),
-        DieColorway(bodyHex: "#00ADB4", numberHex: "#F5F5F5")
+        DieColorway(bodyHex: "#6E6456"),
+        DieColorway(bodyHex: "#CCDB48"),
+        DieColorway(bodyHex: "#CB7D94"),
+        DieColorway(bodyHex: "#9A593A"),
+        DieColorway(bodyHex: "#FDE558"),
+        DieColorway(bodyHex: "#A1CFDD"),
+        DieColorway(bodyHex: "#DB362C"),
+        DieColorway(bodyHex: "#FFA23F"),
+        DieColorway(bodyHex: "#D33AFD"),
+        DieColorway(bodyHex: "#7CBD7B"),
+        DieColorway(bodyHex: "#A88E65"),
+        DieColorway(bodyHex: "#D2735F"),
+        DieColorway(bodyHex: "#FBD365"),
+        DieColorway(bodyHex: "#FCFBF9"),
+        DieColorway(bodyHex: "#00ADB4")
     ]
 }
 

@@ -27,11 +27,15 @@ enum Elevation {
     /// Raised across the board, because a hard-edged shadow at the old
     /// opacities reads as a smudge rather than as a silhouette. With no blur
     /// to soften it, the shadow either commits or looks like a mistake.
+    /// A quarter lighter than it was: 0.45/0.55/0.70 became 0.34/0.41/0.53.
+    /// The ladder keeps its proportions — three heights that stop being a
+    /// sequence stop being three heights, same reason `offset` was doubled
+    /// in proportion rather than only where the hub needed it.
     var opacity: Double {
         switch self {
-        case .resting: return 0.45
-        case .piece:   return 0.55
-        case .lifted:  return 0.70
+        case .resting: return 0.34
+        case .piece:   return 0.41
+        case .lifted:  return 0.53
         }
     }
 

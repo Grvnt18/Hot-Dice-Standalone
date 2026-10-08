@@ -384,22 +384,35 @@ struct DiceScoreBar: View {
                     DieSlot(kind: shape(at: index))
                         .fill(Color(hex: die.colorway.bodyHex))
                 )
+                // The same three-layer edge every other panel wears, cut
+                // to the slot's own shape: a LIT bevel inset inside the
+                // outline, then the outline over it. See PixelPanel.body —
+                // this is that composition by hand, because a slot is not
+                // a rounded rectangle.
+                //
+                // The bevel is the layer that was never here. The slot had
+                // a fill and a flat outline, which is a border; the bevel
+                // is what makes an edge read as a turned corner, and it is
+                // what the settings button has that this did not.
                 .overlay(
                     DieSlot(kind: shape(at: index))
-                        .stroke(PixelPanel.outlineColor,
-                                lineWidth: PixelPanel.cellOutline)
+                        .inset(by: PixelPanel.cellOutline)
+                        .strokeBorder(PieceSheen.bevel,
+                                      lineWidth: PixelPanel.cellBevel)
                 )
-                // No `.elevated(.piece)`.
-                //
-                // Elevation's offsets were doubled when the main menu
-                // asked for a shadow that read as a shadow rather than as
-                // noise, and that is a global ladder — so these small
-                // slots got the long offset too. On a shape that now fills
-                // its whole box it lands as a hard-edged copy sitting
-                // behind the die rather than as depth under it, which is
-                // the double image reported here. The fill and the outline
-                // are what make a banked die read as solid; the shadow was
-                // only ever helping.
+                .overlay(
+                    DieSlot(kind: shape(at: index))
+                        .strokeBorder(PixelPanel.outlineColor,
+                                      lineWidth: PixelPanel.cellOutline)
+                )
+                // And the depth back. I took this off when the slot read
+                // as a double image, which flattened it rather than fixing
+                // it: without the bevel above there was no edge for the eye
+                // to read the offset against, so the shadow was the only
+                // thing separating die from panel and it read as a second
+                // die. The shadow is also a quarter lighter now — see
+                // Elevation.opacity.
+                .elevated(.piece)
         } else {
             // An empty slot is a hole in the panel, not a thing on it, so the
             // light runs the other way — see .pixelWell. The hairline dashed
@@ -431,7 +444,9 @@ struct DiceRollButton: View {
     @ObservedObject private var theme = AppTheme.shared
 
     var body: some View {
-        VStack(spacing: 2) {
+        // See TurnActionBar: 2pt put the caption inside the 6pt shadow
+        // this button throws.
+        VStack(spacing: Elevation.lifted.offset + 2) {
             Button(action: action) {
                 Text(label)
                     .font(.poppins(15))

@@ -44,7 +44,16 @@ struct RoyalUrScreen: View {
     /// 12 operators against a threshold of 12, which is the arithmetic
     /// Xcode 14.2's solver gives up on.
     static func boardHeight(in size: CGSize) -> CGFloat {
-        let minimumTray: CGFloat = 220
+        // 190, down from 220. A correction to go with it: measured across
+        // seven devices from the iPhone SE to the iPad Pro, `fillsWidth`
+        // is the binding term at EVERY tray height from 150 to 220 — so
+        // the board was already as wide as the screen allows and this does
+        // not change it by a point. It shrinks the rolling area because
+        // that is what was asked for, and nothing else.
+        //
+        // If the board still reads as leaving space at the sides, the
+        // space is inside RoyalUrBoardView below its frame, not here.
+        let minimumTray: CGFloat = 190
         let buttonRow: CGFloat = 104
         let usableWidth = size.width - 12
         let fillsWidth = usableWidth / 9.04 * 3.64

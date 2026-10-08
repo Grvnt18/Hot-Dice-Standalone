@@ -407,10 +407,12 @@ struct GeneralsCardView: View {
                         .font(.poppins(15))
                         .frame(maxWidth: .infinity)
                         .frame(height: 46)
+                        .contentShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
                 }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.roundedRectangle(radius: ControlShape.cornerRadius))
-                .tint(.white)
+                .buttonStyle(.plain)
+                .foregroundStyle(.white)
+                .pixelPanel(fill: .solid(theme.accentColor.opacity(0.35)),
+                            elevation: .resting)
                 .padding(.horizontal, 44)
                 .padding(.bottom, 10)
             }

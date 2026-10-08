@@ -69,7 +69,11 @@ enum GameScope {
 
     static var audioIsPerGame: Bool {
         get {
-            defaults.object(forKey: audioScopeKey) as? Bool ?? true
+            // Defaults to FALSE — one setting across the suite — because
+            // the switch in Settings shows the inverse and ships ON. See
+            // `sharedAudio` below, which is what the toggle actually binds
+            // to and where the reasoning lives.
+            defaults.object(forKey: audioScopeKey) as? Bool ?? false
         }
         set {
             guard newValue != audioIsPerGame else { return }
@@ -92,7 +96,8 @@ enum GameScope {
 
     static var colorIsPerGame: Bool {
         get {
-            defaults.object(forKey: colorScopeKey) as? Bool ?? true
+            // Defaults to FALSE, for the same reason as the audio one.
+            defaults.object(forKey: colorScopeKey) as? Bool ?? false
         }
         set {
             guard newValue != colorIsPerGame else { return }
@@ -108,6 +113,36 @@ enum GameScope {
     static func key(_ base: String) -> String {
         guard let id = activeGameID else { return base }
         return "\(base).\(id)"
+    }
+
+    // MARK: What the switches in Settings bind to
+    //
+    // The two toggles read "Audio Per Game" and "Color Per Game" and are
+    // wired to these, which are the INVERSE of the properties above: ON
+    // means one setting across the whole suite, OFF means each game keeps
+    // its own, and ON is the shipped default.
+    //
+    // On the record, because it will look like a bug to whoever reads it
+    // next: that makes the four words on each switch say the opposite of
+    // what the switch does. It is deliberate and it was asked for. The
+    // footer under each toggle states the actual behaviour in full — "One
+    // track, volume and effects across every game." when ON — so the sheet
+    // is not lying, only the label.
+    //
+    // The inversion lives HERE rather than in the view so there is exactly
+    // one place it happens. A `!` at the call site is the kind of thing
+    // that gets added twice and cancels itself out.
+
+    /// One set of audio settings for every game.
+    static var sharedAudio: Bool {
+        get { !audioIsPerGame }
+        set { audioIsPerGame = !newValue }
+    }
+
+    /// One table colour for every game.
+    static var sharedColor: Bool {
+        get { !colorIsPerGame }
+        set { colorIsPerGame = !newValue }
     }
 
     /// The key for an audio setting, which honours `audioIsPerGame`.

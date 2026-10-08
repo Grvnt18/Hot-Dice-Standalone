@@ -97,8 +97,23 @@ struct TurnActionBar: View {
     @ObservedObject private var theme = AppTheme.shared
 
     var body: some View {
-        VStack(spacing: 2) {
+        // Spacing read off the shadow ladder rather than typed.
+        //
+        // It was 2, and `.lifted` throws its shadow 6pt down — so four
+        // points of hard-edged shadow landed on the line of text below the
+        // button, in this bar and in Rolls' own. Two is a gap between a
+        // button and a caption; six is the thing the button is casting.
+        VStack(spacing: Elevation.lifted.offset + 2) {
             HStack(spacing: 10) {
+                // `.plain` + `.pixelPanel`, which is what Rolls' roll
+                // button wears — see DiceRollButton.
+                //
+                // These ten games were on `.borderedProminent` with a
+                // tint: a system shape with a system fill, no pixel
+                // outline, no bevel and no Elevation shadow. That is the
+                // mismatch, and it was never a tuning difference — it is
+                // two different button systems, one of which the restyle
+                // replaced everywhere except here.
                 Button {
                     onPrimary()
                 } label: {
@@ -106,13 +121,25 @@ struct TurnActionBar: View {
                         .font(.poppins(15))
                         .frame(maxWidth: .infinity)
                         .frame(height: 48)
+                        // Load-bearing: `.plain` hit-tests what it draws,
+                        // and a frame around a Text is layout rather than
+                        // something to tap.
+                        .contentShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
                 }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.roundedRectangle(radius: ControlShape.cornerRadius))
-                .tint(theme.accentColor)
+                .buttonStyle(.plain)
+                .foregroundStyle(primaryEnabled
+                                 ? Color.white
+                                 : Color.white.opacity(0.5))
+                .pixelPanel(fill: .solid(primaryEnabled
+                                         ? theme.accentColor
+                                         : theme.accentColor.opacity(0.4)),
+                            elevation: .lifted)
                 .disabled(!primaryEnabled)
 
                 if let secondaryLabel {
+                    // The same panel, unfilled, so a secondary action reads
+                    // as the same control at a lower weight rather than as
+                    // a different kind of button.
                     Button {
                         onSecondary()
                     } label: {
@@ -120,10 +147,12 @@ struct TurnActionBar: View {
                             .font(.poppins(15))
                             .frame(maxWidth: .infinity)
                             .frame(height: 48)
+                            .contentShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
                     }
-                    .buttonStyle(.bordered)
-                    .buttonBorderShape(.roundedRectangle(radius: ControlShape.cornerRadius))
-                    .tint(theme.accentColor)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(theme.accentTextColor)
+                    .pixelPanel(fill: .solid(theme.accentColor.opacity(0.35)),
+                                elevation: .resting)
                 }
             }
 
@@ -207,10 +236,11 @@ struct HandoverGate: View {
                         .font(.poppins(16))
                         .frame(maxWidth: .infinity)
                         .frame(height: 50)
+                        .contentShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
                 }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.roundedRectangle(radius: ControlShape.cornerRadius))
-                .tint(theme.accentColor)
+                .buttonStyle(.plain)
+                .foregroundStyle(theme.accentTextColor)
+                .pixelPanel(fill: .solid(theme.accentColor), elevation: .lifted)
                 .padding(.horizontal, 44)
             }
         }
@@ -290,10 +320,11 @@ struct MatchResultView: View {
                             .font(.poppins(16))
                             .frame(maxWidth: .infinity)
                             .frame(height: 48)
+                            .contentShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
                     }
-                    .buttonStyle(.borderedProminent)
-                    .buttonBorderShape(.roundedRectangle(radius: ControlShape.cornerRadius))
-                    .tint(theme.accentColor)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(theme.accentTextColor)
+                    .pixelPanel(fill: .solid(theme.accentColor), elevation: .lifted)
 
                     Button {
                         SoundEngine.shared.play(.buttonTap)
@@ -303,10 +334,12 @@ struct MatchResultView: View {
                             .font(.poppins(14))
                             .frame(maxWidth: .infinity)
                             .frame(height: 42)
+                            .contentShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
                     }
-                    .buttonStyle(.bordered)
-                    .buttonBorderShape(.roundedRectangle(radius: ControlShape.cornerRadius))
-                    .tint(.white)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.white)
+                    .pixelPanel(fill: .solid(theme.accentColor.opacity(0.35)),
+                                elevation: .resting)
                 }
                 .padding(.horizontal, 44)
                 .padding(.top, 6)

@@ -59,15 +59,21 @@ struct SettingsView: View {
         }
     }
 
-    /// Whether audio follows the game or the app.
+    /// Whether ONE set of audio settings covers the suite.
     ///
-    /// Mirrored into `@State` because `GameScope.audioIsPerGame` is a
+    /// Named for what it holds, not for the switch it draws: the toggle
+    /// above it reads "Audio Per Game" and is ON when this is true, which
+    /// is the inversion GameScope.sharedAudio documents. Calling this
+    /// `audioPerGame` — which it was — meant every `!` around it looked
+    /// like a mistake.
+    ///
+    /// Mirrored into `@State` because `GameScope.sharedAudio` is a
     /// UserDefaults-backed static, which publishes nothing — without this
     /// the toggle would not move when tapped.
-    @State private var audioPerGame = GameScope.audioIsPerGame
+    @State private var sharedAudio = GameScope.sharedAudio
 
     /// And the same for the table colour, for the same reason.
-    @State private var colorPerGame = GameScope.colorIsPerGame
+    @State private var sharedColor = GameScope.sharedColor
 
     /// What the track button reads when it is closed.
     ///
@@ -118,7 +124,7 @@ struct SettingsView: View {
                         // scroll.
                         howToPlayButton
 
-                        panel("Music", footer: AnyView(scopeNote(perGame: audioPerGame))) {
+                        panel("Music", footer: AnyView(scopeNote(perGame: !sharedAudio))) {
                             Toggle("Music", isOn: $sound.musicEnabled)
                                 .font(.poppins(15))
                                 .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
@@ -193,22 +199,22 @@ struct SettingsView: View {
                             // switch did not do.
                             panel("Audio Scope",
                                   footer: AnyView(
-                                    Text(audioPerGame
-                                         ? "Each game remembers its own track, volume and effects."
-                                         : "One track, volume and effects across every game.")
+                                    Text(sharedAudio
+                                         ? "One track, volume and effects across every game."
+                                         : "Each game remembers its own track, volume and effects.")
                                         .font(.poppins(11)))) {
-                                Toggle("Audio Per Game", isOn: $audioPerGame)
+                                Toggle("Audio Per Game", isOn: $sharedAudio)
                                     .font(.poppins(15))
                                     .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
-                                    .onValueChange(of: audioPerGame) { now in
-                                        GameScope.audioIsPerGame = now
+                                    .onValueChange(of: sharedAudio) { now in
+                                        GameScope.sharedAudio = now
                                     }
                             }
 
                         }
 
                         panel("Sound Effects",
-                              footer: AnyView(scopeNote(perGame: audioPerGame))) {
+                              footer: AnyView(scopeNote(perGame: !sharedAudio))) {
                             Toggle("Sound Effects", isOn: $sound.sfxEnabled)
                                 .font(.poppins(15))
                                 .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
@@ -232,15 +238,15 @@ struct SettingsView: View {
                         if gameName == nil {
                             panel("Color Scope",
                                   footer: AnyView(
-                                    Text(colorPerGame
-                                         ? "Each game remembers its own table color."
-                                         : "One table color across every game.")
+                                    Text(sharedColor
+                                         ? "One table color across every game."
+                                         : "Each game remembers its own table color.")
                                         .font(.poppins(11)))) {
-                                Toggle("Color Per Game", isOn: $colorPerGame)
+                                Toggle("Color Per Game", isOn: $sharedColor)
                                     .font(.poppins(15))
                                     .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
-                                    .onValueChange(of: colorPerGame) { now in
-                                        GameScope.colorIsPerGame = now
+                                    .onValueChange(of: sharedColor) { now in
+                                        GameScope.sharedColor = now
                                     }
                             }
                         }
@@ -251,7 +257,7 @@ struct SettingsView: View {
                                     Text("Changes the playing surface and this menu's own accent color.")
                                     // Per game by default and now by
                                     // choice — Color Scope, on the hub.
-                                    scopeNote(perGame: colorPerGame)
+                                    scopeNote(perGame: !sharedColor)
                                 }
                                 .font(.poppins(11)))) {
                             ColorwayPicker(theme: theme)

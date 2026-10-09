@@ -59,6 +59,19 @@ enum RoyalUrArt {
 /// gaps and the frame in proportion at any scale.
 struct RoyalUrLayout {
 
+    /// How far a square's TAP TARGET reaches past the tile it draws.
+    ///
+    /// The gap between tiles is 0.08 of a tile — about 2.7pt on an iPhone
+    /// SE — and half of it belongs to each neighbour. Taking that half
+    /// gives a 34pt tile a 36.7pt target without two squares ever claiming
+    /// the same point.
+    ///
+    /// It does not reach 44pt and cannot: the squares are adjacent, so
+    /// there is no spare room between them to take. What it does is
+    /// recover every point there is, and tools_bandlayout_verify.py
+    /// records the shortfall rather than letting it pass unremarked.
+    static let tapOutset: CGFloat = 1.3
+
     let tile: CGFloat
     let gap: CGFloat
     let margin: CGFloat
@@ -397,7 +410,16 @@ struct RoyalUrBoardView: View {
             Button {
                 onTapSquare?(square)
             } label: {
-                Color.clear.contentShape(Rectangle())
+                // The TARGET is bigger than the tile. A board square is
+                // 34pt across on an iPhone SE, 40 on a 13 mini and 42 on a
+                // 15 — all under the 44pt minimum, and tapping a square is
+                // the whole game. The drawing is unchanged; only the area
+                // that accepts the touch grows, into the gap between tiles
+                // and no further, so neighbouring targets still cannot
+                // overlap.
+                Color.clear
+                    .padding(-RoyalUrLayout.tapOutset)
+                    .contentShape(Rectangle())
             }
             .frame(width: rect.width, height: rect.height)
             .position(x: rect.midX, y: rect.midY)

@@ -449,9 +449,13 @@ private struct ColorwayPicker: View {
     private let selectedExtraHeight: CGFloat = 10
     private let cornerRadius: CGFloat = 5
 
+    /// The HStack's own spacing, named so the tap target below can take
+    /// exactly half of it without the two numbers drifting apart.
+    private let swatchSpacing: CGFloat = 5
+
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(alignment: .bottom, spacing: 5) {
+            HStack(alignment: .bottom, spacing: swatchSpacing) {
                 ForEach(Array(AppTheme.swatches.enumerated()), id: \.offset) { index, swatch in
                     let isSelected = theme.colorwayIndex == index
                     Button {
@@ -459,6 +463,13 @@ private struct ColorwayPicker: View {
                             theme.colorwayIndex = index
                         }
                     } label: {
+                        // 26pt of stripe, 31pt of target. The swatch is a
+                        // deliberate shape and stays that shape; the
+                        // horizontal padding below is clear and only
+                        // widens what accepts the touch. Without it every
+                        // colour in the app is a 26pt tap, on iPad as well
+                        // as on a phone, because the stripe is a fixed
+                        // width rather than a proportional one.
                         RoundedRectangle(cornerRadius: cornerRadius)
                             .fill(Color(hex: swatch.hex))
                             .frame(width: stripeWidth, height: isSelected ? stripeHeight + selectedExtraHeight : stripeHeight)
@@ -476,6 +487,19 @@ private struct ColorwayPicker: View {
                             }
                     }
                     .buttonStyle(.plain)
+                    // Half the gap on each side, and not a point more.
+                    //
+                    // 44 would be the target to aim for and it is not
+                    // reachable: the stripes sit 31pt apart (26 of stripe,
+                    // 5 of spacing), so anything wider than 31 has two
+                    // neighbours claiming the same point, and a tap that
+                    // picks the wrong colour is worse than a tap that
+                    // needs aiming. This takes the row from 26 to 31 —
+                    // every point there is — and the shortfall is reported
+                    // by tools_bandlayout_verify.py rather than hidden.
+                    .padding(.horizontal, swatchSpacing / 2)
+                    .contentShape(Rectangle())
+                    .padding(.horizontal, -swatchSpacing / 2)
                     .accessibilityLabel(swatch.name)
                 }
             }

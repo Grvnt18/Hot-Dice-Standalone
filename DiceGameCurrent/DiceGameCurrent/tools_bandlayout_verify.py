@@ -73,10 +73,85 @@ def code(filename):
 
 
 def swift_constant(text, name):
-    match = re.search(r"static let %s: CGFloat = ([\d.]+)" % name, text)
+    """A `let <name>: CGFloat = <n>`, however it is scoped.
+
+    `static`, `private`, `private static` and a bare `let` all count: the
+    tap targets below read constants out of a view, where they are usually
+    `private let`, and a static-only pattern simply could not see them.
+    """
+    match = re.search(r"let %s: CGFloat = ([\d.]+)" % name, text)
     if not match:
-        raise AssertionError("GameBandLayout has no `%s`" % name)
+        raise AssertionError("no `%s: CGFloat` to read" % name)
     return float(match.group(1))
+
+
+
+
+# Apple's minimum tap target. Not every control in this app reaches it,
+# and the ones that cannot are listed with the reason rather than excused:
+# a board square and a colour stripe both sit against a neighbour, so
+# growing past the gap between them means two targets claiming the same
+# point, and a tap that picks the wrong square is worse than one that
+# needs aiming.
+TAP_MINIMUM = 44.0
+
+
+def check_tap_targets():
+    """Every control you press, measured at every size.
+
+    This is the check that was missing when the Royal UR board came in at
+    34pt on an iPhone SE — the primary interaction of the game, below the
+    guideline on every iPhone but the Pro Max, and nothing said so.
+
+    What it reports is the TARGET, not the drawing: a tile can stay 34pt
+    and still accept a wider touch, which is what RoyalUrLayout.tapOutset
+    and the colour picker's own padding do. Where even that cannot reach
+    44 the shortfall is printed, so it stays a known number instead of an
+    assumption.
+    """
+    board = code("RoyalUrBoardView.swift")
+    settings = code("SettingsView.swift")
+    problems, rows = [], []
+
+    # --- Royal UR's board squares -----------------------------------
+    outset = swift_constant(board, "tapOutset")
+    if "padding(-RoyalUrLayout.tapOutset)" not in board:
+        problems.append("Royal UR's squares no longer widen their tap "
+                        "target — tapping a square is the whole game and it "
+                        "is 34pt on an iPhone SE")
+    for name, width, height in SIZES:
+        if width > 500:                      # phones are the tight case
+            continue
+        tile = (width - 12) / 9.04
+        rows.append(("Royal UR square", name, tile, tile + outset * 2))
+
+    # --- the colour picker ------------------------------------------
+    stripe = swift_constant(settings, "stripeWidth")
+    spacing = swift_constant(settings, "swatchSpacing")
+    if "padding(.horizontal, swatchSpacing / 2)" not in settings:
+        problems.append("the colour swatches no longer widen their tap "
+                        "target — a fixed 26pt stripe is a 26pt tap on "
+                        "every device, iPad included")
+    rows.append(("colour swatch", "every size", stripe, stripe + spacing))
+
+    for label, where, drawn, target in rows:
+        if target < drawn:
+            problems.append("%s on %s has a target smaller than it draws"
+                            % (label, where))
+
+    short = [(l, w, t) for l, w, d, t in rows if t < TAP_MINIMUM]
+    for label, where, target in short:
+        print("  %-26s %-20s %.1fpt of %.0f" % ("under the tap minimum",
+                                                "%s, %s" % (label, where),
+                                                target, TAP_MINIMUM))
+    widest = max(rows, key=lambda r: r[3])
+    print("  %-26s %s at %.1fpt (drawn %.1f)"
+          % ("largest target", widest[0], widest[3], widest[2]))
+
+    for line in problems:
+        print("  %-26s %s" % ("FAILED", line))
+    return bool(problems)
+
 
 
 def main():
@@ -169,6 +244,9 @@ def main():
 
     print("  %-26s ok (%d screens x %d sizes)"
           % ("every playfield holds", len(SCREENS), len(SIZES)))
+
+    if check_tap_targets():
+        failed.append("a control grew smaller than the touch it accepts")
     print("band layout: PASS")
 
 

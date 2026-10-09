@@ -112,42 +112,10 @@ enum FreeRollGame: SuiteGame {
     /// protocol honest rather than letting the two-player default stand.
     static let maxPlayers = 1
 
-    /// The short version, shown from inside the game.
-    static let quickRules: [GameRuleSection] = [
-        GameRuleSection(
-            title: "The Goal",
-            body: "None. No score, no turns, no way to lose."
-        ),
-        GameRuleSection(
-            title: "The Dice",
-            body: "Pick any mix of d4, d6, d8, d10, d12 and d20 with the + and - controls, up to \(FreeRollPool.maxDice) in all, and roll as often as you like."
-        ),
-        GameRuleSection(
-            title: "Totals",
-            body: "Off by default. Switch it on and every throw reports a subtotal per die type and the throw as a whole."
-        )
-    ]
-
     static let rules: [GameRuleSection] = [
         GameRuleSection(
-            title: "The Dice",
-            body: "Pick up to \(FreeRollPool.maxDice) dice in any combination using the + and - controls: d4, d6, d8, d10, d12, d20. Clear empties the table."
-        ),
-        GameRuleSection(
-            title: "Rolling",
-            body: "Tap Roll to throw everything on the table. Roll as many times as you like — nothing is banked, nothing is scored, and there is no turn to end."
-        ),
-        GameRuleSection(
-            title: "Changing Dice",
-            body: "Add or remove dice whenever you want and the table is rebuilt with your new picks. You cannot change them mid-roll; wait for the dice to settle."
-        ),
-        GameRuleSection(
-            title: "Totals",
-            body: "Totals is off by default — the table is the point. Switch it on and every throw reports a subtotal for each kind of die and the throw as a whole."
-        ),
-        GameRuleSection(
-            title: "Reading the d4",
-            body: "A d4 has no face pointing up when it lands, so it is read at its point: the three faces you can see all show the same number beside the top corner, and that is the result."
+            title: "Overview",
+            body: "  * Players: 1.\n  * Pool Limit: Up to 20 total dice (Selectable mix of d4, d6, d8, d10, d12, d20).\n  * Function: Open sandbox mode without scoring, win conditions, or turn limits.\n    Includes optional subtotals toggle per die type."
         )
     ]
 }

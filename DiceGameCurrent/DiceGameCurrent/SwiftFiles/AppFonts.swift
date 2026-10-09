@@ -83,6 +83,39 @@ enum AppFonts {
         }
     }
 
+    /// Faces that did not resolve, after registration has run.
+    ///
+    /// `register` prints to the console and returns. A font that fails to
+    /// register is therefore INVISIBLE on screen: `Font.custom` falls back
+    /// to the system face and the text renders in a plausible-looking
+    /// weight that is simply the wrong one. The hub's game names are set
+    /// in Poppins-Black and were reported as not reading black — which is
+    /// exactly what a silent fallback looks like, and there was no way to
+    /// tell that from the font being right and the eye being wrong.
+    ///
+    /// So: ask UIKit to resolve each name and report the ones it cannot.
+    /// `UIFont(name:size:)` returns nil when the PostScript name is not
+    /// registered, and when it DOES resolve, `fontName` comes back as the
+    /// face actually chosen — so a silent substitution is caught too.
+    ///
+    /// Checked against the files rather than assumed: all five PostScript
+    /// names are exactly the enum's raw values (Poppins-Black,
+    /// Poppins-Bold, Poppins-Medium, Poppins-Regular, Poppins-SemiBold),
+    /// read out of each TTF's name table. So a miss here is a registration
+    /// failure or a missing file, never a misspelling.
+    static var unresolvedFaces: [String] {
+        registerIfNeeded()
+        var missing: [String] = []
+        for name in bundledFontResources {
+            guard let font = UIFont(name: name, size: 12) else {
+                missing.append(name)
+                continue
+            }
+            if font.fontName != name { missing.append(name) }
+        }
+        return missing
+    }
+
     // MARK: Script text, for UIKit drawing
 
     /// Aguafina at a point size, falling back rather than trapping.
@@ -180,14 +213,20 @@ enum AppFonts {
 // MARK: - SwiftUI convenience
 
 extension Font {
-    /// Stack Sans Notch, the default font for every piece of text in this
-    /// app. Note: the bundled file is a variable font whose default
-    /// (only-registered) instance is the ExtraLight weight — SwiftUI's
-    /// Font.custom doesn't drive variable-font weight axes directly, so
-    /// every size uses that same weight rather than a bolder cut for
-    /// emphasis. If particular text needs to read heavier, that would need
-    /// a separately-exported static weight instance of the font rather
-    /// than something achievable purely at the call site here.
+    /// Poppins, the default font for every piece of text in this app.
+    ///
+    /// The note that used to be here described Stack Sans Notch — a
+    /// variable font whose only registered instance was ExtraLight, so
+    /// every size in the app rendered thin and no call site could ask for
+    /// heavier. That is history: Poppins ships as five separate static
+    /// files and a weight is now just a file, with `.black` the heaviest
+    /// the family has. Left stale, that note read as a live warning that
+    /// weight could not be set at all, which is the opposite of true.
+    ///
+    /// The name passed here is the face's PostScript name, verified
+    /// against each TTF's name table. If a weight still looks wrong on
+    /// screen, the face did not register — see `unresolvedFaces`, which
+    /// BundleCheck surfaces on the hub.
     static func poppins(_ size: CGFloat, _ weight: AppFonts.Weight = .regular) -> Font {
         // The relativeTo: overload, not plain .custom(_:size:) — the latter
         // puts the font on a code path where `.minimumScaleFactor` doesn't

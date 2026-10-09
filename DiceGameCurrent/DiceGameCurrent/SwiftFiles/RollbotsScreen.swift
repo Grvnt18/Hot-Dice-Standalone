@@ -49,7 +49,7 @@ struct RollbotsScreen: View {
         case rollingAttack
         /// Both dice have settled and the attacker is reading them.
         ///
-        /// The game stops here rather than handing over the moment the dice
+        /// The game stops here rather than moving on the moment the dice
         /// stop moving. A roll you did not get to look at might as well have
         /// been made for you.
         case readingAttack
@@ -59,7 +59,7 @@ struct RollbotsScreen: View {
         case rollingDefence
         /// The defence die has settled and the defender is reading it.
         case readingDefence
-        /// Exchange resolved; waiting to hand over.
+        /// Exchange resolved; waiting to send the turn on.
         case resolved
         /// Match decided.
         case finished
@@ -78,6 +78,32 @@ struct RollbotsScreen: View {
         case .defending, .rollingDefence, .readingDefence: return defender
         default:                                      return attacker
         }
+    }
+
+
+    // MARK: Sending a turn
+
+    /// This screen's turn, packed the way the Messages extension will send
+    /// it — the bookkeeping and the game's own state together, which is
+    /// what MatchPayload exists to say.
+    var wireTurn: MatchPayload<RollbotsState> {
+        MatchPayload(match: match, state: state)
+    }
+
+    /// Adopts a turn that arrived from another device.
+    ///
+    /// Phase is not carried: a phase is what THIS device is doing with the
+    /// dice in front of it, and the sender's is meaningless here.
+    ///
+    /// `.action` rather than a roll state, because an arriving turn makes
+    /// this seat the attacker and that is where an attacker starts. There
+    /// is no half-finished exchange to resume: RollbotsState carries
+    /// integrity, loadouts and which abilities are armed — all of which are
+    /// true between exchanges, never during one.
+    func adopt(_ incoming: MatchPayload<RollbotsState>) {
+        match = incoming.match
+        state = incoming.state
+        phase = .action
     }
 
     var body: some View {

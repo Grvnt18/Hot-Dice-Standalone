@@ -26,10 +26,11 @@ struct SettingsView: View {
     init<G: SuiteGame>(for game: G.Type) {
         self.gameName = G.displayName
         self.tagline = G.tagline
-        // The SHORT guide, because this sheet is opened mid-match. The
-        // full one is two taps away on the hub, where a player browsing
-        // the suite actually wants it.
-        self.rules = G.quickRules
+        // The guide — the whole one. This sheet used to show a shorter
+        // array on the grounds that it opens mid-match, which meant the
+        // version missing the detail was the version you could reach
+        // without leaving the game.
+        self.rules = G.rules
     }
 
     /// The hub's sheet: no game open, so no rules and no How to Play.
@@ -40,26 +41,55 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showingHowToPlay = false
 
-    /// Says whose settings these are.
+    /// Says whose settings these are, when they are anyone's in particular.
     ///
-    /// The colour and the music are kept per game, so without this a player
-    /// who sets a table colour in one game and finds another unchanged has
-    /// every reason to read it as a bug rather than as the feature.
+    /// The colour and the audio are kept per game by default, so without
+    /// this a player who sets a table colour in one game and finds another
+    /// unchanged has every reason to read it as a bug rather than as the
+    /// feature.
+    ///
+    /// Nothing at all when the scope is off. It used to say "The same in
+    /// every game." there, which is a line that appears only once the
+    /// player has already told the app that is what they want — the answer
+    /// to a question they have just finished answering.
     @ViewBuilder private func scopeNote(perGame: Bool) -> some View {
-        if let gameName {
-            Text(perGame
-                 ? "Saved for \(gameName). Each game keeps its own."
-                 : "The same in every game.")
+        if let gameName, perGame {
+            Text("Saved for \(gameName). Each game keeps its own.")
                 .font(.poppins(11))
         }
     }
 
-    /// Whether music follows the game or the app.
+    /// Whether ONE set of audio settings covers the suite.
     ///
-    /// Mirrored into `@State` because `GameScope.musicIsPerGame` is a
+    /// Named for what it holds, not for the switch it draws: the toggle
+    /// above it reads "Audio Per Game" and is ON when this is true, which
+    /// is the inversion GameScope.sharedAudio documents. Calling this
+    /// `audioPerGame` — which it was — meant every `!` around it looked
+    /// like a mistake.
+    ///
+    /// Mirrored into `@State` because `GameScope.sharedAudio` is a
     /// UserDefaults-backed static, which publishes nothing — without this
     /// the toggle would not move when tapped.
-    @State private var musicPerGame = GameScope.musicIsPerGame
+    @State private var sharedAudio = GameScope.sharedAudio
+
+    /// And the same for the table colour, for the same reason.
+    @State private var sharedColor = GameScope.sharedColor
+
+    /// What the track button reads when it is closed.
+    ///
+    /// A plain `if let` rather than `selectedTrackIndex.map { ... } ?? "Shuffle"`
+    /// on purpose: a closure inside an optional chain inside a view body is
+    /// the exact shape that took the Playgrounds build down silently once,
+    /// and `tools_qualcheck.py` flags it for that reason. The index is also
+    /// range-checked, since `tracks` is a literal that has changed length
+    /// before and a stale stored index would otherwise trap.
+    private var trackLabel: String {
+        if let idx = sound.selectedTrackIndex,
+           idx >= 0, idx < SoundEngine.tracks.count {
+            return SoundEngine.tracks[idx].displayName
+        }
+        return "Shuffle"
+    }
 
     var body: some View {
         // No NavigationStack and no Form. Both were the system's own
@@ -74,13 +104,27 @@ struct SettingsView: View {
         // strings, same bindings, same scope notes. This is paint.
         ZStack {
             WoodTiledBackground(fraction: MenuTimber.fraction).ignoresSafeArea()
+                // Squares off the card this sheet is presented in. See
+                // SheetCorners — the rounding is UIKit's, not this view's,
+                // so it cannot be set from SwiftUI on the iOS 16 floor.
+                .background(SheetCorners(radius: ControlShape.cornerRadius))
 
             VStack(spacing: 0) {
                 MenuHeaderBar(title: "Settings") { dismiss() }
 
                 ScrollView {
                     VStack(spacing: 14) {
-                        panel("Music", footer: AnyView(scopeNote(perGame: musicPerGame))) {
+                        // FIRST, not last. Inside a game this opens that
+                        // game's guide; on the hub there is no game to
+                        // explain, so it opens the whole set as a cluster
+                        // of bubbles — the one place a player browsing the
+                        // suite can read the rules before deciding to
+                        // play. Either way it is the thing most likely to
+                        // be wanted from this sheet, and it was below a
+                        // scroll.
+                        howToPlayButton
+
+                        panel("Music", footer: AnyView(scopeNote(perGame: !sharedAudio))) {
                             Toggle("Music", isOn: $sound.musicEnabled)
                                 .font(.poppins(15))
                                 .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
@@ -97,23 +141,49 @@ struct SettingsView: View {
                             .opacity(sound.musicEnabled ? 1 : 0.4)
                             .disabled(!sound.musicEnabled)
 
-                            // tag(nil as Int?) is required: the selection
-                            // binding is Int?, and a plain tag(nil) cannot
-                            // infer that, which silently breaks matching for
-                            // the Shuffle row.
+                            // A Menu rather than a Picker, because every
+                            // built-in picker style draws system chrome the
+                            // restyle replaced: .menu is a capsule button,
+                            // .segmented a rounded bar. The capsule is drawn
+                            // by the picker's OWN button, so no amount of
+                            // framing from outside squares it off — the
+                            // control has to be the app's own.
                             //
-                            // .menu style shows the current track title inline
-                            // rather than pushing to a separate list screen,
-                            // which there is no navigation stack for any more.
-                            Picker("Track", selection: $sound.selectedTrackIndex) {
-                                Text("Shuffle").font(.poppins(14)).tag(nil as Int?)
+                            // Same nine choices, same order, and the same
+                            // side effect: assigning selectedTrackIndex
+                            // restarts playback through its didSet, which is
+                            // exactly what the selection binding did.
+                            //
+                            // This also retires the tag(nil as Int?) note —
+                            // there is no tag matching left to get wrong.
+                            Menu {
+                                Button("Shuffle") { sound.selectedTrackIndex = nil }
                                 ForEach(Array(SoundEngine.tracks.enumerated()), id: \.offset) { idx, track in
-                                    Text(track.displayName).font(.poppins(14)).tag(idx as Int?)
+                                    Button(track.displayName) { sound.selectedTrackIndex = idx }
                                 }
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Text("Track")
+                                        .font(.poppins(15))
+                                        .foregroundStyle(MenuInk.text)
+
+                                    Spacer(minLength: 8)
+
+                                    Text(trackLabel)
+                                        .font(.poppins(14))
+                                        .foregroundStyle(theme.accentColor)
+                                        .lineLimit(1)
+
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(MenuInk.dim)
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 7)
+                                .frame(maxWidth: .infinity)
+                                .pixelPanel(fill: .solid(MenuInk.panel),
+                                            elevation: .resting)
                             }
-                            .pickerStyle(.menu)
-                            .font(.poppins(15))
-                            .tint(theme.accentColor)
                             .opacity(sound.musicEnabled ? 1 : 0.4)
                             .disabled(!sound.musicEnabled)
                         }
@@ -123,22 +193,28 @@ struct SettingsView: View {
                         // exactly the kind of setting people cannot find again
                         // afterwards.
                         if gameName == nil {
-                            panel("Music Scope",
+                            // "Audio", not "Music": this governs the
+                            // effects and their volume as well now, which
+                            // is what the label promised and what the
+                            // switch did not do.
+                            panel("Audio Scope",
                                   footer: AnyView(
-                                    Text(musicPerGame
-                                         ? "Each game remembers its own track and volume."
-                                         : "One track and volume across every game.")
+                                    Text(sharedAudio
+                                         ? "One track, volume and effects across every game."
+                                         : "Each game remembers its own track, volume and effects.")
                                         .font(.poppins(11)))) {
-                                Toggle("Music Per Game", isOn: $musicPerGame)
+                                Toggle("Audio Per Game", isOn: $sharedAudio)
                                     .font(.poppins(15))
                                     .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
-                                    .onValueChange(of: musicPerGame) { now in
-                                        GameScope.musicIsPerGame = now
+                                    .onValueChange(of: sharedAudio) { now in
+                                        GameScope.sharedAudio = now
                                     }
                             }
+
                         }
 
-                        panel("Sound Effects") {
+                        panel("Sound Effects",
+                              footer: AnyView(scopeNote(perGame: !sharedAudio))) {
                             Toggle("Sound Effects", isOn: $sound.sfxEnabled)
                                 .font(.poppins(15))
                                 .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
@@ -153,38 +229,60 @@ struct SettingsView: View {
                             .disabled(!sound.sfxEnabled)
                         }
 
+                        // Below the effects and beside the colour it
+                        // governs, rather than stacked under the audio
+                        // switch it has nothing to do with. Still hub-only,
+                        // for the same reason Audio Scope is: inside a game
+                        // it would be a control that changes what every
+                        // OTHER game does.
+                        if gameName == nil {
+                            panel("Color Scope",
+                                  footer: AnyView(
+                                    Text(sharedColor
+                                         ? "One table color across every game."
+                                         : "Each game remembers its own table color.")
+                                        .font(.poppins(11)))) {
+                                Toggle("Color Per Game", isOn: $sharedColor)
+                                    .font(.poppins(15))
+                                    .toggleStyle(RoundedSquareToggleStyle(tint: theme.accentColor))
+                                    .onValueChange(of: sharedColor) { now in
+                                        GameScope.sharedColor = now
+                                    }
+                            }
+                        }
+
                         panel("Table Color",
                               footer: AnyView(
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("Changes the playing surface and this menu's own accent color.")
-                                    // Always per game, whatever the music is
-                                    // set to — a floor is part of a game's look
-                                    // in a way a backing track is not.
-                                    scopeNote(perGame: true)
+                                    // Per game by default and now by
+                                    // choice — Color Scope, on the hub.
+                                    scopeNote(perGame: !sharedColor)
                                 }
                                 .font(.poppins(11)))) {
                             ColorwayPicker(theme: theme)
                                 .padding(.vertical, 4)
                         }
 
-                        // Inside a game this opens that game's guide. On the
-                        // hub there is no game to explain, so it opens the
-                        // whole set as a cluster of bubbles — the one place a
-                        // player browsing the suite can read the rules of a
-                        // game before deciding to play it.
-                        Button {
-                            SoundEngine.shared.play(.buttonTap)
-                            showingHowToPlay = true
-                        } label: {
-                            Text(rules.isEmpty ? "How to Play — Every Game" : "Quick Start")
-                                .font(.poppins(15))
-                                .foregroundStyle(theme.accentTextColor)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 48)
-                                .contentShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
+                        // The hub only, and only until the Messages
+                        // extension exists. The transport is written and
+                        // budgeted but cannot be exercised in Playgrounds
+                        // any other way — the extension itself needs Xcode
+                        // — so this is where a turn gets packed, sent
+                        // through the real URL path and read back, on the
+                        // device, before any of it reaches a Mac.
+                        if rules.isEmpty {
+                            panel("Message Payloads",
+                                  footer: AnyView(
+                                    Text("Each game packs a turn, sends it "
+                                         + "through the real URL path and "
+                                         + "reads it back. Budget is "
+                                         + "\(GameTransport.safeByteBudget) bytes.")
+                                        .font(.poppins(11)))) {
+                                WirePayloadCheck()
+                            }
                         }
-                        .buttonStyle(.plain)
-                        .pixelPanel(fill: .solid(theme.accentColor), elevation: .lifted)
+
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 16)
@@ -196,9 +294,30 @@ struct SettingsView: View {
                 GuideBubbleCluster()
             } else {
                 HowToPlayView(gameName: gameName, tagline: tagline,
-                              sections: rules, isQuickStart: true)
+                              sections: rules)
             }
         }
+    }
+
+    /// The guide, opened from wherever this sheet was opened.
+    ///
+    /// A property rather than inline, so the stack above stays a plain list
+    /// of subviews — the same reason `panel` calls its ViewBuilder once and
+    /// stores the result.
+    private var howToPlayButton: some View {
+        Button {
+            SoundEngine.shared.play(.buttonTap)
+            showingHowToPlay = true
+        } label: {
+            Text(rules.isEmpty ? "How to Play — Every Game" : "How to Play")
+                .font(.poppins(15))
+                .foregroundStyle(theme.accentTextColor)
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .contentShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
+        }
+        .buttonStyle(.plain)
+        .pixelPanel(fill: .solid(theme.accentColor), elevation: .lifted)
     }
 
     /// One titled group of controls, as a pixel panel on the timber.
@@ -391,13 +510,6 @@ struct HowToPlayView: View {
     let tagline: String?
     let sections: [GameRuleSection]
 
-    /// Whether this is the short guide from inside a game or the full one
-    /// from the hub. It changes the title and adds a line saying where
-    /// the rest of it is — a player who opens the quick guide looking for
-    /// the scoring table should be told it exists rather than concluding
-    /// the game has none.
-    var isQuickStart: Bool = false
-
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var theme = AppTheme.shared
 
@@ -411,9 +523,8 @@ struct HowToPlayView: View {
 
             VStack(spacing: 0) {
                 MenuHeaderBar(
-                    title: gameName.map {
-                        "\($0) — \(isQuickStart ? "Quick Start" : "How to Play")"
-                    } ?? "How to Play"
+                    title: gameName.map { "\($0) — How to Play" }
+                        ?? "How to Play"
                 ) { dismiss() }
 
                 ScrollView {
@@ -439,25 +550,21 @@ struct HowToPlayView: View {
                                     .foregroundStyle(MenuInk.dim)
                                     .padding(.leading, 2)
 
-                                Text(section.body)
-                                    .font(.poppins(14))
-                                    .foregroundStyle(MenuInk.text)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                // The document's own lines — bullets,
+                                // numbered steps and tables — rather than a
+                                // paragraph made out of them.
+                                GuideBodyView(body0: section.body)
                                     .padding(12)
                                     .pixelPanel(fill: .solid(MenuInk.panel), elevation: .resting)
+
+                                // A couple of sections carry one or two —
+                                // see GuideFigure.
+                                ForEach(section.figures, id: \.rawValue) { figure in
+                                    GuideFigureView(figure: figure)
+                                }
                             }
                         }
 
-                        if isQuickStart {
-                            Text("The full rules — every table, every edge case "
-                                 + "— are on the game selection screen: "
-                                 + "Settings, then How to Play.")
-                                .font(.poppins(12))
-                                .foregroundStyle(MenuInk.dim)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .padding(.horizontal, 2)
-                        }
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 16)
@@ -467,3 +574,125 @@ struct HowToPlayView: View {
     }
 }
 
+
+// MARK: - Message payloads
+
+/// Runs `GameWireCheck` on demand and shows what each game costs.
+///
+/// On demand rather than on appear: it encodes every game in the suite, and
+/// a settings sheet should not do that work for someone who opened it to
+/// change the volume.
+private struct WirePayloadCheck: View {
+
+    @State private var results: [GameWireCheck.Result] = []
+    @ObservedObject private var theme = AppTheme.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                SoundEngine.shared.play(.buttonTap)
+                results = GameWireCheck.runAll()
+            } label: {
+                Text(results.isEmpty ? "Run the check" : "Run it again")
+                    .font(.poppins(14))
+                    .foregroundStyle(theme.accentTextColor)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 38)
+                    .contentShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
+            }
+            .buttonStyle(.plain)
+            .pixelPanel(fill: .solid(theme.accentColor), elevation: .resting)
+
+            ForEach(results) { result in
+                row(result)
+            }
+
+            if let worst = results.map(\.bytes).max(), !results.isEmpty {
+                Text("Largest turn: \(worst) B of \(GameTransport.safeByteBudget) B")
+                    .font(.poppins(11))
+                    .foregroundStyle(MenuInk.dim)
+            }
+        }
+    }
+
+    private func row(_ result: GameWireCheck.Result) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
+                Text(result.ok ? "OK" : "FAIL")
+                    .font(.poppins(11, .bold))
+                    .foregroundStyle(result.ok ? Color.green : Color.red)
+                    .frame(width: 34, alignment: .leading)
+
+                Text(result.game)
+                    .font(.poppins(12))
+                    .foregroundStyle(MenuInk.text)
+
+                Spacer(minLength: 4)
+
+                Text("\(result.bytes) B")
+                    .font(.poppins(12))
+                    .foregroundStyle(result.fits ? MenuInk.dim : Color.red)
+            }
+
+            // Only when something is wrong. A list of ten passing rows that
+            // each explain themselves is a list nobody reads.
+            if let failure = result.failure {
+                Text(failure)
+                    .font(.poppins(10))
+                    .foregroundStyle(Color.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
+// MARK: - Squaring off the sheet
+
+/// Sets the presented sheet's corner radius.
+///
+/// Every control in this app is cut square or very nearly so —
+/// `ControlShape.cornerRadius` is 4 — and the one shape that ignored that
+/// was the biggest one on screen: the card the Settings sheet is presented
+/// in, which arrives with UIKit's own generous rounding.
+///
+/// It has to be done through UIKit. SwiftUI gained
+/// `.presentationCornerRadius` in iOS 17 and this app's floor is iOS 16,
+/// so the only way in is `UISheetPresentationController.preferredCornerRadius`
+/// (iOS 15+), reached by walking the responder chain from a zero-sized view
+/// planted in the sheet's own hierarchy.
+///
+/// Fails quietly and on purpose. A presentation that is not a sheet — a
+/// popover on a wide iPad, a full-screen cover — has no
+/// `sheetPresentationController`, and the right behaviour there is to leave
+/// the system's shape alone rather than to force one.
+private struct SheetCorners: UIViewRepresentable {
+    let radius: CGFloat
+
+    func makeUIView(context: Context) -> UIView {
+        UIView(frame: .zero)
+    }
+
+    func updateUIView(_ view: UIView, context: Context) {
+        // Deferred by one runloop turn: on the first `updateUIView` the
+        // view is not yet in the window, so the responder chain has no
+        // controller on it and the radius would silently not apply.
+        let wanted = radius
+        DispatchQueue.main.async { [weak view] in
+            guard let sheet = view?.owningController?.sheetPresentationController
+            else { return }
+            sheet.preferredCornerRadius = wanted
+        }
+    }
+}
+
+private extension UIView {
+    /// The nearest controller up the responder chain.
+    var owningController: UIViewController? {
+        var responder: UIResponder? = self
+        while let next = responder?.next {
+            if let controller = next as? UIViewController { return controller }
+            responder = next
+        }
+        return nil
+    }
+}

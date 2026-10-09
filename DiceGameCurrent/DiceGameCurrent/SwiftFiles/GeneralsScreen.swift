@@ -16,6 +16,36 @@ struct GeneralsScreen: View {
     @State private var showingCard = false
     @ObservedObject private var theme = AppTheme.shared
 
+
+    // MARK: Sending a turn
+
+    /// This screen's turn, packed the way the Messages extension will send
+    /// it — the bookkeeping and the game's own state together, which is
+    /// what MatchPayload exists to say.
+    ///
+    /// Assembled from the screen's own properties rather than the screen
+    /// being rebuilt around the state type. The dice mid-turn are not in
+    /// here on purpose: a turn is resolved on the device that threw it and
+    /// arrives as a result.
+    var wireTurn: MatchPayload<GeneralsState> {
+        MatchPayload(match: match, state: GeneralsState(card: card))
+    }
+
+    /// Adopts a turn that arrived from another device.
+    ///
+    /// Phase goes back to `.ready` rather than being carried: a phase is
+    /// what THIS device is doing with the dice in front of it, and the
+    /// sender's is meaningless here.
+    func adopt(_ incoming: MatchPayload<GeneralsState>) {
+        match = incoming.match
+        card = incoming.state.card
+        // Five dice and three rolls belong to the turn that played them.
+        hand = []
+        keptCount = 0
+        rollsUsed = 0
+        phase = .ready
+    }
+
     private enum Phase {
         /// Waiting for the active player to throw.
         case ready
@@ -23,7 +53,7 @@ struct GeneralsScreen: View {
         case rolling
         /// A hand on the table: keep dice and roll again, or go and claim.
         case decide
-        /// Category claimed; waiting to hand over or finish.
+        /// Category claimed; waiting to send the turn on or finish.
         case scored
         /// Handover gate between turns.
         case handover
@@ -34,10 +64,13 @@ struct GeneralsScreen: View {
     var body: some View {
         ZStack {
             GeometryReader { geo in
-                let headerHeight = geo.size.height * 0.17
-                let minButtonHeight: CGFloat = 100
-                let sceneHeight = min(geo.size.width, max(geo.size.height - headerHeight - minButtonHeight, 0))
-                let buttonHeight = geo.size.height - headerHeight - sceneHeight
+                // The split every game makes, made once — see
+                // GameBandLayout. The button band's floor is summed from
+                // what it holds rather than typed as 100.
+                let bands = GameBandLayout.self
+                let headerHeight = bands.header(in: geo.size, fraction: 0.17)
+                let sceneHeight = bands.scene(in: geo.size, fraction: 0.17)
+                let buttonHeight = bands.buttonBand(in: geo.size, fraction: 0.17)
 
                 VStack(spacing: 0) {
                     MatchScoreboard(
@@ -344,7 +377,10 @@ struct GeneralsCardView: View {
                                 .clipShape(RoundedRectangle(
                                     cornerRadius: ControlShape.cornerRadius))
                         )
-                        .elevated(.resting)
+                        // No elevation. The card is the surface the game
+                        // is played on, not an object resting on one, and
+                        // with the doubled offsets its shadow read as a
+                        // second card behind it.
                         .padding(.horizontal, 12)
 
                     if GeneralsCardLayout.fits(in: geo.size.height) {
@@ -374,10 +410,12 @@ struct GeneralsCardView: View {
                         .font(.poppins(15))
                         .frame(maxWidth: .infinity)
                         .frame(height: 46)
+                        .contentShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
                 }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.roundedRectangle(radius: ControlShape.cornerRadius))
-                .tint(.white)
+                .buttonStyle(.plain)
+                .foregroundStyle(.white)
+                .pixelPanel(fill: .solid(theme.accentColor.opacity(0.35)),
+                            elevation: .resting)
                 .padding(.horizontal, 44)
                 .padding(.bottom, 10)
             }

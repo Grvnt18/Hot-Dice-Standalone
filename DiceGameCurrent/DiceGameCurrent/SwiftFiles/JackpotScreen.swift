@@ -18,12 +18,38 @@ struct JackpotScreen: View {
     /// had their turn in that same round, and two in one round cancel.
     @State private var jackpotsThisRound: [String] = []
 
+
+    // MARK: Sending a turn
+
+    /// This screen's turn, packed the way the Messages extension will send
+    /// it — the bookkeeping and the game's own state together, which is
+    /// what MatchPayload exists to say.
+    ///
+    /// Assembled from the screen's own properties rather than the screen
+    /// being rebuilt around the state type. The dice mid-turn are not in
+    /// here on purpose: a turn is resolved on the device that threw it and
+    /// arrives as a result.
+    var wireTurn: MatchPayload<JackpotState> {
+        MatchPayload(match: match, state: JackpotState(jackpotsThisRound: jackpotsThisRound))
+    }
+
+    /// Adopts a turn that arrived from another device.
+    ///
+    /// Phase goes back to `.ready` rather than being carried: a phase is
+    /// what THIS device is doing with the dice in front of it, and the
+    /// sender's is meaningless here.
+    func adopt(_ incoming: MatchPayload<JackpotState>) {
+        match = incoming.match
+        jackpotsThisRound = incoming.state.jackpotsThisRound
+        phase = .ready
+    }
+
     private enum Phase {
         /// Waiting for the active player to roll.
         case ready
         /// Dice in the air.
         case rolling
-        /// Roll scored; waiting to hand over or finish.
+        /// Roll scored; waiting to send the turn on or finish.
         case scored
         /// Handover gate between turns.
         case handover
@@ -37,10 +63,13 @@ struct JackpotScreen: View {
                 // Same three-band split as Rolls and Free Roll, so the
                 // playfield stays square: the scene's world bounds are
                 // derived from this view's measured aspect ratio.
-                let headerHeight = geo.size.height * 0.17
-                let minButtonHeight: CGFloat = 100
-                let sceneHeight = min(geo.size.width, max(geo.size.height - headerHeight - minButtonHeight, 0))
-                let buttonHeight = geo.size.height - headerHeight - sceneHeight
+                // The split every game makes, made once — see
+                // GameBandLayout. The button band's floor is summed from
+                // what it holds rather than typed as 100.
+                let bands = GameBandLayout.self
+                let headerHeight = bands.header(in: geo.size, fraction: 0.17)
+                let sceneHeight = bands.scene(in: geo.size, fraction: 0.17)
+                let buttonHeight = bands.buttonBand(in: geo.size, fraction: 0.17)
 
                 VStack(spacing: 0) {
                     MatchScoreboard(

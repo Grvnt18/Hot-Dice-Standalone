@@ -211,3 +211,259 @@ extension GameTransport {
         )
     }
 }
+
+// MARK: - What a turn actually carries
+
+/// The body of every turn: the bookkeeping and the game's own state.
+///
+/// These were always going to travel together and never had a type saying
+/// so. `TurnMatch` holds who is playing, whose turn it is and every score;
+/// `State` holds whatever that game needs on top. Sending one without the
+/// other is not a thing any game wants, so the pair is the unit.
+///
+/// Keys are one letter for the same reason everything else here is: this
+/// rides in an `MSMessage` URL against a 4 KB budget.
+struct MatchPayload<State: Codable & Equatable>: Codable, Equatable {
+    var match: TurnMatch
+    var state: State
+
+    private enum CodingKeys: String, CodingKey {
+        case match = "m"
+        case state = "d"
+    }
+
+    init(match: TurnMatch, state: State) {
+        self.match = match
+        self.state = state
+    }
+}
+
+// MARK: - Sending and receiving a turn
+
+extension GameTransport {
+
+    /// Packs a turn for sending.
+    ///
+    /// The one call a game makes. Everything underneath — the envelope, the
+    /// version, the JSON, the base64url, the query item — is this file's
+    /// business and no screen's.
+    static func send<State: Codable & Equatable>(
+        game: String,
+        version: Int,
+        seed: UInt64,
+        match: TurnMatch,
+        state: State
+    ) throws -> URL {
+        let body = MatchPayload(match: match, state: state)
+        return try url(for: GameEnvelope(game: game, version: version,
+                                         seed: seed, state: body))
+    }
+
+    /// Unpacks a received turn.
+    ///
+    /// Routes through `decode`, so an unknown game and a newer schema both
+    /// come back as a `GamePayloadError` the receiver can show rather than
+    /// as a decoding failure it cannot explain.
+    static func receive<State: Codable & Equatable>(
+        _ type: State.Type,
+        from url: URL,
+        expecting game: String,
+        supportedVersion: Int
+    ) throws -> (seed: UInt64, match: TurnMatch, state: State) {
+        let envelope = try decode(MatchPayload<State>.self, from: url,
+                                  expecting: game,
+                                  supportedVersion: supportedVersion)
+        return (envelope.seed, envelope.state.match, envelope.state.state)
+    }
+}
+
+// MARK: - Proving it on the device
+
+/// A round trip per game, run on the iPad.
+///
+/// The transport was written, documented and budgeted long before anything
+/// used it, and nothing had ever encoded a real turn — the whole of it was
+/// correct by inspection. This is what makes it correct by demonstration,
+/// and it runs in Swift Playgrounds, where the Messages extension itself
+/// cannot be built at all.
+///
+/// Each probe packs a representative turn, sends it through the real URL
+/// path, reads it back, and compares. A payload that does not survive its
+/// own round trip is a turn that would arrive wrong; a payload over budget
+/// is one that might not arrive.
+enum GameWireCheck {
+
+    struct Result: Identifiable {
+        let game: String
+        let bytes: Int
+        let fits: Bool
+        /// Nil when the turn came back equal to the one that was sent.
+        let failure: String?
+
+        var id: String { game }
+        var ok: Bool { failure == nil && fits }
+    }
+
+    /// Packs, sends, reads back and compares one game.
+    ///
+    /// Generic rather than existential: Swift 5.7 cannot hold a protocol
+    /// with an associated type in an array without ceremony that buys
+    /// nothing here, so the games are listed explicitly in `runAll` and
+    /// each one calls this.
+    static func probe<State: Codable & Equatable>(
+        game: String,
+        version: Int,
+        seed: UInt64 = 0xD1CE_D1CE,
+        match: TurnMatch,
+        state: State
+    ) -> Result {
+        do {
+            let url = try GameTransport.send(game: game, version: version,
+                                             seed: seed, match: match,
+                                             state: state)
+            let bytes = url.absoluteString.utf8.count
+            let back = try GameTransport.receive(State.self, from: url,
+                                                 expecting: game,
+                                                 supportedVersion: version)
+            var problem: String?
+            if back.seed != seed {
+                problem = "seed came back \(back.seed), sent \(seed)"
+            } else if back.match != match {
+                problem = "the match did not survive the round trip"
+            } else if back.state != state {
+                problem = "the game state did not survive the round trip"
+            }
+            return Result(game: game, bytes: bytes,
+                          fits: bytes <= GameTransport.safeByteBudget,
+                          failure: problem)
+        } catch {
+            return Result(game: game, bytes: 0, fits: false,
+                          failure: "\(error)")
+        }
+    }
+
+    /// Every sendable game, each with a turn shaped like a real one.
+    ///
+    /// Free Roll is absent on purpose: it is solo and `isSendable` is false,
+    /// so it has no turn to send and no state to carry.
+    static func runAll() -> [Result] {
+        // `messagesShaped`, not `localTwoPlayer`. This panel existed to
+        // report the real byte cost and was reporting the cost of
+        // pass-and-play instead: `local.1` is seven characters where an
+        // `MSConversation` participant is a 36-character UUID, and each
+        // participant is spelled twice in an encoded match. At two seats
+        // that alone is 154 bytes. Measuring the short ids understated
+        // every game on the list.
+        let two = TurnMatch.messagesShaped(playerCount: 2)
+        let group = TurnMatch.messagesShaped(playerCount: 6)
+
+        var results: [Result] = []
+
+        // Rolls: the biggest payload in the suite by a distance — fifteen
+        // landed faces per player, and no turn order, so a whole group chat
+        // can be mid-round at once. If anything breaks the budget it is this.
+        //
+        // And a FINISHED round for every seat. The probe used to send
+        // `RollsGameState(startedBy:)`, whose `results` are empty — so the
+        // one game that scales with the size of the chat was being measured
+        // with none of the thing that scales. It reported 351 bytes at six
+        // seats; a real six-seat round is 1861.
+        results.append(probe(game: RollsGameState.gameID, version: 1,
+                             match: group,
+                             state: filledRolls(match: group,
+                                                seed: 0xD1CE_D1CE)))
+
+        // With its snake order, which is what GeneralsScreen builds and
+        // which is twelve more entries on the wire. Generals is the
+        // heaviest of the alternating games and the probe was leaving its
+        // own seat sequence out.
+        results.append(probe(game: "generals", version: 1,
+                             match: TurnMatch.messagesShaped(
+                                playerCount: 2,
+                                seatSequence: GeneralsRules.snakeOrder),
+                             state: GeneralsState()))
+        results.append(probe(game: "three_thousand", version: 1,
+                             match: group, state: ThreeThousandState(
+                                turnTotal: 850, turnsLeftAfterTarget: 2,
+                                firstToTarget: group.participants[0])))
+        results.append(probe(game: "hog", version: 1,
+                             match: group, state: HogState(turnTotal: 23)))
+        results.append(probe(game: "fyd", version: 1,
+                             match: group, state: FreighterYachtDinghyState()))
+        // Participant ids taken FROM the match, not written as literals:
+        // a state that names a player has to name one of the real,
+        // full-length ones or it measures a shorter message than it sends.
+        results.append(probe(game: "jackpot", version: 1,
+                             match: two, state: JackpotState(
+                                jackpotsThisRound: [two.participants[0]])))
+        results.append(probe(game: "boneheads", version: 1,
+                             match: two, state: filledBoneheads()))
+        results.append(probe(game: "royal_ur", version: 1,
+                             match: two, state: RoyalUrState()))
+        results.append(probe(game: "rollbots", version: 1,
+                             match: two,
+                             state: RollbotsState(
+                                weapons: [.monoBlade, .railRifle],
+                                ware: [.neuralOverclock, .quantumPhase])))
+        // Nine innings: the longest match the game offers, and so the
+        // most base state a turn can carry.
+        results.append(probe(game: "baseball_dice", version: 1,
+                             match: two, state: BaseballDiceState(innings: 9)))
+
+        return results
+    }
+
+    /// Every seat with a finished round, which is Rolls' largest state.
+    ///
+    /// Built from the probe's own seed so the dice are the dice that seed
+    /// deals and every value is a face that die can physically show — which
+    /// means the result would also pass `validate(againstSeed:)`, not merely
+    /// encode to the right size.
+    ///
+    /// The faces are spread by seat rather than repeated, so no two seats
+    /// encode to the same bytes. JSON has no back-reference, so that would
+    /// not have changed the size — but a probe whose seats are identical is
+    /// one that cannot tell a per-seat bug from a shared one.
+    private static func filledRolls(match: TurnMatch, seed: UInt64)
+        -> RollsGameState {
+        let pool = DiceGameRound(seed: seed).originalPool
+        var results: [String: RollsPlayerResult] = [:]
+
+        for (seat, participant) in match.participants.enumerated() {
+            var values: [Int] = []
+            var score = 0
+            for (index, die) in pool.enumerated() {
+                let value = (index + seat) % die.sides + 1
+                values.append(value)
+                score += RollsPlayerResult.points(sides: die.sides,
+                                                  value: value)
+            }
+            // Any permutation of the pool's indices is a legal bank order,
+            // and reversed is a permutation that is the same every run.
+            let order = Array(pool.indices.reversed())
+            results[participant] = RollsPlayerResult(values: values,
+                                                     order: order,
+                                                     score: score)
+        }
+
+        return RollsGameState(startedBy: match.participants.first ?? "",
+                              results: results)
+    }
+
+    /// A Boneheads board with every slot taken, which is its largest state
+    /// — eighteen placements, each a face and an ink. Measuring an empty
+    /// board would measure nothing.
+    private static func filledBoneheads() -> BoneheadsState {
+        var state = BoneheadsState()
+        for slot in 0..<BoneheadsRules.slotsPerColumn {
+            for column in 0..<BoneheadsRules.columns {
+                for seat in 0...1 {
+                    state.place(seat: seat, column: column,
+                                die: (slot + column + seat) % 6 + 1,
+                                ink: (slot * 3 + column + seat) % 15)
+                }
+            }
+        }
+        return state
+    }
+}

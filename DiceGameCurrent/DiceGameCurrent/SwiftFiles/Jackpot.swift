@@ -175,6 +175,27 @@ extension JackpotRules {
     }
 }
 
+/// Jackpot as it travels in a message.
+///
+/// The round's unresolved Jackpots. They cannot be settled when they are
+/// rolled — a Jackpot only wins once everyone else in the round has had
+/// their turn, and two in the same round cancel — so the list has to
+/// survive the handover or the Equalizer silently stops working.
+///
+/// Scores live in `TurnMatch`, and the five dice are re-read from the seed,
+/// so this is the whole of what Jackpot adds to the wire.
+struct JackpotState: Codable, Equatable {
+
+    /// Participants who have hit a Jackpot in the round now being played.
+    var jackpotsThisRound: [String] = []
+
+    private enum CodingKeys: String, CodingKey { case jackpotsThisRound = "j" }
+
+    init(jackpotsThisRound: [String] = []) {
+        self.jackpotsThisRound = jackpotsThisRound
+    }
+}
+
 // MARK: - Suite entry
 
 enum JackpotGame: SuiteGame {
@@ -182,42 +203,22 @@ enum JackpotGame: SuiteGame {
     static let displayName = "Jackpot"
     static let tagline = "Five rounds, or hit the jackpot."
 
-    /// The short version, shown from inside the game.
-    static let quickRules: [GameRuleSection] = [
-        GameRuleSection(
-            title: "The Goal",
-            body: "The highest total over five rounds each — or a Jackpot, which wins on the spot."
-        ),
-        GameRuleSection(
-            title: "Your Turn",
-            body: "Roll all five dice and read seven numbers: the d4's three exposed faces plus the top of the d6, d8, d12 and d20."
-        ),
-        GameRuleSection(
-            title: "Scoring",
-            body: "Any number appearing more than once scores itself times how often it appears. A d20 of 13 or more adds its own value. No sets at all with a d20 of 12 or less is the Jackpot."
-        )
-    ]
-
     static let rules: [GameRuleSection] = [
         GameRuleSection(
-            title: "Your Turn",
-            body: "Roll all five dice together. Read the three exposed faces of the d4 — every number except the one against the table — plus the top face of the d6, d8, d12 and d20. Seven numbers in all."
+            title: "Game Overview",
+            body: "  * Players: 2 (alternating turns across 5 rounds).\n  * Dice Pool: 1x d4, 1x d6, 1x d8, 1x d12, 1x d20.\n  * Objective: Accumulate highest total points or trigger instant-win Jackpot."
         ),
         GameRuleSection(
-            title: "Sets",
-            body: "For any number appearing two or more times across your seven, score that number multiplied by how many times it appears. Two 4's = 8. A set of three 3's = 9. The d4's three faces are always different, so they can only match the other dice, never each other."
+            title: "Reading the Roll",
+            body: "  Each roll yields seven numbers:\n    * The 3 exposed side faces of the d4.\n    * The top face of the d6, d8, d12, and d20."
         ),
         GameRuleSection(
-            title: "The d20 Booster",
-            body: "If the d20 shows 13 or higher, add its face value to your turn score."
+            title: "Scoring & Instant Win Conditions",
+            body: "  * Sets: Any number appearing two or more times among the 7 exposed values scores:\n      Score = Number Value x Occurrences\n  * Booster: A d20 showing 13 or higher adds its raw face value to turn score.\n  * Jackpot (Instant Win): Achieved when there are ZERO sets across all 7 numbers\n    AND the d20 shows 12 or lower."
         ),
         GameRuleSection(
-            title: "Jackpot",
-            body: "If you have no sets at all and the d20 shows 12 or lower, you hit the Jackpot — roughly one roll in 23."
-        ),
-        GameRuleSection(
-            title: "Winning",
-            body: "A Jackpot wins the game outright, but your opponent always finishes the round first. If they Jackpot in that same round, both are cancelled and play continues. If nobody Jackpots across all five rounds, the highest total wins."
+            title: "Match Resolution",
+            body: "  * An uncancelled Jackpot wins the match instantly.\n  * If a player rolls a Jackpot, all other players in the round complete their final\n    turn. If multiple players hit a Jackpot in the same round, they cancel\n    out and play continues.\n  * If no Jackpot is hit after 5 rounds, the highest total score wins."
         )
     ]
 }

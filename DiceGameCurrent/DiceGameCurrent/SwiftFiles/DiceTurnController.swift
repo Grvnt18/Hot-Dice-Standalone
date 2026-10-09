@@ -54,6 +54,17 @@ final class DiceTurnController {
 
     /// Banked dice in order taken — drive the top bar's 3x5 grid fill
     /// directly from this after each confirm.
+    /// This round, packed the way the Messages extension will send it.
+    ///
+    /// Goes through the controller rather than `DiceGameSession.round`,
+    /// which that type's own comment warns goes stale the moment "Begin"
+    /// starts a new game — the session keeps the round it was assembled
+    /// with, and the controller keeps the one being played.
+    ///
+    /// `round` stays private: this exposes the packed result, not the
+    /// mutable round behind it.
+    var wireResult: RollsPlayerResult { RollsPlayerResult(round: round) }
+
     var bankedOrder: [Die] {
         round.bankedOrder
     }

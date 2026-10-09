@@ -27,11 +27,15 @@ enum Elevation {
     /// Raised across the board, because a hard-edged shadow at the old
     /// opacities reads as a smudge rather than as a silhouette. With no blur
     /// to soften it, the shadow either commits or looks like a mistake.
+    /// A quarter lighter than it was: 0.45/0.55/0.70 became 0.34/0.41/0.53.
+    /// The ladder keeps its proportions — three heights that stop being a
+    /// sequence stop being three heights, same reason `offset` was doubled
+    /// in proportion rather than only where the hub needed it.
     var opacity: Double {
         switch self {
-        case .resting: return 0.45
-        case .piece:   return 0.55
-        case .lifted:  return 0.70
+        case .resting: return 0.34
+        case .piece:   return 0.41
+        case .lifted:  return 0.53
         }
     }
 
@@ -50,11 +54,19 @@ enum Elevation {
     /// Whole pixels, and now the ONLY thing separating the three heights —
     /// see `radius`. Also thrown sideways as well as down, because a hard
     /// shadow directly below reads as a seam rather than as a shadow.
+    ///
+    /// Doubled from 1/2/3, because at those distances it read as noise
+    /// rather than as depth. A 3pt offset under a 95pt hub icon is three
+    /// percent — near enough to the sprite's own edge to look like a
+    /// rasterising artefact, which is precisely what was reported. The
+    /// ladder is kept in proportion rather than raising only the height the
+    /// hub happens to use: three heights that are no longer a sequence stop
+    /// being three heights.
     var offset: CGFloat {
         switch self {
-        case .resting: return 1
-        case .piece:   return 2
-        case .lifted:  return 3
+        case .resting: return 2
+        case .piece:   return 4
+        case .lifted:  return 6
         }
     }
 
@@ -65,7 +77,31 @@ enum Elevation {
     /// Signed for the light: away from it, whichever way it points.
     var dy: CGFloat { PieceSheen.litFromTop ? offset : -offset }
 
-    var color: Color { .black.opacity(opacity) }
+    /// Which way the shadow is signed in TONE, the way `dy` signs it in
+    /// direction.
+    ///
+    /// A dark mark on mid-tone timber cannot throw a dark shadow. The hub's
+    /// wordmark is black on wood now, and a black offset behind black
+    /// glyphs is not depth — it is a thickened edge, which is the other
+    /// half of the "reads as noise" report. So the hub throws a pale
+    /// shadow instead, off the same distances and the same opacities.
+    ///
+    /// Two tones, one ladder: both are the shared `opacity` against a
+    /// different base, which is the whole reason this is still one shadow
+    /// system rather than two. `tools_cohesion_verify.py` checks that,
+    /// because an ink with numbers of its own is how it would stop being
+    /// true.
+    enum Ink {
+        case dark      // anything on a light or mid surface
+        case light     // a dark mark on a mid surface — the hub
+    }
+
+    func color(_ ink: Ink) -> Color {
+        switch ink {
+        case .dark:  return .black.opacity(opacity)
+        case .light: return .white.opacity(opacity)
+        }
+    }
 }
 
 extension View {
@@ -74,8 +110,12 @@ extension View {
     /// The one way to put a shadow on anything in this app —
     /// `tools_cohesion_verify.py` fails a hand-written `.shadow(` so the
     /// four values cannot quietly become five.
-    func elevated(_ elevation: Elevation) -> some View {
-        shadow(color: elevation.color,
+    ///
+    /// `ink` defaults to `.dark`, so every call site that predates the
+    /// second tone keeps exactly the shadow it had.
+    func elevated(_ elevation: Elevation,
+                  ink: Elevation.Ink = .dark) -> some View {
+        shadow(color: elevation.color(ink),
                radius: elevation.radius,
                x: elevation.dx,
                y: elevation.dy)

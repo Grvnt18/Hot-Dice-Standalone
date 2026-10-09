@@ -52,6 +52,99 @@ SWIFT = "DieMaterialFactory.swift"
 LABELS = "DieFaceLabels.swift"
 
 
+# Large numerals on a die face: WCAG's large-text bar is 3:1, and the
+# normal-text bar is 4.5:1. The first is the one that must hold for every
+# colourway; the second is reported.
+LARGE_TEXT_CONTRAST = 3.0
+NORMAL_TEXT_CONTRAST = 4.5
+
+
+def _luminance(hexcode):
+    value = hexcode.lstrip("#")
+    channels = []
+    for offset in (0, 2, 4):
+        raw = int(value[offset:offset + 2], 16) / 255.0
+        channels.append(raw / 12.92 if raw <= 0.03928
+                        else ((raw + 0.055) / 1.055) ** 2.4)
+    return (0.2126 * channels[0] + 0.7152 * channels[1]
+            + 0.0722 * channels[2])
+
+
+def _contrast(one, other):
+    a, b = _luminance(one), _luminance(other)
+    return (max(a, b) + 0.05) / (min(a, b) + 0.05)
+
+
+def check_numerals(failed):
+    """Every die's numeral is readable on its own body.
+
+    `numberHex` was a second hex typed beside `bodyHex` with nothing
+    checking the pair, and six of fifteen colourways failed AA — five of
+    them backwards, carrying white where the dark ink had twice the
+    contrast. Worse, two call sites built their own: Rollbots' seat dice,
+    and Baseball's batter die, whose body is WHATEVER SWATCH THE PLAYER
+    PICKED. On Onyx that was #1B1B1F on #14140F — 1.08:1, a black numeral
+    on a black die.
+
+    So the ink is derived from the body now, and this asserts the two
+    things that makes true: that the derivation picks the better ink, and
+    that no call site has gone back to typing one.
+    """
+    source_text = source("DiceGame.swift")
+
+    light = re.search(r'static let lightInk = "(#\w{6})"', source_text)
+    dark = re.search(r'static let darkInk = "(#\w{6})"', source_text)
+    if not light or not dark:
+        failed.append("DiePalette no longer declares lightInk and darkInk, "
+                      "so there is no pair to choose a numeral from")
+        return
+    light, dark = light.group(1), dark.group(1)
+
+    bodies = re.findall(r'DieColorway\(bodyHex: "(#\w{6})"\)', source_text)
+    if not bodies:
+        failed.append("no colourways found in DiePalette")
+        return
+
+    # Baseball's batter die takes the table colour, so every swatch is a
+    # die body too and has to clear the same bar.
+    bodies += re.findall(r'Swatch\(hex: "(#\w{6})"', source("AppTheme.swift"))
+    bodies.append("#0A0A0C")                    # Baseball's pitcher die
+    # Rollbots' two seat colours, read rather than copied.
+    for pair in re.findall(r'"(#\w{6})" : "(#\w{6})"',
+                           source("RollbotsArt.swift")):
+        bodies.extend(pair)
+
+    worst = ("", 99.0)
+    below_aa = []
+    for body in bodies:
+        chosen = light if _contrast(body, light) >= _contrast(body, dark) else dark
+        ratio = _contrast(body, chosen)
+        if ratio < worst[1]:
+            worst = (body, ratio)
+        if ratio < NORMAL_TEXT_CONTRAST:
+            below_aa.append("%s %.2f:1" % (body, ratio))
+        if ratio < LARGE_TEXT_CONTRAST:
+            failed.append("a %s die's numeral comes out at %.2f:1, under the "
+                          "%.1f:1 large-text bar, and neither ink does better"
+                          % (body, ratio, LARGE_TEXT_CONTRAST))
+
+    # And nobody types an ink any more.
+    for filename in sorted(os.listdir(SWIFT_DIR)):
+        if not filename.endswith(".swift"):
+            continue
+        body = source(filename)
+        if re.search(r'DieColorway\([^)]*numberHex:', body):
+            failed.append("%s builds a DieColorway with its own numberHex — "
+                          "the ink is derived from the body so that a dark "
+                          "die always gets a light numeral" % filename)
+
+    note = ""
+    if below_aa:
+        note = ", under 4.5:1 on %s (fine for large numerals)" % ", ".join(below_aa)
+    print("  %-26s ok (%d bodies, worst %s at %.2f:1%s)"
+          % ("numeral contrast", len(bodies), worst[0], worst[1], note))
+
+
 def main():
     text = source(SWIFT)
     failed = []
@@ -304,6 +397,8 @@ def main():
                       "from the camera would soften as it shrank")
     else:
         print("  %-26s ok (hard texels both ways)" % "label filtering")
+
+    check_numerals(failed)
 
     if failed:
         print()

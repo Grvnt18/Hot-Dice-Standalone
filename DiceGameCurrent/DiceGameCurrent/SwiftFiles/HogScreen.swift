@@ -12,6 +12,32 @@ struct HogScreen: View {
     @State private var showingSettings = false
     @ObservedObject private var theme = AppTheme.shared
 
+
+    // MARK: Sending a turn
+
+    /// This screen's turn, packed the way the Messages extension will send
+    /// it — the bookkeeping and the game's own state together, which is
+    /// what MatchPayload exists to say.
+    ///
+    /// Assembled from the screen's own properties rather than the screen
+    /// being rebuilt around the state type. The dice mid-turn are not in
+    /// here on purpose: a turn is resolved on the device that threw it and
+    /// arrives as a result.
+    var wireTurn: MatchPayload<HogState> {
+        MatchPayload(match: match, state: HogState(turnTotal: turnTotal))
+    }
+
+    /// Adopts a turn that arrived from another device.
+    ///
+    /// Phase goes back to `.ready` rather than being carried: a phase is
+    /// what THIS device is doing with the dice in front of it, and the
+    /// sender's is meaningless here.
+    func adopt(_ incoming: MatchPayload<HogState>) {
+        match = incoming.match
+        turnTotal = incoming.state.turnTotal
+        phase = .ready
+    }
+
     private enum Phase {
         /// Waiting for the active player to throw.
         case ready
@@ -19,7 +45,7 @@ struct HogScreen: View {
         case rolling
         /// A face is up and it was not a 1: roll on, or hold.
         case decide
-        /// Turn over; waiting to hand over.
+        /// Turn over; waiting to send it on.
         case scored
         /// Handover gate between turns.
         case handover
@@ -33,10 +59,13 @@ struct HogScreen: View {
                 // The same three-band split every game in the suite uses:
                 // the scene is square because its world bounds come from
                 // this view's measured aspect ratio.
-                let headerHeight = geo.size.height * 0.17
-                let minButtonHeight: CGFloat = 100
-                let sceneHeight = min(geo.size.width, max(geo.size.height - headerHeight - minButtonHeight, 0))
-                let buttonHeight = geo.size.height - headerHeight - sceneHeight
+                // The split every game makes, made once — see
+                // GameBandLayout. The button band's floor is summed from
+                // what it holds rather than typed as 100.
+                let bands = GameBandLayout.self
+                let headerHeight = bands.header(in: geo.size, fraction: 0.17)
+                let sceneHeight = bands.scene(in: geo.size, fraction: 0.17)
+                let buttonHeight = bands.buttonBand(in: geo.size, fraction: 0.17)
 
                 VStack(spacing: 0) {
                     MatchScoreboard(

@@ -1,485 +1,338 @@
-ROLLS — THE COMPLETE RULES
-Every game in the suite, in full. Plain text, for copy and paste.
-Taken from the shipped code: every number below is the number the app uses.
-
-Games in hub order:
-   1. Baseball Dice        7. Freighter.Yacht.Dinghy
-   2. Rolls                8. Royal UR
-   3. Jackpot              9. Rollbots
-   4. Hog                 10. Boneheads
-   5. Generals            11. Free Roll
-   6. Three Thousand
-
-Every game but Free Roll is two players on one device, passing it back and
-forth. A handover screen covers the table between turns, so nobody sees the
-other player's choice.
-
-
 ===============================================================================
-1. BASEBALL DICE — "Guess the pitch. Take the extra base."
+GAME RULES REFERENCE GUIDE
 ===============================================================================
-Players 2 · 2 to 3 dice a throw · 3, 6 or 9 innings
 
-SETUP
-  Choose the match length once, before anything else. There is no way back
-  to it without starting a new match.
-      3 innings   short, about 31 at-bats, roughly 2.8 runs a side
-      6 innings   medium, about 59 at-bats, roughly 5.3 runs a side
-      9 innings   extra long, about 87 at-bats, roughly 7.9 runs a side
-  Three outs to a half-inning. Whoever starts the match pitches first, so
-  they bat second — they are the home side, as in real baseball.
+-------------------------------------------------------------------------------
+1. BASEBALL DICE
+-------------------------------------------------------------------------------
+GAME OVERVIEW
+  * Players: 2. Player 1 pitches first; Player 2 bats first (Home Team advantage).
+  * Length: Selected before match start (3, 6, or 9 innings). Three outs per half-inning.
+  * Objective: Score the most runs by matching pitch and swing tactics.
 
-THE TURN CYCLE
-  1. The pitcher picks a PITCHING STYLE for the whole half-inning, hidden,
-     then taps Hide It and hands the device over.
-  2. The batter bats until three outs. Each at-bat they pick a SWING without
-     seeing the pitch; the app draws the actual pitch from the pitcher's
-     style and throws both sides' dice together.
-  3. On the third out the player who has just batted picks their own style,
-     still holding the device, and hands it back. Roles swap.
-  One handover per half-inning. The last batter of the match never picks a
-  style, since nobody bats after them.
+TURN STRUCTURE
+  1. Pitcher Style Selection: The pitcher secretly selects a Pitching Style for 
+     the entire half-inning, confirming their choice to end the step.
+  2. At-Bat Execution: For each at-bat, the batter chooses a Swing without seeing 
+     the pitch. The pitch is drawn automatically based on the pitcher’s 
+     style, and both dice are rolled simultaneously.
+  3. Inning Handover: Upon the third out, the half-inning ends. Roles swap, 
+     and the new pitcher selects their Pitching Style.
 
-THE THREE PITCHING STYLES
-  A style is a MIX, not a single pitch — the app rolls the actual pitch from
-  it every at-bat, so even the pitcher does not know exactly what is coming.
-      Style            Fastball  Changeup  Slider
-      Power Pitcher      60%       25%      15%
-      Crafty             20%       60%      20%
-      Breaking Ball      20%       20%      60%
+PITCHING STYLES & SWING MATCHUPS
+  Pitching Styles:
+    * Power Pitcher: Heavy emphasis on Fastballs; secondary Changeup and Slider.
+    * Crafty: Heavy emphasis on Changeups; secondary Fastball and Slider.
+    * Breaking Ball: Heavy emphasis on Sliders; secondary Fastball and Changeup.
 
-THE CYCLE
-  Each pitch beats exactly one swing and loses to exactly one.
-      Fastball  beats Power Swing    · loses to Patient Swing
-      Changeup  beats Patient Swing  · loses to Contact Swing
-      Slider    beats Contact Swing  · loses to Power Swing
-  Any other pairing is even.
+  Strategic Cycle:
+    * Fastball beats Power Swing | Loses to Patient Swing
+    * Changeup beats Patient Swing | Loses to Contact Swing
+    * Slider beats Contact Swing | Loses to Power Swing
 
-THE DICE EACH PAIRING THROWS
-      Matchup                          Batter            Pitcher
-      Favoured (swing beats pitch)     2 x swing die,    1d4
-                                       keep the highest
-      Even                             1 x swing die     1d8
-      Unfavoured — Fastball/Power      1d12              2d12, keep highest
-      Unfavoured — Changeup/Patient    1d8               1d10
-      Unfavoured — Slider/Contact      1d10              1d12
-  The swing dice: Patient d8, Contact d10, Power d12.
+DICE & MATCHUP MECHANICS
+  Matchup Type                        Batter Dice               Pitcher Dice
+  -----------------------------------------------------------------------------
+  Favoured (Swing Beats Pitch)        2x Swing Die (Keep High)  1d4
+  Even (Neutral Matchup)              1x Swing Die              1d8
+  Unfavoured: Fastball vs. Power      1d12                      2d12 (Keep High)
+  Unfavoured: Changeup vs. Patient    1d8                       1d10
+  Unfavoured: Slider vs. Contact      1d10                      1d12
 
-THE RESULT — batter's roll minus pitcher's roll
-      -5 or worse   Strikeout          1 out
-      -4 to +1      Field Out          1 out; see the double play below
-      +2            Walk               batter to first, forced runners move 1
-      +3 to +4      Single             batter to first, every runner moves 1
-      +5            Double             batter to second, every runner moves 2
-      +6            Triple             batter to third, every runner scores
-      +7 to +9      Deep Out           1 out; a runner on third scores,
-                                       unless it was the third out
-      +10 or more   Home Run           batter and every runner score
+  * Base Swing Dice Sizes: Patient (1d8), Contact (1d10), Power (1d12).
+
+SCORING MATRIX (Batter Roll Minus Pitcher Roll)
+  Differential    Result        Effect
+  -----------------------------------------------------------------------------
+  -5 or lower     Strikeout     1 Out
+  -4 to +1        Field Out     1 Out (Triggers Double Play if Pitcher roll is 
+                                even with a runner on 1st)
+  +2              Walk          Batter to 1st; forced runners advance 1 base
+  +3 to +4        Single        Batter to 1st; all base runners advance 1 base
+  +5              Double        Batter to 2nd; all base runners advance 2 bases
+  +6              Triple        Batter to 3rd; all base runners score
+  +7 to +9        Deep Out      1 Out; runner on 3rd scores (Unless 3rd out)
+  +10 or higher   Home Run      Batter and all base runners score
 
 SPECIAL RULES
-  Favoured immunity   A favoured swing can never strike out: the worst
-                      differential it can produce is 1 - 4 = -3.
-  Double max          Both dice of a favoured swing on their maximum is an
-                      automatic home run, whatever the table says.
-  Double play         A field out with a runner on first is a double play
-                      when the PITCHER's roll is even.
-  Third-out catch     A deep out that is the third out ends the inning
-                      before the runner crosses, so no run scores. The
-                      banner says so, because it looks like a bug otherwise.
-
-HOW IT ENDS
-  Most runs when the innings run out. A tie plays extra innings, in pairs,
-  until someone leads at the end of one.
-
-WORTH KNOWING
-  Nothing in this game is a safe pick. Played perfectly, the pitcher's mix
-  is 37/30/33 and the batter's 36/26/38 — close to even on both sides, which
-  is the point. The Fastball throws two d12 against a Power Swing precisely
-  because d12 against d12 was a coin flip rather than a punishment.
+  * Favoured Immunity: A favoured swing cannot strike out (minimum net value is -3).
+  * Double Maximum: Rolling the maximum value on both dice during a favoured swing 
+    results in an automatic Home Run regardless of differential.
+  * Third-Out Catch: A Deep Out recorded as the third out immediately ends 
+    the half-inning; no run scores.
 
 
-===============================================================================
-2. ROLLS — "One round. Lowest score takes it."
-===============================================================================
-Players 2 or a whole group · 15 dice · one round each
+-------------------------------------------------------------------------------
+2. ROLLS
+-------------------------------------------------------------------------------
+GAME OVERVIEW
+  * Players: 2 or more (group play compatible).
+  * Dice Pool: 15 total (12x d6, 1x d8, 1x d10, 1x d12).
+  * Objective: Bank all 15 dice; lowest cumulative score wins.
 
-THE POOL
-  Twelve d6, one d8, one d10 and one d12 — fifteen dice.
+PLAYER TURN
+  1. Roll all remaining active dice in the pool.
+  2. Select and bank at least one die.
+  3. Re-roll all unbanked dice. Repeat until all 15 dice are banked to 
+     finish the turn.
 
-YOUR TURN
-  1. Tap Begin to roll every die in the pool.
-  2. Tap any settled die to select it. You must bank at least one die.
-  3. Tap Roll to bank the selection and re-throw everything left.
-  4. Repeat until every die is banked. Selecting every remaining die turns
-     the button into Finish.
+SCORING STRUCTURE
+  A banked die scores based on its differential from its highest face value. 
+  Lower scores are better.
 
-SCORING — low is good
-  A banked die scores against its OWN best face.
-      Rolled the die's highest number     0 points
-      One below it                        1 point
-      Two below it                        2 points  (and so on)
-      Rolled a 1                          the die's full number of sides
-  So a 1 costs 6 on a d6, 8 on a d8, 10 on a d10 and 12 on a d12 — the four
-  worst results in the game.
-      Die       Best face (0 pts)   A 1 costs
-      d6 (x12)        6                 6
-      d8              8                 8
-      d10            10                10
-      d12            12                12
+  Die Type    Highest Face (0 Pts)    Penalty for Rolling a 1
+  -----------------------------------------------------------------------------
+  d6          6                       6 Points
+  d8          8                       8 Points
+  d10         10                      10 Points
+  d12         12                      12 Points
 
-HOW IT ENDS
-  When all fifteen dice are banked. Lowest total wins.
-
-WORTH KNOWING
-  A single round has no turn order, so Rolls is the one game in the suite a
-  whole group can play at once — everybody rolls, lowest takes it.
+  * Formula: Score = Max Value - Rolled Face
+  * Exception: Rolling a 1 scores penalty points equal to the die's total sides.
 
 
-===============================================================================
-3. JACKPOT — "Five rounds, or hit the jackpot."
-===============================================================================
-Players 2 · d4, d6, d8, d12, d20 · 5 rounds each, alternating
+-------------------------------------------------------------------------------
+3. JACKPOT
+-------------------------------------------------------------------------------
+GAME OVERVIEW
+  * Players: 2 (alternating turns across 5 rounds).
+  * Dice Pool: 1x d4, 1x d6, 1x d8, 1x d12, 1x d20.
+  * Objective: Accumulate highest total points or trigger instant-win Jackpot.
 
-YOUR TURN
-  Roll all five dice together and read SEVEN numbers:
-      - the three exposed faces of the d4 (every number except the one
-        against the table)
-      - the top face of the d6, the d8, the d12 and the d20
+READING THE ROLL
+  Each roll yields seven numbers:
+    * The 3 exposed side faces of the d4.
+    * The top face of the d6, d8, d12, and d20.
 
-SCORING
-  Sets      Any number appearing two or more times across your seven scores
-            that number times how many times it appears.
-                Two 4's           = 8
-                Three 3's         = 9
-                Four 2's          = 8
-            The d4's three faces are always different, so they can only
-            match the other dice, never each other.
-  Booster   A d20 of 13 or higher adds its own face value to the turn.
-  Jackpot   NO sets at all AND a d20 of 12 or lower.
+SCORING & INSTANT WIN CONDITIONS
+  * Sets: Any number appearing two or more times among the 7 exposed values scores:
+      Score = Number Value x Occurrences
+  * Booster: A d20 showing 13 or higher adds its raw face value to turn score.
+  * Jackpot (Instant Win): Achieved when there are ZERO sets across all 7 numbers 
+    AND the d20 shows 12 or lower.
 
-HOW IT ENDS
-  A Jackpot wins the game outright — but your opponent always finishes the
-  round first. If they Jackpot in the same round, both cancel and play goes
-  on. If nobody Jackpots in five rounds, the highest total wins.
-
-WORTH KNOWING
-  A Jackpot is about one roll in 23 (4.4%), so roughly a third of games end
-  on one. Both players hitting one in the same round happens about twice in
-  a thousand games.
+MATCH RESOLUTION
+  * An uncancelled Jackpot wins the match instantly.
+  * If a player rolls a Jackpot, all other players in the round complete their final 
+    turn. If multiple players hit a Jackpot in the same round, they cancel 
+    out and play continues.
+  * If no Jackpot is hit after 5 rounds, the highest total score wins.
 
 
-===============================================================================
-4. HOG — "Push your luck to 75."
-===============================================================================
-Players 2 · one d6 · first to 75
+-------------------------------------------------------------------------------
+4. HOG
+-------------------------------------------------------------------------------
+GAME OVERVIEW
+  * Players: 2 or more (alternating turns).
+  * Dice Pool: 1x d6.
+  * Objective: First player to bank 75 points wins instantly.
 
-YOUR TURN
+TURN MECHANICS
   1. Roll the die.
-  2. A 2 through 6 adds to your TURN TOTAL. Roll again, or hold.
-  3. A 1 — the Hog — ends the turn immediately and the whole turn total is
-     gone. Your banked score is untouched.
-  4. Holding adds the turn total to your score and passes the die.
-
-HOW IT ENDS
-  The first player to bank 75 wins on the spot. There is no answering turn,
-  so a lead you can see is a lead you have to catch before they hold.
-
-WORTH KNOWING
-  The button says what holding is worth right now ("Hold 14"), and becomes
-  "Hold & Win" when banking would end it. A match runs about 15 messages.
+  2. Roll 2-6: Add value to running turn total. Choose to roll again or hold.
+  3. Roll 1 (The Hog): Turn ends immediately and all points accumulated during 
+     that turn are lost. Banked score is unaffected.
+  4. Hold: Bank running turn total into overall score and end turn.
 
 
-===============================================================================
-5. GENERALS — "One scorecard. Claim it first."
-===============================================================================
-Players 2 · 5 dice · 12 turns (6 claims each)
+-------------------------------------------------------------------------------
+5. GENERALS
+-------------------------------------------------------------------------------
+GAME OVERVIEW
+  * Players: 2.
+  * Dice Pool: 5x d6.
+  * Structure: 12 total turns (6 per player) using a single shared scorecard 
+    in a snake turn order (P1, P2, P2, P1...).
 
-THE CARD
-  Twelve categories on a SINGLE SHARED scorecard. Each can be claimed once,
-  by whoever takes it first. Six claims each, so twelve turns in all.
+TURN STRUCTURE
+  1. Roll all 5 dice.
+  2. Optionally keep any number of dice and re-roll the rest. Max 3 rolls per turn.
+  3. Claim one available category on the shared scorecard to end turn.
 
-YOUR TURN
-  1. Roll five dice.
-  2. Tap the dice you want to keep, then roll the rest. Three rolls in all.
-  3. Claim one open category for whatever your hand pays there.
-
-THE CATEGORIES
-      Category        Qualifies with                        Scores
-      Ones            any dice showing 1                    sum of the 1's
-      Twos            any dice showing 2                    sum of the 2's
-      Threes          any dice showing 3                    sum of the 3's
-      Fours           any dice showing 4                    sum of the 4's
-      Fives           any dice showing 5                    sum of the 5's
-      Sixes           any dice showing 6                    sum of the 6's
-      Set of 3        three of the same face                all five dice
-      Set of 4        four of the same face                 all five dice
-      Packed House    three of one and a pair of another    25
-      Small Joker     four consecutive: 1-2-3-4, 2-3-4-5
-                      or 3-4-5-6                            30
-      Large Joker     five consecutive: 1-2-3-4-5
-                      or 2-3-4-5-6                          40
-      Set of 5        all five on the same face             50
+CATEGORIES & SCORING
+  Category          Qualification Requirement           Score
+  -----------------------------------------------------------------------------
+  Ones to Sixes     Any dice showing selected face (1-6) Sum of matching dice
+  Set of 3          Three dice of same face             Sum of all 5 dice
+  Set of 4          Four dice of same face              Sum of all 5 dice
+  Packed House      Three of one face + pair of another 25 Points
+  Small Joker       Four sequential faces (1-2-3-4 etc) 30 Points
+  Large Joker       Five sequential faces (1-2-3-4-5)   40 Points
+  General           All five dice showing same face     50 Points
 
 ZEROING
-  If nothing qualifies you must still claim a category, for zero — and that
-  burns it for your opponent too. Which one you give up is a real decision.
-
-TURN ORDER
-  A snake: you, them, them, you, you, them, and so on. Six claims each.
-  Going first on a shared card is otherwise worth about ten points; the
-  snake is what takes that away (measured: 50.0% to the first seat).
-
-HOW IT ENDS
-  When all twelve categories are claimed. Highest total wins.
+  If a hand does not qualify for an open category (or by choice), a player 
+  must select an open category to claim for 0 points, permanently removing it 
+  for both players.
 
 
-===============================================================================
-6. THREE THOUSAND — "Bank it or lose it."
-===============================================================================
-Players 2 · six d6 · first to 3,000
+-------------------------------------------------------------------------------
+6. THREE THOUSAND
+-------------------------------------------------------------------------------
+GAME OVERVIEW
+  * Players: 2 or more (alternating turns).
+  * Dice Pool: 6x d6.
+  * Objective: First player to reach or exceed 3,000 points.
 
-YOUR TURN
-  1. Roll the dice you still have.
-  2. Set aside at least one scoring die. EVERY die you set aside has to be
-     part of a scoring combination — you may keep a single 1, but you may
-     not smuggle a 2 out with it.
-  3. Roll what is left, or bank.
+TURN MECHANICS
+  1. Roll all active dice.
+  2. Set aside at least one scoring die or valid scoring combination. 
+     Every set-aside die must contribute to a valid score.
+  3. Choose to bank accumulated points (ending turn) or roll remaining dice.
 
-SCORING
-      Each 1                          100
-      Each 5                           50
-      Three 1's                     1,000
-      Three of a kind (2-6)     face x 100   (three 4's = 400)
-      Four of a kind                1,000
-      Five of a kind                2,000
-      Six of a kind                 3,000
-      Straight 1-2-3-4-5-6          1,500
-      Three pairs                     750
+SCORING COMBINATIONS
+  Combination                     Points
+  -----------------------------------------------------------------------------
+  Single 1                        100
+  Single 5                        50
+  Three 1s                        1,000
+  Three-of-a-Kind (2s-6s)          Face Value x 100
+  Four-of-a-Kind                  1,000
+  Five-of-a-Kind                  2,000
+  Six-of-a-Kind                   3,000
+  Full Straight (1-2-3-4-5-6)     1,500
+  Three Pairs                     750
 
-BUSTED
-  Roll and find nothing that scores and the turn ends with everything from
-  that turn gone. About half of all turns end this way.
-
-HOT DICE
-  Set aside all six and you roll all six again with the running total
-  intact. There is no limit to how far a turn can run, and no safety in it.
-
-HOW IT ENDS
-  Bank 3,000 and your opponent gets ONE last turn to beat it. A tie goes to
-  whoever got there first.
-
-WORTH KNOWING
-  A banked turn averages about 900. A straight turns up in about one roll of
-  six fresh dice in 65, so roughly one game in eight carries one — and at
-  1,500 it is half the target.
+TURN RULES
+  * Bust: Roll zero scoring dice, turn ends immediately and turn points are lost.
+  * Hot Dice: Set aside all 6 dice into scoring combinations, re-roll all 6 dice 
+    to continue accumulating points in the same turn.
+  * Match End: When a player reaches 3,000 points, all other players receive one 
+    final turn in the round to attempt to beat the highest score.
 
 
-===============================================================================
-7. FREIGHTER.YACHT.DINGHY — "Best of three."
-===============================================================================
-Players 2 · five d6 · 3 rounds each
+-------------------------------------------------------------------------------
+7. FREIGHTER.YACHT.DINGHY
+-------------------------------------------------------------------------------
+GAME OVERVIEW
+  * Players: 2 or more (alternating turns).
+  * Dice Pool: 6x d6.
+  * Structure: Best of 3 rounds.
 
-YOUR TURN
-  Four rolls of five dice. You are claiming, strictly in this order:
-      Freighter = a 6      then    Yacht = a 5      then    Dinghy = a 4
-  After each roll the app sets aside what you need automatically. You cannot
-  take a Yacht before you have a Freighter, or a Dinghy before a Yacht — a
-  roll full of 5's is worth nothing until a 6 turns up.
+TURN MECHANICS
+  Each player receives up to 4 rolls per round to unlock cargo sequence:
+    1. Freighter: Requires a 6.
+    2. Yacht: Requires a 5 (Must be claimed after Freighter).
+    3. Dinghy: Requires a 4 (Must be claimed after Yacht).
+  (Required dice are set aside automatically as they land).
 
-CARGO
-  Once all three are claimed, the TWO dice left over are your Cargo and
-  their total is your score. With rolls left you may rethrow both together —
-  both or neither, and whatever comes up stands.
-
-COMING UP SHORT
-  Fail to claim all three inside four rolls and the round scores nothing.
-  That happens about 31% of the time.
-
-HOW IT ENDS
-  Three rounds each, played one at a time so you see every result as it
-  lands. Highest total after the third round wins; a tie plays one
-  sudden-death round.
-
-WORTH KNOWING
-  You qualify about 69% of the time. Cumulative ties over three rounds run
-  about 4%, which is why it is best of three rather than a single round.
+CARGO SCORING & REROLLS
+  * Once all three vessels (6, 5, and 4) are claimed, remaining three dice form 
+    Cargo.
+  * Combined total of remaining three dice is your round score.
+  * If rolls remain within 4-roll allowance, player may select any cargo dice to 
+    re-roll (any, all, or none).
+  * Failure to Qualify: Failing to claim all three vessels within 4 rolls scores 0.
+  * Resolution: Highest cumulative score after 3 rounds wins. Ties trigger 
+    sudden-death round.
 
 
-===============================================================================
-8. ROYAL UR — "Race, capture, come home."
-===============================================================================
-Players 2 · five four-sided dice · 3 pieces each
+-------------------------------------------------------------------------------
+8. ROYAL UR
+-------------------------------------------------------------------------------
+GAME OVERVIEW
+  * Players: 2.
+  * Dice Pool: 5x d4 (marked points system).
+  * Pieces: 3 pieces per player on shared 16-square track.
+  * Objective: First player to bring 2 pieces home wins.
 
-THE RACE
-  Three pieces each on a shared board. First to bring TWO of them home wins.
-  Your route is sixteen squares: out along your own row, up the middle past
-  the bridge, around the far block, and out.
+MOVEMENT DICE CALCULATION
+  Roll 5x d4. Count total upward-facing marked points (0 to 5) for distance.
 
-THE DICE
-  Roll five d4. Two of each die's four points are marked; count the marked
-  points sticking up and that is how far you move.
-      Marked up   Move            Chance
-          0       0 + Setback      3.1%
-          1       1 square        15.6%
-          2       2 squares       31.3%
-          3       3 squares       31.3%
-          4       4 squares       15.6%
-          5       5 squares        3.1%
+  Marked Points   Movement Distance   Special Effect
+  -----------------------------------------------------------------------------
+  0               0 Squares           Triggers Setback Rule
+  1 to 5          1 to 5 Squares      Move one piece standard distance
 
-MOVING
-  Move ONE piece the full count. A piece waiting to start enters that many
-  squares along. You cannot land on your own piece, and you cannot overshoot
-  — coming home takes the exact number.
-  Tap a piece to select it and its destination lights up; tap the
-  destination to commit, or tap another piece to change your mind.
-
-CAPTURE
-  Land on your opponent's piece and it goes all the way back to the start.
-  Every shared square can be taken, rosettes included — and because the
-  final loop runs in opposite directions, the square one step from home is
-  exactly where they come in.
-
-ROSETTES
-  The five flowered squares fall on the 4th, 8th, 12th and 16th square of
-  both routes. Land on one and you roll again.
-
-THE SETBACK
-  Roll nothing, or have nowhere legal to go, and you do not simply pass: one
-  of your own pieces goes back four squares — or to the start, if something
-  is already sitting there. You choose which.
-
-HOW IT ENDS
-  The first player with two pieces home wins.
+MOVEMENT & BOARD MECHANICS
+  * Move a single piece full exact count rolled. Exact count to enter/land home.
+  * Cannot land on your own pieces.
+  * Capture: Landing on opponent's piece sends it back to start.
+  * Rosettes (Squares 4, 8, 12, 16): Landing on a Rosette grants extra roll.
+  * Setback Rule: Rolling 0 or having no legal moves forces player to move one of 
+    their own pieces backward 4 squares (or to start if occupied).
 
 
-===============================================================================
-9. ROLLBOTS — "Duel in the net. Answer every shot."
-===============================================================================
-Players 2 · 16 Integrity Points each · about 12 turns
+-------------------------------------------------------------------------------
+9. ROLLBOTS
+-------------------------------------------------------------------------------
+GAME OVERVIEW
+  * Players: 2.
+  * Starting Health: 16 Integrity Points (IP) each (Player 2 starts with 17 IP).
+  * Objective: Reduce opponent's IP to zero.
 
-SETUP
-  Each runner picks a WEAPON and one CYBERWARE ability. The second runner
-  starts on 17 IP rather than 16, because striking first is worth about four
-  percent.
+LOADOUT SELECTION
+  Each player selects 1 Weapon and 1 Cyberware Ability at match start.
 
-THE WEAPONS
-      Weapon         Damage   Special
-      Mono-Blade       d8     Cuts through half of any Firewall
-      Smart Pistol     d6     Doubled on an accuracy of 7 or more, and that
-                              crit cuts armour the same way
-      Rail Rifle      d12     No Firewall stops it — but it spends a turn
-                              charging first
-      Sidearm          d4     No tricks. You never choose it; it is what the
-                              Emergency Sub-Routine leaves you holding
+  Weapons:
+    * Mono-Blade (d8): Bypasses 50% of target's Firewall.
+    * Smart Pistol (d6): Damage doubles if Accuracy roll is 7+; critical 
+      damage bypasses 50% of Firewall.
+    * Rail Rifle (d12): Bypasses Firewall completely. Requires 1 turn to 
+      charge before firing.
+    * Sidearm (d4): Default fallback weapon when primary weapon is disabled.
 
-ATTACKING
-  Throw the accuracy d10 and the weapon's damage die TOGETHER. Both land,
-  and the game stops until you tap Send It — so you read your own roll
-  before you spend it.
+COMBAT CYCLE
+  1. Attacker: Rolls Accuracy die (d10) and assigned Weapon Damage die together, 
+     confirming attack to resolve.
+  2. Defender Choice:
+       * Dodge (d6): Roll higher than attacker's Accuracy to negate all damage. 
+         Ties or lower take full damage.
+       * Firewall (d8): Subtract Firewall roll from incoming damage. Natural 8 
+         (Hard Lockdown) negates all damage completely.
 
-DEFENDING
-  The defender sees both numbers before choosing.
-      Dodge      d6   Beat their accuracy outright and take nothing. Tie or
-                      miss and take all of it.
-      Firewall   d8   Subtract the roll from the damage. A natural 8 is a
-                      Hard Lockdown and stops everything, the Mono-Blade
-                      included.
-  The defence die lands and the game stops again until they tap Resolve.
+CYBERWARE ABILITIES (One-Time Use Per Match)
+  Ability                 Effect                              Drawback / Cost
+  -----------------------------------------------------------------------------
+  Neural Overclock        Next attack deals forced Acc 10,    Disables defense 
+                          bypasses Firewall, Rail fires       options on opponent's 
+                          without charging.                   next turn.
 
-CYBERWARE — one ability, once a match, and every one costs you something
-      Ability                 Does                        Costs
-      Neural Overclock        Next attack lands at         You cannot defend
-                              accuracy 10 and no Firewall  at all on their
-                              stops it; the Rail fires     next turn
-                              without charging
-      Corrosive Virus         3 IP at the start of each    Roll a d6 first:
-                              of their next three turns,   on a 1 or 2 it
-                              9 in all                     turns on you
-      Quantum Phase           Next defence rolls a d12;    Fail the roll and
-                              beat their accuracy, take    the attack hits
-                              nothing and hit back for 4   you for double
-      Emergency Sub-Routine   Repairs 8 IP on the spot     You are down to
-                                                           the Sidearm for
-                                                           four turns
+  Corrosive Virus         Deals 3 IP damage/turn at start     Roll d6 on activation: 
+                          of opponent's next 3 turns.         1 or 2 turns virus 
+                                                              back on self.
 
-HOW IT ENDS
-  First to take the other to zero. Both at zero in one exchange is a System
-  Draw.
+  Quantum Phase           Defense uses d12. Beating           Failing roll causes 
+                          accuracy negates damage and         taking double damage 
+                          counter-attacks for 4 IP.           from attack.
 
-WORTH KNOWING
-  The three choosable weapons are within a couple of percent of each other
-  head to head, and each Cyberware is near break-even — none of them is a
-  trap and none is an auto-pick.
+  Emergency Sub-Routine   Immediately repairs 8 IP.           Downgrades weapon to 
+                                                              Sidearm (d4) for 4 
+                                                              turns.
 
 
-===============================================================================
-10. BONEHEADS — "Stack yours. Smash theirs."
-===============================================================================
-Players 2 · one d6 · 3 columns of 3 slots each
+-------------------------------------------------------------------------------
+10. BONEHEADS
+-------------------------------------------------------------------------------
+GAME OVERVIEW
+  * Players: 2.
+  * Board Layout: 3 columns per player (A, B, C), 3 slots each (9 slots total).
+  * Objective: Fill all slots while maximizing column scoring multipliers and 
+    destroying opponent dice.
 
-YOUR TURN
-  Roll one die and place it in any of your three columns that still has
-  room. That is the whole turn — the only question is which column.
+TURN MECHANICS
+  Roll 1x d6 and place it into any available slot in your columns to end turn.
 
-STACKING
-  Every number in a column is multiplied by how many times it appears there.
-      One 5                 5
-      Two 5's              20     (5 x 2, then x2 again)
-      Three 5's            45     (5 x 3, then x3 again)
-      A 5, a 5 and a 2     22     (20 for the pair, 2 for the single)
+COLUMN STACKING MULTIPLIERS
+  Matching numbers in same column multiply combined value:
+    Column Score = (Die Face x Occurrences) x Occurrences
+    * Single Die: Face Value (1x)
+    * Pair: (Face x 2) x 2
+    * Triple: (Face x 3) x 3
 
-SMASHING
-  Place a die and EVERY die of that number in your opponent's column of the
-  same letter is destroyed. Their survivors close the gap. A three-stack
-  they spent three turns building comes apart in one.
+SMASHING MECHANIC
+  Placing a die in a column destroys all matching dice in opponent's directly 
+  opposing column. Remaining opponent dice collapse down to fill gaps.
 
-HOW IT ENDS
-  There are nine slots each, and the moment either player fills their ninth
-  the game stops — no answering turn. Highest total wins. That rule is what
-  keeps going first from being an advantage (measured: 50.4%).
-
-WORTH KNOWING
-  A match is about 23 turns, and a typical winning score is in the forties.
-  Each player's dice are their own colour, and a banked die is a copy of the
-  one that was thrown.
+GAME END
+  Game ends immediately when either player fills their 9th slot. Highest score wins.
 
 
-===============================================================================
-11. FREE ROLL — "No score, no turns, just dice."
-===============================================================================
-Players 1 · up to 20 dice · no end
-
-  Pick any mix of d4, d6, d8, d10, d12 and d20 with the + and - controls, up
-  to twenty dice in total. Clear empties the table.
-  Roll as often as you like. Nothing is banked, nothing is scored, and there
-  is no way to lose.
-  TOTALS is off by default — the table is the point. Switch it on and every
-  throw reports a subtotal per die type ("3d6 · 11") and the throw as a
-  whole.
-  Dice can be added or removed any time the table is still; wait for a roll
-  to settle first.
-
-READING THE DICE
-      d4    read at its point — the three faces you can see all show the
-            same number beside the top corner, and that is the result
-      d6    top face
-      d8    top face
-      d10   top face
-      d12   top face
-      d20   top face
-
-
-===============================================================================
-ACROSS EVERY GAME
-===============================================================================
-  Settings (the gear, top right) holds music, sound effects, the table
-  colour and How to Play. The table colour and the music are remembered PER
-  GAME; the hub has a switch to make the music the same everywhere instead.
-
-  The rules come in two tiers. Inside a game, Settings > Quick Start shows
-  the short version for that game alone — the goal, the turn, and the one
-  rule that bites. From the game selection screen, Settings > How to Play
-  opens a cluster of bubbles, one per game, each opening the full guide:
-  every table and every edge case, which is what this document holds.
-
-  Rolls is the only game that takes more than two players.
+-------------------------------------------------------------------------------
+11. FREE ROLL
+-------------------------------------------------------------------------------
+OVERVIEW
+  * Players: 1.
+  * Pool Limit: Up to 20 total dice (Selectable mix of d4, d6, d8, d10, d12, d20).
+  * Function: Open sandbox mode without scoring, win conditions, or turn limits. 
+    Includes optional subtotals toggle per die type.

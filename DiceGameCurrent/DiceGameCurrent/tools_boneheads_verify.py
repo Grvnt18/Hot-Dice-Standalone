@@ -191,7 +191,77 @@ def main():
             assert abs(first - second) < 0.05, (first, second)
             assert 20 < turns < 26, turns
 
+    check_colour()
     print("Boneheads: PASS")
+
+
+def check_colour():
+    """A banked die keeps the colour it was thrown in.
+
+    Colour here has been wrong twice in opposite directions. It started
+    random per throw, which made the die in the air match neither side of
+    the board, and was replaced by one colour per seat. Now it is random
+    again by request — which is fine, and was fine the first time, except
+    for the part that actually broke: a banked die had no colour of its
+    own and was drawn in whatever its SEAT was using when the view ran. Had
+    throws gone back to random without that fixed, the whole board would
+    have re-coloured itself under the player every turn.
+
+    So the ink is stored with the placement, and these are the three
+    properties that keep it honest:
+
+      * a placement carries its own ink, and it is Codable, because the
+        board travels between devices
+      * nothing renders a banked die from the seat
+      * the smash still matches on the FACE — colour is for the eye and
+        must never change a result
+    """
+    import os
+    import re
+    here = os.path.dirname(os.path.abspath(__file__))
+    swift = os.path.join(here, "SwiftFiles")
+
+    def read(name):
+        with open(os.path.join(swift, name), encoding="utf-8") as handle:
+            text = handle.read()
+        text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+        return "\n".join(re.sub(r"//.*$", "", line)
+                          for line in text.splitlines())
+
+    rules = read("Boneheads.swift")
+    screen = read("BoneheadsScreen.swift")
+    problems = []
+
+    if "struct BoneheadsPlacement: Codable" not in rules:
+        problems.append("a placement is not a Codable value — the board "
+                        "cannot carry its colours between devices")
+    if "let ink: Int" not in rules:
+        problems.append("a placement no longer stores its ink, so a banked "
+                        "die is being coloured from somewhere else")
+    if "removeAll { $0.face == die }" not in rules:
+        problems.append("the smash no longer matches on the face alone — "
+                        "colour must never decide what is destroyed")
+    if "static func randomInk()" not in rules:
+        problems.append("there is no per-throw ink any more")
+
+    if "colorway(ink: die.ink)" not in screen:
+        problems.append("a banked die is not drawn from its own ink")
+    if re.search(r'colorway\(for:', screen):
+        problems.append("a die is being coloured by seat again")
+
+    # The frames went neutral when the dice went multicoloured: a frame in
+    # the player's tone would be fighting a different palette entry every
+    # turn, which is the clash the first random version was reverted for.
+    if re.search(r'\.stroke\(tint\.opacity', screen):
+        problems.append("the column frame is tinted to the seat again, and "
+                        "the dice inside it are every colour in the palette")
+
+    for line in problems:
+        print("  %-29s FAILED  %s" % ("colour", line))
+    if problems:
+        raise SystemExit("Boneheads: FAILED (%d problem(s))" % len(problems))
+    print("  %-29s ok (ink travels with the placement, face decides the smash)"
+          % "colour")
 
 
 if __name__ == "__main__":

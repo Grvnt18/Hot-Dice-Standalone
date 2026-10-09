@@ -535,4 +535,313 @@ for f in SOURCES:
         scale_bad += 1
 print("render-scale check:", "FAIL" if scale_bad else "PASS", "(%d)" % scale_bad)
 
-sys.exit(1 if bad or escapes or merged or undeclared or render_bad or member_bad or nested_bad or aa_bad or scale_bad else 0)
+# ---------------------------------------------------------------------------
+# INITIALISER ARITY
+#
+# There is no Swift toolchain in this container, so every check here reads
+# spellings rather than asking a compiler. That leaves one gap with a known
+# cost: a type constructed with arguments it does not take compiles nowhere
+# and is caught by nothing until a real build.
+#
+# It has already happened. Three probes were written as RollsGameState(),
+# RollbotsState() and BaseballDiceState() — all three take required
+# arguments, and all three were found by reading the initialisers rather
+# than by any check. The static-member check could not see them: the type
+# exists and the call is well-formed, it just does not match any init.
+#
+# So the declared initialisers of this project's own structs are collected,
+# and a call with an argument LABEL SET that matches none of them is
+# reported. Label sets rather than counts, because that is what Swift
+# actually overloads on and what a typo in a label produces.
+#
+# Deliberately narrow, to stay quiet rather than be clever:
+#   * only types declared in this project, so no stdlib or SwiftUI
+#   * only types whose every init this file can see, so a type with an
+#     init built by a macro or an extension elsewhere is skipped
+#   * memberwise initialisers are allowed for any struct that declares no
+#     init of its own, since Swift synthesises one from the stored
+#     properties and matching that exactly is not worth the false alarms
+init_bad = 0
+
+_DECL = re.compile(r'\b(?:struct|final class|class|enum)\s+(\w+)')
+# Generic and failable initialisers are still initialisers: `init<G>(` and
+# `init?(` both have to be seen, or a type looks like it declares fewer than
+# it does and every call to the missing one is reported.
+_INIT = re.compile(r'\binit\??\s*(?:<[^>]*>)?\s*\(')
+
+
+def _split_top(text):
+    """Comma-separated pieces at paren depth zero."""
+    out, depth, current = [], 0, ""
+    for ch in text:
+        if ch in "([<{": depth += 1
+        elif ch in ")]>}": depth -= 1
+        if ch == "," and depth == 0:
+            out.append(current); current = ""
+        else:
+            current += ch
+    if current.strip():
+        out.append(current)
+    return out
+
+
+def _params(arglist):
+    """(label, has_default) per declared parameter."""
+    result = []
+    for piece in _split_top(arglist):
+        piece = piece.strip()
+        if not piece:
+            continue
+        has_default = "=" in piece.split(":", 1)[-1]
+        head = piece.split(":", 1)[0].strip() if ":" in piece else piece
+        words = head.split()
+        label = words[0] if words else ""
+        result.append(("_" if label == "_" else label, has_default))
+    return result
+
+
+def _call_labels(arglist):
+    """Argument labels at a call site, or None if this is not readable."""
+    labels = []
+    for piece in _split_top(arglist):
+        piece = piece.strip()
+        if not piece:
+            continue
+        if ":" not in piece:
+            return None               # unlabelled, or something cleverer
+        head = piece.split(":", 1)[0].strip()
+        if not re.fullmatch(r'\w+', head):
+            return None               # a ternary, a cast, a dictionary
+        labels.append(head)
+    return labels
+
+
+def _accepts(declared, used):
+    """Whether a call with these labels could match this initialiser.
+
+    Defaults are the whole difficulty: Swift lets a caller leave out any
+    parameter that has one, so a valid call is an ordered SUBSEQUENCE of
+    the declared labels in which every parameter without a default appears.
+    Comparing label sets outright reports a correct call every time an
+    initialiser grows an optional parameter, which is noise rather than a
+    check.
+    """
+    if any(label == "_" for label, _ in declared):
+        return True                   # unlabelled parameters, not read here
+    position = 0
+    for label in used:
+        while position < len(declared) and declared[position][0] != label:
+            if not declared[position][1]:
+                return False          # skipped a required parameter
+            position += 1
+        if position >= len(declared):
+            return False              # label not found, or out of order
+        position += 1
+    return all(default for _, default in declared[position:])
+
+
+_inits = {}
+for f in SOURCES:
+    src_f = strip(open(f).read())
+    for decl in _DECL.finditer(src_f):
+        tname = decl.group(1)
+        body = body_after(src_f, decl.end())
+        if body is None:
+            continue
+        for init in _INIT.finditer(body):
+            _, close = paren_span(body, init.end() - 1)
+            if close < init.end():
+                continue
+            _inits.setdefault(tname, []).append(_params(body[init.end():close]))
+
+for f in SOURCES:
+    name = os.path.relpath(f)
+    src_f = strip(open(f).read())
+    for call in re.finditer(r'(?<![.\w])([A-Z]\w+)\(', src_f):
+        tname = call.group(1)
+        if tname not in _inits:
+            continue                  # not ours, or memberwise-only
+        _, close = paren_span(src_f, call.end() - 1)
+        if close < call.end():
+            continue
+        used = _call_labels(src_f[call.end():close])
+        if used is None:
+            continue
+        if any(_accepts(declared, used) for declared in _inits[tname]):
+            continue
+        shapes = " | ".join(
+            "(" + ", ".join(l + ("=" if d else "") for l, d in declared) + ")"
+            for declared in _inits[tname])
+        print("  INIT %s:%d  %s(%s) matches none of its %d declared "
+              "initialiser(s): %s"
+              % (name, src_f[:call.start()].count("\n") + 1, tname,
+                 ", ".join("%s:" % l for l in used), len(_inits[tname]), shapes))
+        init_bad += 1
+print("initialiser-arity check:", "FAIL" if init_bad else "PASS",
+      "(%d, %d project types with declared inits)"
+      % (init_bad, len(_inits)))
+
+# ---------------------------------------------------------------------------
+# ENUM CASES THAT EXIST
+#
+# Three compile errors reached the iPad at once, and two were the same
+# mistake: `phase = .ready` written into BaseballDiceScreen and
+# RollbotsScreen, neither of which has a `.ready`. Nine screens share a
+# shape and a template was applied to all of them, so the two with their
+# own phase machines — Baseball runs setup/pickingStyle/handover/swinging,
+# Rollbots an attack-and-defence exchange — got a case that does not exist.
+#
+# A leading-dot case is inferred from the target's type, so it cannot be
+# checked in general without one. It CAN be checked where the type is
+# written down a few lines away, which is the common case and the one that
+# broke: a property declared `var x: SomeEnum` or `var x: SomeEnum = ...`
+# assigned a `.case` in the same file as that enum's declaration.
+case_bad = 0
+
+_ENUM = re.compile(r'\benum\s+(\w+)\s*[:{]')
+_CASE_LINE = re.compile(r'^\s*case\s+([A-Za-z_]\w*(?:\s*,\s*[A-Za-z_]\w*)*)',
+                        re.M)
+
+for f in SOURCES:
+    name = os.path.relpath(f)
+    src_f = strip(open(f).read())
+
+    # Enums declared in this file, and the cases each one declares.
+    cases = {}
+    for decl in _ENUM.finditer(src_f):
+        ename = decl.group(1)
+        body = body_after(src_f, decl.end() - 1)
+        if body is None:
+            continue
+        found = set()
+        for line in _CASE_LINE.finditer(body):
+            for piece in line.group(1).split(","):
+                found.add(piece.strip())
+        if found:
+            cases[ename] = found
+    if not cases:
+        continue
+
+    # Properties in this file whose type is one of those enums.
+    typed = {}
+    for m in re.finditer(r'\bvar\s+(\w+)\s*:\s*(\w+)', src_f):
+        if m.group(2) in cases:
+            typed[m.group(1)] = m.group(2)
+    if not typed:
+        continue
+
+    for m in re.finditer(r'\b(\w+)\s*=\s*\.(\w+)', src_f):
+        prop, case = m.group(1), m.group(2)
+        if prop not in typed:
+            continue
+        ename = typed[prop]
+        if case in cases[ename]:
+            continue
+        print("  CASE %s:%d  %s = .%s — %s declares no case %r (has: %s)"
+              % (name, src_f[:m.start()].count("\n") + 1, prop, case, ename,
+                 case, ", ".join(sorted(cases[ename]))))
+        case_bad += 1
+print("enum-case check:", "FAIL" if case_bad else "PASS", "(%d)" % case_bad)
+
+
+# ---------------------------------------------------------------------------
+# MEMBERS REACHED THROUGH AN ENUM CASE
+#
+# The third error that reached the iPad: `Elevation.piece.color` passed
+# where a Color was wanted, months after `var color: Color` became
+# `func color(_ ink:)`. The static-member check could not see it — that one
+# is statics-only by design, and `piece` is a case while `color` is an
+# instance member.
+#
+# What actually let it through is worth recording, because it was not the
+# checker's fault. The grep that found the other call sites was piped
+# through `head -20` and this line was past the cut. A truncated search read
+# as a complete one.
+#
+# So: where a project enum is reached through one of its own cases, the
+# member on the far side has to be something that enum declares.
+member_hop_bad = 0
+
+# Members nobody writes but every enum may have: rawValue comes from a raw
+# type, allCases from CaseIterable, the rest from Hashable, Identifiable and
+# friends. Reporting these would fail correct code, which is worse than
+# missing the occasional typo.
+_SYNTHESIZED = {
+    "rawValue", "allCases", "hashValue", "description", "debugDescription",
+    "id", "self", "init", "hash", "encode",
+}
+
+_ENUM_DECL = re.compile(r'\benum\s+(\w+)\s*[:{]')
+_MEMBER = re.compile(r'\b(var|func)\s+(\w+)')
+
+enum_cases = {}
+enum_members = {}
+enum_methods = {}
+for f in SOURCES:
+    src_f = strip(open(f).read())
+    for decl in _ENUM_DECL.finditer(src_f):
+        ename = decl.group(1)
+        body = body_after(src_f, decl.end() - 1)
+        if body is None:
+            continue
+        found = set()
+        for line in _CASE_LINE.finditer(body):
+            for piece in line.group(1).split(","):
+                found.add(piece.strip())
+        if found:
+            enum_cases.setdefault(ename, set()).update(found)
+        for decl_m in _MEMBER.finditer(body):
+            enum_members.setdefault(ename, set()).add(decl_m.group(2))
+            if decl_m.group(1) == "func":
+                enum_methods.setdefault(ename, set()).add(decl_m.group(2))
+
+# Extensions add members too, and missing them would report correct code.
+for f in SOURCES:
+    src_f = strip(open(f).read())
+    for ext in re.finditer(r'\bextension\s+(\w+)\s*[:{]', src_f):
+        ename = ext.group(1)
+        if ename not in enum_cases:
+            continue
+        body = body_after(src_f, ext.end() - 1)
+        if body is None:
+            continue
+        for decl_m in _MEMBER.finditer(body):
+            enum_members.setdefault(ename, set()).add(decl_m.group(2))
+            if decl_m.group(1) == "func":
+                enum_methods.setdefault(ename, set()).add(decl_m.group(2))
+
+for f in SOURCES:
+    name = os.path.relpath(f)
+    src_f = strip(open(f).read())
+    for m in re.finditer(r'\b([A-Z]\w+)\.(\w+)\.(\w+)\b', src_f):
+        ename, case, member = m.group(1), m.group(2), m.group(3)
+        if ename not in enum_cases or case not in enum_cases[ename]:
+            continue
+
+        # A method named but not called. This is what actually shipped:
+        # `Elevation.piece.color` long after `var color: Color` became
+        # `func color(_ ink:)`, so the expression is a function value where
+        # a Color was wanted. The member EXISTS, which is why checking only
+        # that it exists missed it entirely.
+        if member in enum_methods.get(ename, set()):
+            if not src_f[m.end():].lstrip().startswith("("):
+                print("  HOP %s:%d  %s.%s.%s is a method used as a value — "
+                      "call it, or this is a function where its result was "
+                      "wanted"
+                      % (name, src_f[:m.start()].count("\n") + 1,
+                         ename, case, member))
+                member_hop_bad += 1
+            continue
+        if member in enum_members.get(ename, set()):
+            continue
+        if member in _SYNTHESIZED:
+            continue
+        print("  HOP %s:%d  %s.%s.%s — %s declares no member %r (has: %s)"
+              % (name, src_f[:m.start()].count("\n") + 1, ename, case, member,
+                 ename, member,
+                 ", ".join(sorted(enum_members.get(ename, set()))) or "none"))
+        member_hop_bad += 1
+print("enum-member check:", "FAIL" if member_hop_bad else "PASS",
+      "(%d, %d project enums with cases)" % (member_hop_bad, len(enum_cases)))
+
+sys.exit(1 if bad or escapes or merged or undeclared or render_bad or member_bad or nested_bad or aa_bad or scale_bad or init_bad or case_bad or member_hop_bad else 0)

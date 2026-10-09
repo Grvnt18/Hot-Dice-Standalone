@@ -166,3 +166,95 @@ enum PlayfieldVerticalBounds {
     /// Height of the invisible ceiling collider above the floor.
     static let ceilingHeight: Float = 2.5
 }
+
+
+// MARK: - The three bands a game screen is split into
+
+/// Header, square scene, button band — the split every game makes.
+///
+/// It was made eight times, separately, with three different header
+/// fractions and a `minButtonHeight` of 100 typed into each one. Three
+/// more screens — Boneheads, Royal UR, Baseball Dice — fix their button
+/// band outright at 100, 104 and 96.
+///
+/// Nothing checked any of them at any size. That matters because the band
+/// has to hold a known stack of things, and the number guarding it was a
+/// round figure that happened to be big enough: the content comes to 95
+/// points, Baseball's band is 96, and the margin went from 7 points to 1
+/// when the stack spacing in `TurnActionBar` moved from 2 to 8 to keep the
+/// button's shadow off its caption. Nothing noticed, because there was
+/// nothing to notice with.
+///
+/// So the arithmetic lives here once, the floor is summed from its own
+/// parts rather than typed, and `tools_bandlayout_verify.py` walks it
+/// across every size iOS can hand the app.
+///
+/// `PlayfieldLayout` above is the same idea for the 3D arena — a size in,
+/// a measurement out, no view required — which is why this sits beside it
+/// rather than in a file of its own.
+enum GameBandLayout {
+
+    // MARK: What the button band holds
+
+    /// `.padding(.vertical, 12)`, top and bottom, on the action bar.
+    static let bandPadding: CGFloat = 12
+
+    /// The roll button itself.
+    static let buttonHeight: CGFloat = 48
+
+    /// Between the button and its caption. The SAME expression the bars
+    /// use, so the floor moves when the spacing does instead of being
+    /// quietly eaten by it.
+    static var captionGap: CGFloat { Elevation.lifted.offset + 2 }
+
+    /// One line of the 12pt caption under the button.
+    ///
+    /// 15, which is 12 at Poppins' own line height of roughly 1.25. One
+    /// line and not two: both bars cap the caption at a single line — see
+    /// the note on Rolls' subtitle, which did not and could wrap on a
+    /// narrow screen.
+    static let captionLine: CGFloat = 15
+
+    /// Everything above, summed. The band may not be shorter than this.
+    static var buttonBandFloor: CGFloat {
+        bandPadding * 2 + buttonHeight + captionGap + captionLine
+    }
+
+    // MARK: The split
+
+    /// The header's share, per game. Boneheads wants a shorter one than
+    /// Jackpot, so the fraction stays the caller's business — only the
+    /// arithmetic is shared.
+    static func header(in size: CGSize, fraction: CGFloat) -> CGFloat {
+        size.height * fraction
+    }
+
+    /// The square playfield: as wide as the screen, or as tall as what is
+    /// left once the header and the button band have theirs.
+    ///
+    /// Square because the arena and its orthographic camera are built
+    /// square — which is also why a wider screen buys the scene nothing,
+    /// and why landscape costs these games height for width they cannot
+    /// spend.
+    static func scene(in size: CGSize, fraction: CGFloat) -> CGFloat {
+        let spare = size.height - header(in: size, fraction: fraction)
+            - buttonBandFloor
+        return min(size.width, max(spare, 0))
+    }
+
+    /// Whatever the scene did not take. Never below `buttonBandFloor`,
+    /// because the scene gives way first.
+    static func buttonBand(in size: CGSize, fraction: CGFloat) -> CGFloat {
+        size.height - header(in: size, fraction: fraction)
+            - scene(in: size, fraction: fraction)
+    }
+
+    /// Whether a fixed band height still holds its content.
+    ///
+    /// For the three screens that set their own rather than taking the
+    /// remainder. Following `GeneralsCardLayout.fits(in:)`, which is the
+    /// one place in the app that already asked this question.
+    static func fits(band: CGFloat) -> Bool {
+        band >= buttonBandFloor
+    }
+}

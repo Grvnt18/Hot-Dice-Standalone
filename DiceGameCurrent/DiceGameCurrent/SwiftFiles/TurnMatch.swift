@@ -188,6 +188,62 @@ extension TurnMatch {
     /// A local two-player match. Ids are arbitrary but stable within the
     /// match, which is all anything here needs.
     static func localTwoPlayer(seatSequence: [Int]? = nil) -> TurnMatch {
-        TurnMatch(participants: ["local.1", "local.2"], seatSequence: seatSequence)
+        local(playerCount: 2, seatSequence: seatSequence)
     }
+
+    /// A local match for any number of seats.
+    ///
+    /// Everything above this line already handles N: `advanceTurn` wraps on
+    /// `participants.count`, `activeIsLastInRound` compares against it, and
+    /// scores are keyed by participant rather than by a player-one and a
+    /// player-two. The only thing that ever said "two" was the factory.
+    ///
+    /// Which is what this is for. Three Thousand, HOG and
+    /// Freighter.Yacht.Dinghy are all described as two or more players in
+    /// GAME_RULES.txt, and none of their screens contains a two-player
+    /// assumption — no `1 - seat`, no `participants[1]`, no count check.
+    /// They are seat-based already. When the Messages extension supplies
+    /// real participant ids, it calls `TurnMatch(participants:)` directly
+    /// and these games need no further change.
+    ///
+    /// Clamped at one, because a match with no seats has no active
+    /// participant and every read here would be answering about nobody.
+    static func local(playerCount: Int, seatSequence: [Int]? = nil) -> TurnMatch {
+        let seats = max(1, playerCount)
+        return TurnMatch(participants: (1...seats).map { "local.\($0)" },
+                         seatSequence: seatSequence)
+    }
+
+    /// A match whose ids are the SIZE Messages actually hands out.
+    ///
+    /// Only `GameWireCheck` uses this, and it exists because the budget
+    /// figure on the device was measuring the wrong thing. Pass-and-play
+    /// ids are `local.1` — seven characters — while an `MSConversation`
+    /// participant is a 36-character UUID, and every participant is spelled
+    /// TWICE in an encoded match: once in `participants` and once as a key
+    /// in `scores`. At two seats that is 154 bytes of a 365-byte Royal UR
+    /// turn, which makes the roster, not the game, the dominant cost of
+    /// almost every message the suite sends.
+    ///
+    /// So the probe has to use ids of the real length or it reports a number
+    /// no real message will ever have. The characters are arbitrary — only
+    /// the count is load-bearing — but they are shaped like a UUID so that
+    /// a log of a probe payload is not mistaken for a live one.
+    static func messagesShaped(playerCount: Int,
+                               seatSequence: [Int]? = nil) -> TurnMatch {
+        let seats = max(1, playerCount)
+        var ids: [String] = []
+        for seat in 1...seats {
+            // 8-4-4-4-12, the canonical UUID string: 36 characters.
+            let tail = String(format: "%012d", seat)
+            ids.append("00000000-0000-4000-8000-" + tail)
+        }
+        return TurnMatch(participants: ids, seatSequence: seatSequence)
+    }
+
+    /// How long a participant id is when Messages supplies it.
+    ///
+    /// Named so the guard on the probes can assert they are using one,
+    /// rather than counting characters in a literal.
+    static let messagesIDLength = 36
 }

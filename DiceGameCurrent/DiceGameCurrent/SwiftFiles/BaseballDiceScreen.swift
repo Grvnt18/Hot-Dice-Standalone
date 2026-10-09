@@ -55,7 +55,7 @@ struct BaseballDiceScreen: View {
         case setup
         /// The pitching seat picks a style, screen turned away.
         case pickingStyle
-        /// Handing the device to the batter.
+        /// The turn is the batter's now.
         case handover
         /// The batter picks a swing, blind to the pitch.
         case swinging
@@ -75,10 +75,41 @@ struct BaseballDiceScreen: View {
     private var batter: Int { state.battingSeat }
     private var pitcher: Int { state.pitchingSeat }
 
+
+    // MARK: Sending a turn
+
+    /// This screen's turn, packed the way the Messages extension will send
+    /// it — the bookkeeping and the game's own state together, which is
+    /// what MatchPayload exists to say.
+    var wireTurn: MatchPayload<BaseballDiceState> {
+        MatchPayload(match: match, state: state)
+    }
+
+    /// Adopts a turn that arrived from another device.
+    ///
+    /// Phase is not carried: a phase is what THIS device is doing with the
+    /// dice in front of it, and the sender's is meaningless here.
+    ///
+    /// `.handover` rather than a first-roll state, because that is this
+    /// screen's own name for the device changing hands. There is no
+    /// mid-at-bat position to resume into — BaseballDiceState holds the
+    /// inning, the half, the outs and the diamond, all of which are true
+    /// between at-bats.
+    func adopt(_ incoming: MatchPayload<BaseballDiceState>) {
+        match = incoming.match
+        state = incoming.state
+        phase = .handover
+    }
+
     var body: some View {
         ZStack {
             GeometryReader { geo in
-                let buttonHeight: CGFloat = 96
+                // Was 96. The band holds a DiceRollButton and its
+                // caption, which come to 95 — one point of margin, and
+                // only by luck: it was seven until the stack spacing moved
+                // to keep the button's shadow off the caption. Taken from
+                // the floor now, so it cannot be eaten again.
+                let buttonHeight = GameBandLayout.buttonBandFloor
                 let fieldHeight = geo.size.height - buttonHeight
 
                 VStack(spacing: 0) {
@@ -637,10 +668,18 @@ enum BaseballArt {
     static func die(sides: Int, isBatter: Bool) -> Die {
         Die(
             sides: sides,
+            // The ink is derived, not chosen — see DieColorway.numberHex.
+            //
+            // It was `#1B1B1F` for the batter, whose body is WHATEVER
+            // SWATCH THE PLAYER PICKED. On Onyx that is near-black
+            // numerals on a near-black die at 1.08:1, which is not a
+            // contrast problem so much as an invisible die; on Green it is
+            // 2.58:1. Twenty-four swatches against one typed ink was never
+            // going to hold, and deriving it takes the worst case to
+            // 6.10:1 and Onyx to 16.95:1.
             colorway: DieColorway(
                 bodyHex: isBatter ? AppTheme.swatches[AppTheme.shared.colorwayIndex].hex
-                                 : "#0A0A0C",
-                numberHex: isBatter ? "#1B1B1F" : "#C9B18A"
+                                 : "#0A0A0C"
             )
         )
     }

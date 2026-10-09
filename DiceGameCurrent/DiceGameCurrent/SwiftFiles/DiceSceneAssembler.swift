@@ -74,8 +74,17 @@ final class DiceTraySession {
         didSet { if !isSelectionEnabled { clearSelection() } }
     }
 
-    /// Dice the player has tapped. In a keeping game these are the dice a
-    /// reroll will leave alone — pass them straight to `roll(keeping:)`.
+    /// Dice the player has tapped.
+    ///
+    /// What a tap MEANS is the game's business, not this class's. In a
+    /// keeping game — Three Thousand, Generals — these are the dice a
+    /// reroll will leave alone, and they go straight to `roll(keeping:)`.
+    /// In a rethrowing one — Rolls, and Freighter.Yacht.Dinghy's cargo —
+    /// they are the dice the player has picked to throw AGAIN, and the
+    /// game passes `roll(keeping: everything - selectedIDs)`.
+    ///
+    /// Both read the same on screen and that is the point: the pulse marks
+    /// the dice the next button press will act on.
     private(set) var selectedIDs: Set<UUID> = []
 
     /// Selected dice that can no longer be un-selected.
@@ -178,6 +187,33 @@ final class DiceTraySession {
         lockedIDs.formUnion(selectedIDs)
         for die in lifecycle.rollableDice where lockedIDs.contains(die.id) {
             DieSelectionHighlight.setLocked(true, on: die.node)
+        }
+        onSelectionChanged?(selectedIDs)
+    }
+
+    /// Locks exactly these dice, selecting nothing.
+    ///
+    /// `lockSelection()` freezes whatever the player has already picked,
+    /// which suits a keeping game. A rethrowing one needs the opposite: the
+    /// dice that are NOT the choice have to be set aside and made
+    /// untappable before the player picks anything at all —
+    /// Freighter.Yacht.Dinghy's three claimed vessels are not cargo and a
+    /// tap on one must do nothing.
+    ///
+    /// Replaces any previous lock rather than adding to it, so re-entering
+    /// the decision after a rethrow states the whole set again instead of
+    /// accumulating.
+    func lockOnly(_ ids: Set<UUID>) {
+        lockedIDs = ids
+        for die in lifecycle.rollableDice {
+            if ids.contains(die.id) {
+                DieSelectionHighlight.setLocked(true, on: die.node)
+                selectedIDs.remove(die.id)
+            } else if !selectedIDs.contains(die.id) {
+                // Back to full opacity: a die that was locked a moment ago
+                // and is cargo now must not stay dimmed.
+                DieSelectionHighlight.setLocked(false, on: die.node)
+            }
         }
         onSelectionChanged?(selectedIDs)
     }

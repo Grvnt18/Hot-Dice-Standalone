@@ -120,6 +120,46 @@ extension ThreeThousandRules {
     }
 }
 
+/// Three Thousand as it travels in a message.
+///
+/// The turn total rides along for the same reason HOG's does: a turn can be
+/// handed over mid-push, and what is at risk is the whole decision.
+///
+/// The two end-game fields are the ones that would be easy to leave out and
+/// expensive to miss. Reaching 3,000 does not end the match — every other
+/// player gets one more turn — so the countdown and who got there first
+/// both have to cross. Without them the receiving device would either end
+/// the match early or never end it.
+///
+/// The dice on the table do not travel. A turn is resolved where it is
+/// played and arrives as points.
+struct ThreeThousandState: Codable, Equatable {
+
+    /// Set aside this turn and not yet banked.
+    var turnTotal: Int = 0
+
+    /// Turns still owed before the match is decided, once someone has
+    /// passed the target. Nil while nobody has.
+    var turnsLeftAfterTarget: Int? = nil
+
+    /// Who reached the target first, which is who a tie goes to.
+    var firstToTarget: String? = nil
+
+    private enum CodingKeys: String, CodingKey {
+        case turnTotal = "t"
+        case turnsLeftAfterTarget = "l"
+        case firstToTarget = "f"
+    }
+
+    init(turnTotal: Int = 0,
+         turnsLeftAfterTarget: Int? = nil,
+         firstToTarget: String? = nil) {
+        self.turnTotal = turnTotal
+        self.turnsLeftAfterTarget = turnsLeftAfterTarget
+        self.firstToTarget = firstToTarget
+    }
+}
+
 // MARK: - Suite entry
 
 enum ThreeThousandGame: SuiteGame {
@@ -127,42 +167,28 @@ enum ThreeThousandGame: SuiteGame {
     static let displayName = "Three Thousand"
     static let tagline = "Bank it or lose it."
 
-    /// The short version, shown from inside the game.
-    static let quickRules: [GameRuleSection] = [
-        GameRuleSection(
-            title: "The Goal",
-            body: "First to bank 3,000. Your opponent then gets one last turn to beat it."
-        ),
-        GameRuleSection(
-            title: "Your Turn",
-            body: "Roll, set aside at least one scoring die — every die you take has to be part of a combination — then roll on or bank."
-        ),
-        GameRuleSection(
-            title: "Busted, and Hot Dice",
-            body: "A roll with nothing scoring in it ends the turn and loses everything from it. Set all six aside and you roll all six again with the total intact."
-        )
-    ]
+    /// Two or more, per GAME_RULES.txt. The turns alternate and the state
+    /// is per seat, so nothing here is counting to two — see
+    /// TurnMatch.local(playerCount:).
+    static let maxPlayers = Int.max
+
 
     static let rules: [GameRuleSection] = [
         GameRuleSection(
-            title: "Your Turn",
-            body: "Roll all six dice. Tap the dice that score to set them aside — you must set aside at least one, and every die you take has to be part of a scoring combination. Then roll what is left, or bank."
+            title: "Game Overview",
+            body: "  * Players: 2 or more (alternating turns).\n  * Dice Pool: 6x d6.\n  * Objective: First player to reach or exceed 3,000 points."
         ),
         GameRuleSection(
-            title: "Scoring",
-            body: "Each 1 is 100 and each 5 is 50. Three of a kind scores the face times 100 — three 1's are 1,000. Four of a kind is 1,000, five is 2,000, six is 3,000. A 1-2-3-4-5-6 straight is 1,500 and three pairs are 750."
+            title: "Turn Mechanics",
+            body: "  1. Roll all active dice.\n  2. Set aside at least one scoring die or valid scoring combination.\n     Every set-aside die must contribute to a valid score.\n  3. Choose to bank accumulated points (ending turn) or roll remaining dice."
         ),
         GameRuleSection(
-            title: "Busted",
-            body: "Roll and find nothing that scores and you are Busted: the turn ends and everything you had going that turn is gone. About half of all turns end this way."
+            title: "Scoring Combinations",
+            body: "  Combination                     Points\n  -----------------------------------------------------------------------------\n  Single 1                        100\n  Single 5                        50\n  Three 1s                        1,000\n  Three-of-a-Kind (2s-6s)          Face Value x 100\n  Four-of-a-Kind                  1,000\n  Five-of-a-Kind                  2,000\n  Six-of-a-Kind                   3,000\n  Full Straight (1-2-3-4-5-6)     1,500\n  Three Pairs                     750"
         ),
         GameRuleSection(
-            title: "Hot Dice",
-            body: "Set aside all six and you roll all six again with your running total intact. There is no limit to how far a turn can run — and no safety in it either."
-        ),
-        GameRuleSection(
-            title: "Winning",
-            body: "Bank 3,000 and your opponent gets one last turn to beat it. If they cannot, you win — a tie goes to whoever got there first."
+            title: "Turn Rules",
+            body: "  * Bust: Roll zero scoring dice, turn ends immediately and turn points are lost.\n  * Hot Dice: Set aside all 6 dice into scoring combinations, re-roll all 6 dice\n    to continue accumulating points in the same turn.\n  * Match End: When a player reaches 3,000 points, all other players receive one\n    final turn in the round to attempt to beat the highest score."
         )
     ]
 }

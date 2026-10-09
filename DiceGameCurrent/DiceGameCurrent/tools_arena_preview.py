@@ -761,10 +761,13 @@ def royalur_board(w=1040, h=420):
 
     # Two pieces, with the hard offset shadow Elevation now specifies — dx as
     # well as dy, which drawPiece currently omits.
+    #
+    # 2/4 rather than 2/2: Elevation.piece throws 4pt now (it was 2, which
+    # read as noise rather than as depth), and dx is half the vertical.
     for (row, col), seat in (((2, 2), INK), ((2, 7), PET)):
         x0, y0 = tile_rect(row, col)
         cx, cy, r = x0 + tile / 2, y0 + tile / 2, tile * 0.30
-        disc(cx + 2, cy + 2, r, SH)
+        disc(cx + 2, cy + 4, r, SH)
         disc(cx, cy, r, seat)
         ring(cx, cy, r, WH)
         ring(cx, cy, r * 0.62, WH)

@@ -26,6 +26,42 @@ struct RoyalUrScreen: View {
     @State private var showingSettings = false
     @ObservedObject private var theme = AppTheme.shared
 
+    /// How tall the board should be so that it fills the width it is given.
+    ///
+    /// It was a flat 0.34 of the screen height, which on a phone happens to
+    /// leave the WIDTH binding — the board spans the screen and nothing
+    /// looks wrong. Turn an iPad to landscape and the height binds instead:
+    /// the board shrinks to 865pt inside 1354pt and sits in the middle of
+    /// 489pt of empty timber.
+    ///
+    /// 9.04 x 3.64 tiles is the board's own aspect — see RoyalUrLayout — so
+    /// the first term is the height at which the width is exactly used up.
+    /// It is clamped so the tray below never drops under `minimumTray`,
+    /// because a board that fills the screen by squeezing the dice out of it
+    /// is not an improvement.
+    ///
+    /// Out of the ViewBuilder because it has to be: inline, this body scored
+    /// 12 operators against a threshold of 12, which is the arithmetic
+    /// Xcode 14.2's solver gives up on.
+    static func boardHeight(in size: CGSize) -> CGFloat {
+        // 190, down from 220. A correction to go with it: measured across
+        // seven devices from the iPhone SE to the iPad Pro, `fillsWidth`
+        // is the binding term at EVERY tray height from 150 to 220 — so
+        // the board was already as wide as the screen allows and this does
+        // not change it by a point. It shrinks the rolling area because
+        // that is what was asked for, and nothing else.
+        //
+        // If the board still reads as leaving space at the sides, the
+        // space is inside RoyalUrBoardView below its frame, not here.
+        let minimumTray: CGFloat = 190
+        let buttonRow = GameBandLayout.buttonBandFloor
+        let usableWidth = size.width - 12
+        let fillsWidth = usableWidth / 9.04 * 3.64
+        let header = size.height * 0.15
+        let spare = size.height - header - buttonRow - minimumTray
+        return min(fillsWidth, max(spare, size.height * 0.30))
+    }
+
     private enum Phase {
         /// Waiting for the active player to throw.
         case ready
@@ -35,7 +71,7 @@ struct RoyalUrScreen: View {
         case choosing
         /// A roll with nowhere to go: pick the piece that goes backwards.
         case setback
-        /// Move made; waiting to hand over.
+        /// Move made; waiting to send the turn on.
         case scored
         /// Handover gate between turns.
         case handover
@@ -44,6 +80,27 @@ struct RoyalUrScreen: View {
     }
 
     private var seat: Int { match.activeIndex }
+
+
+    // MARK: Sending a turn
+
+    /// This screen's turn, packed the way the Messages extension will send
+    /// it — the bookkeeping and the game's own state together, which is
+    /// what MatchPayload exists to say.
+    var wireTurn: MatchPayload<RoyalUrState> {
+        MatchPayload(match: match, state: state)
+    }
+
+    /// Adopts a turn that arrived from another device.
+    ///
+    /// Phase goes back to `.ready` rather than being carried: a phase is
+    /// what THIS device is doing with the dice in front of it, and the
+    /// sender's is meaningless here.
+    func adopt(_ incoming: MatchPayload<RoyalUrState>) {
+        match = incoming.match
+        state = incoming.state
+        phase = .ready
+    }
 
     var body: some View {
         ZStack {
@@ -68,8 +125,9 @@ struct RoyalUrScreen: View {
                 // tiles become 92.2pt on an 11-inch iPad. The tray still
                 // keeps more height than the board at every size, which
                 // it has to: five d4s are thrown in it.
-                let boardHeight = geo.size.height * 0.34
-                let buttonHeight: CGFloat = 104
+                let boardHeight = RoyalUrScreen.boardHeight(in: geo.size)
+                // From the floor rather than typed — see GameBandLayout.
+                let buttonHeight = GameBandLayout.buttonBandFloor
                 let trayHeight = max(geo.size.height - headerHeight - boardHeight - buttonHeight, 0)
 
                 VStack(spacing: 0) {
@@ -243,8 +301,17 @@ struct RoyalUrScreen: View {
             guard selectedPiece == nil else {
                 return "Tap the ringed square to move, or pick another piece"
             }
-            let count = moves.count
-            return "Rolled \(steps) — \(count) piece\(count == 1 ? "" : "s") can move"
+            // How far the roll MOVES, not how many pieces could take it.
+            // The four binary dice give a distance, and that distance is
+            // the same for every piece — the piece count was answering a
+            // question the player had not asked, and the one they had
+            // (how far does this get me?) was only on the board.
+            //
+            // And without "Rolled N —" in front of it: the four dice are on
+            // screen above this line, so repeating their total here only
+            // made room for the number that matters to be read as the
+            // second one.
+            return "Move \(steps) space\(steps == 1 ? "" : "s")"
         case .setback:
             guard selectedPiece == nil else {
                 return "Tap the ringed square to send it back, or pick another"
@@ -451,46 +518,19 @@ enum RoyalUrGame: SuiteGame {
     static let displayName = "Royal UR"
     static let tagline = "Race, capture, come home."
 
-    /// The short version, shown from inside the game.
-    static let quickRules: [GameRuleSection] = [
-        GameRuleSection(
-            title: "The Goal",
-            body: "Three pieces each, sixteen squares each, and the first player to bring two of them home wins."
-        ),
-        GameRuleSection(
-            title: "Your Turn",
-            body: "Roll five four-sided dice and count the marked points showing — nought to five. Move one piece that far: tap it to select, tap the ringed square to commit."
-        ),
-        GameRuleSection(
-            title: "The Board",
-            body: "Land on an opponent's piece and it goes back to the start. Land on a rosette and you roll again. Roll nothing, or have nowhere to go, and one of your own pieces goes back four."
-        )
-    ]
-
     static let rules: [GameRuleSection] = [
         GameRuleSection(
-            title: "The Race",
-            body: "Three pieces each, and the first player to bring two of them home wins. Your route runs sixteen squares: out along your own row, up the middle past the bridge, around the far block, and out."
+            title: "Game Overview",
+            body: "  * Players: 2.\n  * Dice Pool: 5x d4 (marked points system).\n  * Pieces: 3 pieces per player on shared 16-square track.\n  * Objective: First player to bring 2 pieces home wins."
         ),
         GameRuleSection(
-            title: "The Dice",
-            body: "Roll five four-sided dice. Two of each die's four points are marked — count the marked points sticking up and that is how far you move, anywhere from nothing to five squares. Half the points are marked, so the count lands on 2 or 3 about five rolls in eight: 0 and 5 come up one roll in 32 each, 1 and 4 five rolls in 32, and 2 and 3 ten rolls in 32."
+            title: "Movement Dice Calculation",
+            body: "  Roll 5x d4. Count total upward-facing marked points (0 to 5) for distance.\n\n  Marked Points   Movement Distance   Special Effect\n  -----------------------------------------------------------------------------\n  0               0 Squares           Triggers Setback Rule\n  1 to 5          1 to 5 Squares      Move one piece standard distance"
         ),
         GameRuleSection(
-            title: "Moving",
-            body: "Move one piece the full count. A piece waiting to start enters that many squares along. You cannot land on your own piece, and you cannot overshoot: coming home takes the exact number."
-        ),
-        GameRuleSection(
-            title: "Capture",
-            body: "Land on your opponent's piece and it goes all the way back to the start. Every shared square can be taken, rosettes included — and since you run the final loop in opposite directions, the square one step from home is exactly where they come in."
-        ),
-        GameRuleSection(
-            title: "Rosettes",
-            body: "The five flowered squares fall on the 4th, 8th, 12th and 16th square of both routes. Land on one and you roll again."
-        ),
-        GameRuleSection(
-            title: "The Setback",
-            body: "Roll nothing, or have nowhere legal to go, and you do not simply pass: one of your own pieces goes back four squares — or to the start, if something is already sitting there. You choose which."
+            title: "Movement & Board Mechanics",
+            body: "  * Move a single piece full exact count rolled. Exact count to enter/land home.\n  * Cannot land on your own pieces.\n  * Capture: Landing on opponent's piece sends it back to start.\n  * Rosettes (Squares 4, 8, 12, 16): Landing on a Rosette grants extra roll.\n  * Setback Rule: Rolling 0 or having no legal moves forces player to move one of\n    their own pieces backward 4 squares (or to start if occupied).",
+            figures: [.royalUrPath, .rosette]
         )
     ]
 }

@@ -336,10 +336,37 @@ struct DiceScoreBar: View {
         // Removed for instant, immediate updates.
     }
 
+    /// Which die, if any, belongs in this slot.
+    ///
+    /// The last three are RESERVED, one each for the d8, d10 and d12, and
+    /// the twelve before them take the d6s in banking order. Without that
+    /// the shapes would mean nothing: slots fill in the order dice are
+    /// banked, so a d10 banked first would land in a square and the diamond
+    /// at the end would sit empty all game.
+    private func die(at index: Int) -> Die? {
+        let reserved = [8, 10, 12]
+        if index >= totalSlots - reserved.count {
+            let sides = reserved[index - (totalSlots - reserved.count)]
+            return bankedOrder.first { $0.sides == sides }
+        }
+        var sixes = 0
+        for die in bankedOrder where die.sides == 6 {
+            if sixes == index { return die }
+            sixes += 1
+        }
+        return nil
+    }
+
+    /// The outline this slot wears — its reserved die's face, or a square.
+    private func shape(at index: Int) -> DieSlotShape {
+        let reserved = [8, 10, 12]
+        guard index >= totalSlots - reserved.count else { return .square }
+        return DieSlotShape.forSides(reserved[index - (totalSlots - reserved.count)])
+    }
+
     @ViewBuilder
     private func cell(at index: Int, width: CGFloat, height: CGFloat) -> some View {
-        if index < bankedOrder.count {
-            let die = bankedOrder[index]
+        if let die = die(at: index) {
             Text("\(die.currentValue ?? 0)")
                 .font(.poppins(17, .semibold))
                 // The die's own paired number color, not a hardcoded
@@ -351,12 +378,41 @@ struct DiceScoreBar: View {
                 .foregroundStyle(Color(hex: die.colorway.numberHex))
                 .frame(width: width, height: height)
                 // A banked die is a solid thing sitting on the panel, so it
-                // gets the panel treatment the rest of the chrome has.
-                .pixelPanel(fill: .solid(Color(hex: die.colorway.bodyHex)),
-                            elevation: .piece,
-                            radius: PixelPanel.cellRadius,
-                            outline: PixelPanel.cellOutline,
-                            bevel: PixelPanel.cellBevel)
+                // gets the panel treatment the rest of the chrome has —
+                // cut to its own face for the three that are not d6.
+                .background(
+                    DieSlot(kind: shape(at: index))
+                        .fill(Color(hex: die.colorway.bodyHex))
+                )
+                // The same three-layer edge every other panel wears, cut
+                // to the slot's own shape: a LIT bevel inset inside the
+                // outline, then the outline over it. See PixelPanel.body —
+                // this is that composition by hand, because a slot is not
+                // a rounded rectangle.
+                //
+                // The bevel is the layer that was never here. The slot had
+                // a fill and a flat outline, which is a border; the bevel
+                // is what makes an edge read as a turned corner, and it is
+                // what the settings button has that this did not.
+                .overlay(
+                    DieSlot(kind: shape(at: index))
+                        .inset(by: PixelPanel.cellOutline)
+                        .strokeBorder(PieceSheen.bevel,
+                                      lineWidth: PixelPanel.cellBevel)
+                )
+                .overlay(
+                    DieSlot(kind: shape(at: index))
+                        .strokeBorder(PixelPanel.outlineColor,
+                                      lineWidth: PixelPanel.cellOutline)
+                )
+                // And the depth back. I took this off when the slot read
+                // as a double image, which flattened it rather than fixing
+                // it: without the bevel above there was no edge for the eye
+                // to read the offset against, so the shadow was the only
+                // thing separating die from panel and it read as a second
+                // die. The shadow is also a quarter lighter now — see
+                // Elevation.opacity.
+                .elevated(.piece)
         } else {
             // An empty slot is a hole in the panel, not a thing on it, so the
             // light runs the other way — see .pixelWell. The hairline dashed
@@ -365,9 +421,11 @@ struct DiceScoreBar: View {
             // device the app runs on, which is the opposite of pixel art.
             Color.clear
                 .frame(width: width, height: height)
-                .pixelWell(radius: PixelPanel.cellRadius,
-                           outline: PixelPanel.cellOutline,
-                           bevel: PixelPanel.cellBevel)
+                .overlay(
+                    DieSlot(kind: shape(at: index))
+                        .stroke(PixelPanel.outlineColor.opacity(0.55),
+                                lineWidth: PixelPanel.cellOutline)
+                )
         }
     }
 }
@@ -386,7 +444,9 @@ struct DiceRollButton: View {
     @ObservedObject private var theme = AppTheme.shared
 
     var body: some View {
-        VStack(spacing: 2) {
+        // See TurnActionBar: 2pt put the caption inside the 6pt shadow
+        // this button throws.
+        VStack(spacing: Elevation.lifted.offset + 2) {
             Button(action: action) {
                 Text(label)
                     .font(.poppins(15))
@@ -431,10 +491,27 @@ struct DiceRollButton: View {
                 Text(subtitle)
                     .font(.poppins(12))
                     .foregroundStyle(.secondary)
+                    // One line, like TurnActionBar's. Without this it
+                    // wraps on a narrow screen and the band it sits in —
+                    // sized for one line, see GameBandLayout.captionLine —
+                    // has nowhere to put the second.
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
+        // Fills the band it is handed, rather than sizing to its own
+        // content.
+        //
+        // Both callers already pass `.frame(height: buttonHeight)`, so
+        // this changes nothing on screen — but it moves the guarantee
+        // inside the view. Without it the stack sizes to the caption, and
+        // the caption now carries `minimumScaleFactor`, which means a
+        // sentence would be deciding how far the wood below reaches.
+        // tools_cohesion_verify.py fails exactly that, and is right to:
+        // a surface does not breathe with a caption.
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         // Same wood as the header, tiled the same way — see
         // WoodTiledBackground. This area grows to absorb whatever height
         // squaring the scene above frees up (see DiceGameScreen.body), so

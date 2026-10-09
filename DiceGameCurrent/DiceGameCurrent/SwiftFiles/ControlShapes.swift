@@ -224,3 +224,134 @@ struct OverlayChromeButton: View {
         .padding(10)
     }
 }
+
+// MARK: - Die-shaped slots
+
+/// The outline a banking slot wears, by the kind of die it holds.
+///
+/// Rolls' pool is twelve d6 and one each of d8, d10 and d12, and the history
+/// grid used to draw fifteen identical rounded cells — so the three dice
+/// that are not d6 were invisible until you read their numbers. The last
+/// three slots are now reserved for them and cut to the shape of their own
+/// face: a triangle for the d8, a diamond for the d10, a pentagon for the
+/// d12.
+///
+/// Flat geometry, no curves beyond the square's existing corner: these are
+/// drawn at about 30pt and a rounded polygon at that size is mush.
+enum DieSlotShape: Equatable {
+    case square
+    case triangle
+    case diamond
+    case pentagon
+
+    /// Which shape a die of this many sides lands in.
+    static func forSides(_ sides: Int) -> DieSlotShape {
+        switch sides {
+        case 8:  return .triangle
+        case 10: return .diamond
+        case 12: return .pentagon
+        default: return .square
+        }
+    }
+}
+
+/// `DieSlotShape` as something SwiftUI can fill and stroke.
+struct DieSlot: InsettableShape {
+    let kind: DieSlotShape
+
+    /// How far in from the given rect to draw.
+    ///
+    /// `InsettableShape` rather than `Shape`, because a slot has to take
+    /// the same three-layer edge every other panel wears — fill, a lit
+    /// bevel inset inside the outline, then the outline — and both
+    /// `strokeBorder` and `inset(by:)` need this conformance.
+    /// `tools_cohesion_verify.py` fails a `strokeBorder` on a bare Shape
+    /// precisely so this is not worked around with a plain `stroke`, which
+    /// straddles the edge instead of sitting inside it.
+    ///
+    /// Shrinking the rect is the right inset for every shape here. For the
+    /// square it is exactly what `insetBy` means; for the three polygons it
+    /// is not a true mitred offset, but these are 1pt insets on a ~30pt
+    /// slot and the difference is below a device pixel.
+    var inset: CGFloat = 0
+
+    func inset(by amount: CGFloat) -> DieSlot {
+        var copy = self
+        copy.inset += amount
+        return copy
+    }
+
+    func path(in outer: CGRect) -> Path {
+        let rect = outer.insetBy(dx: inset, dy: inset)
+        return slotPath(in: rect)
+    }
+
+    private func slotPath(in rect: CGRect) -> Path {
+        switch kind {
+        case .square:
+            return Path(roundedRect: rect, cornerRadius: PixelPanel.cellRadius)
+        case .triangle:
+            return polygon(in: rect, sides: 3)
+        case .diamond:
+            return polygon(in: rect, sides: 4)
+        case .pentagon:
+            return polygon(in: rect, sides: 5)
+        }
+    }
+
+    /// A polygon with a point at the top, filling `rect` exactly.
+    ///
+    /// Out of the switch above and written as a loop for the usual reason:
+    /// the vertices are trigonometry over an Int index, which is the shape
+    /// of expression Xcode 14.2's solver gives up on inside a ViewBuilder.
+    ///
+    /// **Stretched to the box, not inscribed in a circle.** It used to put
+    /// the vertices on a circle of `min(width, height) / 2`, which is a
+    /// regular polygon — and a regular polygon does not fill a square.
+    /// Measured on the unit circle, the triangle's own bounds came to 87%
+    /// of the slot's width by 75% of its height and the pentagon's to 95%
+    /// by 90%, so three of Rolls' banking slots read as visibly smaller
+    /// spaces than the twelve squares beside them. These are the same slot
+    /// in a different outline, so they take the same footprint.
+    ///
+    /// The ink follows: the triangle now covers 50% of its box where it
+    /// covered 32%, and the pentagon 69% where it covered 59%.
+    ///
+    /// Filling a square means scaling the two axes by different amounts, so
+    /// these are not quite regular — the triangle is a third taller than an
+    /// equilateral one. That is the trade, and it is the right way round: a
+    /// row of slots that are not the same size is the error a player sees.
+    ///
+    /// The diamond is the one that comes out exactly regular anyway, since
+    /// its four vertices already sit on the box's edge midpoints.
+    private func polygon(in rect: CGRect, sides: Int) -> Path {
+        var points: [CGPoint] = []
+        for index in 0..<sides {
+            let turn = (Double(index) / Double(sides)) * 2 * Double.pi
+            let angle = turn - Double.pi / 2
+            points.append(CGPoint(x: CGFloat(cos(angle)),
+                                  y: CGFloat(sin(angle))))
+        }
+
+        // The unit polygon's own bounds, which is what gets mapped onto the
+        // rect. Computed rather than tabulated so adding a sixth side needs
+        // nothing here.
+        let xs = points.map { $0.x }
+        let ys = points.map { $0.y }
+        let minX = xs.min() ?? -1
+        let minY = ys.min() ?? -1
+        let spanX = (xs.max() ?? 1) - minX
+        let spanY = (ys.max() ?? 1) - minY
+        guard spanX > 0, spanY > 0 else { return Path(rect) }
+
+        var path = Path()
+        for (index, point) in points.enumerated() {
+            let mapped = CGPoint(
+                x: rect.minX + (point.x - minX) / spanX * rect.width,
+                y: rect.minY + (point.y - minY) / spanY * rect.height)
+            if index == 0 { path.move(to: mapped) } else { path.addLine(to: mapped) }
+        }
+        path.closeSubpath()
+        return path
+    }
+}

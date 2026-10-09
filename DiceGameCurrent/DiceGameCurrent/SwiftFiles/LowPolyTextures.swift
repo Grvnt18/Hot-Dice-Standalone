@@ -375,7 +375,15 @@ extension LowPolyTextures {
     private static let woodGrainThick = 2
     private static let woodGrainAmplitude: CGFloat = 6.0
     private static let woodGrainCycles: CGFloat = 1.3
-    private static let woodKnotChance = 45
+    /// Per cent of planks that get a knot. **Zero.**
+    ///
+    /// The note further down said that if the knots ever read as screws
+    /// rather than grain, this is the one number to take to zero. They
+    /// did — as dots on the home page's background — so it is zero. The
+    /// drawing code below stays, because the knot is the only irregular
+    /// thing the timber has and taking it out entirely would mean
+    /// reinventing it to put one back.
+    private static let woodKnotChance = 0
     private static let woodKnotRadius: CGFloat = 5
 
     /// Boards are told apart by the WIDTH of their chamfer bands, not by
@@ -710,7 +718,11 @@ enum SmokeFloor {
     /// Not approximately. Time enters the field only as a point travelling a
     /// circle (see `surfaceModifier`), so every term is periodic in this and
     /// the composite is too.
-    static let loopSeconds: Float = 30.0
+    /// 37.5, not 30: a fifth slower, as asked. The field is periodic in
+    /// whatever this says, so slowing it is this one number and nothing
+    /// else — but tools_smoke_preview.py holds the same value and
+    /// tools_smoke_verify.py compares them, so it is two files.
+    static let loopSeconds: Float = 37.5
 
     /// Texels per dither cell — the apparent pixel size of the stipple.
     static let pixelSize: Float = 4.0
@@ -875,7 +887,17 @@ enum SmokeFloor {
     static let fieldScale: Float = 1.5
     static let fieldAspect: Float = 0.55
     static let contrast: Float = 2.90
-    static let levels = 4
+
+    /// Tones the floor is posterised to.
+    ///
+    /// Was four, which was the original brief and reads as four flat shelves
+    /// once the smoke is moving — the animation has somewhere to go between
+    /// them and nothing to show for it. Six keeps the posterised look while
+    /// giving the drift a wider range to travel through.
+    ///
+    /// Mirrored in tools_smoke_preview.py, which renders the same field, so
+    /// both move together or tools_smoke_verify.py says so.
+    static let levels = 6
     static let dither: Float = 0.70
 
     static let warpA: Float = 2.4
@@ -900,6 +922,45 @@ enum SmokeFloor {
     static let rampSatLift: CGFloat = 0.05
     static let rampBias: CGFloat = 0.55
 
+    /// How far up its own band the floor's AVERAGE tone sits.
+    ///
+    /// Measured, not guessed: the noise field spends 13.9/8.9/11.7/18.4/
+    /// 25.0/22.2 per cent of its area in the six levels, and weighting
+    /// `pow(i/5, rampBias)` by that puts the mean at 0.689 of the band.
+    /// Six levels and this bias, so it moves if either does.
+    static let rampMeanLevel: CGFloat = 0.689
+
+    /// How much of the gap between the band's mean and its top to close.
+    ///
+    /// The band used to hang straight DOWN from the swatch — the brightest
+    /// tone WAS the swatch — which meant every tone on screen was darker
+    /// than the colour that was picked, and the floor read duller than the
+    /// picker promised. Against #006B38 the area-weighted mean came back
+    /// #045D33: a dE of 7.3, which is a different green.
+    ///
+    /// Lifting the whole band by this much moves the MEAN onto the swatch
+    /// instead of the ceiling. Measured across all eleven swatches, at 0.8:
+    ///
+    ///                  dE before   dE after   L* span   tightest step
+    ///   Green            7.3        2.4       16.6→16.8   1.85→1.87
+    ///   Deep Teal        5.7        1.5       16.6→16.7   1.83→1.85
+    ///   Royal Blue       8.9        5.1       13.2→13.5   1.55→1.59
+    ///   Pale Lavender    6.2        4.7       22.4→22.9   2.61→2.67
+    ///   Onyx             6.4        6.4       13.7→13.7   1.67→1.67
+    ///
+    /// Two things that matters for. First, the tonal range is untouched —
+    /// this slides the band, it does not squeeze it, so the posterised look
+    /// the six levels exist for is exactly as it was. Second, **Onyx does
+    /// not move at all**: it is pinned by `rampFloor`, so the olive-grey
+    /// regression recorded in the note above — which came from CENTRING the
+    /// band — cannot come back through this.
+    ///
+    /// 0.8 rather than 1.0 so the mean lands a shade under the swatch
+    /// rather than on it. The tray is a surface under a light, and reading
+    /// a hair darker than the picker is right; reading a different colour
+    /// is not.
+    static let rampLift: CGFloat = 0.8
+
     /// The four tones, darkest first, hung DOWNWARD from the chosen swatch.
     ///
     /// The brightest of the four IS the swatch; the other three shade away
@@ -923,7 +984,11 @@ enum SmokeFloor {
             return Array(repeating: color, count: levels)
         }
 
-        var hi = min(rampCeil, b)
+        // The band's width at the swatch's own brightness, which is what
+        // sets how far the lift may travel.
+        let top = min(rampCeil, b)
+        let band = rampSpreadMin + (rampSpread - rampSpreadMin) * top
+        var hi = min(rampCeil, b + band * rampLift * (1 - rampMeanLevel))
         let spread = rampSpreadMin + (rampSpread - rampSpreadMin) * hi
         var lo = hi - spread
         if lo < rampFloor {
@@ -1111,5 +1176,63 @@ enum SmokeFloor {
         n += (limit - 0.5) * (dither / Float(levels - 1))
         let i = Int(n * Float(levels))
         return i < 0 ? 0 : (i > levels - 1 ? levels - 1 : i)
+    }
+}
+
+// MARK: - A pixel-block surface
+
+extension LowPolyTextures {
+
+    /// A surface of square cells, each one tone off a posterised ramp.
+    ///
+    /// `facetedSurface` builds triangles, which is the low-poly look the rest
+    /// of the suite left behind: the timber, the steel, the floor and the
+    /// dice are all pixel grids now, and the ballpark was the last surface
+    /// still made of facets. A diamond drawn in triangles reads as a
+    /// different game's art on the same screen.
+    ///
+    /// Same inputs as `facetedSurface` so the call sites barely move, and the
+    /// same `SmokeFloor.ramp` the floor posterises against — so the pitch is
+    /// lit by the same handful of tones as everything else.
+    static func pixelSurface(baseColor: UIColor,
+                             cell: CGFloat,
+                             pixelSize: CGFloat,
+                             pixelHeight: CGFloat,
+                             seed: UInt64) -> UIImage {
+        let tones = SmokeFloor.ramp(from: baseColor)
+        let columns = max(1, Int((pixelSize / cell).rounded(.up)))
+        let rows = max(1, Int((pixelHeight / cell).rounded(.up)))
+
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        format.opaque = true
+        let renderer = UIGraphicsImageRenderer(
+            size: CGSize(width: pixelSize, height: pixelHeight), format: format)
+
+        var generator = SeededGenerator(seed: seed)
+        // Drawn ahead of the render so the loop below is a fill per cell and
+        // nothing else — a renderer closure doing arithmetic is the shape
+        // Xcode 14.2's solver struggles with.
+        var picks: [Int] = []
+        picks.reserveCapacity(columns * rows)
+        for _ in 0..<(columns * rows) {
+            picks.append(Int(generator.next() % UInt64(max(1, tones.count))))
+        }
+
+        return renderer.image { context in
+            let cg = context.cgContext
+            cg.setShouldAntialias(false)
+            cg.interpolationQuality = .none
+            var index = 0
+            for row in 0..<rows {
+                for column in 0..<columns {
+                    cg.setFillColor(tones[picks[index]].cgColor)
+                    cg.fill(CGRect(x: CGFloat(column) * cell,
+                                   y: CGFloat(row) * cell,
+                                   width: cell, height: cell))
+                    index += 1
+                }
+            }
+        }
     }
 }

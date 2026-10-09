@@ -37,7 +37,7 @@ final class AppTheme: ObservableObject {
     /// whole set, at ~11) — genuinely hard to tell apart in the picker,
     /// unlike everything that remains.
     static let swatches: [Swatch] = [
-        Swatch(hex: "#36F422", name: "Green"),
+        Swatch(hex: "#006B38", name: "Green"),
         Swatch(hex: "#1B2A4A", name: "Midnight Navy"),
         Swatch(hex: "#2952CC", name: "Royal Blue"),
         Swatch(hex: "#5B2C91", name: "Deep Violet"),
@@ -74,7 +74,7 @@ final class AppTheme: ObservableObject {
     @Published var colorwayIndex: Int {
         didSet {
             guard Self.swatches.indices.contains(colorwayIndex) else { return }
-            GameScope.set(colorwayIndex, Keys.colorwayIndex)
+            GameScope.setColor(colorwayIndex, Keys.colorwayIndex)
         }
     }
 
@@ -97,7 +97,7 @@ final class AppTheme: ObservableObject {
     }
 
     private static func storedIndex() -> Int {
-        let stored = GameScope.int(Keys.colorwayIndex)
+        let stored = GameScope.colorInt(Keys.colorwayIndex)
         return swatches.indices.contains(stored) ? stored : 0
     }
 

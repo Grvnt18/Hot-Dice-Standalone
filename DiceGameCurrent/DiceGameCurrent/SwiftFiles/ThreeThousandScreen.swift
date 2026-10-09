@@ -30,6 +30,41 @@ struct ThreeThousandScreen: View {
     @State private var showingSettings = false
     @ObservedObject private var theme = AppTheme.shared
 
+
+    // MARK: Sending a turn
+
+    /// This screen's turn, packed the way the Messages extension will send
+    /// it — the bookkeeping and the game's own state together, which is
+    /// what MatchPayload exists to say.
+    ///
+    /// Assembled from the screen's own properties rather than the screen
+    /// being rebuilt around the state type. The dice mid-turn are not in
+    /// here on purpose: a turn is resolved on the device that threw it and
+    /// arrives as a result.
+    var wireTurn: MatchPayload<ThreeThousandState> {
+        MatchPayload(match: match, state: ThreeThousandState(
+            turnTotal: turnTotal,
+            turnsLeftAfterTarget: turnsLeftAfterTarget,
+            firstToTarget: firstToTarget))
+    }
+
+    /// Adopts a turn that arrived from another device.
+    ///
+    /// Phase goes back to `.ready` rather than being carried: a phase is
+    /// what THIS device is doing with the dice in front of it, and the
+    /// sender's is meaningless here.
+    func adopt(_ incoming: MatchPayload<ThreeThousandState>) {
+        match = incoming.match
+        turnTotal = incoming.state.turnTotal
+        turnsLeftAfterTarget = incoming.state.turnsLeftAfterTarget
+        firstToTarget = incoming.state.firstToTarget
+        // The dice on the table belong to the turn that threw them.
+        hand = []
+        selected = []
+        locked = []
+        phase = .ready
+    }
+
     private enum Phase {
         /// Waiting for the active player to throw.
         case ready
@@ -37,7 +72,7 @@ struct ThreeThousandScreen: View {
         case rolling
         /// A roll that scores something: set dice aside, then roll on or bank.
         case choosing
-        /// Turn over — banked or busted; waiting to hand over.
+        /// Turn over — banked or busted; waiting to send it on.
         case scored
         /// Handover gate between turns.
         case handover
@@ -48,10 +83,13 @@ struct ThreeThousandScreen: View {
     var body: some View {
         ZStack {
             GeometryReader { geo in
-                let headerHeight = geo.size.height * 0.17
-                let minButtonHeight: CGFloat = 100
-                let sceneHeight = min(geo.size.width, max(geo.size.height - headerHeight - minButtonHeight, 0))
-                let buttonHeight = geo.size.height - headerHeight - sceneHeight
+                // The split every game makes, made once — see
+                // GameBandLayout. The button band's floor is summed from
+                // what it holds rather than typed as 100.
+                let bands = GameBandLayout.self
+                let headerHeight = bands.header(in: geo.size, fraction: 0.17)
+                let sceneHeight = bands.scene(in: geo.size, fraction: 0.17)
+                let buttonHeight = bands.buttonBand(in: geo.size, fraction: 0.17)
 
                 VStack(spacing: 0) {
                     MatchScoreboard(

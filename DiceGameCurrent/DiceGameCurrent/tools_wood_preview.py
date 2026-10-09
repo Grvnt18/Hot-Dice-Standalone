@@ -59,7 +59,11 @@ GRAIN_THICK = 2         # 1px reads as a scratch; 2 reads as painted grain
 PLANK_BEVEL = (3, 1, 5)
 PLANK_SHADE = (2, 5, 1)
 
-KNOT_CHANCE = 45        # 1 in N shard columns carries a knot
+KNOT_CHANCE = 0         # per cent of planks carrying a knot. ZERO: the
+                        # knots read as dots or screw heads on the home
+                        # page background rather than as grain, which the
+                        # Swift's own note said was the signal to take this
+                        # to nothing. The drawing code stays either way.
 KNOT_R = 5
 
 # The four tones, as offsets from the base in HSB. Fixed rather than derived

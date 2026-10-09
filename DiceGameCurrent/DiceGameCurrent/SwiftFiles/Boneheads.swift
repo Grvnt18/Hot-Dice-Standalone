@@ -38,45 +38,79 @@ enum BoneheadsRules {
         return counts.reduce(0) { $0 + $1.key * $1.value * $1.value }
     }
 
-    /// A single d6, coloured to whoever is throwing it.
-    /// The second player's colour.
+    /// The second seat's colour, for its FURNITURE — its column letters and
+    /// its running totals, not its dice.
     ///
-    /// Fixed rather than drawn from the palette, and the same tone the
-    /// opponent's grid has always been drawn in — so the die in the air,
-    /// the die banked in a column and the frame around that column are one
-    /// colour per player.
-    static let opponentBodyHex = "#D2735F"
+    /// Two scoreboards on one screen still need telling apart, and that is
+    /// all this is for now. The dice stopped using it when they started
+    /// carrying their own ink.
+    static let secondSeatHex = "#D2735F"
 
-    /// A seat's dice.
+    /// A die's colour, by its index into the shared palette.
     ///
-    /// Seat 0 takes the player's chosen table colour, seat 1 the fixed
-    /// tone above. This used to be `DiePalette.colorways.shuffled().first`,
-    /// so the die you threw was a different colour every turn and matched
-    /// neither side of the board.
-    static func colorway(for seat: Int) -> DieColorway {
-        seat == 0
-            ? DieColorway(
-                bodyHex: AppTheme.swatches[AppTheme.shared.colorwayIndex].hex,
-                numberHex: "#1B1B1F")
-            : DieColorway(bodyHex: opponentBodyHex, numberHex: "#2A1712")
+    /// Colour used to mean *seat*: yours took the table colour, theirs a
+    /// fixed clay, and the column frames matched. That was itself a
+    /// correction — before it, the colour was reshuffled every turn and
+    /// matched neither side of the board.
+    ///
+    /// It is random again now, deliberately, with the thing that broke it
+    /// last time fixed rather than reverted: a placed die KEEPS the colour
+    /// it was thrown in (see `Placement.ink`), and the frames no longer
+    /// claim a colour at all. Ownership is read from position — your three
+    /// columns are on your side of the board — which it always could have
+    /// been, and colour is free to be colour.
+    static func colorway(ink: Int) -> DieColorway {
+        let palette = DiePalette.colorways
+        return palette[((ink % palette.count) + palette.count) % palette.count]
     }
 
-    static func makeDice(for seat: Int = 0) -> [Die] {
-        [Die(sides: dieSides, colorway: colorway(for: seat))]
+    /// A fresh colour for a throw.
+    ///
+    /// An index rather than a DieColorway because this travels: it is
+    /// stored with the placement and sent over the wire, and one Int is
+    /// both smaller and impossible to get subtly wrong against a palette
+    /// that gains an entry later.
+    static func randomInk() -> Int {
+        Int.random(in: 0..<DiePalette.colorways.count)
+    }
+
+    static func makeDice(ink: Int) -> [Die] {
+        [Die(sides: dieSides, colorway: colorway(ink: ink))]
     }
 }
 
 // MARK: - State
 
+/// A die in a column: the face it shows, and the colour it was thrown in.
+///
+/// The colour is stored rather than derived, which is the whole of the fix.
+/// A banked die used to be drawn in whatever colour its SEAT was using at
+/// the time, so once throws became random the board would have re-coloured
+/// itself under the player every turn. Keeping the ink with the die means
+/// the one in the column is the one you threw.
+///
+/// `ink` is an index into `DiePalette.colorways`, not a colour: this is
+/// Codable and goes over the wire.
+struct BoneheadsPlacement: Codable, Equatable {
+    let face: Int
+    let ink: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case face = "f"
+        case ink = "i"
+    }
+}
+
 /// Both grids. `grids[seat][column]` holds that column's dice, first
 /// placed first — which is also bottom-up on screen.
 struct BoneheadsState: Codable, Equatable {
 
-    private(set) var grids: [[[Int]]]
+    private(set) var grids: [[[BoneheadsPlacement]]]
 
     init() {
         grids = Array(
-            repeating: Array(repeating: [Int](), count: BoneheadsRules.columns),
+            repeating: Array(repeating: [BoneheadsPlacement](),
+                             count: BoneheadsRules.columns),
             count: 2
         )
     }
@@ -85,14 +119,24 @@ struct BoneheadsState: Codable, Equatable {
 
     // MARK: Reading
 
-    func column(seat: Int, _ index: Int) -> [Int] { grids[seat][index] }
+    func column(seat: Int, _ index: Int) -> [BoneheadsPlacement] {
+        grids[seat][index]
+    }
+
+    /// The faces in a column, which is all the scoring and the smash care
+    /// about — colour is for the eye only and never changes a result.
+    func faces(seat: Int, _ index: Int) -> [Int] {
+        grids[seat][index].map(\.face)
+    }
 
     func score(seat: Int) -> Int {
-        grids[seat].reduce(0) { $0 + BoneheadsRules.columnScore($1) }
+        grids[seat].reduce(0) {
+            $0 + BoneheadsRules.columnScore($1.map(\.face))
+        }
     }
 
     func columnScore(seat: Int, _ index: Int) -> Int {
-        BoneheadsRules.columnScore(grids[seat][index])
+        BoneheadsRules.columnScore(faces(seat: seat, index))
     }
 
     func canPlace(seat: Int, column: Int) -> Bool {
@@ -126,12 +170,14 @@ struct BoneheadsState: Codable, Equatable {
     /// falls out for free here, because a column is just an array in
     /// placement order.
     @discardableResult
-    mutating func place(seat: Int, column: Int, die: Int) -> Strike {
-        grids[seat][column].append(die)
+    mutating func place(seat: Int, column: Int, die: Int, ink: Int) -> Strike {
+        grids[seat][column].append(BoneheadsPlacement(face: die, ink: ink))
 
         let opponent = 1 - seat
         let before = grids[opponent][column].count
-        grids[opponent][column].removeAll { $0 == die }
+        // Faces only. Two dice of the same number smash each other whatever
+        // colours they happen to be wearing.
+        grids[opponent][column].removeAll { $0.face == die }
         let destroyed = before - grids[opponent][column].count
 
         return Strike(column: column, value: die, destroyed: destroyed)
@@ -170,38 +216,27 @@ enum BoneheadsGame: SuiteGame {
     static let displayName = "Boneheads"
     static let tagline = "Stack yours. Smash theirs."
 
-    /// The short version, shown from inside the game.
-    static let quickRules: [GameRuleSection] = [
-        GameRuleSection(
-            title: "The Goal",
-            body: "Three columns of three each. Fill the ninth slot and the game ends on the spot — highest total wins."
-        ),
-        GameRuleSection(
-            title: "Your Turn",
-            body: "Roll one die and place it in any of your columns with room. That is the whole turn."
-        ),
-        GameRuleSection(
-            title: "Stacking and Smashing",
-            body: "Matching numbers in a column multiply: one 5 is 5, two are 20, three are 45. And placing a die destroys every die of that number in your opponent's column of the same letter."
-        )
-    ]
-
     static let rules: [GameRuleSection] = [
         GameRuleSection(
-            title: "Your Turn",
-            body: "You roll one die and place it in any of your columns that still has room. That is the whole turn — the only question is which column."
+            title: "Game Overview",
+            body: "  * Players: 2.\n  * Board Layout: 3 columns per player (A, B, C), 3 slots each (9 slots total).\n  * Objective: Fill all slots while maximizing column scoring multipliers and\n    destroying opponent dice."
         ),
         GameRuleSection(
-            title: "Stacking",
-            body: "Every number in a column is multiplied by how many times it appears there. One 5 is 5. Two 5's are 20, not 10. Three 5's are 45. A 5, a 5 and a 2 is 22."
+            title: "Turn Mechanics",
+            body: "  Roll 1x d6 and place it into any available slot in your columns to end turn."
         ),
         GameRuleSection(
-            title: "Smashing",
-            body: "Place a die and every die of that number in your opponent's column of the same letter is destroyed. Their survivors close the gap. A three-stack they spent three turns building comes apart in one."
+            title: "Column Stacking Multipliers",
+            body: "  Matching numbers in same column multiply combined value:\n    Column Score = (Die Face x Occurrences) x Occurrences\n    * Single Die: Face Value (1x)\n    * Pair: (Face x 2) x 2\n    * Triple: (Face x 3) x 3",
+            figures: [.boneheadsScoring]
         ),
         GameRuleSection(
-            title: "Winning",
-            body: "There are nine slots a side, and the moment either player fills their ninth the game stops — there is no answering turn. Highest total wins. That rule is what keeps going first from being an advantage."
+            title: "Smashing Mechanic",
+            body: "  Placing a die in a column destroys all matching dice in opponent's directly\n  opposing column. Remaining opponent dice collapse down to fill gaps."
+        ),
+        GameRuleSection(
+            title: "Game End",
+            body: "  Game ends immediately when either player fills their 9th slot. Highest score wins."
         )
     ]
 }

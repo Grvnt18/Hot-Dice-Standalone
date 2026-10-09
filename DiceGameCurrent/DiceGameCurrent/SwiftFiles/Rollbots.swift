@@ -410,46 +410,22 @@ enum RollbotsGame: SuiteGame {
     static let displayName = "Rollbots"
     static let tagline = "Duel in the net. Answer every shot."
 
-    /// The short version, shown from inside the game.
-    static let quickRules: [GameRuleSection] = [
-        GameRuleSection(
-            title: "The Goal",
-            body: "Take your opponent from \(RollbotsRules.startingIP) Integrity Points to zero. The second runner starts one point up."
-        ),
-        GameRuleSection(
-            title: "Attacking",
-            body: "Pick a weapon at setup. Attacking throws the accuracy d10 and the weapon's damage die together, and you read both before sending the shot."
-        ),
-        GameRuleSection(
-            title: "Defending",
-            body: "You see both of their numbers first. Dodge rolls a d6 — beat their accuracy outright and take nothing, tie or miss and take all of it. Firewall rolls a d8 and subtracts it, and a natural 8 stops everything."
-        )
-    ]
-
     static let rules: [GameRuleSection] = [
         GameRuleSection(
-            title: "The Duel",
-            body: "Two netrunners, \(RollbotsRules.startingIP) Integrity Points each. Take your opponent to zero. The second runner starts one point up, because striking first is worth about four percent."
+            title: "Game Overview",
+            body: "  * Players: 2.\n  * Starting Health: 16 Integrity Points (IP) each (Player 2 starts with 17 IP).\n  * Objective: Reduce opponent's IP to zero."
         ),
         GameRuleSection(
-            title: "Attacking",
-            body: "Pick a weapon at setup. Attacking throws a d10 for accuracy — and your opponent sees it before they choose how to answer, which is what makes the answer a real decision."
+            title: "Loadout Selection",
+            body: "  Each player selects 1 Weapon and 1 Cyberware Ability at match start.\n\n  Weapons:\n    * Mono-Blade (d8): Bypasses 50% of target's Firewall.\n    * Smart Pistol (d6): Damage doubles if Accuracy roll is 7+; critical\n      damage bypasses 50% of Firewall.\n    * Rail Rifle (d12): Bypasses Firewall completely. Requires 1 turn to\n      charge before firing.\n    * Sidearm (d4): Default fallback weapon when primary weapon is disabled."
         ),
         GameRuleSection(
-            title: "Weapons",
-            body: "Mono-Blade: d8, and it cuts through half of any Firewall. Smart Pistol: d6, doubled on an accuracy of 7 or more, and a crit cuts armour the same way. Rail Rifle: d12 and no Firewall stops it — but it spends a turn charging first. There is a fourth you never pick: the Sidearm, a d4 with no tricks at all, which is what the Emergency Sub-Routine leaves you holding."
+            title: "Combat Cycle",
+            body: "  1. Attacker: Rolls Accuracy die (d10) and assigned Weapon Damage die together,\n     confirming attack to resolve.\n  2. Defender Choice:\n       * Dodge (d6): Roll higher than attacker's Accuracy to negate all damage.\n         Ties or lower take full damage.\n       * Firewall (d8): Subtract Firewall roll from incoming damage. Natural 8\n         (Hard Lockdown) negates all damage completely."
         ),
         GameRuleSection(
-            title: "Defending",
-            body: "Dodge rolls a d6: beat their accuracy outright and take nothing, tie or miss and take all of it. Firewall rolls a d8 and subtracts it from the damage — and a natural 8 is a Hard Lockdown that stops everything, the Mono-Blade included."
-        ),
-        GameRuleSection(
-            title: "Cyberware",
-            body: "One ability each, once a match, and every one costs you something. Neural Overclock: your next attack lands at accuracy 10 and no Firewall stops it, and the Rail fires without charging — but you cannot defend at all on their next turn. Corrosive Virus: 3 IP at the start of each of their next three turns, nine in all — but roll a d6 first, and on a 1 or 2 it turns on you. Quantum Phase: your next defence rolls a d12, and beating their accuracy takes nothing and hits back for 4 — but fail it and the attack hits you double. Emergency Sub-Routine: repairs 8 IP on the spot — and leaves you on the Sidearm for four turns."
-        ),
-        GameRuleSection(
-            title: "Winning",
-            body: "First to take their opponent to zero. If you both hit zero in the same exchange it is a System Draw."
+            title: "Cyberware Abilities (One-Time Use per Match)",
+            body: "  Ability                 Effect                              Drawback / Cost\n  -----------------------------------------------------------------------------\n  Neural Overclock        Next attack deals forced Acc 10,    Disables defense\n                          bypasses Firewall, Rail fires       options on opponent's\n                          without charging.                   next turn.\n\n  Corrosive Virus         Deals 3 IP damage/turn at start     Roll d6 on activation:\n                          of opponent's next 3 turns.         1 or 2 turns virus\n                                                              back on self.\n\n  Quantum Phase           Defense uses d12. Beating           Failing roll causes\n                          accuracy negates damage and         taking double damage\n                          counter-attacks for 4 IP.           from attack.\n\n  Emergency Sub-Routine   Immediately repairs 8 IP.           Downgrades weapon to\n                                                              Sidearm (d4) for 4\n                                                              turns."
         )
     ]
 }

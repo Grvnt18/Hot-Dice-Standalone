@@ -11,6 +11,7 @@ anything that goes around them. It also pins the two materials that were
 added to close the survey's gaps, because a material nobody uses is the
 same as no material.
 """
+import math
 import os
 import re
 import sys
@@ -24,6 +25,123 @@ SWIFT = os.path.join(HERE, "SwiftFiles")
 def strip_comments(text):
     text = re.sub(r'/\*.*?\*/', '', text, flags=re.S)
     return "\n".join(re.sub(r'//.*$', '', line) for line in text.splitlines())
+
+
+def check_slot_shapes():
+    """Rolls' four banking slots take the same footprint.
+
+    Twelve of the sixteen slots are squares, and three — the triangle for
+    the d8, the diamond for the d10, the pentagon for the d12 — are
+    polygons. They were put on a circle of `min(width, height) / 2`, which
+    makes them regular and makes them SMALLER: a regular polygon does not
+    fill a square, so three slots read as narrower, shorter spaces than the
+    twelve beside them.
+
+    `DieSlot.polygon` maps the unit polygon's own bounds onto the rect
+    instead. This mirrors that mapping and asserts what it is for — each
+    outline reaches all four edges of its slot — and that the slots have
+    not simply become squares, which would reach the edges too.
+
+    Run against the inscribed version the triangle comes back 87% as wide
+    and 75% as tall as its slot, and this fails on both.
+    """
+    art = source("ControlShapes.swift")
+    kinds = dict(re.findall(r'case \.(\w+):\s*\n\s*return polygon\(in: rect, '
+                            r'sides: (\d+)\)', art))
+    if not kinds:
+        print("  %-26s FAILED  DieSlot no longer builds its slots from "
+              "polygon(in:sides:)" % "slot footprints")
+        return True
+
+    failed = False
+    summary = []
+
+    # The mirror below is Python, so first: the Swift must be doing the
+    # mapping it mirrors. Without this the check would pass on the
+    # inscribed version it was written to catch.
+    if re.search(r'radius\s*=\s*min\(rect\.width, rect\.height\) / 2', art):
+        print("  %-26s FAILED  DieSlot.polygon is back on a circle of "
+              "min(width, height) / 2 — that is a regular polygon, and a "
+              "regular polygon does not fill a square"
+              % "slot footprints")
+        failed = True
+    for token in ("let spanX = (xs.max() ?? 1) - minX",
+                  "(point.x - minX) / spanX * rect.width",
+                  "(point.y - minY) / spanY * rect.height"):
+        if token not in art:
+            print("  %-26s FAILED  DieSlot.polygon no longer maps the unit "
+                  "polygon's bounds onto the slot (missing `%s`)"
+                  % ("slot footprints", token))
+            failed = True
+    for name, sides in sorted(kinds.items(), key=lambda kv: int(kv[1])):
+        count = int(sides)
+        points = [(math.cos(i / count * 2 * math.pi - math.pi / 2),
+                   math.sin(i / count * 2 * math.pi - math.pi / 2))
+                  for i in range(count)]
+        xs = [p[0] for p in points]
+        ys = [p[1] for p in points]
+        span_x, span_y = max(xs) - min(xs), max(ys) - min(ys)
+        mapped = [((p[0] - min(xs)) / span_x, (p[1] - min(ys)) / span_y)
+                  for p in points]
+
+        # Reaches every edge of a unit slot.
+        reach = (min(p[0] for p in mapped), max(p[0] for p in mapped),
+                 min(p[1] for p in mapped), max(p[1] for p in mapped))
+        if reach != (0.0, 1.0, 0.0, 1.0):
+            print("  %-26s FAILED  the %s spans x %.3f..%.3f and y "
+                  "%.3f..%.3f of its slot, not the whole of it"
+                  % ("slot footprints", name, *reach))
+            failed = True
+
+        # ...and is still a polygon, not the square it sits beside.
+        area = abs(sum(mapped[i][0] * mapped[(i + 1) % count][1]
+                       - mapped[(i + 1) % count][0] * mapped[i][1]
+                       for i in range(count))) / 2
+        if area > 0.95:
+            print("  %-26s FAILED  the %s now fills %.0f%% of its slot — it "
+                  "has become the square it is meant to differ from"
+                  % ("slot footprints", name, area * 100))
+            failed = True
+        summary.append("%s %.0f%%" % (name, area * 100))
+
+    if not failed:
+        print("  %-26s ok (%s of its slot, each reaching all four edges)"
+              % ("slot footprints", ", ".join(summary)))
+    return failed
+
+
+def check_button_chrome():
+    """No screen draws a system button.
+
+    Rolls' roll button is `.plain` + `.pixelPanel(elevation:)` — the app's
+    own chrome. The other ten games' action bar was
+    `.buttonStyle(.borderedProminent)` with a tint: a system shape, a
+    system fill, no pixel outline, no bevel and no Elevation shadow. They
+    were never going to match by tuning, because they were two different
+    button systems, and the restyle replaced that one everywhere except
+    the file nothing pointed at.
+
+    `.borderedProminent` and `.bordered` also draw their own rounded shape
+    that no amount of framing from outside can square off — the same
+    reason DiceRollButton's own note gives for not using them.
+    """
+    offenders = []
+    for filename in sorted(os.listdir(SWIFT)):
+        if not filename.endswith(".swift"):
+            continue
+        body = strip_comments(source(filename))
+        for style in (".borderedProminent", ".bordered"):
+            if "buttonStyle(%s)" % style in body:
+                offenders.append("%s uses buttonStyle(%s)"
+                                 % (filename, style))
+
+    if offenders:
+        for line in offenders:
+            print("  %-26s FAILED  %s" % ("button chrome", line))
+        return True
+    print("  %-26s ok (every button is .plain under a pixelPanel)"
+          % "button chrome")
+    return False
 
 
 def main():
@@ -54,6 +172,30 @@ def main():
     for height in ("resting", "piece", "lifted"):
         if "case %s" % height not in elevation:
             failed.append("Elevation lost its .%s height" % height)
+
+    # --- and the two inks come off ONE ladder. ----------------------
+    #
+    # A dark mark on mid-tone timber cannot throw a dark shadow: the offset
+    # stops reading as depth and reads as a thickened edge instead. So
+    # Elevation signs its shadow in TONE as well as in direction, and the
+    # hub's black wordmark and its icons throw the pale one.
+    #
+    # The risk that buys is two ladders — a light ink that quietly grows its
+    # own opacities, at which point "one shadow system" is a comment rather
+    # than a fact. Both inks must therefore be written against the SHARED
+    # `opacity`, not against numbers of their own.
+    if "enum Ink" not in elevation:
+        failed.append("Elevation has no Ink, so a shadow cannot be signed "
+                      "for the tone it falls on")
+    else:
+        for ink in ("dark", "light"):
+            if "case %s" % ink not in elevation:
+                failed.append("Elevation.Ink lost its .%s tone" % ink)
+        for base, ink in (("black", "dark"), ("white", "light")):
+            if not re.search(r'\.%s\.opacity\(opacity\)' % base, elevation):
+                failed.append("Elevation's .%s ink does not derive from the "
+                              "shared opacity ladder — two inks with their "
+                              "own numbers are two shadow systems" % ink)
 
     # --- 3. The materials are actually used. -------------------------
     generals = strip_comments(source("GeneralsScreen.swift"))
@@ -202,6 +344,10 @@ def main():
                                              "pixelPanel"),
         ("Capsule()", "a pill is the one shape the restyle replaced "
                       "everywhere else, so one here reads as another app"),
+        (".pickerStyle(", "every built-in picker style draws system "
+                          "chrome the restyle replaced — .menu is a "
+                          "capsule button, .segmented a rounded bar. A "
+                          "Menu with a pixelPanel label is the square one"),
     ):
         if token in menus:
             where = [f for f in MENU_FILES if token in strip_comments(source(f))]
@@ -215,11 +361,16 @@ def main():
     if failed:
         sys.exit("cohesion: FAILED (%d problem(s))" % len(failed))
 
-    print("  %-26s ok (direction shared, three heights)" % "one light")
+    print("  %-26s ok (direction shared, three heights, two inks on one ladder)"
+          % "one light")
     print("  %-26s ok (paper + ink, solid placements)" % "materials in use")
     print("  %-26s ok (no strokeBorder on a bare Shape)" % "shape constraints")
     print("  %-26s ok (every plain Button fills its own tap target)"
           % "tap targets")
+    failed_chrome = check_button_chrome()
+    if check_slot_shapes() or failed_chrome:
+        print("cohesion: FAILED")
+        sys.exit(1)
     print("cohesion: PASS")
 
 

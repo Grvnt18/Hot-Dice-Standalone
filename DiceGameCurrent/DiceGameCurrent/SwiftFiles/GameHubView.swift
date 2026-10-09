@@ -12,6 +12,15 @@ struct GameHubView: View {
     @State private var showingSettings = false
     @State private var openGame: GameCatalogEntry?
 
+    /// Whether the mark has finished travelling from the middle of the
+    /// screen to its place at the top.
+    @State private var hasSettled = HubIntro.hasPlayed
+
+    /// Honoured rather than ignored: this animation moves a large element
+    /// most of the way down the screen, which is exactly what Reduce Motion
+    /// is asked to stop.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         // The width is measured rather than negotiated.
         //
@@ -38,6 +47,21 @@ struct GameHubView: View {
                 ScrollView {
                     VStack(spacing: 18) {
                         HubTitle(width: geo.size.width)
+                            // The same HubTitle in both states, moved rather
+                            // than duplicated: a second copy drawn centred
+                            // would have to be kept identical to this one
+                            // forever, and would drift the first time either
+                            // changed.
+                            .offset(y: hasSettled
+                                    ? 0
+                                    : HubIntro.travel(in: geo.size,
+                                                      width: geo.size.width))
+
+                        // Everything below the mark arrives with it. One
+                        // opacity on the group rather than one per element,
+                        // so nothing can be forgotten and left visible
+                        // behind the intro.
+                        Group {
 
                         // Says what is absent rather than letting four
                         // separate features fail quietly — see BundleCheck.
@@ -76,6 +100,9 @@ struct GameHubView: View {
                         }
                         .frame(width: HubLayout.gridWidth(forWidth: geo.size.width))
                         .padding(.horizontal, HubLayout.gutter)
+
+                        }
+                        .opacity(hasSettled ? 1 : 0)
                     }
                     .padding(.vertical, 22)
                 }
@@ -105,6 +132,7 @@ struct GameHubView: View {
             SettingsView()
         }
         .onAppear {
+            HubIntro.play(reduceMotion: reduceMotion) { hasSettled = true }
             // Belt and braces, not a move.
             //
             // Registration also happens at the top of
@@ -125,14 +153,17 @@ struct GameHubView: View {
             SoundEngine.shared.play(.buttonTap)
             showingSettings = true
         } label: {
+            // The same control as the one in a game — see DiceGameShell's
+            // back and settings buttons. It was a plain black wash on a
+            // rounded rectangle, which is the only chrome in the app that
+            // was neither a pixelPanel nor the floor's own tone.
             Image(systemName: "gearshape.fill")
                 .font(.system(size: 18))
-                .foregroundStyle(.white.opacity(0.75))
+                .foregroundStyle(.white.opacity(0.9))
                 .padding(9)
-                .background(
-                    Color.black.opacity(0.45),
-                    in: RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                )
+                .pixelPanel(fill: .solid(SmokeFloor.backdropColor
+                                            .opacity(HubLayout.chromePlate)),
+                            elevation: .piece)
         }
         .padding(10)
     }
@@ -224,15 +255,20 @@ enum HubLayout {
         labelFont(tile: tile) * 2.4
     }
 
-    /// The suite mark above the wordmark: exactly the size of a tile's icon.
+    /// The suite mark above the wordmark: twice a tile icon across.
     ///
-    /// This was `min(max(width * 0.22, 72), 120)`, which approximated the
-    /// tiles and undershot them — 86pt on a 393pt phone where a tile's icon
-    /// is 95. Derived from the grid instead, so "the same size as the other
-    /// icons" is what the code says rather than what a constant happens to
-    /// land near, and it stays true if the grid's spacing ever moves.
+    /// It was `min(max(width * 0.22, 72), 120)`, which approximated the
+    /// tiles and undershot them, and then exactly one tile icon — which
+    /// made the suite's own mark read as a twelfth game sitting above the
+    /// eleven. At twice the width it covers about the area of the icons it
+    /// sits over and reads as the thing they belong to.
+    ///
+    /// Still derived from the grid rather than typed, so it stays true if
+    /// the spacing moves, and clamped to the grid's own width so it can
+    /// never be wider than the tiles below it.
     static func headerMark(forWidth width: CGFloat) -> CGFloat {
-        iconSide(tile: tileSide(forWidth: width))
+        let doubled = iconSide(tile: tileSide(forWidth: width)) * 2
+        return min(doubled, gridWidth(forWidth: width))
     }
 
     /// What is left for the artwork once the name has its room.
@@ -244,6 +280,42 @@ enum HubLayout {
     static func iconSide(tile: CGFloat) -> CGFloat {
         max(40, tile - inset * 2 - labelHeight(tile: tile) - gap)
     }
+
+    // MARK: Chrome over timber
+    //
+    // The in-game back and settings buttons wear the field's darkest tone
+    // at 0.85 (DiceGameShell). The hub wears the SAME control over the
+    // timber instead of over the field, and 0.85 of a near-black tone on
+    // light timber is not translucent — it is a dark block. Matching the
+    // in-game button means matching how it READS, which is a lower number
+    // here, not the same number.
+    //
+    // Measured, compositing SmokeFloor.backdrop over the #AE7B5B timber
+    // and taking the WCAG ratio against the glyph:
+    //
+    //            white glyph        black artwork
+    //   0.10     4.1 : 1  (fails)   5.1 : 1
+    //   0.20     4.7 : 1            4.4 : 1
+    //   0.30     5.3 : 1            3.8 : 1
+    //   0.55     7.3 : 1            2.6 : 1
+    //
+    // (Green, Midnight Navy and Crimson all within 0.2 of each other, so
+    // the choice holds for every swatch.)
+
+    /// Behind the settings gear.
+    ///
+    /// **The same number as the in-game button, deliberately.** This was
+    /// 0.30 for a measured reason — 0.85 of a near-black tone over light
+    /// timber is a dark block rather than a translucent plate — but
+    /// "matches the in-game button" was the actual requirement and 0.30
+    /// did not match it. Two controls that are the same control have to
+    /// look the same; the tone is the thing being matched, not the
+    /// translucency, and at 0.85 the white glyph sits at 10.4:1 rather
+    /// than 5.3:1, so nothing is lost on legibility either.
+    ///
+    /// If this ever moves, the in-game buttons in DiceGameShell move with
+    /// it or they stop matching again.
+    static let chromePlate: Double = 0.85
 }
 
 // MARK: - Title
@@ -267,16 +339,38 @@ private struct HubTitle: View {
         VStack(spacing: 6) {
             GameIconView(id: "app")
                 // Proportional, like the tiles, so the mark keeps its weight
-                // against them on a phone and on an iPad alike.
+                // against them on a phone and on an iPad alike — and now
+                // about twice the area of one, so the suite's own mark is
+                // not just another tile at the top of the grid.
                 .frame(width: HubLayout.headerMark(forWidth: width),
                        height: HubLayout.headerMark(forWidth: width))
 
             // The SUITE's name. Rolls is still a game in it — see
             // RollsGame.displayName, which keeps that title — but it stopped
             // being the name of the thing holding the other ten.
-            ScriptText("Hot Dice", size: 52)
-                .foregroundStyle(.white)
-                .elevated(.lifted)
+            //
+            // Not ScriptText any more, and that is a trade rather than a
+            // slip: the mark is wanted in the heaviest weight the app has,
+            // and the script face ships Regular only. Poppins-Black is the
+            // boldest thing in Resources, so the mark moved to it. The
+            // script face keeps its other two jobs — the turn-complete
+            // caption and the floor wordmark — so nothing about
+            // AppFonts.swift changes.
+            //
+            // 245pt wide at 52, measured off the actual TTF, against the
+            // 320pt of the narrowest phone this app meets less its gutters.
+            // It fits; the scale floor is there because "it fits" was
+            // measured once and fonts get swapped.
+            Text("HOT DICE")
+                .font(.poppins(52, .black))
+                .foregroundStyle(.black)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                // No shadow. It had a pale one, which is what made it read
+                // as a different KIND of text from the eleven names below
+                // it — those sit flat on the timber in the same ink and the
+                // same weight, and the mark is now one of them rather than
+                // a sign hung above them.
         }
     }
 }
@@ -304,21 +398,49 @@ private struct GameTile: View {
                     // Through Elevation, which is the app's one shadow
                     // system — four hand-picked values were collapsed into
                     // it precisely so a twelfth could not be added here.
-                    .elevated(.lifted)
+                    //
+                    // Pale, matching the wordmark above: the artwork is
+                    // black line work, and the hub is the one screen where
+                    // the ink and the shadow would otherwise be the same
+                    // colour.
+                    //
+                    // This is the treatment the hub shipped with, restored.
+                    // It was replaced twice — first by a translucent plate,
+                    // then by a traced silhouette — and both replacements
+                    // were solving for something that did not need solving.
+                    .elevated(.lifted, ink: .light)
 
-                Text(entry.tileName)
-                    .font(.poppins(HubLayout.labelFont(tile: side), .semibold))
+                Text(entry.tileName.uppercased())
+                    // Black, the heaviest face in Resources — these sit on
+                    // timber under a plate and semibold was losing to both.
+                    //
+                    // Uppercased at the view, not in GameCatalog: the
+                    // catalogue's names are the names (Freighter.Yacht.Dinghy
+                    // keeps its stops, Rolls keeps its spelling) and this is
+                    // only how the hub sets them. Anything else reading
+                    // `tileName` — the guide nameplates aside, which do the
+                    // same thing for the same reason — still gets the name.
+                    .font(.poppins(HubLayout.labelFont(tile: side), .black))
+                    // One size across the grid, with the longest names
+                    // shrinking to fit — FREIGHTER.YACHT.DINGHY is the only
+                    // one that ever does, and it fires rather than
+                    // truncating. Scaling every name to fill its own width
+                    // instead would leave a page of tiles carrying visibly
+                    // different type sizes.
+                    //
+                    // ONE of these, and only one. There were two — 0.8 here
+                    // and 0.6 further down the chain — and only the inner
+                    // one ever applied, because this is an environment
+                    // value and the modifier nearest the Text wins. The 0.6
+                    // was dead, and tools_hublayout_verify.py was reading
+                    // whichever it found first.
+                    .minimumScaleFactor(0.8)
                     // Black on the timber. The artwork is black line work on
                     // transparency, so a white name beside it was the one
                     // element on the tile not drawn in the same ink.
                     .foregroundStyle(.black)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
-                    // One size across the grid, with the longest names
-                    // shrinking to fit. Scaling every name to fill its own
-                    // width instead would leave a page of tiles carrying
-                    // visibly different type sizes.
-                    .minimumScaleFactor(0.6)
                     // Stack Sans overhangs its advance width, so a trailing
                     // glyph can clip against a tight frame.
                     .padding(.trailing, 3)
@@ -342,5 +464,69 @@ private struct GameTile: View {
             .contentShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - The mark arriving
+
+/// The hub's opening move: the mark sits in the middle of the screen, then
+/// travels up to its place at the top and the games appear under it.
+///
+/// **This is not the launch screen, and cannot be.** An iOS launch screen is
+/// a static storyboard rendered before any code runs — it has no animation
+/// and never will. What makes the two read as one thing is that the
+/// storyboard draws the same mark, the same size, in the same place, so the
+/// first frame the app draws is identical to the last frame the system drew.
+/// The travel then starts from there. Get the storyboard wrong and this
+/// reads as a jump, not as a continuation — the numbers it has to match are
+/// in MAC_SETUP.txt.
+enum HubIntro {
+
+    /// Seconds the mark holds in the middle before setting off, so the
+    /// handoff from the launch screen is seen as a still rather than as a
+    /// stutter.
+    static let hold: Double = 0.35
+
+    /// Seconds of travel.
+    static let travelDuration: Double = 0.62
+
+    /// Once per launch, not once per appearance.
+    ///
+    /// `onAppear` on the hub fires again every time a game is dismissed, and
+    /// replaying the intro on the way back from a match would be an
+    /// animation nobody asked for in the middle of using the app.
+    private(set) static var hasPlayed = false
+
+    /// How far the mark starts below its resting place.
+    ///
+    /// The mark's natural home is `padding(.vertical, 22)` down the scroll
+    /// view; its own height is `headerMark`, and the wordmark sits under it
+    /// with 6pt of spacing. Centring the ARTWORK — not the title block — is
+    /// what matches a launch screen, which has only the artwork on it.
+    static func travel(in size: CGSize, width: CGFloat) -> CGFloat {
+        let mark = HubLayout.headerMark(forWidth: width)
+        let restingCentre = 22 + mark / 2
+        return max(0, size.height / 2 - restingCentre)
+    }
+
+    /// Runs the intro, or skips straight to the end.
+    ///
+    /// Skipped entirely under Reduce Motion: this moves a large element most
+    /// of the way down the screen, which is the exact thing that setting
+    /// exists to stop.
+    static func play(reduceMotion: Bool, settle: @escaping () -> Void) {
+        guard !hasPlayed else { return }
+        hasPlayed = true
+
+        guard !reduceMotion else {
+            settle()
+            return
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + hold) {
+            withAnimation(.easeInOut(duration: travelDuration)) {
+                settle()
+            }
+        }
     }
 }

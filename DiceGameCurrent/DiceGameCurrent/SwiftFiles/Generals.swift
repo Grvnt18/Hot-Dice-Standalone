@@ -59,6 +59,13 @@ enum GeneralsRules {
 enum GeneralsCategory: String, CaseIterable, Codable, Identifiable {
     case ones, twos, threes, fours, fives, sixes
     case setOfThree, setOfFour, packedHouse
+    /// `setOfFive` shows as "General" and keeps its old spelling as a case.
+    ///
+    /// The raw value is the wire format: GeneralsCategory is the key type of
+    /// GeneralsCard.claims, which is Codable and travels between devices in
+    /// a turn. Renaming the case renames the key, and a card sent by one
+    /// build would not decode in the other. What a player reads is
+    /// `displayName`, and that is what changed.
     case smallJoker, largeJoker, setOfFive
 
     var id: String { rawValue }
@@ -76,7 +83,7 @@ enum GeneralsCategory: String, CaseIterable, Codable, Identifiable {
         case .packedHouse: return "Packed House"
         case .smallJoker:  return "Small Joker"
         case .largeJoker:  return "Large Joker"
-        case .setOfFive:   return "Set of 5"
+        case .setOfFive:   return "General"
         }
     }
 
@@ -166,6 +173,21 @@ struct GeneralsCard: Codable, Equatable {
     struct Claim: Codable, Equatable {
         let participant: String
         let points: Int
+
+        /// One letter each, because there are twelve of these in a full
+        /// card and the names were being spelled out twelve times over.
+        /// "participant" and "points" cost 19 bytes per claim in key names
+        /// alone, 228 across the card — against a 4096-byte budget that
+        /// Generals was already using 42% of, making it the heaviest of the
+        /// two-player games by a wide margin.
+        ///
+        /// Every other type on the wire already does this (`TurnMatch`,
+        /// `RollsPlayerResult`, `GeneralsCard` itself); this one was simply
+        /// missed.
+        private enum CodingKeys: String, CodingKey {
+            case participant = "w"
+            case points = "p"
+        }
     }
 
     private(set) var claims: [GeneralsCategory: Claim] = [:]
@@ -232,6 +254,28 @@ extension GeneralsRules {
     }
 }
 
+/// Generals as it travels in a message.
+///
+/// The shared scorecard, which is the entire point of the game: twelve
+/// categories claimed once each by whoever takes them first. Nothing else
+/// in the suite has state this load-bearing — a lost card is a lost match,
+/// and both devices must agree on every claim already made.
+///
+/// `GeneralsCard` was already Codable; what was missing was a state type to
+/// put it in, which is why Generals could not be sent while its card could.
+///
+/// The five dice and the rolls used do not travel: a turn is three rolls on
+/// one device and arrives as a claim.
+struct GeneralsState: Codable, Equatable {
+
+    /// Who has claimed what, and for how much.
+    var card: GeneralsCard = GeneralsCard()
+
+    private enum CodingKeys: String, CodingKey { case card = "c" }
+
+    init(card: GeneralsCard = GeneralsCard()) { self.card = card }
+}
+
 // MARK: - Suite entry
 
 enum GeneralsGame: SuiteGame {
@@ -239,46 +283,22 @@ enum GeneralsGame: SuiteGame {
     static let displayName = "Generals"
     static let tagline = "One scorecard. Claim it first."
 
-    /// The short version, shown from inside the game.
-    static let quickRules: [GameRuleSection] = [
-        GameRuleSection(
-            title: "The Goal",
-            body: "One shared card of twelve categories, claimed once each by whoever takes it first. Six claims apiece, twelve turns in all, highest total wins."
-        ),
-        GameRuleSection(
-            title: "Your Turn",
-            body: "Roll five dice, tap the ones to keep, roll the rest — three rolls — then claim one open category for whatever your hand pays there."
-        ),
-        GameRuleSection(
-            title: "Zeroing",
-            body: "If nothing qualifies you must still claim a category, for zero. It burns that category for your opponent too."
-        )
-    ]
-
     static let rules: [GameRuleSection] = [
         GameRuleSection(
-            title: "One Card, Two Players",
-            body: "There are twelve categories and a single shared scorecard. Each category can be claimed once, by whoever takes it first — so the whole game is twelve turns, six each."
+            title: "Game Overview",
+            body: "  * Players: 2.\n  * Dice Pool: 5x d6.\n  * Structure: 12 total turns (6 per player) using a single shared scorecard\n    in a snake turn order (P1, P2, P2, P1...)."
         ),
         GameRuleSection(
-            title: "Your Turn",
-            body: "Roll five dice. Tap any dice you want to keep, then roll the rest — up to three rolls in all. Then claim one open category for whatever your hand scores in it."
+            title: "Turn Structure",
+            body: "  1. Roll all 5 dice.\n  2. Optionally keep any number of dice and re-roll the rest. Max 3 rolls per turn.\n  3. Claim one available category on the shared scorecard to end turn."
         ),
         GameRuleSection(
-            title: "The Categories",
-            body: "Ones through Sixes score the sum of that number and nothing else. Set of 3 needs three dice on the same face and Set of 4 needs four, and both score all five dice added up. Packed House is three of one and a pair of another, for 25. Small Joker is four consecutive faces — 1-2-3-4, 2-3-4-5 or 3-4-5-6 — for 30. Large Joker is five consecutive, 1-2-3-4-5 or 2-3-4-5-6, for 40. Set of 5 is all five on the same face, for 50."
+            title: "Categories & Scoring",
+            body: "  Category          Qualification Requirement           Score\n  -----------------------------------------------------------------------------\n  Ones to Sixes     Any dice showing selected face (1-6) Sum of matching dice\n  Set of 3          Three dice of same face             Sum of all 5 dice\n  Set of 4          Four dice of same face              Sum of all 5 dice\n  Packed House      Three of one face + pair of another 25 Points\n  Small Joker       Four sequential faces (1-2-3-4 etc) 30 Points\n  Large Joker       Five sequential faces (1-2-3-4-5)   40 Points\n  General           All five dice showing same face     50 Points"
         ),
         GameRuleSection(
             title: "Zeroing",
-            body: "If nothing you rolled qualifies, you must still claim a category — for zero. That burns it for your opponent too, so which one you give up is a real decision."
-        ),
-        GameRuleSection(
-            title: "Turn Order",
-            body: "Turns run in a snake: you, them, them, you, you, them, and so on. Six claims each. Going first on a shared card is otherwise worth about ten points, and the snake is what takes that away."
-        ),
-        GameRuleSection(
-            title: "Winning",
-            body: "The game ends when all twelve categories are claimed. Highest total wins."
+            body: "  If a hand does not qualify for an open category (or by choice), a player\n  must select an open category to claim for 0 points, permanently removing it\n  for both players."
         )
     ]
 }

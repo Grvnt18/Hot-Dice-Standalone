@@ -39,6 +39,27 @@ extension HogRules {
     }
 }
 
+/// HOG as it travels in a message.
+///
+/// Almost nothing, and that is the game rather than an oversight: every
+/// point HOG keeps is banked into `TurnMatch.scores`, and a turn total is
+/// the only thing that exists outside it. Carried anyway so a turn can be
+/// handed over mid-push rather than only at a hold — the receiver sees
+/// what is riding on the next roll.
+///
+/// The die in the air does not travel. A roll is resolved on the device
+/// that threw it and the face is already folded into `turnTotal`.
+struct HogState: Codable, Equatable {
+
+    /// Points accumulated this turn and not yet banked. Zero at a handover
+    /// that followed a hold or a Hog.
+    var turnTotal: Int = 0
+
+    private enum CodingKeys: String, CodingKey { case turnTotal = "t" }
+
+    init(turnTotal: Int = 0) { self.turnTotal = turnTotal }
+}
+
 // MARK: - Suite entry
 
 enum HogGame: SuiteGame {
@@ -46,38 +67,20 @@ enum HogGame: SuiteGame {
     static let displayName = "Hog"
     static let tagline = "Push your luck to 75."
 
-    /// The short version, shown from inside the game.
-    static let quickRules: [GameRuleSection] = [
-        GameRuleSection(
-            title: "The Goal",
-            body: "First to bank 75 wins immediately — there is no answering turn."
-        ),
-        GameRuleSection(
-            title: "Your Turn",
-            body: "Roll one die as often as you dare, adding each face to your turn total, then hold to bank it and pass."
-        ),
-        GameRuleSection(
-            title: "The Hog",
-            body: "Roll a 1 and the whole turn total is gone. What you have already banked is safe."
-        )
-    ]
+    /// Two or more, per GAME_RULES.txt. The turns alternate and the state
+    /// is per seat, so nothing here is counting to two — see
+    /// TurnMatch.local(playerCount:).
+    static let maxPlayers = Int.max
+
 
     static let rules: [GameRuleSection] = [
         GameRuleSection(
-            title: "Your Turn",
-            body: "Roll one die as many times as you dare. Every face adds to your turn total — and you keep none of it until you hold."
+            title: "Game Overview",
+            body: "  * Players: 2 or more (alternating turns).\n  * Dice Pool: 1x d6.\n  * Objective: First player to bank 75 points wins instantly."
         ),
         GameRuleSection(
-            title: "The Hog",
-            body: "Roll a 1 and the turn ends immediately with nothing. Everything you built up that turn is gone; your banked score is safe."
-        ),
-        GameRuleSection(
-            title: "Holding",
-            body: "Hold at any time to add your turn total to your score and pass the die. Holding is never wrong, only expensive."
-        ),
-        GameRuleSection(
-            title: "Winning",
-            body: "First to bank 75 wins on the spot — there is no answering turn, so a lead you can see is a lead you have to catch before they hold."
+            title: "Turn Mechanics",
+            body: "  1. Roll the die.\n  2. Roll 2-6: Add value to running turn total. Choose to roll again or hold.\n  3. Roll 1 (The Hog): Turn ends immediately and all points accumulated during\n     that turn are lost. Banked score is unaffected.\n  4. Hold: Bank running turn total into overall score and end turn."
         )
     ]
 }

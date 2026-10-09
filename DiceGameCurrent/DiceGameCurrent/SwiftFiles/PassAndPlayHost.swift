@@ -176,6 +176,19 @@ struct TurnActionBar: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
+        // Fills the band it is handed, like DiceGameShell's own bar.
+        //
+        // This is the gap. Converting these buttons from
+        // `.borderedProminent` to `.plain` + `.pixelPanel` took away the
+        // system style's intrinsic padding, so the stack got shorter — and
+        // without this it sizes to its content and sits CENTRED in a band
+        // the caller fixes with `.frame(height: buttonHeight)`, leaving
+        // bare screen above and below it where the timber used to reach.
+        //
+        // The other bar got this line in the same change, for the same
+        // reason, and only seven of the eleven games use this one. That is
+        // why the gap appeared in some games and not others.
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(WoodTiledBackground())
     }
 }

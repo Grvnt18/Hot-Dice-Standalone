@@ -31,10 +31,13 @@ struct FreeRollScreen: View {
             // on a screen too short for it, exactly as Rolls does.
             // One row taller with totals showing, so the readout has
             // somewhere to go rather than squeezing the chips.
-            let headerHeight = geo.size.height * (showingTotals ? 0.30 : 0.26)
-            let minButtonHeight: CGFloat = 100
-            let sceneHeight = min(geo.size.width, max(geo.size.height - headerHeight - minButtonHeight, 0))
-            let buttonHeight = geo.size.height - headerHeight - sceneHeight
+            // Same split as every other game — see GameBandLayout — with
+            // the one fraction in the app that moves: the totals panel
+            // needs a taller header when it is open.
+            let fraction: CGFloat = showingTotals ? 0.30 : 0.26
+            let headerHeight = GameBandLayout.header(in: geo.size, fraction: fraction)
+            let sceneHeight = GameBandLayout.scene(in: geo.size, fraction: fraction)
+            let buttonHeight = GameBandLayout.buttonBand(in: geo.size, fraction: fraction)
 
             VStack(spacing: 0) {
                 picker

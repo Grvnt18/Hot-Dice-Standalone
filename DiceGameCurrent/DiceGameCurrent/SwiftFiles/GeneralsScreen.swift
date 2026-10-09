@@ -64,10 +64,13 @@ struct GeneralsScreen: View {
     var body: some View {
         ZStack {
             GeometryReader { geo in
-                let headerHeight = geo.size.height * 0.17
-                let minButtonHeight: CGFloat = 100
-                let sceneHeight = min(geo.size.width, max(geo.size.height - headerHeight - minButtonHeight, 0))
-                let buttonHeight = geo.size.height - headerHeight - sceneHeight
+                // The split every game makes, made once — see
+                // GameBandLayout. The button band's floor is summed from
+                // what it holds rather than typed as 100.
+                let bands = GameBandLayout.self
+                let headerHeight = bands.header(in: geo.size, fraction: 0.17)
+                let sceneHeight = bands.scene(in: geo.size, fraction: 0.17)
+                let buttonHeight = bands.buttonBand(in: geo.size, fraction: 0.17)
 
                 VStack(spacing: 0) {
                     MatchScoreboard(

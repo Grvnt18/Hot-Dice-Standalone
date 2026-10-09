@@ -210,6 +210,37 @@ To check from a terminal, in the repo:
 
 
 ===============================================================================
+ORIENTATION — SET THIS, IT IS NOT IN THE REPO
+===============================================================================
+
+Portrait only. Set it in Swift Playgrounds' project settings now, and in
+the Xcode target's Deployment Info when the project moves across. Like
+the icon below, it does not travel in the repo, so an Xcode build will
+quietly re-enable everything unless it is set again.
+
+Why portrait, measured rather than assumed:
+
+  * Ten of the eleven games build a SQUARE playfield — min(width, height
+    available) — because the physics arena and its orthographic camera are
+    square. In landscape the height binds, so the extra width is thrown
+    away while the lost height squeezes the button band underneath.
+
+  * Royal UR is the one exception. Its board is 9.04 x 3.64, genuinely
+    wide, and gains about a third more board on an iPad in landscape:
+    407 points against 545.
+
+  * One game gains, ten lose. If Royal UR is ever worth it, that one
+    screen can opt in rather than the whole app.
+
+Slide Over and Split View are fine to allow. A 320-point window is just a
+narrow phone, and tools_bandlayout_verify.py checks that case. It looks
+sparse rather than broken — the button band becomes tall and mostly empty.
+
+The checker walks landscape anyway, even though it is not supported: it is
+the shape where the button band bottoms out, so it is the one that says
+how much margin the floor really has.
+
+===============================================================================
 THE APP ICON AND THE LAUNCH SCREEN
 ===============================================================================
 

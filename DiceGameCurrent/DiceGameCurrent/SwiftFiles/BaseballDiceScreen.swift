@@ -104,7 +104,12 @@ struct BaseballDiceScreen: View {
     var body: some View {
         ZStack {
             GeometryReader { geo in
-                let buttonHeight: CGFloat = 96
+                // Was 96. The band holds a DiceRollButton and its
+                // caption, which come to 95 — one point of margin, and
+                // only by luck: it was seven until the stack spacing moved
+                // to keep the button's shadow off the caption. Taken from
+                // the floor now, so it cannot be eaten again.
+                let buttonHeight = GameBandLayout.buttonBandFloor
                 let fieldHeight = geo.size.height - buttonHeight
 
                 VStack(spacing: 0) {

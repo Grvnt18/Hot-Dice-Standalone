@@ -54,7 +54,7 @@ struct RoyalUrScreen: View {
         // If the board still reads as leaving space at the sides, the
         // space is inside RoyalUrBoardView below its frame, not here.
         let minimumTray: CGFloat = 190
-        let buttonRow: CGFloat = 104
+        let buttonRow = GameBandLayout.buttonBandFloor
         let usableWidth = size.width - 12
         let fillsWidth = usableWidth / 9.04 * 3.64
         let header = size.height * 0.15
@@ -126,7 +126,8 @@ struct RoyalUrScreen: View {
                 // keeps more height than the board at every size, which
                 // it has to: five d4s are thrown in it.
                 let boardHeight = RoyalUrScreen.boardHeight(in: geo.size)
-                let buttonHeight: CGFloat = 104
+                // From the floor rather than typed — see GameBandLayout.
+                let buttonHeight = GameBandLayout.buttonBandFloor
                 let trayHeight = max(geo.size.height - headerHeight - boardHeight - buttonHeight, 0)
 
                 VStack(spacing: 0) {

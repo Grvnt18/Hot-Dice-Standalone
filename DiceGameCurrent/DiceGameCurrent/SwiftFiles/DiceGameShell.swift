@@ -491,10 +491,27 @@ struct DiceRollButton: View {
                 Text(subtitle)
                     .font(.poppins(12))
                     .foregroundStyle(.secondary)
+                    // One line, like TurnActionBar's. Without this it
+                    // wraps on a narrow screen and the band it sits in —
+                    // sized for one line, see GameBandLayout.captionLine —
+                    // has nowhere to put the second.
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
+        // Fills the band it is handed, rather than sizing to its own
+        // content.
+        //
+        // Both callers already pass `.frame(height: buttonHeight)`, so
+        // this changes nothing on screen — but it moves the guarantee
+        // inside the view. Without it the stack sizes to the caption, and
+        // the caption now carries `minimumScaleFactor`, which means a
+        // sentence would be deciding how far the wood below reaches.
+        // tools_cohesion_verify.py fails exactly that, and is right to:
+        // a surface does not breathe with a caption.
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         // Same wood as the header, tiled the same way — see
         // WoodTiledBackground. This area grows to absorb whatever height
         // squaring the scene above frees up (see DiceGameScreen.body), so

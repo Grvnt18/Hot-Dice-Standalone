@@ -290,7 +290,8 @@ struct BoneheadsScreen: View {
             GeometryReader { geo in
                 let headerHeight = geo.size.height * 0.14
                 let boardHeight = geo.size.height * 0.23
-                let buttonHeight: CGFloat = 100
+                // From the floor rather than typed — see GameBandLayout.
+                let buttonHeight = GameBandLayout.buttonBandFloor
                 let trayHeight = max(
                     geo.size.height - headerHeight - boardHeight * 2 - buttonHeight, 0
                 )

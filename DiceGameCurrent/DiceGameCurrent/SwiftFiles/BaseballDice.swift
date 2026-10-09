@@ -480,6 +480,9 @@ extension BaseballDiceRules {
 
         case .deepOut:
             effect.outs = 1
+            // The sacrifice fly, exactly as it was: a runner on third
+            // scores unless this is the third out, which is the Third-Out
+            // Catch.
             if diamond.occupied[2] {
                 if outs + 1 < outsPerHalfInning {
                     effect.runs = 1
@@ -488,6 +491,20 @@ extension BaseballDiceRules {
                 } else {
                     effect.strandedOnThird = true
                 }
+            }
+            // ADDED on top of it: everyone else moves up a base too. Worked
+            // from the lead runner backwards, because advancing first base
+            // first would find second still occupied by a runner that is
+            // about to leave it.
+            //
+            // Third is handled above and is empty by now in every case
+            // where it could move, so this only ever walks second and
+            // first — but it reads the board rather than assuming that,
+            // since the stranded-on-third branch leaves a runner there.
+            for base in stride(from: 1, through: 0, by: -1)
+            where diamond.occupied[base] && !diamond.occupied[base + 1] {
+                diamond.occupied[base + 1] = true
+                diamond.occupied[base] = false
             }
 
         case .fieldOut:

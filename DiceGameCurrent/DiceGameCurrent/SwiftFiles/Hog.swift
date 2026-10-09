@@ -65,7 +65,7 @@ struct HogState: Codable, Equatable {
 enum HogGame: SuiteGame {
     static let id = "hog"
     static let displayName = "Hog"
-    static let tagline = "Push your luck to 75."
+    static let tagline = "Be greedy, but don't let the Hog eat your points."
 
     /// Two or more, per GAME_RULES.txt. The turns alternate and the state
     /// is per seat, so nothing here is counting to two — see
@@ -79,8 +79,8 @@ enum HogGame: SuiteGame {
             body: "  * Players: 2 or more (alternating turns).\n  * Dice Pool: 1x d6.\n  * Objective: First player to bank 75 points wins instantly."
         ),
         GameRuleSection(
-            title: "Turn Mechanics",
-            body: "  1. Roll the die.\n  2. Roll 2-6: Add value to running turn total. Choose to roll again or hold.\n  3. Roll 1 (The Hog): Turn ends immediately and all points accumulated during\n     that turn are lost. Banked score is unaffected.\n  4. Hold: Bank running turn total into overall score and end turn."
+            title: "Mechanics",
+            body: "  1. Roll the die.\n  2. Roll 2-6: Add value to running turn total. Choose to roll again or hold.\n  3. Roll 1 (Hog): Turn ends immediately and all points accumulated during\n     that turn are eaten by the Hog. Banked score is unaffected.\n  4. Hold: Bank running turn score into overall score and end turn."
         )
     ]
 }

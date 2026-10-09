@@ -30,7 +30,7 @@ PIECES = 3
 TO_WIN = 2
 SETBACK = 4
 DICE = 5
-EXACT_EXIT = True
+EXACT_EXIT = False       # a piece may overshoot the end to come home
 ROSETTE_ROLLS_AGAIN = True
 
 # The constants above are a PORT of the Swift, not a reading of it, so
@@ -42,6 +42,18 @@ SWIFT_CONSTANTS = {
     "piecesPerPlayer": PIECES,
     "piecesToWin": TO_WIN,
     "setbackDistance": SETBACK,
+}
+
+# The two BOOLS, which SWIFT_CONSTANTS cannot carry — swiftconst.constant
+# parses numbers only. They were therefore the two rules in this file that
+# nothing tied to the Swift, and it showed: `requiresExactExit` was flipped
+# in RoyalUrRules and this port kept simulating the old rule, reporting
+# 26.9 messages for a game that no longer plays that way. Checked by hand
+# below, since a wrong match length here is a wrong match length in every
+# number this file prints.
+SWIFT_FLAGS = {
+    "requiresExactExit": EXACT_EXIT,
+    "rosetteGrantsAnotherRoll": ROSETTE_ROLLS_AGAIN,
 }
 
 
@@ -288,10 +300,15 @@ def check_trays():
 
 def check_rules():
     s = State()
-    # Exact exit: a piece on 16 comes home on a 1 and cannot move on a 2.
+    # Overshoot: a piece on 16 comes home on a 1 AND on a 2. It used to
+    # need the exact count and this asserted that it did, which is how the
+    # rule change announced itself here rather than on the device.
     s.pos[0][0] = 16
     assert s.legal_moves(0, 1)[0] == HOME
-    assert 0 not in s.legal_moves(0, 2)
+    if EXACT_EXIT:
+        assert 0 not in s.legal_moves(0, 2)
+    else:
+        assert s.legal_moves(0, 2)[0] == HOME
     # You cannot land on your own piece.
     s = State()
     s.pos[0][0], s.pos[0][1] = 5, 3
@@ -313,11 +330,26 @@ def check_rules():
     s = State()
     s.pos[0][0] = 3
     assert s.setback_destination(0, 0) == 0
-    print("rules: PASS (exact exit, self-blocking, shared-only capture, Setback)")
+    print("rules: PASS (%s, self-blocking, shared-square capture, Setback)"
+          % ("exact exit" if EXACT_EXIT else "overshoot allowed"))
 
 
 def main():
     swiftconst.expect("Royal UR", "RoyalUrRules.swift", SWIFT_CONSTANTS)
+
+    rules_source = swiftconst.source("RoyalUrRules.swift")
+    for name, expected in sorted(SWIFT_FLAGS.items()):
+        found = re.search(r"static let %s = (true|false)" % name, rules_source)
+        if not found:
+            raise SystemExit("Royal UR: RoyalUrRules has no `%s`" % name)
+        actual = found.group(1) == "true"
+        if actual != expected:
+            raise SystemExit(
+                "Royal UR: RoyalUrRules.%s is %s but this port simulates %s "
+                "— every number below would be for the wrong game"
+                % (name, found.group(1), str(expected).lower()))
+    print("  %-34s ok (%d flags match RoyalUrRules.swift)"
+          % ("Royal UR rules", len(SWIFT_FLAGS)))
     check_board()
     check_layout()
     check_trays()
@@ -335,8 +367,17 @@ def main():
     print("setbacks per match   %.1f" % setbacks)
     print("dead turns per match %.2f" % dead)
     print("first seat wins      %.1f%%" % (first * 100))
-    assert 24 < messages < 30, messages
-    assert captures > 2.0, captures
+    # Both bands moved with the overshoot rule, and they are recorded
+    # here rather than adjusted quietly: the match was 24-30 messages with
+    # 2.0+ captures under the exact count, and comes in at about 22 and
+    # 1.7 now. That is the trade the rule makes — shorter game, fewer
+    # captures — and these are the numbers it has to keep hitting.
+    if EXACT_EXIT:
+        assert 24 < messages < 30, messages
+        assert captures > 2.0, captures
+    else:
+        assert 19 < messages < 25, messages
+        assert captures > 1.4, captures
     assert dead < 0.5, dead
     print("Royal UR: PASS")
 

@@ -11,10 +11,9 @@ GAME OVERVIEW
   * Objective: Score the most runs by matching pitch and swing tactics.
 
 TURN STRUCTURE
-  1. Pitcher Style Selection: The pitcher secretly selects a Pitching Style for 
+  1. Pitcher Style Selection: The pitcher selects a Pitching Style for 
      the entire half-inning, confirming their choice to end the step.
-  2. At-Bat Execution: For each at-bat, the batter chooses a Swing without seeing 
-     the pitch. The pitch is drawn automatically based on the pitcher’s 
+  2. At-Bat: For each at-bat, the batter chooses a Swing. The pitch is drawn automatically based on the pitcher’s 
      style, and both dice are rolled simultaneously.
   3. Inning Handover: Upon the third out, the half-inning ends. Roles swap, 
      and the new pitcher selects their Pitching Style.
@@ -51,7 +50,8 @@ SCORING MATRIX (Batter Roll Minus Pitcher Roll)
   +3 to +4        Single        Batter to 1st; all base runners advance 1 base
   +5              Double        Batter to 2nd; all base runners advance 2 bases
   +6              Triple        Batter to 3rd; all base runners score
-  +7 to +9        Deep Out      1 Out; runner on 3rd scores (Unless 3rd out)
+  +7 to +9        Deep Out      1 Out; all base runners advance 1 base, so a 
+                                runner on 3rd scores (Unless 3rd out)
   +10 or higher   Home Run      Batter and all base runners score
 
 SPECIAL RULES
@@ -66,7 +66,7 @@ SPECIAL RULES
 2. ROLLS
 -------------------------------------------------------------------------------
 GAME OVERVIEW
-  * Players: 2 or more (group play compatible).
+  * Players: 2+
   * Dice Pool: 15 total (12x d6, 1x d8, 1x d10, 1x d12).
   * Objective: Bank all 15 dice; lowest cumulative score wins.
 
@@ -88,7 +88,7 @@ SCORING STRUCTURE
   d12         12                      12 Points
 
   * Formula: Score = Max Value - Rolled Face
-  * Exception: Rolling a 1 scores penalty points equal to the die's total sides.
+  * Bust: Rolling a 1 scores penalty points equal to the die's total sides.
 
 
 -------------------------------------------------------------------------------
@@ -127,12 +127,12 @@ GAME OVERVIEW
   * Dice Pool: 1x d6.
   * Objective: First player to bank 75 points wins instantly.
 
-TURN MECHANICS
+MECHANICS
   1. Roll the die.
   2. Roll 2-6: Add value to running turn total. Choose to roll again or hold.
-  3. Roll 1 (The Hog): Turn ends immediately and all points accumulated during 
-     that turn are lost. Banked score is unaffected.
-  4. Hold: Bank running turn total into overall score and end turn.
+  3. Roll 1 (Hog): Turn ends immediately and all points accumulated during 
+     that turn are eaten by the Hog. Banked score is unaffected.
+  4. Hold: Bank running turn score into overall score and end turn.
 
 
 -------------------------------------------------------------------------------
@@ -141,18 +141,18 @@ TURN MECHANICS
 GAME OVERVIEW
   * Players: 2.
   * Dice Pool: 5x d6.
-  * Structure: 12 total turns (6 per player) using a single shared scorecard 
-    in a snake turn order (P1, P2, P2, P1...).
+  * Structure: 12 total turns in a snake order (P1, P2, P2, P1...) using 
+    a single shared scorecard.
 
 TURN STRUCTURE
   1. Roll all 5 dice.
-  2. Optionally keep any number of dice and re-roll the rest. Max 3 rolls per turn.
-  3. Claim one available category on the shared scorecard to end turn.
+  2. Keep any number of dice and re-roll the rest. Max 3 rolls per turn.
+  3. Claim one available category on the shared scorecard to end your turn.
 
 CATEGORIES & SCORING
   Category          Qualification Requirement           Score
   -----------------------------------------------------------------------------
-  Ones to Sixes     Any dice showing selected face (1-6) Sum of matching dice
+  Ones to Sixes     Any dice showing selected face      Sum of dice with same face
   Set of 3          Three dice of same face             Sum of all 5 dice
   Set of 4          Four dice of same face              Sum of all 5 dice
   Packed House      Three of one face + pair of another 25 Points
@@ -174,11 +174,16 @@ GAME OVERVIEW
   * Dice Pool: 6x d6.
   * Objective: First player to reach or exceed 3,000 points.
 
-TURN MECHANICS
+MECHANICS
   1. Roll all active dice.
   2. Set aside at least one scoring die or valid scoring combination. 
-     Every set-aside die must contribute to a valid score.
+     Every die set aside must score during the current roll.
   3. Choose to bank accumulated points (ending turn) or roll remaining dice.
+  4. Bust: Roll zero scoring dice, turn ends immediately and turn points are lost.
+  5. Hot Dice: Set aside all 6 dice into scoring combinations, re-roll all 6 dice 
+     to continue accumulating points in the same turn.
+  6. Match End: When a player reaches 3,000 points, all other players receive one 
+     final turn in the round to attempt to beat the highest score.
 
 SCORING COMBINATIONS
   Combination                     Points
@@ -189,16 +194,10 @@ SCORING COMBINATIONS
   Three-of-a-Kind (2s-6s)          Face Value x 100
   Four-of-a-Kind                  1,000
   Five-of-a-Kind                  2,000
-  Six-of-a-Kind                   3,000
+  Jackpot                         3,000
   Full Straight (1-2-3-4-5-6)     1,500
   Three Pairs                     750
 
-TURN RULES
-  * Bust: Roll zero scoring dice, turn ends immediately and turn points are lost.
-  * Hot Dice: Set aside all 6 dice into scoring combinations, re-roll all 6 dice 
-    to continue accumulating points in the same turn.
-  * Match End: When a player reaches 3,000 points, all other players receive one 
-    final turn in the round to attempt to beat the highest score.
 
 
 -------------------------------------------------------------------------------
@@ -209,21 +208,19 @@ GAME OVERVIEW
   * Dice Pool: 6x d6.
   * Structure: Best of 3 rounds.
 
-TURN MECHANICS
-  Each player receives up to 4 rolls per round to unlock cargo sequence:
-    1. Freighter: Requires a 6.
-    2. Yacht: Requires a 5 (Must be claimed after Freighter).
-    3. Dinghy: Requires a 4 (Must be claimed after Yacht).
-  (Required dice are set aside automatically as they land).
-
-CARGO SCORING & REROLLS
-  * Once all three vessels (6, 5, and 4) are claimed, remaining three dice form 
+MECHANICS
+  1. Each player receives up to 4 rolls per round to unlock cargo sequence:
+   *Freighter: Requires a 6.
+    * Yacht: Requires a 5 (Must be claimed after Freighter).
+    * Dinghy: Requires a 4 (Must be claimed after Yacht).
+  *Required dice are set aside automatically as they land.*
+  2. Once all three vessels (6, 5, and 4) are claimed, remaining three dice form 
     Cargo.
-  * Combined total of remaining three dice is your round score.
-  * If rolls remain within 4-roll allowance, player may select any cargo dice to 
+    * Combined total of remaining three dice is your round score.
+    * If rolls remain within 4-roll allowance, player may select any cargo dice to 
     re-roll (any, all, or none).
-  * Failure to Qualify: Failing to claim all three vessels within 4 rolls scores 0.
-  * Resolution: Highest cumulative score after 3 rounds wins. Ties trigger 
+  3.  Failure to Qualify: Failing to claim all three vessels within 4 rolls scores 0.
+  4.  Game End: Highest cumulative score after 3 rounds wins. Ties trigger 
     sudden-death round.
 
 
@@ -232,7 +229,7 @@ CARGO SCORING & REROLLS
 -------------------------------------------------------------------------------
 GAME OVERVIEW
   * Players: 2.
-  * Dice Pool: 5x d4 (marked points system).
+  * Dice Pool: 5x d4 (Binary dice).
   * Pieces: 3 pieces per player on shared 16-square track.
   * Objective: First player to bring 2 pieces home wins.
 
@@ -244,21 +241,25 @@ MOVEMENT DICE CALCULATION
   0               0 Squares           Triggers Setback Rule
   1 to 5          1 to 5 Squares      Move one piece standard distance
 
-MOVEMENT & BOARD MECHANICS
-  * Move a single piece full exact count rolled. Exact count to enter/land home.
+MECHANICS
+  * Move a single piece the full count rolled. A piece may overshoot the end 
+    of the path to come home - an exact count is not required.
   * Cannot land on your own pieces.
-  * Capture: Landing on opponent's piece sends it back to start.
+  * Capture: Landing on an opponent's piece sends it back to start. This 
+    applies on any square both players' paths pass through.
   * Rosettes (Squares 4, 8, 12, 16): Landing on a Rosette grants extra roll.
   * Setback Rule: Rolling 0 or having no legal moves forces player to move one of 
     their own pieces backward 4 squares (or to start if occupied).
-
+  * Game End: When a player has brought two pieces down the entirety of the 
+    path to the end slot, they are declared the winner.
 
 -------------------------------------------------------------------------------
 9. ROLLBOTS
 -------------------------------------------------------------------------------
 GAME OVERVIEW
   * Players: 2.
-  * Starting Health: 16 Integrity Points (IP) each (Player 2 starts with 17 IP).
+  * Starting Health: 16 Integrity Points (IP) for Player 1, Player 2 
+    starts with 17 IP as an equalizer.
   * Objective: Reduce opponent's IP to zero.
 
 LOADOUT SELECTION
@@ -272,16 +273,7 @@ LOADOUT SELECTION
       charge before firing.
     * Sidearm (d4): Default fallback weapon when primary weapon is disabled.
 
-COMBAT CYCLE
-  1. Attacker: Rolls Accuracy die (d10) and assigned Weapon Damage die together, 
-     confirming attack to resolve.
-  2. Defender Choice:
-       * Dodge (d6): Roll higher than attacker's Accuracy to negate all damage. 
-         Ties or lower take full damage.
-       * Firewall (d8): Subtract Firewall roll from incoming damage. Natural 8 
-         (Hard Lockdown) negates all damage completely.
-
-CYBERWARE ABILITIES (One-Time Use Per Match)
+   Cyberware Abilities (One-Time Use Per Match)
   Ability                 Effect                              Drawback / Cost
   -----------------------------------------------------------------------------
   Neural Overclock        Next attack deals forced Acc 10,    Disables defense 
@@ -299,7 +291,15 @@ CYBERWARE ABILITIES (One-Time Use Per Match)
   Emergency Sub-Routine   Immediately repairs 8 IP.           Downgrades weapon to 
                                                               Sidearm (d4) for 4 
                                                               turns.
-
+MECHANICS
+  1. Attacker: Rolls Accuracy die (d10) and assigned Weapon Damage die together, 
+     confirming attack to resolve.
+  2. Defender Choice:
+       * Dodge (d6): Roll higher than attacker's Accuracy to negate all damage. 
+         Ties or lower take full damage.
+       * Firewall (d8): Subtract Firewall roll from incoming damage. Natural 8 
+         (Hard Lockdown) negates all damage completely.
+  3. Game End: Immediately when either player reached 0 IP.
 
 -------------------------------------------------------------------------------
 10. BONEHEADS
@@ -310,8 +310,12 @@ GAME OVERVIEW
   * Objective: Fill all slots while maximizing column scoring multipliers and 
     destroying opponent dice.
 
-TURN MECHANICS
+MECHANICS
   Roll 1x d6 and place it into any available slot in your columns to end turn.
+
+  Smashing: Placing a die in a column destroys all matching dice in opponent's directly 
+  opposing column. Remaining opponent dice collapse down to fill gaps.
+  Game End: Immediately when either player fills their 9th slot. Highest score wins.
 
 COLUMN STACKING MULTIPLIERS
   Matching numbers in same column multiply combined value:
@@ -320,12 +324,7 @@ COLUMN STACKING MULTIPLIERS
     * Pair: (Face x 2) x 2
     * Triple: (Face x 3) x 3
 
-SMASHING MECHANIC
-  Placing a die in a column destroys all matching dice in opponent's directly 
-  opposing column. Remaining opponent dice collapse down to fill gaps.
 
-GAME END
-  Game ends immediately when either player fills their 9th slot. Highest score wins.
 
 
 -------------------------------------------------------------------------------

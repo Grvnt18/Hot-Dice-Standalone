@@ -265,12 +265,10 @@ private struct RosetteFigure: View {
             // that the extra roll is a whole extra turn rather than a
             // bonus added to this one.
             VStack(alignment: .leading, spacing: 4) {
-                Text("Squares \(stepList) of your route are rosettes, and "
-                     + "both players count to the same four.")
-                Text("Land exactly on one and you roll again — a second "
-                     + "full turn, not an extra step on this one.")
-                Text("The last square before home is one, so a piece "
-                     + "leaving the board earns a roll on its way out.")
+                Text("Squares \(stepList) of your route are rosettes, both "
+                     + "players have potential access to 4 each.")
+                Text("Land on one and you roll again. A full second turn "
+                     + "that can be used to move any available piece.")
             }
             .font(.poppins(12))
             .foregroundStyle(MenuInk.text)
@@ -297,7 +295,7 @@ private struct RoyalUrPathFigure: View {
             }
             .frame(height: 112)
 
-            Text("Your route runs from START to END. The middle row is shared — that is the only place a piece can be captured.")
+            Text("Your route runs from START to END. The middle row is shared, that is where pieces can begin to capture each other.")
                 .font(.poppins(12))
                 .foregroundStyle(MenuInk.dim)
                 .fixedSize(horizontal: false, vertical: true)
@@ -347,9 +345,21 @@ private struct RoyalUrPathFigure: View {
                                lineCap: .round, lineJoin: .round,
                                dash: [cell * 0.22, cell * 0.16]))
 
-        guard let first = path.first, let last = path.last else { return }
+        guard let first = path.first else { return }
         marker("START", at: frame(first), in: context, cell: cell)
-        marker("END", at: frame(last), in: context, cell: cell)
+        // END sits on the HOME TRAY, not on the last square of the path.
+        //
+        // The last path square is in the middle of the far block, where the
+        // label lands on top of the route it is meant to terminate. The
+        // home tray is the cell in the column the board leaves empty — the
+        // one column holding only the middle row — which is exactly the
+        // space the route is running towards and the only place the word
+        // has room to sit.
+        //
+        // Read from the board rather than placed by hand, like the rosettes
+        // and the route itself.
+        let home = RoyalUrBoard.homeTray(seat: RoyalUrBoard.bottomSeat)
+        marker("END", at: frame(home), in: context, cell: cell)
     }
 
     /// A label over the square it names, dark on the seat's colour so it

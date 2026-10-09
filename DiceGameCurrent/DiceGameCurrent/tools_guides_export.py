@@ -45,8 +45,12 @@ GAMES = [
 # Sections that carry a diagram, by game and by the document's own heading.
 # Kept here rather than hand-edited back in after every export, which is a
 # step that gets forgotten exactly once.
+# Royal UR's section was renamed MOVEMENT & BOARD MECHANICS -> MECHANICS
+# when the document was rewritten, which is exactly the drop this map's
+# own check exists to catch: a figure pinned to a heading that no longer
+# exists is a figure that silently stops being drawn.
 FIGURES = {
-    ("ROYAL UR", "MOVEMENT & BOARD MECHANICS"): ["royalUrPath", "rosette"],
+    ("ROYAL UR", "MECHANICS"): ["royalUrPath", "rosette"],
     ("BONEHEADS", "COLUMN STACKING MULTIPLIERS"): ["boneheadsScoring"],
 }
 

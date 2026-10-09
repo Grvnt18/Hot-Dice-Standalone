@@ -197,7 +197,7 @@ struct FreighterYachtDinghyState: Codable, Equatable {
 enum FreighterYachtDinghyGame: SuiteGame {
     static let id = "fyd"
     static let displayName = "Freighter.Yacht.Dinghy"
-    static let tagline = "Freighter, yacht, dinghy. Best of three."
+    static let tagline = "Carry the boats! Don't drop the cargo!"
 
     /// Two or more, per GAME_RULES.txt. The turns alternate and the state
     /// is per seat, so nothing here is counting to two — see
@@ -231,12 +231,8 @@ enum FreighterYachtDinghyGame: SuiteGame {
             body: "  * Players: 2 or more (alternating turns).\n  * Dice Pool: 6x d6.\n  * Structure: Best of 3 rounds."
         ),
         GameRuleSection(
-            title: "Turn Mechanics",
-            body: "  Each player receives up to 4 rolls per round to unlock cargo sequence:\n    1. Freighter: Requires a 6.\n    2. Yacht: Requires a 5 (Must be claimed after Freighter).\n    3. Dinghy: Requires a 4 (Must be claimed after Yacht).\n  (Required dice are set aside automatically as they land)."
-        ),
-        GameRuleSection(
-            title: "Cargo Scoring & Rerolls",
-            body: "  * Once all three vessels (6, 5, and 4) are claimed, remaining three dice form\n    Cargo.\n  * Combined total of remaining three dice is your round score.\n  * If rolls remain within 4-roll allowance, player may select any cargo dice to\n    re-roll (any, all, or none).\n  * Failure to Qualify: Failing to claim all three vessels within 4 rolls scores 0.\n  * Resolution: Highest cumulative score after 3 rounds wins. Ties trigger\n    sudden-death round."
+            title: "Mechanics",
+            body: "  1. Each player receives up to 4 rolls per round to unlock cargo sequence:\n   *Freighter: Requires a 6.\n    * Yacht: Requires a 5 (Must be claimed after Freighter).\n    * Dinghy: Requires a 4 (Must be claimed after Yacht).\n  *Required dice are set aside automatically as they land.*\n  2. Once all three vessels (6, 5, and 4) are claimed, remaining three dice form\n    Cargo.\n    * Combined total of remaining three dice is your round score.\n    * If rolls remain within 4-roll allowance, player may select any cargo dice to\n    re-roll (any, all, or none).\n  3.  Failure to Qualify: Failing to claim all three vessels within 4 rolls scores 0.\n  4.  Game End: Highest cumulative score after 3 rounds wins. Ties trigger\n    sudden-death round."
         )
     ]
 }

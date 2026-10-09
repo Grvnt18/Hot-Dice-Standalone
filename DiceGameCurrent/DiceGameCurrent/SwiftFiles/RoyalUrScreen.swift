@@ -516,20 +516,20 @@ struct RoyalUrScreen: View {
 enum RoyalUrGame: SuiteGame {
     static let id = "royal_ur"
     static let displayName = "Royal UR"
-    static let tagline = "Race, capture, come home."
+    static let tagline = "The game of ancients. Race. Capture. Survive."
 
     static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Game Overview",
-            body: "  * Players: 2.\n  * Dice Pool: 5x d4 (marked points system).\n  * Pieces: 3 pieces per player on shared 16-square track.\n  * Objective: First player to bring 2 pieces home wins."
+            body: "  * Players: 2.\n  * Dice Pool: 5x d4 (Binary dice).\n  * Pieces: 3 pieces per player on shared 16-square track.\n  * Objective: First player to bring 2 pieces home wins."
         ),
         GameRuleSection(
             title: "Movement Dice Calculation",
             body: "  Roll 5x d4. Count total upward-facing marked points (0 to 5) for distance.\n\n  Marked Points   Movement Distance   Special Effect\n  -----------------------------------------------------------------------------\n  0               0 Squares           Triggers Setback Rule\n  1 to 5          1 to 5 Squares      Move one piece standard distance"
         ),
         GameRuleSection(
-            title: "Movement & Board Mechanics",
-            body: "  * Move a single piece full exact count rolled. Exact count to enter/land home.\n  * Cannot land on your own pieces.\n  * Capture: Landing on opponent's piece sends it back to start.\n  * Rosettes (Squares 4, 8, 12, 16): Landing on a Rosette grants extra roll.\n  * Setback Rule: Rolling 0 or having no legal moves forces player to move one of\n    their own pieces backward 4 squares (or to start if occupied).",
+            title: "Mechanics",
+            body: "  * Move a single piece the full count rolled. A piece may overshoot the end\n    of the path to come home - an exact count is not required.\n  * Cannot land on your own pieces.\n  * Capture: Landing on an opponent's piece sends it back to start. This\n    applies on any square both players' paths pass through.\n  * Rosettes (Squares 4, 8, 12, 16): Landing on a Rosette grants extra roll.\n  * Setback Rule: Rolling 0 or having no legal moves forces player to move one of\n    their own pieces backward 4 squares (or to start if occupied).\n  * Game End: When a player has brought two pieces down the entirety of the\n    path to the end slot, they are declared the winner.",
             figures: [.royalUrPath, .rosette]
         )
     ]

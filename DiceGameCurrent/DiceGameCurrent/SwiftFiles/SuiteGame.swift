@@ -240,7 +240,7 @@ enum GameCatalog {
 enum BaseballDiceGame: SuiteGame {
     static let id = "baseball_dice"
     static let displayName = "Baseball Dice"
-    static let tagline = "Guess the pitch. Take the extra base."
+    static let tagline = "Beat the pitch. Take the plate."
 
     /// The floor is the ballpark itself, so it carries no wordmark.
     static let floorTitle = ""
@@ -252,7 +252,7 @@ enum BaseballDiceGame: SuiteGame {
         ),
         GameRuleSection(
             title: "Turn Structure",
-            body: "  1. Pitcher Style Selection: The pitcher secretly selects a Pitching Style for\n     the entire half-inning, confirming their choice to end the step.\n  2. At-Bat Execution: For each at-bat, the batter chooses a Swing without seeing\n     the pitch. The pitch is drawn automatically based on the pitcher’s\n     style, and both dice are rolled simultaneously.\n  3. Inning Handover: Upon the third out, the half-inning ends. Roles swap,\n     and the new pitcher selects their Pitching Style."
+            body: "  1. Pitcher Style Selection: The pitcher selects a Pitching Style for\n     the entire half-inning, confirming their choice to end the step.\n  2. At-Bat: For each at-bat, the batter chooses a Swing. The pitch is drawn automatically based on the pitcher’s\n     style, and both dice are rolled simultaneously.\n  3. Inning Handover: Upon the third out, the half-inning ends. Roles swap,\n     and the new pitcher selects their Pitching Style."
         ),
         GameRuleSection(
             title: "Pitching Styles & Swing Matchups",
@@ -264,7 +264,7 @@ enum BaseballDiceGame: SuiteGame {
         ),
         GameRuleSection(
             title: "Scoring Matrix (Batter Roll Minus Pitcher Roll)",
-            body: "  Differential    Result        Effect\n  -----------------------------------------------------------------------------\n  -5 or lower     Strikeout     1 Out\n  -4 to +1        Field Out     1 Out (Triggers Double Play if Pitcher roll is\n                                even with a runner on 1st)\n  +2              Walk          Batter to 1st; forced runners advance 1 base\n  +3 to +4        Single        Batter to 1st; all base runners advance 1 base\n  +5              Double        Batter to 2nd; all base runners advance 2 bases\n  +6              Triple        Batter to 3rd; all base runners score\n  +7 to +9        Deep Out      1 Out; runner on 3rd scores (Unless 3rd out)\n  +10 or higher   Home Run      Batter and all base runners score"
+            body: "  Differential    Result        Effect\n  -----------------------------------------------------------------------------\n  -5 or lower     Strikeout     1 Out\n  -4 to +1        Field Out     1 Out (Triggers Double Play if Pitcher roll is\n                                even with a runner on 1st)\n  +2              Walk          Batter to 1st; forced runners advance 1 base\n  +3 to +4        Single        Batter to 1st; all base runners advance 1 base\n  +5              Double        Batter to 2nd; all base runners advance 2 bases\n  +6              Triple        Batter to 3rd; all base runners score\n  +7 to +9        Deep Out      1 Out; all base runners advance 1 base, so a\n                                runner on 3rd scores (Unless 3rd out)\n  +10 or higher   Home Run      Batter and all base runners score"
         ),
         GameRuleSection(
             title: "Special Rules",
@@ -288,7 +288,7 @@ enum RollsGame: SuiteGame {
     static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Game Overview",
-            body: "  * Players: 2 or more (group play compatible).\n  * Dice Pool: 15 total (12x d6, 1x d8, 1x d10, 1x d12).\n  * Objective: Bank all 15 dice; lowest cumulative score wins."
+            body: "  * Players: 2+\n  * Dice Pool: 15 total (12x d6, 1x d8, 1x d10, 1x d12).\n  * Objective: Bank all 15 dice; lowest cumulative score wins."
         ),
         GameRuleSection(
             title: "Player Turn",
@@ -296,7 +296,7 @@ enum RollsGame: SuiteGame {
         ),
         GameRuleSection(
             title: "Scoring Structure",
-            body: "  A banked die scores based on its differential from its highest face value.\n  Lower scores are better.\n\n  Die Type    Highest Face (0 Pts)    Penalty for Rolling a 1\n  -----------------------------------------------------------------------------\n  d6          6                       6 Points\n  d8          8                       8 Points\n  d10         10                      10 Points\n  d12         12                      12 Points\n\n  * Formula: Score = Max Value - Rolled Face\n  * Exception: Rolling a 1 scores penalty points equal to the die's total sides."
+            body: "  A banked die scores based on its differential from its highest face value.\n  Lower scores are better.\n\n  Die Type    Highest Face (0 Pts)    Penalty for Rolling a 1\n  -----------------------------------------------------------------------------\n  d6          6                       6 Points\n  d8          8                       8 Points\n  d10         10                      10 Points\n  d12         12                      12 Points\n\n  * Formula: Score = Max Value - Rolled Face\n  * Bust: Rolling a 1 scores penalty points equal to the die's total sides."
         )
     ]
 }

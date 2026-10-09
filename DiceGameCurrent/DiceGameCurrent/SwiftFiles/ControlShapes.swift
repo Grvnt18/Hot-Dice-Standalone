@@ -155,6 +155,33 @@ struct PixelPanel: ViewModifier {
 }
 
 extension View {
+
+    /// One border around the whole playing area.
+    ///
+    /// The same edge the settings button wears — a near-black outline with
+    /// a lit bevel inset inside it — and deliberately NO shadow: this is a
+    /// frame around the thing, not an object sitting on top of something
+    /// else.
+    ///
+    /// Applied once, where the hub presents a game, rather than on each of
+    /// the eleven screens. It therefore traces the SAFE AREA rather than
+    /// the glass: a screen's backgrounds call `.ignoresSafeArea()` and
+    /// bleed past it, but the screen's own layout bounds stop there, and a
+    /// border under the home indicator is a border nobody sees.
+    func gameFrame(radius: CGFloat = ControlShape.cornerRadius) -> some View {
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        return self
+            .overlay(
+                shape.inset(by: PixelPanel.outlineWidth)
+                    .strokeBorder(PieceSheen.bevel,
+                                  lineWidth: PixelPanel.bevelWidth)
+            )
+            .overlay(
+                shape.strokeBorder(PixelPanel.outlineColor,
+                                   lineWidth: PixelPanel.outlineWidth)
+            )
+    }
+
     /// Frames this view as a pixel panel.
     ///
     /// The one way to put a chrome edge on anything, the way `.elevated(_:)`

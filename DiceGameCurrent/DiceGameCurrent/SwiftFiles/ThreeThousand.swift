@@ -179,16 +179,12 @@ enum ThreeThousandGame: SuiteGame {
             body: "  * Players: 2 or more (alternating turns).\n  * Dice Pool: 6x d6.\n  * Objective: First player to reach or exceed 3,000 points."
         ),
         GameRuleSection(
-            title: "Turn Mechanics",
-            body: "  1. Roll all active dice.\n  2. Set aside at least one scoring die or valid scoring combination.\n     Every set-aside die must contribute to a valid score.\n  3. Choose to bank accumulated points (ending turn) or roll remaining dice."
+            title: "Mechanics",
+            body: "  1. Roll all active dice.\n  2. Set aside at least one scoring die or valid scoring combination.\n     Every die set aside must score during the current roll.\n  3. Choose to bank accumulated points (ending turn) or roll remaining dice.\n  4. Bust: Roll zero scoring dice, turn ends immediately and turn points are lost.\n  5. Hot Dice: Set aside all 6 dice into scoring combinations, re-roll all 6 dice\n     to continue accumulating points in the same turn.\n  6. Match End: When a player reaches 3,000 points, all other players receive one\n     final turn in the round to attempt to beat the highest score."
         ),
         GameRuleSection(
             title: "Scoring Combinations",
-            body: "  Combination                     Points\n  -----------------------------------------------------------------------------\n  Single 1                        100\n  Single 5                        50\n  Three 1s                        1,000\n  Three-of-a-Kind (2s-6s)          Face Value x 100\n  Four-of-a-Kind                  1,000\n  Five-of-a-Kind                  2,000\n  Six-of-a-Kind                   3,000\n  Full Straight (1-2-3-4-5-6)     1,500\n  Three Pairs                     750"
-        ),
-        GameRuleSection(
-            title: "Turn Rules",
-            body: "  * Bust: Roll zero scoring dice, turn ends immediately and turn points are lost.\n  * Hot Dice: Set aside all 6 dice into scoring combinations, re-roll all 6 dice\n    to continue accumulating points in the same turn.\n  * Match End: When a player reaches 3,000 points, all other players receive one\n    final turn in the round to attempt to beat the highest score."
+            body: "  Combination                     Points\n  -----------------------------------------------------------------------------\n  Single 1                        100\n  Single 5                        50\n  Three 1s                        1,000\n  Three-of-a-Kind (2s-6s)          Face Value x 100\n  Four-of-a-Kind                  1,000\n  Five-of-a-Kind                  2,000\n  Jackpot                         3,000\n  Full Straight (1-2-3-4-5-6)     1,500\n  Three Pairs                     750"
         )
     ]
 }

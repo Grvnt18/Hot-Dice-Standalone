@@ -709,8 +709,21 @@ def main():
     # passing if rollsPerTurn became five.
 
     def stated(text, pattern, label):
-        """One number out of the guide text, by pattern."""
-        match = re.search(pattern, rules_blob(text))
+        """One number out of the guide text, by pattern.
+
+        Whitespace is flattened first. A guide body wraps wherever
+        GAME_RULES.txt wraps, so a phrase these patterns look for can be
+        split across a line at any time — "Player 2 starts with 17" became
+        "Player 2\\n    starts with 17" the moment that sentence gained a
+        comma, and the check reported the guide had stopped saying
+        something it still said. Where a line breaks is not a fact about
+        the rules.
+        """
+        # The blob comes out of SWIFT SOURCE, so a line break in it is the
+        # two characters backslash-n, not whitespace — `\s+` alone leaves
+        # them sitting in the middle of the phrase.
+        flat = re.sub(r"(\\n|\s)+", " ", rules_blob(text))
+        match = re.search(pattern, flat)
         if not match:
             check(label, False, "the guide no longer states it")
             return None

@@ -222,21 +222,13 @@ enum BoneheadsGame: SuiteGame {
             body: "  * Players: 2.\n  * Board Layout: 3 columns per player (A, B, C), 3 slots each (9 slots total).\n  * Objective: Fill all slots while maximizing column scoring multipliers and\n    destroying opponent dice."
         ),
         GameRuleSection(
-            title: "Turn Mechanics",
-            body: "  Roll 1x d6 and place it into any available slot in your columns to end turn."
+            title: "Mechanics",
+            body: "  Roll 1x d6 and place it into any available slot in your columns to end turn.\n\n  Smashing: Placing a die in a column destroys all matching dice in opponent's directly\n  opposing column. Remaining opponent dice collapse down to fill gaps.\n  Game End: Immediately when either player fills their 9th slot. Highest score wins."
         ),
         GameRuleSection(
             title: "Column Stacking Multipliers",
             body: "  Matching numbers in same column multiply combined value:\n    Column Score = (Die Face x Occurrences) x Occurrences\n    * Single Die: Face Value (1x)\n    * Pair: (Face x 2) x 2\n    * Triple: (Face x 3) x 3",
             figures: [.boneheadsScoring]
-        ),
-        GameRuleSection(
-            title: "Smashing Mechanic",
-            body: "  Placing a die in a column destroys all matching dice in opponent's directly\n  opposing column. Remaining opponent dice collapse down to fill gaps."
-        ),
-        GameRuleSection(
-            title: "Game End",
-            body: "  Game ends immediately when either player fills their 9th slot. Highest score wins."
         )
     ]
 }

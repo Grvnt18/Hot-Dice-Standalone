@@ -143,6 +143,13 @@ enum RoyalUrBoard {
 
     /// Whether both players share a square — the twelve contested ones.
     ///
+    /// Asked whether capture could apply to "any potential overlapping
+    /// space along the path". It already does, and this is why: the only
+    /// squares excluded below are each player's first four, and those are
+    /// DIFFERENT PHYSICAL SQUARES for the two seats — row 3 columns 1-4 for
+    /// one, row 1 columns 1-4 for the other. Two pieces can never meet
+    /// there, so there is no overlapping square that is not capturable.
+    ///
     /// Indices 5 to 16 are all shared: 5 through 11 are the same square at
     /// the same index for both, and 12 through 16 are the same five squares
     /// *in reverse*, so the two players run the final loop in opposite

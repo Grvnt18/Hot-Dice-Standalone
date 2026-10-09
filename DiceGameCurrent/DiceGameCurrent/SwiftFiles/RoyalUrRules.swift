@@ -26,16 +26,20 @@ enum RoyalUrRules {
     /// One past the last square on the path.
     static let homeIndex = RoyalUrBoard.pathLength + 1
 
-    /// A piece comes home only on an exact count; an overshoot is not a
-    /// legal move.
+    /// A piece may overshoot the end of the path to come home.
     ///
-    /// **This is the game's length dial, and it costs captures to turn.**
-    /// Allowing overshoots finishes in 21.8 messages instead of 26.9 — but
-    /// captures fall from 2.8 a game to 1.7, because pieces stop queueing
-    /// up in the final loop waiting for the right number. Captures are what
-    /// makes this board worth playing on, and every tile being capturable
-    /// was a deliberate choice, so the exact count stays.
-    static let requiresExactExit = true
+    /// **This is the game's length dial, and turning it costs captures.**
+    /// It was `true` — an exact count, no overshoot — and the measurement
+    /// that argued for it is still the right measurement: overshoots
+    /// finish the match in about 22 messages instead of 27, but captures
+    /// fall from 2.8 a game to roughly 1.7, because pieces stop queueing up
+    /// in the final loop waiting for the right number.
+    ///
+    /// Asked for anyway, and it is one Bool if the captures read too thin
+    /// on the device. The current figures are whatever
+    /// tools_royalur_verify.py last printed, which is the only place they
+    /// should be read from.
+    static let requiresExactExit = false
 
     /// Landing on a rosette gives you another roll.
     ///

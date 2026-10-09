@@ -289,6 +289,10 @@ struct SettingsView: View {
                 }
             }
         }
+        // The same border the games wear, so the sheet reads as part of
+        // the same object rather than as a card from somewhere else. Its
+        // corners are squared by SheetCorners above.
+        .gameFrame()
         .sheet(isPresented: $showingHowToPlay) {
             if rules.isEmpty {
                 GuideBubbleCluster()

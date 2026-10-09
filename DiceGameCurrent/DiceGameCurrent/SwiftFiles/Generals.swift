@@ -286,15 +286,15 @@ enum GeneralsGame: SuiteGame {
     static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Game Overview",
-            body: "  * Players: 2.\n  * Dice Pool: 5x d6.\n  * Structure: 12 total turns (6 per player) using a single shared scorecard\n    in a snake turn order (P1, P2, P2, P1...)."
+            body: "  * Players: 2.\n  * Dice Pool: 5x d6.\n  * Structure: 12 total turns in a snake order (P1, P2, P2, P1...) using\n    a single shared scorecard."
         ),
         GameRuleSection(
             title: "Turn Structure",
-            body: "  1. Roll all 5 dice.\n  2. Optionally keep any number of dice and re-roll the rest. Max 3 rolls per turn.\n  3. Claim one available category on the shared scorecard to end turn."
+            body: "  1. Roll all 5 dice.\n  2. Keep any number of dice and re-roll the rest. Max 3 rolls per turn.\n  3. Claim one available category on the shared scorecard to end your turn."
         ),
         GameRuleSection(
             title: "Categories & Scoring",
-            body: "  Category          Qualification Requirement           Score\n  -----------------------------------------------------------------------------\n  Ones to Sixes     Any dice showing selected face (1-6) Sum of matching dice\n  Set of 3          Three dice of same face             Sum of all 5 dice\n  Set of 4          Four dice of same face              Sum of all 5 dice\n  Packed House      Three of one face + pair of another 25 Points\n  Small Joker       Four sequential faces (1-2-3-4 etc) 30 Points\n  Large Joker       Five sequential faces (1-2-3-4-5)   40 Points\n  General           All five dice showing same face     50 Points"
+            body: "  Category          Qualification Requirement           Score\n  -----------------------------------------------------------------------------\n  Ones to Sixes     Any dice showing selected face      Sum of dice with same face\n  Set of 3          Three dice of same face             Sum of all 5 dice\n  Set of 4          Four dice of same face              Sum of all 5 dice\n  Packed House      Three of one face + pair of another 25 Points\n  Small Joker       Four sequential faces (1-2-3-4 etc) 30 Points\n  Large Joker       Five sequential faces (1-2-3-4-5)   40 Points\n  General           All five dice showing same face     50 Points"
         ),
         GameRuleSection(
             title: "Zeroing",

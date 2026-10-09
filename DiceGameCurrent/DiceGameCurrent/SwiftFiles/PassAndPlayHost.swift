@@ -22,11 +22,18 @@ struct MatchScoreboard: View {
         ZStack {
             WoodTiledBackground()
 
+            // `maxWidth: .infinity` on the stack and on both lines of
+            // text, so they centre on the SCREEN rather than on whatever
+            // the row of seat tiles happens to be wide. A VStack hugs its
+            // widest child, which means two seats of uneven name length
+            // were quietly deciding where "Round 3 of 6" sat.
             VStack(spacing: 4) {
                 if let totalRounds {
                     Text("Round \(min(match.round, totalRounds)) of \(totalRounds)")
                         .font(.poppins(12))
                         .foregroundStyle(.white.opacity(0.75))
+                        .frame(maxWidth: .infinity)
+                        .multilineTextAlignment(.center)
                 }
 
                 HStack(spacing: 10) {
@@ -41,8 +48,11 @@ struct MatchScoreboard: View {
                         .foregroundStyle(.white.opacity(0.7))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
+                        .frame(maxWidth: .infinity)
+                        .multilineTextAlignment(.center)
                 }
             }
+            .frame(maxWidth: .infinity)
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
         }

@@ -405,14 +405,15 @@ struct DiceScoreBar: View {
                         .strokeBorder(PixelPanel.outlineColor,
                                       lineWidth: PixelPanel.cellOutline)
                 )
-                // And the depth back. I took this off when the slot read
-                // as a double image, which flattened it rather than fixing
-                // it: without the bevel above there was no edge for the eye
-                // to read the offset against, so the shadow was the only
-                // thing separating die from panel and it read as a second
-                // die. The shadow is also a quarter lighter now — see
-                // Elevation.opacity.
-                .elevated(.piece)
+                // No shadow, and that is the point of the bevel above.
+                //
+                // The depth was restored here when the slot read flat, and
+                // the shadow turned out to be the wrong half of the fix:
+                // the BEVEL is what makes the edge read as a turned corner,
+                // and with it in place the offset silhouette behind the
+                // slot — and behind the numeral, which is inside the same
+                // composite and so cast one too — was the double image
+                // rather than the depth.
         } else {
             // An empty slot is a hole in the panel, not a thing on it, so the
             // light runs the other way — see .pixelWell. The hairline dashed

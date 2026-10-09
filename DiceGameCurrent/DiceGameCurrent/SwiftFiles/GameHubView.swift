@@ -121,6 +121,10 @@ struct GameHubView: View {
         // own back control via onExit.
         .fullScreenCover(item: $openGame) { entry in
             entry.makeView({ openGame = nil })
+                // One border round the whole game — see .gameFrame. Here
+                // rather than on each of the eleven screens, because this
+                // is the one place every one of them is presented.
+                .gameFrame()
                 // Back to the hub's own settings on the way out. One place
                 // rather than eleven, so a game added later is covered
                 // without remembering to do anything.

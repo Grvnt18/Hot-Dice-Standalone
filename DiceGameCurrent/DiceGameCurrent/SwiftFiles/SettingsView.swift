@@ -104,10 +104,6 @@ struct SettingsView: View {
         // strings, same bindings, same scope notes. This is paint.
         ZStack {
             WoodTiledBackground(fraction: MenuTimber.fraction).ignoresSafeArea()
-                // Squares off the card this sheet is presented in. See
-                // SheetCorners — the rounding is UIKit's, not this view's,
-                // so it cannot be set from SwiftUI on the iOS 16 floor.
-                .background(SheetCorners(radius: ControlShape.cornerRadius))
 
             VStack(spacing: 0) {
                 MenuHeaderBar(title: "Settings") { dismiss() }
@@ -289,10 +285,8 @@ struct SettingsView: View {
                 }
             }
         }
-        // The same border the games wear, so the sheet reads as part of
-        // the same object rather than as a card from somewhere else. Its
-        // corners are squared by SheetCorners above.
-        .gameFrame()
+        // Squared corners and the games' own border — see .menuSheet.
+        .menuSheet()
         .sheet(isPresented: $showingHowToPlay) {
             if rules.isEmpty {
                 GuideBubbleCluster()
@@ -599,6 +593,10 @@ struct HowToPlayView: View {
                 }
             }
         }
+        // The same squared corners and border as Settings and the bubble
+        // cluster. All three are the app's own sheets and only one of them
+        // had been told so.
+        .menuSheet()
     }
 }
 
@@ -675,52 +673,3 @@ private struct WirePayloadCheck: View {
 }
 
 // MARK: - Squaring off the sheet
-
-/// Sets the presented sheet's corner radius.
-///
-/// Every control in this app is cut square or very nearly so —
-/// `ControlShape.cornerRadius` is 4 — and the one shape that ignored that
-/// was the biggest one on screen: the card the Settings sheet is presented
-/// in, which arrives with UIKit's own generous rounding.
-///
-/// It has to be done through UIKit. SwiftUI gained
-/// `.presentationCornerRadius` in iOS 17 and this app's floor is iOS 16,
-/// so the only way in is `UISheetPresentationController.preferredCornerRadius`
-/// (iOS 15+), reached by walking the responder chain from a zero-sized view
-/// planted in the sheet's own hierarchy.
-///
-/// Fails quietly and on purpose. A presentation that is not a sheet — a
-/// popover on a wide iPad, a full-screen cover — has no
-/// `sheetPresentationController`, and the right behaviour there is to leave
-/// the system's shape alone rather than to force one.
-private struct SheetCorners: UIViewRepresentable {
-    let radius: CGFloat
-
-    func makeUIView(context: Context) -> UIView {
-        UIView(frame: .zero)
-    }
-
-    func updateUIView(_ view: UIView, context: Context) {
-        // Deferred by one runloop turn: on the first `updateUIView` the
-        // view is not yet in the window, so the responder chain has no
-        // controller on it and the radius would silently not apply.
-        let wanted = radius
-        DispatchQueue.main.async { [weak view] in
-            guard let sheet = view?.owningController?.sheetPresentationController
-            else { return }
-            sheet.preferredCornerRadius = wanted
-        }
-    }
-}
-
-private extension UIView {
-    /// The nearest controller up the responder chain.
-    var owningController: UIViewController? {
-        var responder: UIResponder? = self
-        while let next = responder?.next {
-            if let controller = next as? UIViewController { return controller }
-            responder = next
-        }
-        return nil
-    }
-}

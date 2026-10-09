@@ -113,6 +113,13 @@ struct GameHubView: View {
         // fixed point size, so Dynamic Type is pinned rather than
         // allowed to rescale a layout that was tuned around it.
         .dynamicTypeSize(.large)
+        // The hub takes the border too.
+        //
+        // It was applied to `entry.makeView` inside the fullScreenCover,
+        // which is every GAME and nothing else — so the frame appeared the
+        // moment you opened something and was missing on the screen you
+        // started from. The hub is a screen like the rest of them.
+        .gameFrame()
         // Full-screen rather than a NavigationStack push. A pushed view
         // gets a navigation bar, and DiceGameScreen derives its square
         // playfield from the height it is handed — a bar would silently

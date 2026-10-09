@@ -81,6 +81,8 @@ struct GuideBubbleCluster: View {
         // use the relativeTo: overload, so shrink-to-fit still works inside
         // the pinned size.
         .dynamicTypeSize(.large)
+        // Squared corners and the games' own border — see .menuSheet.
+        .menuSheet()
     }
 
     private func bubble(_ entry: GameCatalogEntry, index: Int) -> some View {

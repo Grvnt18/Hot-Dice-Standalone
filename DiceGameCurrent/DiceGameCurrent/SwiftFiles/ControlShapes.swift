@@ -382,3 +382,68 @@ struct DieSlot: InsettableShape {
         return path
     }
 }
+
+// MARK: - Menus and sheets
+
+/// Sets the presented sheet's corner radius.
+///
+/// Every control in this app is cut square or very nearly so —
+/// `ControlShape.cornerRadius` is 4 — and the one shape that ignored that
+/// was the biggest one on screen: the card the Settings sheet is presented
+/// in, which arrives with UIKit's own generous rounding.
+///
+/// It has to be done through UIKit. SwiftUI gained
+/// `.presentationCornerRadius` in iOS 17 and this app's floor is iOS 16,
+/// so the only way in is `UISheetPresentationController.preferredCornerRadius`
+/// (iOS 15+), reached by walking the responder chain from a zero-sized view
+/// planted in the sheet's own hierarchy.
+///
+/// Fails quietly and on purpose. A presentation that is not a sheet — a
+/// popover on a wide iPad, a full-screen cover — has no
+/// `sheetPresentationController`, and the right behaviour there is to leave
+/// the system's shape alone rather than to force one.
+struct SheetCorners: UIViewRepresentable {
+    let radius: CGFloat
+
+    func makeUIView(context: Context) -> UIView {
+        UIView(frame: .zero)
+    }
+
+    func updateUIView(_ view: UIView, context: Context) {
+        // Deferred by one runloop turn: on the first `updateUIView` the
+        // view is not yet in the window, so the responder chain has no
+        // controller on it and the radius would silently not apply.
+        let wanted = radius
+        DispatchQueue.main.async { [weak view] in
+            guard let sheet = view?.owningController?.sheetPresentationController
+            else { return }
+            sheet.preferredCornerRadius = wanted
+        }
+    }
+}
+
+extension UIView {
+    /// The nearest controller up the responder chain.
+    var owningController: UIViewController? {
+        var responder: UIResponder? = self
+        while let next = responder?.next {
+            if let controller = next as? UIViewController { return controller }
+            responder = next
+        }
+        return nil
+    }
+}
+
+extension View {
+    /// The app's own sheet: squared corners and the same border the games
+    /// wear.
+    ///
+    /// One modifier because it is one look. Settings had the two halves
+    /// applied by hand and the two guide screens had neither, which is
+    /// exactly how a "sheet style" ends up meaning three different things.
+    func menuSheet() -> some View {
+        self
+            .background(SheetCorners(radius: ControlShape.cornerRadius))
+            .gameFrame()
+    }
+}

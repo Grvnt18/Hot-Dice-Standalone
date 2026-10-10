@@ -267,6 +267,21 @@ struct SettingsView: View {
                         // — so this is where a turn gets packed, sent
                         // through the real URL path and read back, on the
                         // device, before any of it reaches a Mac.
+                        //
+                        // Debug builds only. It still earns its place —
+                        // nothing else can exercise the transport yet — but
+                        // a byte-budget readout is a developer tool, and a
+                        // beta tester finding one in Settings learns only
+                        // that the app is unfinished. The gate is
+                        // compile-time, so the TestFlight build does not
+                        // carry the panel at all rather than hiding it.
+                        //
+                        // WirePayloadCheck itself stays outside the gate so
+                        // it keeps compiling in both configurations; one
+                        // unreferenced private view costs nothing and means
+                        // a release build cannot fail on a type only the
+                        // debug branch mentions.
+                        #if DEBUG
                         if rules.isEmpty {
                             panel("Message Payloads",
                                   footer: AnyView(
@@ -278,6 +293,7 @@ struct SettingsView: View {
                                 WirePayloadCheck()
                             }
                         }
+                        #endif
 
                     }
                     .padding(.horizontal, 14)

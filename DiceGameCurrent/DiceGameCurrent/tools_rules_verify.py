@@ -543,6 +543,7 @@ def _guide_bodies():
 TABLE_SHAPE = {
     ("Generals.swift", "Category"): (3, 7),
     ("Rollbots.swift", "Ability"): (3, 4),
+    ("Rollbots.swift", "Weapon"): (2, 4),
     ("RoyalUrScreen.swift", "Marked Points"): (3, 2),
     ("SuiteGame.swift", "Matchup Type"): (3, 5),
     ("SuiteGame.swift", "Differential"): (3, 8),

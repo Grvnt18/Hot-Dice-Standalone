@@ -265,13 +265,19 @@ GAME OVERVIEW
 LOADOUT SELECTION
   Each player selects 1 Weapon and 1 Cyberware Ability at match start.
 
-  Weapons:
-    * Mono-Blade (d8): Bypasses 50% of target's Firewall.
-    * Smart Pistol (d6): Damage doubles if Accuracy roll is 7+; critical 
-      damage bypasses 50% of Firewall.
-    * Rail Rifle (d12): Bypasses Firewall completely. Requires 1 turn to 
-      charge before firing.
-    * Sidearm (d4): Default fallback weapon when primary weapon is disabled.
+  Weapons
+  Weapon                  Effect
+  -----------------------------------------------------------------------------
+  Mono-Blade (d8)         Bypasses 50% of target's Firewall.
+
+  Smart Pistol (d6)       Damage doubles if Accuracy roll is 7+; critical
+                          damage bypasses 50% of Firewall.
+
+  Rail Rifle (d12)        Bypasses Firewall completely. Requires 1 turn to
+                          charge before firing.
+
+  Sidearm (d4)            Default fallback weapon when primary weapon is
+                          disabled.
 
    Cyberware Abilities (One-Time Use Per Match)
   Ability                 Effect                              Drawback / Cost

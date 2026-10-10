@@ -27,15 +27,43 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SWIFT = os.path.join(HERE, "SwiftFiles")
+EXTENSION = os.path.join(HERE, "MessagesExtension")
 RESOURCES = os.path.join(HERE, "Resources")
+
+# The two folders holding Swift the platform floor applies to, in the order
+# a listing should show them. MessagesExtension/ is a SEPARATE Xcode target
+# — it is the one that cannot be built in Swift Playgrounds at all, which
+# makes it the one place an iOS 17 spelling would sit unnoticed longest.
+SWIFT_ROOTS = (SWIFT, EXTENSION)
 
 
 def source(name):
-    """The text of a Swift file, by bare filename."""
-    path = os.path.join(SWIFT, name)
-    if not os.path.exists(path):
-        sys.exit("swiftconst: no such source %s" % path)
-    return open(path).read()
+    """The text of a Swift file.
+
+    Takes a bare filename, resolved against SwiftFiles/, or a path relative
+    to the project folder — which is how a Messages extension source is
+    named, as `MessagesExtension/Foo.swift`. Tried in that order so every
+    existing call site means exactly what it did before.
+    """
+    for path in (os.path.join(SWIFT, name), os.path.join(HERE, name)):
+        if os.path.exists(path):
+            return open(path).read()
+    sys.exit("swiftconst: no such source %s" % os.path.join(SWIFT, name))
+
+
+def swift_names():
+    """Every Swift source in the project, as names `source` accepts.
+
+    SwiftFiles/ entries come back bare and extension entries prefixed, so a
+    caller testing membership against a bare filename still works and a
+    failure message still names something findable.
+    """
+    names = sorted(f for f in os.listdir(SWIFT) if f.endswith(".swift"))
+    if os.path.isdir(EXTENSION):
+        names += [os.path.join("MessagesExtension", f)
+                  for f in sorted(os.listdir(EXTENSION))
+                  if f.endswith(".swift")]
+    return names
 
 
 # `static let name = 3`, `static let name: CGFloat = 16`, `let name = 3`.

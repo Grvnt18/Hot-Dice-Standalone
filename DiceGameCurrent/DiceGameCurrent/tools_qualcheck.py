@@ -22,7 +22,12 @@ def sources():
     if sys.argv[1:]:
         return sorted(sys.argv[1:])
     here = os.path.dirname(os.path.abspath(__file__))
+    # Both targets. MessagesExtension/ is the one folder Swift Playgrounds
+    # cannot compile at all, so it is also the folder where a call to
+    # something that does not exist survives longest — which is exactly
+    # what this check is for.
     found = sorted(glob.glob(os.path.join(here, "SwiftFiles", "*.swift"))
+                   + glob.glob(os.path.join(here, "MessagesExtension", "*.swift"))
                    or glob.glob(os.path.join(here, "*.swift")))
     if not found:
         sys.exit("qualcheck: found no .swift files to check — refusing to "
@@ -236,6 +241,12 @@ KNOWN = {
     # payload error cases, declared as `case name(...)` in their enums
     "scoreMismatch", "unknownGame", "unsupportedVersion",
     "valueOutOfRange", "wrongDieCount",
+    # UIViewController and MSMessagesAppViewController, called on self in
+    # the Messages extension. Both are framework members with no receiver
+    # spelled, which is the shape this list exists to absorb —
+    # `requestPresentationStyle` in particular is the whole mechanism for
+    # getting out of the compact strip and into a playable screen.
+    "addChild", "requestPresentationStyle",
 }
 
 declared = set()

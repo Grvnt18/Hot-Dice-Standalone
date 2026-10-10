@@ -6,6 +6,14 @@ import Combine
 
 struct DiceSceneView: UIViewRepresentable {
     @Binding var session: DiceGameSession?
+
+    /// The seed the round is dealt from.
+    ///
+    /// Defaults to a fresh one, which is the app: every game of Rolls on
+    /// this device is its own deal. A Messages match passes the seed that
+    /// travelled in the envelope, so every participant rolls the same
+    /// fifteen dice — see DiceSceneAssembler.assemble.
+    var seed: UInt64 = SeededGenerator.newSeed()
     /// Called synchronously, in the same dispatch block that assigns
     /// `session`, the moment the scene finishes assembling. Replaces an
     /// earlier .onChange(of: session == nil)-based approach that wired
@@ -84,7 +92,8 @@ struct DiceSceneView: UIViewRepresentable {
         coordinator.hasStartedAssembly = true
 
         let newSession = DiceSceneAssembler.assemble(
-            into: uiView
+            into: uiView,
+            seed: seed
         )
         DispatchQueue.main.async {
             session = newSession
@@ -788,6 +797,27 @@ struct DiceGameScreen: View {
     /// would quietly reshape the board.
     var onExit: (() -> Void)? = nil
 
+    /// Called once the round is over, with the result packed for sending.
+    ///
+    /// Nil in the app, where a finished round is a score on an overlay and
+    /// nothing more. Set by the Messages extension, which turns it into the
+    /// message it inserts into the conversation — so the extension does not
+    /// need its own copy of this screen, and this screen does not need to
+    /// know a conversation exists.
+    ///
+    /// `RollsPlayerResult` rather than the round itself: the round is the
+    /// controller's to own and mutate, and what travels is already a
+    /// separate, Codable type with its own initialiser. See
+    /// `DiceTurnController.wireResult`.
+    var onRoundFinished: ((RollsPlayerResult) -> Void)? = nil
+
+    /// The seed this round is dealt from.
+    ///
+    /// Fresh by default. The Messages extension passes the one carried in
+    /// the envelope, which is what makes a conversation's participants
+    /// play the same deal rather than fifteen dice each of their own.
+    var seed: UInt64 = SeededGenerator.newSeed()
+
     @StateObject private var ui = GameUIState()
     @State private var session: DiceGameSession?
     @State private var finishedScore: Int?
@@ -833,6 +863,7 @@ struct DiceGameScreen: View {
 
                     DiceSceneView(
                         session: $session,
+                        seed: seed,
                         onSessionCreated: { newSession in
                             // Wired here, synchronously with session
                             // creation — not via a separate .onChange
@@ -987,6 +1018,10 @@ struct DiceGameScreen: View {
             // No turn-complete sound was supplied, so the cue is gone rather
             // than declared-and-silent. Restore both together when one is.
             finishedScore = session.turnController.currentScore
+            // Read before the overlay is dismissed, not after: the player
+            // taps that overlay away and the extension needs the result
+            // whether they do or not.
+            onRoundFinished?(session.turnController.wireResult)
         }
     }
 }

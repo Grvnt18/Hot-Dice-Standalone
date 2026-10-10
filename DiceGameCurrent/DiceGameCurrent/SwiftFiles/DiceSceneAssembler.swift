@@ -328,7 +328,8 @@ enum DiceSceneAssembler {
     /// on-screen aspect ratio.
     static func assemble(
         into sceneView: SCNView,
-        title: String = RollsGame.floorTitle
+        title: String = RollsGame.floorTitle,
+        seed: UInt64 = SeededGenerator.newSeed()
     ) -> DiceGameSession {
         // Called here, as the very first thing — not relied upon via
         // SwiftUI's .onAppear on some outer view. That was the actual bug
@@ -353,7 +354,12 @@ enum DiceSceneAssembler {
         let floorTextMaterial = env.floorTextMaterial
         let diceContainer = env.diceContainer
 
-        let round = DiceGameRound()
+        // Seeded, so a Rolls match in a conversation deals every
+        // participant the same fifteen dice: which colorway gets which
+        // type, and in what order, is built entirely from this number, and
+        // `RollsPlayerResult` travels as indices into that dealt order.
+        // Defaults to a fresh seed, so the app is unchanged.
+        let round = DiceGameRound(seed: seed)
         let lifecycle = DicePoolLifecycleController(containerNode: diceContainer)
         lifecycle.setupPool(round.pool, playAreaBounds: layout.bounds)
 

@@ -155,12 +155,30 @@ struct GameCatalogEntry: Identifiable {
     /// chrome to go back with — each game draws its own control.
     let makeView: (@escaping () -> Void) -> AnyView
 
+    /// Whether a turn can be sent to someone else — `SuiteGame.isSendable`.
+    ///
+    /// Carried here because the Messages extension lists games from this
+    /// catalogue and must not offer Free Roll: a solo sandbox has no
+    /// opponent state, so there is nothing to put in a message. The hub
+    /// shows all eleven; the extension shows the ten that can travel.
+    let isSendable: Bool
+
+    /// Upper bound on participants — `SuiteGame.maxPlayers`.
+    ///
+    /// The extension needs this before it builds a match: a conversation
+    /// can hold more people than a two-player game can seat, and the
+    /// roster has to be refused at that point rather than silently
+    /// truncated into a game two of the five participants are playing.
+    let maxPlayers: Int
+
     init(
         id: String,
         displayName: String,
         tileName: String,
         tagline: String,
         rules: [GameRuleSection] = [],
+        isSendable: Bool = true,
+        maxPlayers: Int = 2,
         makeView: @escaping (@escaping () -> Void) -> AnyView
     ) {
         self.id = id
@@ -168,6 +186,8 @@ struct GameCatalogEntry: Identifiable {
         self.tileName = tileName
         self.tagline = tagline
         self.rules = rules
+        self.isSendable = isSendable
+        self.maxPlayers = maxPlayers
         self.makeView = makeView
     }
 
@@ -183,6 +203,8 @@ struct GameCatalogEntry: Identifiable {
             tileName: G.tileName,
             tagline: G.tagline,
             rules: G.rules,
+            isSendable: G.isSendable,
+            maxPlayers: G.maxPlayers,
             makeView: makeView
         )
     }

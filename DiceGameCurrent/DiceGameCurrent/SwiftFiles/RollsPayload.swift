@@ -131,6 +131,28 @@ extension RollsGameState {
     /// Bumped whenever the encoded shape changes in a way an older build
     /// could not read correctly. The receiver checks this before decoding.
     static let schemaVersion = 1
+
+    /// The most people who can play one Rolls game in a conversation.
+    ///
+    /// **`RollsGame.maxPlayers` is `Int.max`, and that is correct about the
+    /// rules and wrong about the wire.** A single round has no turn order,
+    /// so the game itself has no ceiling — but every seat's finished round
+    /// is fifteen landed faces plus a bank order plus a 36-character
+    /// participant UUID spelled twice, and a message has a 4096-byte
+    /// budget.
+    ///
+    /// Measured, not estimated — `tools_rules_verify.py` models this
+    /// encoding exactly and asserts the number:
+    ///
+    ///       2 seats    738 B        12 seats   3477 B
+    ///       6 seats   1831 B        14 seats   4023 B
+    ///      10 seats   2930 B        15 seats   4297 B  OVER
+    ///
+    /// It matters more here than anywhere else in the suite because Rolls
+    /// is the one game where every participant plays: the payload is at its
+    /// largest on the LAST person's turn, so a fifteen-seat game would send
+    /// fourteen turns fine and fail on the one that completes it.
+    static let maxSeatsOnTheWire = 14
 }
 
 // MARK: - Scoring and validation

@@ -33,7 +33,7 @@ import os
 import re
 import sys
 
-from tools_swiftconst import source, SWIFT
+from tools_swiftconst import source, SWIFT, swift_names
 
 # What the Mac can build today: Monterey -> Xcode 14.2 -> iOS 16.2 SDK,
 # and Swift 5.7. The SDK is the obvious gate; the LANGUAGE version is the
@@ -199,7 +199,7 @@ def main():
     print("floor: %s (macOS 12 Monterey, Xcode 14.2)" % FLOOR)
 
     failures = []
-    files = sorted(f for f in os.listdir(SWIFT) if f.endswith(".swift"))
+    files = swift_names()
     for filename in files:
         text = strip(source(filename))
         for pattern, sdk, instead in ABOVE_THE_FLOOR:
@@ -247,7 +247,7 @@ def check_onchange_goes_through_the_shim():
     that holds until someone adds a screen.
     """
     failures = []
-    files = sorted(f for f in os.listdir(SWIFT) if f.endswith(".swift"))
+    files = swift_names()
 
     if ONCHANGE_SHIM not in files:
         sys.exit("platform: FAILED (%s is gone, so nothing reconciles the "
@@ -313,7 +313,7 @@ def check_simulator_render_targets():
     grep for its own name while fixing nothing.
     """
     failures = []
-    files = sorted(f for f in os.listdir(SWIFT) if f.endswith(".swift"))
+    files = swift_names()
 
     for setting, enum_name, owner, safe_everywhere in SIMULATOR_RENDER_TARGETS:
         accessor = "%s.mode" % enum_name

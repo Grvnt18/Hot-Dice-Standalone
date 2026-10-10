@@ -39,7 +39,7 @@ import os
 import re
 import sys
 
-from tools_swiftconst import source, SWIFT
+from tools_swiftconst import source, SWIFT, swift_names
 
 # Set just under PipFace's pre-fix score of 14. Both real failures were
 # 14 and 47; the next body in the tree scores 10, and everything else 5
@@ -79,7 +79,10 @@ def score(body):
 def main():
     print("SwiftUI bodies, against Swift 5.7's solver:")
     worst, flagged = [], []
-    for filename in sorted(os.listdir(SWIFT)):
+    # Both folders. The extension is the one target Swift Playgrounds
+    # cannot build at all, so an expression Xcode 14.2's solver gives up
+    # on would sit there unseen until the Mac opened it.
+    for filename in swift_names():
         if not filename.endswith(".swift"):
             continue
         for line, body in bodies(source(filename)):

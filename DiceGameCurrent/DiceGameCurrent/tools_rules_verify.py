@@ -696,6 +696,20 @@ def check_budget():
           % (ceiling + 1, ROLLS_MIN_SEATS))
     print("  %-34s %d seats" % ("largest Rolls match that fits", ceiling))
 
+    # 5. And the Swift refuses a game bigger than that.
+    #
+    # RollsGame.maxPlayers is Int.max, which is right about the rules and
+    # silent about the wire. The Messages extension seats a conversation
+    # from RollsGameState.maxSeatsOnTheWire instead, and if that number and
+    # this model ever disagree the failure is the worst shape there is:
+    # Rolls is the one game where everybody plays, so the payload peaks on
+    # the LAST person's turn. A game one seat too big sends every turn fine
+    # and fails on the one that finishes it.
+    stated = constant(source("RollsPayload.swift"), "maxSeatsOnTheWire")
+    check("the Swift's seat ceiling is the measured one", stated == ceiling,
+          "RollsGameState.maxSeatsOnTheWire is %s, the budget allows %d"
+          % (stated, ceiling))
+
 
 def main():
     print("rules text against the constants:")

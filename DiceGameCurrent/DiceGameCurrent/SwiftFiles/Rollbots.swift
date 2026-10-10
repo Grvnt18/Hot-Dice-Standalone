@@ -268,6 +268,43 @@ extension RollbotsRules {
         let lockedDown: Bool
     }
 
+    /// Whether a reaction can change the outcome at all.
+    ///
+    /// The defence menu is built from the defender's seat alone, so
+    /// against a Rail Rifle it still offers a Firewall — and the card
+    /// promises "a natural 8 stops everything", which against that weapon
+    /// is false: `resolve` returns the raw damage before a natural 8 is
+    /// ever looked at. The defender then throws a d8, watches it settle,
+    /// reads the number, and takes the damage in full: a roll that could
+    /// not have gone any other way.
+    ///
+    /// Three answers, each read straight off `resolve` below:
+    ///
+    ///   Dodge          only if a d6 can beat the accuracy — accuracy < 6
+    ///   Firewall       only if the shot is not piercing it outright
+    ///   Quantum Phase  always, since a d12 beats any d10 accuracy
+    ///
+    /// Exposed is not a choice and never helps, which is why it needs no
+    /// arithmetic of its own.
+    ///
+    /// No probability moves: the roll that goes away never affected one.
+    static func canHelp(
+        _ defence: CyberDefence,
+        weapon: CyberWeapon,
+        accuracy: Int,
+        ignoresFirewall: Bool = false
+    ) -> Bool {
+        switch defence {
+        case .exposed:
+            return false
+        case .dodge, .phase:
+            guard let sides = defence.sides else { return false }
+            return sides > accuracy
+        case .firewall:
+            return !(ignoresFirewall || weapon.ignoresFirewall)
+        }
+    }
+
     /// Resolves one attack from its three dice.
     ///
     /// Takes the rolls rather than making them: the dice are thrown on the

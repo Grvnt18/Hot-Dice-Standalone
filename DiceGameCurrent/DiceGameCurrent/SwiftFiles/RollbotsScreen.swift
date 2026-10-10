@@ -477,7 +477,11 @@ struct RollbotsScreen: View {
                     NetCard(
                         title: option.displayName,
                         summary: description(for: option),
-                        tint: NetArt.seat(defender)
+                        tint: NetArt.seat(defender),
+                        // Greyed, not removed. A card that vanishes
+                        // teaches nothing; one that is there and greyed
+                        // says "this exists, and not against this".
+                        isEnabled: canHelp(option)
                     ) { choose(option) }
                 }
             }
@@ -495,6 +499,14 @@ struct RollbotsScreen: View {
                 ? "A d6 cannot beat \(accuracy). You would take all of it."
                 : "Roll a d6 above \(accuracy) — \(outs) of 6 — and take nothing. Otherwise take all of it."
         case .firewall:
+            // The card used to promise "a natural 8 stops everything"
+            // unconditionally, which against a piercing shot is simply
+            // untrue — resolve returns the raw damage before a natural 8
+            // is ever looked at. Saying so is the point of greying it.
+            guard canHelp(.firewall) else {
+                return "The \(state.activeWeapon(attacker).displayName) "
+                     + "goes straight through a Firewall. Nothing to roll."
+            }
             return "Roll a d8 and subtract it from the damage. A natural 8 stops everything."
         case .phase:
             let outs = max(0, 12 - accuracy)
@@ -601,6 +613,34 @@ struct RollbotsScreen: View {
         finishTurn()
     }
 
+    /// Whether this reaction can change the outcome of the shot on the
+    /// table.
+    ///
+    /// `state.defences(for:)` answers what the seat's own state allows,
+    /// which is a different question: against a Rail Rifle it still offers
+    /// a Firewall, and the card promises "a natural 8 stops everything",
+    /// which against that weapon is untrue. See RollbotsRules.canHelp.
+    private func canHelp(_ option: CyberDefence) -> Bool {
+        RollbotsRules.canHelp(option,
+                              weapon: state.activeWeapon(attacker),
+                              accuracy: accuracy,
+                              // usedOverclock, not state.overclocked:
+                              // resolveExchange passes that one, and the
+                              // flag is cleared during resolution. Two
+                              // different values here would mean canHelp
+                              // answering about a different shot than the
+                              // one that lands.
+                              ignoresFirewall: usedOverclock)
+    }
+
+    /// True when nothing the defender could pick would change the number.
+    ///
+    /// The Rail Rifle at accuracy 6 or more, and the Exposed state — which
+    /// turns out to have been the same case all along.
+    private var noDefenceCanHelp: Bool {
+        !state.defences(for: defender).contains { canHelp($0) }
+    }
+
     private func choose(_ option: CyberDefence) {
         defence = option
         if option == .phase { state.phaseArmed[defender] = false }
@@ -655,6 +695,23 @@ struct RollbotsScreen: View {
 
     /// The attacker has read their two dice and sends the shot across.
     private func sendAttack() {
+        // No defence die at all when none of them could change the
+        // number. Handing the device over to pick between three greyed
+        // cards is a decision that does not exist, and the old flow made
+        // the defender throw a d8 and read a result that was already
+        // fixed. The banner names the weapon nothing stops.
+        //
+        // This is the Rail Rifle at accuracy 6 or more, and the Exposed
+        // state — which turns out to have been the same case all along.
+        if noDefenceCanHelp {
+            defence = .exposed
+            defenceRoll = nil
+            // Consumed if it was set; a no-op in the Rail case, where it
+            // was never set in the first place.
+            state.exposed[defender] = false
+            resolveExchange()
+            return
+        }
         phase = .defending
         handoverTo = defender
     }

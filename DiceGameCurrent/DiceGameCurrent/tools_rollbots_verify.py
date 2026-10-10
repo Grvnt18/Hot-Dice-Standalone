@@ -59,6 +59,82 @@ def resolve(weapon, accuracy, damage_roll, defence, defence_roll, ignores_firewa
     return max(0, raw - defence_roll), 0
 
 
+DEFENCE_SIDES = {"dodge": 6, "firewall": 8, "phase": 12}
+
+
+def can_help(defence, weapon, accuracy, ignores_firewall=False):
+    """RollbotsRules.canHelp — a PORT, checked against resolve below."""
+    if defence == "none":
+        return False
+    if defence in ("dodge", "phase"):
+        return DEFENCE_SIDES[defence] > accuracy
+    return not (ignores_firewall or weapon == "rail")
+
+
+def check_useless_defences():
+    """Every reaction canHelp calls useless must really be useless.
+
+    The defence menu is built from the defender's seat alone, so against a
+    Rail Rifle it offers a Firewall — and the card promises "a natural 8
+    stops everything", which against that weapon is false. The defender
+    throws a d8, watches it settle, reads the number and takes the damage
+    in full: a roll that could not have gone any other way.
+
+    `canHelp` answers whether a reaction can change the outcome, and that
+    is only honest if "cannot" is exactly true — a defence whose die does
+    move the number, even on one face, is a decision being taken away from
+    the player.
+
+    So this asks `resolve` directly, over every weapon, every accuracy,
+    every damage roll and every face the defence die could show.
+    """
+    hidden = []
+    for weapon, dmg_sides in DAMAGE_SIDES.items():
+        for ignores in (False, True):
+            for accuracy in range(1, 11):
+                for defence in ("dodge", "firewall", "phase"):
+                    if can_help(defence, weapon, accuracy, ignores):
+                        continue
+                    for damage in range(1, dmg_sides + 1):
+                        outcomes = {
+                            resolve(weapon, accuracy, damage, defence, face,
+                                    ignores_firewall=ignores)
+                            for face in range(1, DEFENCE_SIDES[defence] + 1)
+                        }
+                        # And it must match what the game resolves with no
+                        # roll at all — a nil defence roll reads as a zero.
+                        outcomes.add(resolve(weapon, accuracy, damage,
+                                             defence, 0,
+                                             ignores_firewall=ignores))
+                        if len(outcomes) > 1:
+                            hidden.append(
+                                "%s vs %s at accuracy %d, damage %d: %s"
+                                % (defence, weapon, accuracy, damage,
+                                   sorted(outcomes)))
+    for line in hidden[:8]:
+        print("  FAILED  a 'useless' defence is not useless — %s" % line)
+    assert not hidden, "%d combination(s) hide a real choice" % len(hidden)
+    print("  useless defences are useless   ok "
+          "(every weapon, accuracy, damage and defence face)")
+
+    # And the converse, so this cannot be made to pass by calling
+    # everything useful: the cases the game would skip must actually exist.
+    skipped = [(w, a) for w in DAMAGE_SIDES for a in range(1, 11)
+               if not any(can_help(d, w, a) for d in ("dodge", "firewall"))]
+    assert skipped, "nothing is ever skipped — canHelp has stopped saying no"
+    assert all(w == "rail" and a >= 6 for w, a in skipped), skipped
+    print("  the roll is skipped            ok "
+          "(the Rail Rifle at accuracy 6 or more, and nothing else)")
+
+    # And that the Swift actually HAS it. The check above is a port; a port
+    # that passes while the shipped game offers the useless option anyway is
+    # the exact failure this is here to prevent.
+    swift = swiftconst.source("Rollbots.swift")
+    assert "static func canHelp(" in swift, \
+        "RollbotsRules.canHelp is gone from Rollbots.swift"
+    print("  the Swift has canHelp          ok")
+
+
 # --- the document's own numbers -------------------------------------------
 
 def check_document():
@@ -238,6 +314,7 @@ def match(rng, w0, w1, ware0=None, ware1=None):
 
 def main():
     swiftconst.expect("Rollbots", "Rollbots.swift", SWIFT_CONSTANTS)
+    check_useless_defences()
     check_visible_damage()
     check_document()
     check_edges()

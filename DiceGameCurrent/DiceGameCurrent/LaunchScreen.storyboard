@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Hot Dice — launch screen.
+
+    An iOS launch screen is a static storyboard rendered before any code
+    runs. It cannot animate, and the hub's opening — the mark travelling up
+    to its place as the games appear — is therefore done IN THE APP, by
+    HubIntro in GameHubView.swift. This file's only job is to draw the frame
+    that animation starts from, so the first frame the app draws is
+    identical to the last frame the system drew.
+
+    Three things have to match, and all three are read off the code rather
+    than chosen here:
+
+    1. THE BACKGROUND is #AE7B5B — LowPolyTextures.woodBaseHex, the tone the
+       hub's timber is generated from. A flat fill, not a picture of grain:
+       the wood is generated at runtime and no static image matches it pixel
+       for pixel, so matching the BASE TONE and letting the grain appear with
+       the first drawn frame reads as the texture arriving, where a near-miss
+       photograph reads as the whole screen changing.
+       0xAE/255 = 0.682, 0x7B/255 = 0.482, 0x5B/255 = 0.357.
+
+    2. THE MARK is Resources/icon-app.png, centred horizontally and
+       vertically, aspect fit.
+
+    3. ITS SIZE is HubLayout.headerMark(forWidth:) — twice a tile icon
+       across. That function is a clamped chain of four others, but worked
+       through it is piecewise AFFINE in the screen width, so a storyboard
+       can reproduce it exactly rather than approximately:
+
+           iconSide  = 0.7·tile - 26 - labelHeight
+           tile      = (width - 46) / 2        (two columns, 16 gutters, 14 gap)
+           mark      = 2 · iconSide, capped at the grid's own width
+
+       which comes out as:
+
+           width <  494    mark = 0.7·width - 84.2
+           494 .. 646      mark = width - 232.4
+           width >= 646    mark = 413.6         (tile pinned at maxTile 300)
+
+       The two constraints below are the first segment and the cap, which is
+       EXACT for every phone (all < 494) and every iPad in portrait (all
+       >= 646). Checked against the Swift: 320 -> 139.8, 375 -> 178.3,
+       393 -> 190.9, 430 -> 216.8, 810 -> 413.6, 1024 -> 413.6.
+
+       The one band it does not match is 494-646 points, which is iPad Split
+       View, where this undershoots by up to 46pt for a single frame. A
+       storyboard constraint is linear and that segment has a different
+       slope; a 46pt pop in a multitasking column is the cheaper of the two
+       wrong answers.
+
+    4. NOTHING ELSE. No wordmark, no games, no spinner. The wordmark is part
+       of the title block that travels, so drawing it here would make it
+       jump when the app takes over.
+-->
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="22154" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="01J-lp-oVM">
+    <device id="retina6_12" orientation="portrait" appearance="light"/>
+    <dependencies>
+        <deployment identifier="iOS"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="22131"/>
+        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+        <capability name="System colors in document resources" minToolsVersion="11.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <scenes>
+        <!--View Controller-->
+        <scene sceneID="EHf-IW-A2E">
+            <objects>
+                <viewController id="01J-lp-oVM" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="Ze5-6b-2t3">
+                        <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="icon-app" translatesAutoresizingMaskIntoConstraints="NO" id="mrk-00-001">
+                                <rect key="frame" x="101.5" y="330.5" width="190.5" height="190.5"/>
+                                <constraints>
+                                    <!-- Square, so aspect fit never letterboxes the artwork. -->
+                                    <constraint firstAttribute="height" secondItem="mrk-00-001" secondAttribute="width" multiplier="1:1" id="mrk-00-sqr"/>
+                                    <!-- The cap: HubLayout's tile is pinned at maxTile 300 above
+                                         646pt wide, which makes the mark a constant 413.6. -->
+                                    <constraint firstAttribute="width" relation="lessThanOrEqual" constant="413.6" id="mrk-00-cap"/>
+                                </constraints>
+                            </imageView>
+                        </subviews>
+                        <viewLayoutGuide key="safeArea" id="6Tk-OE-BBY"/>
+                        <color key="backgroundColor" red="0.68235294117647061" green="0.48235294117647059" blue="0.35686274509803922" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <constraints>
+                            <constraint firstItem="mrk-00-001" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="mrk-00-ctx"/>
+                            <constraint firstItem="mrk-00-001" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="mrk-00-cty"/>
+                            <!-- mark = 0.7 * width - 84.2. See the note above: this is
+                                 HubLayout.headerMark's first segment, exact for every phone. -->
+                            <constraint firstItem="mrk-00-001" firstAttribute="width" secondItem="Ze5-6b-2t3" secondAttribute="width" multiplier="0.7" constant="-84.2" id="mrk-00-wid"/>
+                        </constraints>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="iYj-Kq-Ea1" userLabel="First Responder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="53" y="375"/>
+        </scene>
+    </scenes>
+    <resources>
+        <!-- Resources/icon-app.png, as it actually is: 1300 x 1300. The
+             storyboard only uses this to size its own canvas preview; the
+             constraints above decide what is drawn. -->
+        <image name="icon-app" width="1300" height="1300"/>
+    </resources>
+</document>

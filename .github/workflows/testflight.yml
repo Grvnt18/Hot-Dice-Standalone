@@ -1,0 +1,200 @@
+# The release build, in the cloud.
+#
+# WHY THIS EXISTS
+#
+# There is one Mac, it runs macOS 12 Monterey, and the last Xcode that runs
+# on Monterey is 14.2. PLATFORM.txt lists the two things that Xcode cannot
+# do: install onto an iOS 18 iPad, and upload to the App Store. Apple
+# requires builds to be made with a recent SDK and raises the bar every
+# year. So the Mac writes and tests everything — including the Messages
+# extension, in the Simulator, with two conversations, which is how Apple
+# intends these to be tested — and this does the release build and the
+# TestFlight upload.
+#
+# Nothing about the code changes. What SDK you build against and what system
+# you run on are two different things: the suite is written to an iOS 16
+# floor and runs unchanged on anything newer.
+#
+# ----------------------------------------------------------------------
+# BEFORE THIS CAN RUN — six secrets, and only you can make them
+# ----------------------------------------------------------------------
+#
+# Settings -> Secrets and variables -> Actions -> New repository secret.
+#
+# From App Store Connect (Users and Access -> Integrations -> App Store
+# Connect API -> generate a key with the "App Manager" role):
+#
+#   ASC_KEY_ID          The key's ID, ten characters.
+#   ASC_ISSUER_ID       The issuer ID on that same page. One per account.
+#   ASC_PRIVATE_KEY     The WHOLE .p8 file, pasted in, BEGIN/END lines and
+#                       all. Apple lets you download it exactly once.
+#
+# From Keychain Access on the Mac, for signing (Apple will not sign a build
+# for the store with a development certificate):
+#
+#   SIGNING_CERTIFICATE_P12   An "Apple Distribution" certificate and its
+#                             private key, exported together as one .p12,
+#                             then base64'd:
+#                               base64 -i cert.p12 | pbcopy
+#   SIGNING_CERTIFICATE_PASSWORD   The password you set on that export.
+#   KEYCHAIN_PASSWORD         Any string. It unlocks the throwaway keychain
+#                             this job builds and deletes; it is not an
+#                             account password and protects nothing outside
+#                             the runner.
+#
+# (The plan said four. It is six: three to talk to App Store Connect and
+# three to sign. Writing it down wrong once is cheaper than finding out on
+# the sixth run.)
+#
+# Provisioning profiles are NOT a secret here. `-allowProvisioningUpdates`
+# with the API key lets Xcode fetch or create them, which is also what
+# stops two bundle ids' profiles going stale in a secret store.
+#
+# ----------------------------------------------------------------------
+# WHAT IT DOES NOT DO
+# ----------------------------------------------------------------------
+#
+# It does not submit for review and it does not release to users. It
+# uploads a build to TestFlight, which is as far as an automated job should
+# go on its own.
+
+name: TestFlight
+
+on:
+  # Deliberately manual. A push-triggered upload burns a build number on
+  # every commit and TestFlight build numbers cannot be reused.
+  workflow_dispatch:
+    inputs:
+      notes:
+        description: "What testers should know about this build"
+        required: false
+        default: ""
+
+jobs:
+  upload:
+    # macos-14 carries Xcode 15.x, which is above Apple's current SDK
+    # floor and well above the iOS 16 the code targets. Pinned rather than
+    # macos-latest: a runner image that moves under you is a build that
+    # fails on a morning you changed nothing.
+    runs-on: macos-14
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show the toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      # The checks that do not need a compiler. They are the whole of this
+      # repo's verification — there is no Swift toolchain in the authoring
+      # environment, so these run before the one place that can actually
+      # build, not after.
+      - name: Run the verifiers
+        working-directory: DiceGameCurrent/DiceGameCurrent
+        run: python3 tools_qualcheck.py && python3 tools_platform_verify.py
+
+      - name: Generate the project
+        working-directory: DiceGameCurrent/DiceGameCurrent
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      # A keychain of its own, created and destroyed in this job. The
+      # runner is thrown away afterwards, but a job that leaves a
+      # certificate in the default keychain is a habit worth not having.
+      - name: Import the signing certificate
+        env:
+          CERT: ${{ secrets.SIGNING_CERTIFICATE_P12 }}
+          CERT_PASSWORD: ${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          echo "$CERT" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -P "$CERT_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          # Without this, codesign stops to ask for permission on a
+          # machine with nobody at the keyboard, and the job hangs rather
+          # than fails.
+          security set-key-partition-list -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+          security list-keychain -d user -s "$KEYCHAIN" login.keychain-db
+          rm "$RUNNER_TEMP/cert.p12"
+
+      - name: Place the App Store Connect key
+        env:
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$ASC_PRIVATE_KEY" > \
+            "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+
+      - name: Archive
+        working-directory: DiceGameCurrent/DiceGameCurrent
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          xcodebuild archive \
+            -project HotDice.xcodeproj \
+            -scheme HotDice \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/HotDice.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
+            CODE_SIGN_STYLE=Automatic
+
+      - name: Export and upload to TestFlight
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store</string>
+            <key>destination</key><string>upload</string>
+            <key>uploadSymbols</key><true/>
+            <!-- Automatic, so the extension's profile is fetched alongside
+                 the app's rather than being the one nobody remembered. -->
+            <key>signingStyle</key><string>automatic</string>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/HotDice.xcarchive" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+
+      # Runs even if the upload failed: the log is the only place a
+      # signing or validation complaint is explained, and a job that
+      # throws it away makes the next attempt a guess.
+      - name: Keep the logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            ${{ runner.temp }}/HotDice.xcarchive/Info.plist
+            ${{ runner.temp }}/export
+          if-no-files-found: ignore
+
+      - name: Tidy the keychain
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true

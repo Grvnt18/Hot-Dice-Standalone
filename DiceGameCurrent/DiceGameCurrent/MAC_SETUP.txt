@@ -215,8 +215,28 @@ ORIENTATION — SET THIS, IT IS NOT IN THE REPO
 
 Portrait only. Set it in Swift Playgrounds' project settings now, and in
 the Xcode target's Deployment Info when the project moves across. Like
-the icon below, it does not travel in the repo, so an Xcode build will
-quietly re-enable everything unless it is set again.
+the icon below, it does not travel in the repo in the hand-built route,
+so an Xcode build will quietly re-enable everything unless it is set
+again.
+
+If you took the XcodeGen route (see PROJECT.YML below), it is already
+stated there and you can skip this. If you are clicking the project
+together by hand, these are the keys rather than the checkboxes —
+Info.plist, Open As → Source Code, paste:
+
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+    </array>
+    <key>UISupportedInterfaceOrientations~ipad</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+    </array>
+    <key>UIRequiresFullScreen</key>
+    <false/>
+
+The last one keeps Slide Over and Split View allowed, which is
+deliberate — see the note at the end of this section.
 
 Why portrait, measured rather than assumed:
 
@@ -330,15 +350,89 @@ Match these or the handoff reads as a jump:
 
 
 ===============================================================================
+THE LAUNCH SCREEN IS NOW IN THE REPO
+===============================================================================
+
+`LaunchScreen.storyboard` is in the project folder, written to the spec
+above rather than laid out by hand. Drag it in and set it as the target's
+Launch Screen File (General tab); the XcodeGen route below does both.
+
+The mark's size is not a guessed percentage. `HubLayout.headerMark` is a
+clamped chain of four functions, but worked through it is piecewise affine
+in the screen width, so the storyboard reproduces it with one proportional
+constraint and one cap:
+
+    width <  494    mark = 0.7 x width - 84.2
+    494 .. 646      mark = width - 232.4
+    width >= 646    mark = 413.6
+
+The storyboard holds the first line and the cap, which is exact for every
+phone (all below 494) and every iPad in portrait (all above 646). The
+band it misses is iPad Split View, where it undershoots by up to 46pt for
+a single frame. A storyboard constraint is linear and that middle segment
+has its own slope; the storyboard's own comment says so.
+
+
+===============================================================================
+PROJECT.YML — THE OTHER WAY TO MAKE THE PROJECT
+===============================================================================
+
+Steps 2 to 6 above build the project by hand. `project.yml` describes the
+same project as a file, and XcodeGen generates it:
+
+    brew install xcodegen
+    cd DiceGameCurrent/DiceGameCurrent
+    xcodegen generate
+
+Either route works. This one is worth knowing about for three reasons:
+
+  1. It is the only one the cloud build can take. A runner has no project
+     to open, and the release build is the thing this Mac cannot do.
+
+  2. It fixes the problem the "IF YOU EVER PULL A NEW VERSION" section
+     above describes. That section exists because Xcode holds a reference
+     to every file individually, so a .swift file that appears after a git
+     pull is on disk and NOT in the build — "cannot find X in scope", on
+     many lines, with no usable error. It has broken the build on both
+     machines at once. project.yml uses folder references, which cannot.
+
+  3. It states the Messages extension and the app together, including the
+     fact that both need the resources. `Bundle.main` inside an app
+     extension is the EXTENSION's bundle — eight call sites go through it
+     — so the 162 files genuinely have to be in both targets, and
+     remembering that by hand twice is how one of them ends up with 161.
+
+The bundle identifiers in it are placeholders (`com.example.hotdice`).
+Change both — the app's and the extension's, which must be the app's with
+a suffix — to whatever you register with Apple.
+
+
+===============================================================================
 WHAT COMES AFTER THIS
 ===============================================================================
 
-Once the games run in the simulator, the next piece is the Messages
-extension: File → New → Target → iMessage Extension, sharing the same
-source files. That is where the iMessage version actually begins, and
-Xcode 14.2 can build and test all of it — the simulator runs Messages
+The Messages extension is no longer a later step: `MessagesExtension/`
+holds five files and Rolls plays end to end in a conversation. If you are
+building the project by hand, File → New → Target → iMessage Extension
+and add that folder, SwiftFiles and Resources to it; XcodeGen does it
+from project.yml. Set the extension's principal class to
+`MessagesViewController`.
+
+Xcode 14.2 can build and test all of it — the Simulator runs Messages
 with two conversations, which is how Apple intends these to be tested.
+That is also the only reason to use the Simulator at all: PLATFORM.txt's
+rule still holds, and anything touching SceneKit is cheaper to shake out
+on the iPad.
+
+Nine games show "isn't playable in Messages yet" when tapped. They have
+Codable state and a measured payload; what they do not have is an
+injectable starting position — every screen builds its own `TurnMatch` in
+a `@State` initialiser. That seam gets cut once a Rolls turn has actually
+crossed between two simulated conversations, so it is cut to fit
+something that works rather than to a guess.
 
 The two things this Mac cannot do — installing on your iOS 18 iPad, and
-uploading to the App Store — are handled later by a cloud build. See
+uploading to the App Store — are handled by the cloud build in
+`.github/workflows/testflight.yml`. It needs six secrets that only you
+can create; the file lists each one and where it comes from. See also
 PLATFORM.txt.

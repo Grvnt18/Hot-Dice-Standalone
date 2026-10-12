@@ -71,12 +71,19 @@ enum MessagesSeating {
 
     /// Whether this device's participant is in the match at all.
     ///
-    /// False for somebody added to the thread after a match began. They
-    /// get the result, not a seat — joining a game in progress would mean
-    /// a roster change mid-match, and no game in the suite has scoring that
+    /// False for somebody added to the thread after a match began. They get
+    /// the result, not a seat — joining a game in progress would mean a
+    /// roster change mid-match, and no game in the suite has scoring that
     /// survives one.
+    ///
+    /// Takes an optional conversation and answers `false` without one. The
+    /// store holds `MSConversation?` — it is dropped on `didResignActive`,
+    /// because a retained conversation is a stale one — and "not seated" is
+    /// the safe direction to fail in: it shows standings rather than a
+    /// board, and a board is the thing that could write a turn.
     static func isSeated(_ match: TurnMatch,
-                         in conversation: MSConversation) -> Bool {
-        match.participants.contains(localID(in: conversation))
+                         in conversation: MSConversation?) -> Bool {
+        guard let conversation else { return false }
+        return match.participants.contains(localID(in: conversation))
     }
 }

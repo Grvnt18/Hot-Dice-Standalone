@@ -37,6 +37,25 @@ struct MessagesRollsHost: View {
     var body: some View {
         content
             .onAppear(perform: load)
+            // A turn can arrive while this screen is open: didReceive and
+            // didSelect both update the store, and onAppear does not fire
+            // again when SwiftUI reuses the view. Without this, a received
+            // turn leaves the board showing the state it was opened with.
+            //
+            // Keyed on the message's URL rather than the message itself:
+            // MSMessage is a reference type and not Equatable, so it cannot
+            // be watched directly — and the URL is where the turn actually
+            // lives, so a different turn is a different string. See
+            // MessagesStore.selectedKey.
+            .onValueChange(of: store.selectedKey) { _ in reload() }
+            // And the first read, if the conversation arrived after this
+            // view did. Guarded on `game == nil` rather than reloading:
+            // `willBecomeActive` fires again every time the extension is
+            // brought forward, and a reload there would throw away a round
+            // the player is part way through.
+            .onValueChange(of: store.isReady) { ready in
+                if ready, game == nil { load() }
+            }
     }
 
     @ViewBuilder
@@ -53,10 +72,26 @@ struct MessagesRollsHost: View {
 
     @ViewBuilder
     private func loaded(_ game: LoadedGame) -> some View {
-        if hasRolled(game) || game.state.isClosed {
+        // Standings, not a board, for anyone who cannot or need not roll.
+        //
+        // `isSeated` is the one that was missing. Somebody added to the
+        // thread after the match began is not in `participants`, so
+        // `hasRolled` is false for them and the old condition handed them
+        // the board: they could roll, and `send` would write a result and a
+        // score under an id the match does not contain. Worse than a stray
+        // score — `results.count >= participants.count` could then close the
+        // game while a real player still had a turn to take.
+        if !MessagesSeating.isSeated(game.match, in: store.conversation)
+            || hasRolled(game) || game.state.isClosed {
             MessagesRollsStandings(game: game,
                                    localID: localID,
-                                   onClose: game.state.isClosed ? nil : close)
+                                   // Bug: this used to be offered to
+                                   // everyone, and `close` silently returns
+                                   // for anyone but the starter — so every
+                                   // participant saw a button that did
+                                   // nothing. Only the starter can close a
+                                   // game, so only the starter is shown it.
+                                   onClose: canClose(game) ? close : nil)
         } else {
             // The app's own Rolls screen, unchanged, with the seed the
             // match was dealt from. `onExit` stays nil: Messages supplies
@@ -79,8 +114,32 @@ struct MessagesRollsHost: View {
         game.state.results[localID] != nil
     }
 
+    /// Whether this device may close the game early.
+    ///
+    /// The starter, and only while it is still open. Stated once so the
+    /// button and the action cannot disagree — which is exactly how the
+    /// button came to be shown to people it did nothing for.
+    private func canClose(_ game: LoadedGame) -> Bool {
+        !game.state.isClosed && game.state.startedBy == localID
+    }
+
+    /// Re-reads after the selected message changes.
+    ///
+    /// Drops what was loaded first, so a received turn cannot be merged into
+    /// a half-finished local one — and so a stale `problem` from a message
+    /// that would not decode does not outlive it.
+    private func reload() {
+        game = nil
+        load()
+    }
+
     /// Decodes the tapped message, or starts a match.
     private func load() {
+        // Cleared first, so a `problem` left by an earlier attempt cannot
+        // outlive the attempt that succeeds — `content` tests `problem`
+        // before `game`, so a stale one hides a perfectly good board.
+        problem = nil
+
         guard let conversation = store.conversation else {
             problem = "This needs to run inside a conversation."
             return
@@ -174,7 +233,7 @@ struct MessagesRollsHost: View {
     /// waiting for every participant would hang it forever. Whoever has
     /// rolled is who counts.
     private func close() {
-        guard var next = game, next.state.startedBy == localID else { return }
+        guard var next = game, canClose(next) else { return }
         next.state.isClosed = true
         next.match.finish(lowestScoreWins: RollsGame.lowestScoreWins)
         self.game = next

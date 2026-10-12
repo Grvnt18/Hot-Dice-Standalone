@@ -44,12 +44,15 @@ final class MessagesStore: ObservableObject {
         // only. Cleared here so a stale choice cannot survive into a
         // received turn of a different game.
         if selected != nil { self.chosenGameID = nil }
+        // Decoded once per change, not once per redraw.
+        self.receivedHeader = try? MatchMessage.header(from: selected)
     }
 
     func clearConversation() {
         conversation = nil
         selected = nil
         chosenGameID = nil
+        receivedHeader = nil
     }
 
     func send(_ message: MSMessage) {
@@ -67,11 +70,31 @@ final class MessagesStore: ObservableObject {
 
     /// The game a received message carries, or nil when there isn't one.
     ///
-    /// Reads only the header, so a game this build does not ship still
-    /// comes back named rather than as a decode failure.
-    var receivedHeader: GameEnvelopeHeader? {
-        try? MatchMessage.header(from: selected)
-    }
+    /// Cached rather than decoded on demand. This used to be a computed
+    /// property doing a base64 decode and a JSON parse, read from three
+    /// separate view bodies — so every redraw of the compact strip or the
+    /// expanded screen re-parsed the same message two or three times.
+    /// `update` is the only place `selected` changes, so it is the only
+    /// place this needs recomputing.
+    @Published private(set) var receivedHeader: GameEnvelopeHeader?
+
+    /// What identifies the currently selected turn, for change detection.
+    ///
+    /// `MSMessage` is a reference type and not `Equatable`, so a view
+    /// cannot watch the message itself. Its `url` is what actually carries
+    /// the turn, so a different turn is a different string — and nil when
+    /// nothing is selected.
+    var selectedKey: String { selected?.url?.absoluteString ?? "" }
+
+    /// Whether there is a conversation to read yet.
+    ///
+    /// SwiftUI's `onAppear` is not promised to run after Messages has
+    /// handed over the conversation — `viewDidLoad` builds this tree, and
+    /// `willBecomeActive` is what supplies the conversation. A view that
+    /// read it once, on appear, could come up on the "needs to run inside a
+    /// conversation" message and stay there, because nothing would ask
+    /// again. This is what it watches instead.
+    var isReady: Bool { conversation != nil }
 }
 
 // MARK: - The root
@@ -185,6 +208,15 @@ struct MessagesExpandedView: View {
     private func gameBody(_ id: String?) -> some View {
         if let id {
             MessagesGameRouter(store: store, gameID: id)
+        } else if store.selected != nil {
+            // A message was tapped and its payload would not read. Falling
+            // through to the game list here showed somebody who tapped a
+            // damaged turn a cheerful menu of new games, with no hint that
+            // the thing they tapped was the problem.
+            MessagesProblemView(
+                message: "This message doesn't contain a game this "
+                       + "version can read."
+            )
         } else {
             MessagesGamePicker(store: store)
         }

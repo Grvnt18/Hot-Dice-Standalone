@@ -711,6 +711,65 @@ def check_budget():
           % (stated, ceiling))
 
 
+
+# ---------------------------------------------------------------------------
+# The Messages extension
+#
+# Three bugs shipped in the first cut of this, and all three were SILENT:
+# nothing crashed, nothing failed a check, and each would have presented as
+# "the game is a bit odd in a group chat" weeks later.
+#
+#   * The close button was offered to every participant and did nothing for
+#     anyone but the starter, because the view and the action disagreed
+#     about who may close a game.
+#   * `isSeated` was written for the join-late case and never called, so
+#     somebody added to a thread mid-match could roll, and their turn could
+#     close the game while a real player still had one to take.
+#   * The board was read once on appear, so a turn arriving while the screen
+#     was open did not show, and a conversation that arrived after the view
+#     left it stuck on an error.
+#
+# This cannot prove the fixes work — there is no Swift compiler here. It
+# asserts the shape, which is the thing that was missing in each case.
+# ---------------------------------------------------------------------------
+
+def check_extension():
+    print("messages extension")
+    host = source("MessagesExtension/MessagesRollsHost.swift")
+    store = source("MessagesExtension/MessagesGameHost.swift")
+    code = strip_comments(host)
+
+    check("a seatless participant gets no board",
+          "MessagesSeating.isSeated(" in code,
+          "MessagesRollsHost no longer asks whether this device has a seat")
+
+    check("only the starter may close", "canClose(" in code,
+          "the close button and close() can disagree again")
+    check("close() shares that test",
+          "guard var next = game, canClose(next)" in code,
+          "close() has its own starter test rather than the shared one")
+
+    check("the board re-reads on a new turn",
+          "onValueChange(of: store.selectedKey)" in code,
+          "a turn arriving while the screen is open will not show")
+    check("the first read is retried",
+          "onValueChange(of: store.isReady)" in code,
+          "a conversation arriving after the view leaves it stuck")
+
+    # And the header is decoded once per change rather than per redraw —
+    # it was read from three view bodies as a computed property.
+    check("the envelope header is cached",
+          "@Published private(set) var receivedHeader" in strip_comments(store),
+          "receivedHeader is computed again, so every redraw re-parses")
+
+    # Same class of fix, in the app: GuideBodyView re-parsed every section
+    # on every redraw of a scrolling sheet.
+    check("a guide section parses once",
+          "private let lines: [GuideLine]" in strip_comments(
+              source("GuideBubbles.swift")),
+          "GuideBodyView parses in body again")
+
+
 def main():
     print("rules text against the constants:")
 
@@ -890,6 +949,7 @@ def main():
     check_budget()
     check_seats()
     check_wire()
+    check_extension()
     check_retired_wording()
 
     if check.failed:

@@ -70,6 +70,12 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.hotdice
+        # The INFOPLIST_KEY_* settings below only do anything when this is
+        # on: they are inputs to a GENERATED Info.plist, not edits to a
+        # file. Without it they are silently ignored — and the one that
+        # matters most is the orientation pair, so the app would come up
+        # rotating in every direction with nothing to point at.
+        GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UILaunchStoryboardName: LaunchScreen
         INFOPLIST_KEY_CFBundleDisplayName: Hot Dice
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
@@ -119,7 +125,12 @@ targets:
       # is the part that makes it a Messages extension rather than a
       # bundle Messages ignores.
     info:
-      path: MessagesExtension/Info.plist
+      # Deliberately NOT inside MessagesExtension/, which is a `sources`
+      # folder for this target: a generated plist sitting in a compiled
+      # source directory is at best noise in the build and at worst copied
+      # in as a resource. Kept beside project.yml, which is what generates
+      # it.
+      path: HotDiceMessages-Info.plist
       properties:
         CFBundleDisplayName: Hot Dice
         NSExtension:

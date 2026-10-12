@@ -1,0 +1,217 @@
+WHAT YOU NEED TO DO
+===============================================================================
+
+Everything in this list is something only you can do: it happens on your
+Mac, on your iPad, or on Apple's website. The code side is done.
+
+Work top to bottom. Nothing later works without the step before it.
+MAC_SETUP.txt has the long version of every step if one goes wrong.
+
+
+-------------------------------------------------------------------------------
+PART 1 — GET XCODE  (about 2 hours, mostly waiting)
+-------------------------------------------------------------------------------
+
+1.  Go to  https://developer.apple.com/download/all
+    Sign in with any Apple ID. A free one is fine for this part.
+
+2.  Search for "Xcode 14.2" and download it. It is about 7 GB.
+
+    NOT from the App Store. The App Store only ever offers the newest
+    Xcode, which will refuse to install on your Mac.
+
+3.  Double-click the downloaded file to unpack it. This takes a long time
+    and looks frozen. It is not frozen. Leave it.
+
+4.  Drag Xcode into your Applications folder. Not Downloads — things
+    break quietly if it lives anywhere else.
+
+5.  Open Terminal and paste this, then press Return:
+
+        sudo xcode-select --switch /Applications/Xcode.app
+
+    It will ask for your Mac password. Nothing will appear to happen.
+    That is correct.
+
+6.  Open Xcode once. Let it install the extra pieces it asks for.
+    Then turn OFF automatic updates, so it never replaces itself with a
+    version your Mac cannot run.
+
+
+-------------------------------------------------------------------------------
+PART 2 — BUILD THE APP  (about 30 minutes)
+-------------------------------------------------------------------------------
+
+There are two ways. The first is less clicking and I recommend it.
+
+  EASY WAY
+
+7.  In Terminal:
+
+        brew install xcodegen
+
+    (If `brew` is not installed, follow Part 2's hard way instead, or
+    install Homebrew from https://brew.sh first.)
+
+8.  In Terminal, go to the project folder and run:
+
+        cd <wherever you cloned Rolls>/DiceGameCurrent/DiceGameCurrent
+        xcodegen generate
+
+    That creates HotDice.xcodeproj with everything already set: both
+    targets, all the files, portrait-only, the launch screen.
+
+9.  Open HotDice.xcodeproj. Skip to step 14.
+
+  HARD WAY (if Homebrew is a problem)
+
+10. Follow MAC_SETUP.txt steps 2 to 6. It is Xcode menus and dragging
+    folders. The one thing people miss: DELETE the two files Xcode makes
+    for you (ContentView.swift, and the one with "@main" in it), or the
+    build fails.
+
+11. Set Minimum Deployments to iOS 16.0.
+
+12. Target → Deployment Info → tick PORTRAIT ONLY, untick the rest.
+
+13. Add LaunchScreen.storyboard and set it as the Launch Screen File.
+
+  BOTH WAYS
+
+14. Press Command-B to build. Expect no red errors.
+
+    This is the first time a real compiler has seen a lot of this code,
+    so if something is wrong, this is where it shows up. Send me whatever
+    it says and I will fix it.
+
+15. Pick "iPhone 14" from the bar at the top. Press Command-R to run.
+    You should get the game menu: eleven tiles with artwork, on wood.
+
+16. Click "Resources" in the file list on the left. The count at the
+    bottom should say 162.
+
+    If the app runs but something looks wrong — no dice, no sound, the
+    wrong font — a file is missing, and it will NOT tell you. MAC_SETUP.txt
+    has a table of "what you see" → "what is missing".
+
+
+-------------------------------------------------------------------------------
+PART 3 — THE ICON  (10 minutes)
+-------------------------------------------------------------------------------
+
+17. In Terminal, in the project folder:
+
+        python3 tools_icon_export.py
+
+    That writes 16 icon files into Icons/export/.
+
+18. In Xcode, open the asset catalog, select AppIcon, and in the panel on
+    the right set it to "Single Size". Drag in the 1024 file.
+
+19. The iMessage icon is separate and fussier: it is not square and needs
+    all 14 sizes. The files are all in Icons/export/ already — drag each
+    into the slot with the matching size.
+
+    Do not skip the 1024 x 768 one. It is the one that fails much later,
+    at upload, with a confusing message.
+
+
+-------------------------------------------------------------------------------
+PART 4 — TEST IT  (this is the actual testing)
+-------------------------------------------------------------------------------
+
+20. ON THE SIMULATOR, test the Messages part only:
+    open Messages in the simulator, start a conversation, open Hot Dice
+    from the app row, start a Rolls game, play it, send it.
+
+    Rolls is the only game that works in Messages. The other nine say
+    "isn't playable in Messages yet" — that is expected, not a bug.
+
+21. ON THE IPAD, test everything else. All eleven games, pass-and-play.
+
+    This matters: the simulator's graphics are missing features every
+    real device has, and dice are the thing that breaks there. If the
+    playfield is blank or the buttons stop responding IN THE SIMULATOR,
+    try it on the iPad before reporting it.
+
+22. Things worth checking because no automated check can:
+      - does every game's roll button look the same as Rolls'
+      - is any text cut off or overlapping on the smallest screen
+      - do the How to Play guides match GAME_RULES.txt
+      - does the opening animation flow smoothly from the launch screen
+        (the logo should not jump when the app takes over)
+
+
+-------------------------------------------------------------------------------
+PART 5 — APPLE PAPERWORK  (do while builds run)
+-------------------------------------------------------------------------------
+
+23. You need a PAID Apple Developer account, about $99 a year. The free
+    Apple ID got you this far but will not do TestFlight.
+    https://developer.apple.com/programs/
+
+24. In App Store Connect, create the app record.
+
+25. Register TWO bundle IDs — one for the app, one for the Messages
+    extension. The extension's must be the app's with something added on
+    the end, for example:
+
+        com.yourname.hotdice
+        com.yourname.hotdice.messages
+
+26. Open project.yml and replace BOTH `com.example.hotdice` placeholders
+    with the two you just registered. (Or set them in Xcode if you took
+    the hard way.)
+
+27. Fill in App Privacy. This app collects nothing and makes no network
+    calls, so it is a short form — but it blocks the upload until it is
+    answered.
+
+28. Answer the export compliance question: no encryption beyond what
+    Apple exempts.
+
+
+-------------------------------------------------------------------------------
+PART 6 — TESTFLIGHT  (the only way onto your iPad)
+-------------------------------------------------------------------------------
+
+Your Mac cannot do this part. Xcode 14.2 is too old to upload to Apple,
+and too old to install onto an iPad running iOS 18. A cloud build does
+both.
+
+29. In App Store Connect: Users and Access → Integrations → App Store
+    Connect API → generate a key with the "App Manager" role.
+    Download the .p8 file. Apple lets you download it ONCE.
+
+30. On your Mac, in Keychain Access, export your "Apple Distribution"
+    certificate and its private key together as one .p12 file, with a
+    password. Then in Terminal:
+
+        base64 -i <that file>.p12 | pbcopy
+
+31. On GitHub, in this repository: Settings → Secrets and variables →
+    Actions. Add six secrets. The exact names and what goes in each are
+    listed in the comments at the top of:
+
+        .github/workflows/testflight.yml
+
+32. On GitHub: Actions → TestFlight → "Run workflow".
+
+33. When it finishes, the build appears in TestFlight. Install
+    TestFlight on your iPad from the App Store and the build will be
+    there.
+
+
+-------------------------------------------------------------------------------
+IF SOMETHING GOES WRONG
+-------------------------------------------------------------------------------
+
+Send me the exact text of the error, not a description of it. For a build
+failure, the first red line is the useful one. For something that looks
+wrong on screen, say which game and which screen.
+
+The one thing to know: everything in this repository has been checked by
+scripts that read the code, not by a compiler. There is no Swift compiler
+on the machine I work on. So "all checks pass" means the spelling is
+right and the numbers agree — it does not mean it builds. Step 14 is the
+first real test, and finding problems there is expected.

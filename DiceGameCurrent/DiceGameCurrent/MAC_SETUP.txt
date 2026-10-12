@@ -424,12 +424,36 @@ That is also the only reason to use the Simulator at all: PLATFORM.txt's
 rule still holds, and anything touching SceneKit is cheaper to shake out
 on the iPad.
 
-Nine games show "isn't playable in Messages yet" when tapped. They have
-Codable state and a measured payload; what they do not have is an
-injectable starting position — every screen builds its own `TurnMatch` in
-a `@State` initialiser. That seam gets cut once a Rolls turn has actually
-crossed between two simulated conversations, so it is cut to fit
-something that works rather than to a guess.
+Nine games show "isn't playable in Messages yet" when tapped. An earlier
+version of this note said they had no seam for it. They do — each of the
+nine carries a matched pair, written when the Codable state was:
+
+    var wireTurn: MatchPayload<HogState> { ... }   // pack this turn
+    func adopt(_ incoming: MatchPayload<HogState>) // take one that arrived
+
+Nothing calls either, anywhere. The reason is not that the pack and unpack
+logic is missing — it is written, per game, and it is the part that would
+have taken the longest. It is that `adopt` mutates `@State` on a `View`
+struct, and nothing outside can get a handle on the instance SwiftUI is
+actually rendering in order to call it. The shape is right and the
+mechanism is not.
+
+Two ways to finish it, neither started, because both are a refactor rather
+than a wiring job and this is the wrong side of the first real build to be
+doing one:
+
+  * Seed at init. Each screen takes an optional `MatchPayload<State>` and
+    an `onTurn` callback — the pattern `DiceGameScreen` already uses for
+    Rolls (`onRoundFinished` and `seed`). Additive, defaults keep every
+    existing call site working.
+  * Lift the state. Move each screen's `@State` into an `ObservableObject`
+    the host owns, which is what `adopt` was shaped for.
+
+Rolls needed neither, because its state was designed for a thread rather
+than adapted to one.
+
+So the beta runs ten games pass-and-play and Rolls in a conversation. That
+is a real beta; it is not the finished multiplayer.
 
 The two things this Mac cannot do — installing on your iOS 18 iPad, and
 uploading to the App Store — are handled by the cloud build in

@@ -74,10 +74,28 @@ final class MessagesStore: ObservableObject {
 
     private var previousSelectedKey = ""
 
-    /// The player picked a game from the menu: start a fresh chain.
-    func startNew(gameID: String) {
-        chosenGameID = gameID
+    /// The player picked a game from the menu.
+    ///
+    /// **A playable game is sent, not opened.** Tapping a tile stages the
+    /// opening message in the conversation and the player hits send — no
+    /// screen in between, which is both what GamePigeon does and the
+    /// plainest reading of "as easy as selecting it on the menu and sending
+    /// it to your opponent".
+    ///
+    /// The nine games that cannot be played in a thread yet open instead,
+    /// onto the screen that says so. Sending a message nobody can open
+    /// would be worse than saying it is not ready.
+    func pick(_ gameID: String) {
         sendError = nil
+        guard MessagesInvite.canStart(gameID) else {
+            chosenGameID = gameID
+            onRequestExpanded?()
+            return
+        }
+        if let problem = MessagesInvite.start(gameID, in: self) {
+            sendError = problem
+            onRequestExpanded?()
+        }
     }
 
     /// Back to the menu, to pick a game for a new chain.
@@ -186,41 +204,40 @@ struct MessagesRootView: View {
 
 // MARK: - Compact
 
-/// The strip above the keyboard.
+/// The strip above the keyboard: the menu of games.
 ///
-/// A few hundred points tall, and no game in the suite fits it: every one
-/// derives a square playfield from the height it is given. So this says
-/// where the match is and nothing else, and a tap asks for the room to
-/// play in.
+/// **The compact presentation IS the picker.** It used to be a single
+/// "Tap to play" button that asked for the expanded style, on the
+/// reasoning that no game fits a few hundred points — which is true of a
+/// playfield and irrelevant to a grid of tiles. Picking a game is the one
+/// thing a player opens this strip to do, and making them expand first put
+/// a tap in front of it for nothing.
+///
+/// It is also what makes starting a second game easy, which is the whole
+/// requirement: close whatever is open, and the menu is already there.
 struct MessagesCompactView: View {
 
     @ObservedObject var store: MessagesStore
 
     var body: some View {
-        Button {
-            SoundEngine.shared.play(.buttonTap)
-            store.requestExpanded()
-        } label: {
-            VStack(spacing: 4) {
-                Text(title)
-                    .font(.poppins(15, .semibold))
-                Text("Tap to play")
-                    .font(.poppins(12))
-                    .foregroundStyle(.white.opacity(0.7))
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .padding(.horizontal, 16)
+        VStack(spacing: 0) {
+            header
+            MessagesGamePicker(store: store)
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(.white)
     }
 
-    private var title: String {
-        guard let header = store.receivedHeader else { return "Hot Dice" }
-        return GameCatalog.all
-            .first { $0.id == header.game }?
-            .displayName ?? "Hot Dice"
+    /// The suite's name, so the strip says whose games these are before a
+    /// single tile is read. GamePigeon's compact view carries the same.
+    private var header: some View {
+        HStack(spacing: 6) {
+            Text("HOT DICE")
+                .font(.poppins(13, .semibold))
+                .foregroundStyle(.white.opacity(0.9))
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 10)
+        .padding(.bottom, 2)
     }
 }
 
@@ -233,7 +250,7 @@ struct MessagesExpandedView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            MessagesChromeBar(store: store, showNewGame: gameID != nil)
+            MessagesChromeBar(store: store)
             if let error = store.sendError {
                 Text(error)
                     .font(.poppins(12))
@@ -279,25 +296,24 @@ struct MessagesExpandedView: View {
 
 // MARK: - Chrome
 
-/// Close on the left, New game on the right.
-///
-/// The two controls a player needs at every moment in a thread, and
-/// neither is a game's business — which is why they live here, above
-/// whatever `gameBody` draws, rather than being added to ten screens.
+/// Close, and nothing else.
 ///
 /// **Close does not end anything.** A match is its message: it stays in
 /// the transcript whether anyone is looking at it or not, so closing the
 /// view is just closing the view. Quitting a game means not replying to
 /// it, the same way you abandon any conversation. Nothing to confirm.
 ///
-/// **New game is always one tap.** Pick from the menu, send it, and it is
-/// its own chain in the same thread — no need to finish, or even to touch,
-/// whatever is already going on. Hidden only when the menu is already what
-/// is on screen, where it would do nothing.
+/// It closes to the compact strip, which is the menu — so "start another
+/// game" is Close, then tap one. There was a New game chip here; it went
+/// when the compact presentation became the picker, because it had become
+/// a second door to the same room.
+///
+/// GamePigeon has no close control at all and relies on the system
+/// grabber. This keeps one, because a grabber is not discoverable and
+/// every other screen in this suite has a way out drawn on it.
 struct MessagesChromeBar: View {
 
     @ObservedObject var store: MessagesStore
-    let showNewGame: Bool
 
     var body: some View {
         HStack(spacing: 8) {
@@ -305,11 +321,6 @@ struct MessagesChromeBar: View {
                 store.close()
             }
             Spacer(minLength: 8)
-            if showNewGame {
-                chip("New game", icon: "plus") {
-                    store.showPicker()
-                }
-            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -373,7 +384,7 @@ struct MessagesGamePicker: View {
     private func tile(_ entry: GameCatalogEntry) -> some View {
         Button {
             SoundEngine.shared.play(.buttonTap)
-            store.startNew(gameID: entry.id)
+            store.pick(entry.id)
         } label: {
             Text(entry.tileName.uppercased())
                 .font(.poppins(14, .semibold))

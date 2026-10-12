@@ -789,10 +789,25 @@ def check_extension():
           "enum Chain" in chain and "case continuing(MSMessage)" in chain,
           "MatchMessage takes an optional message again, so starting a new "
           "match can silently overwrite an existing one")
-    check("an unsent match starts its own chain",
-          "if let selected = store.selected, !game.isUnsent" in code,
-          "MessagesRollsHost no longer distinguishes a new match from a "
-          "continuing one")
+    check("an opening message starts its own chain",
+          "chain: .new" in strip_comments(
+              source("MessagesExtension/MessagesInvite.swift")),
+          "MessagesInvite no longer mints a new session, so a new game "
+          "would replace whatever match is already in the thread")
+    check("a turn continues the bubble it came from",
+          "return .continuing(selected)" in code,
+          "a turn in an existing match would leave a second bubble")
+
+    # Picking a game sends it. No screen in between — which is both what
+    # the convention does and what was asked for.
+    picker = strip_comments(source("MessagesExtension/MessagesGameHost.swift"))
+    check("a tile sends the game", "store.pick(entry.id)" in picker,
+          "picking a game opens a screen instead of staging the message")
+    check("the compact strip IS the menu",
+          "MessagesGamePicker(store: store)" in picker.split(
+              "struct MessagesCompactView")[1],
+          "the compact presentation no longer shows the picker, so "
+          "starting a game needs an extra tap")
 
     # --- what the thread itself looks like -------------------------------
     #
@@ -816,7 +831,7 @@ def check_extension():
     # Tapping a message you SENT has to say it is with the other player.
     # A bare scoreboard on an unfinished game reads as a result.
     check("your own turn says it is waiting",
-          "isWaiting" in code and "Waiting for your opponent." in code,
+          "isWaiting" in code and "WAITING FOR OPPONENT" in code,
           "a sent turn shows a scoreboard with no sign the game is still "
           "running")
 

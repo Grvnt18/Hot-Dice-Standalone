@@ -32,15 +32,6 @@ struct MessagesRollsHost: View {
         var seed: UInt64
         var match: TurnMatch
         var state: RollsGameState
-
-        /// Minted on this device and not sent yet.
-        ///
-        /// Decides two things that must not be decided separately: whether
-        /// the player sees an invitation rather than a board, and whether
-        /// the message starts its own chain or updates the one it came
-        /// from. A new match that continued an existing session would
-        /// replace that match's bubble in the thread.
-        var isUnsent: Bool
     }
 
     var body: some View {
@@ -79,16 +70,11 @@ struct MessagesRollsHost: View {
         }
     }
 
-    /// Three screens, in order of who is looking.
+    /// Two screens, by who is looking.
     ///
-    /// **An invitation, for a match this device has minted and not sent.**
-    /// The sender of the first message is player 2 and moves second — see
-    /// `MessagesSeating.roster` — so whoever starts a Rolls game does not
-    /// roll when they start it: they send it, player 1 rolls, and the match
-    /// comes back for their turn. A board here would make the starter
-    /// player 1 and invert the rule for every game in the suite. Rolls is
-    /// where that is easiest to get wrong, because Rolls has no turn order
-    /// of its own.
+    /// There is no invitation here any more: `MessagesInvite` builds the
+    /// opening message straight from the picker, so this screen is only
+    /// ever reached by tapping a match that exists.
     ///
     /// **Standings, for anyone who cannot or need not roll.** `isSeated`
     /// is the one that was missing: somebody added to the thread after the
@@ -101,11 +87,7 @@ struct MessagesRollsHost: View {
     /// **The board, for the seat whose roll it is.**
     @ViewBuilder
     private func loaded(_ game: LoadedGame) -> some View {
-        if game.isUnsent {
-            MessagesRollsInvite(opponents: opponentNames(game)) {
-                insert(game)
-            }
-        } else if !MessagesSeating.isSeated(game.match, in: store.conversation)
+        if !MessagesSeating.isSeated(game.match, in: store.conversation)
                     || hasRolled(game) || game.state.isClosed {
             // `canEnd`, not a second copy of the starter test: the button
             // and the action used to disagree, so every participant saw an
@@ -134,18 +116,6 @@ struct MessagesRollsHost: View {
 
     private func hasRolled(_ game: LoadedGame) -> Bool {
         game.state.results[localID] != nil
-    }
-
-    /// Everyone but this device, by seat label.
-    ///
-    /// Messages hands an extension opaque per-conversation UUIDs and no
-    /// names, so these are positional — the same labelling the app uses.
-    /// The real attribution comes free in the thread: the bubble sits under
-    /// the sender's name.
-    private func opponentNames(_ game: LoadedGame) -> [String] {
-        game.match.participants
-            .filter { $0 != localID }
-            .map { game.match.displayName(for: $0) }
     }
 
     /// Whether this device has taken its turn and the match is still open.
@@ -181,49 +151,27 @@ struct MessagesRollsHost: View {
         load()
     }
 
-    /// Decodes the tapped message, or starts a match.
+    /// Decodes the tapped message.
+    ///
+    /// Only that: a match that does not exist yet is `MessagesInvite`'s
+    /// business, built from the picker without a screen. This used to mint
+    /// one here too, which meant the roster rules and the seat ceiling were
+    /// written in two places.
     private func load() {
         // Cleared first, so a `problem` left by an earlier attempt cannot
         // outlive the attempt that succeeds — `content` tests `problem`
         // before `game`, so a stale one hides a perfectly good board.
         problem = nil
 
-        guard let conversation = store.conversation else {
+        guard store.conversation != nil else {
             problem = "This needs to run inside a conversation."
             return
         }
-
-        // The selected message, unless the player has explicitly asked for
-        // a new game from the menu — which is how a second match starts
-        // without the first one being finished or even touched. See
-        // MessagesStore.isComposingNew.
-        if store.selected != nil, !store.isComposingNew {
-            loadReceived()
+        guard store.selected != nil else {
+            problem = "Pick a game from the menu to start one."
             return
         }
-
-        // A new match. `RollsGame.maxPlayers` is `Int.max` — true about the
-        // rules, since a single round has no turn order — so the ceiling
-        // that applies here is the WIRE's, not the game's. See
-        // RollsGameState.maxSeatsOnTheWire: a fifteen-seat game sends
-        // fourteen turns fine and fails on the one that completes it.
-        guard let match = MessagesSeating.newMatch(
-            in: conversation,
-            maxPlayers: RollsGameState.maxSeatsOnTheWire
-        ) else {
-            let seats = MessagesSeating.roster(in: conversation).count
-            problem = seats < 2
-                ? "Rolls needs at least two people in the conversation."
-                : "This conversation has \(seats) people. Rolls fits "
-                  + "\(RollsGameState.maxSeatsOnTheWire) in one game — "
-                  + "any more and the last turn is too big to send."
-            return
-        }
-        let me = MessagesSeating.localID(in: conversation)
-        game = LoadedGame(seed: SeededGenerator.newSeed(),
-                          match: match,
-                          state: RollsGameState(startedBy: me),
-                          isUnsent: true)
+        loadReceived()
     }
 
     private func loadReceived() {
@@ -235,7 +183,7 @@ struct MessagesRollsHost: View {
                 supportedVersion: RollsGameState.schemaVersion
             )
             game = LoadedGame(seed: turn.seed, match: turn.match,
-                              state: turn.state, isUnsent: false)
+                              state: turn.state)
         } catch {
             // `GamePayloadError`'s descriptions are written for a player —
             // an unknown game and a newer schema both say what to do — so
@@ -306,10 +254,6 @@ struct MessagesRollsHost: View {
                 subcaption: subcaption(for: game),
                 chain: chain(for: game)
             )
-            // Sent: it has a bubble of its own now, so a later turn in this
-            // same match must continue that bubble rather than start a
-            // third one. Set before `store.send`, which is asynchronous.
-            self.game?.isUnsent = false
             store.send(message)
         } catch {
             problem = "That turn couldn't be packed: \(error)"
@@ -318,15 +262,18 @@ struct MessagesRollsHost: View {
 
     /// Which bubble this message belongs to.
     ///
-    /// A match that has never been sent starts its own chain. One that
-    /// arrived updates the bubble it arrived in. The two are a word apart
-    /// and the wrong one is silent — a new game minted into an old game's
-    /// session replaces it in the transcript, and the first match is gone.
+    /// Always the one it arrived in: this screen is only reached by tapping
+    /// an existing match, and a turn in that match must update its bubble
+    /// rather than start a second. Opening messages are `MessagesInvite`'s,
+    /// and they are `.new`.
+    ///
+    /// The fallback is defensive rather than expected. The two are a word
+    /// apart and the wrong one is silent — a turn minted into no session
+    /// leaves a duplicate bubble, and a new game minted into an old game's
+    /// session replaces it and the first match is gone.
     private func chain(for game: LoadedGame) -> MatchMessage.Chain {
-        if let selected = store.selected, !game.isUnsent {
-            return .continuing(selected)
-        }
-        return .new
+        guard let selected = store.selected else { return .new }
+        return .continuing(selected)
     }
 
     // MARK: - Captions
@@ -354,70 +301,6 @@ struct MessagesRollsHost: View {
         let waiting = game.match.participants.count - game.state.results.count
         if waiting == 1 { return "1 player still to roll" }
         return "\(waiting) players still to roll"
-    }
-}
-
-// MARK: - The invitation
-
-/// What the player who starts a game sees: a send button, not a board.
-///
-/// **The sender is player 2.** They do not roll here — they send, player 1
-/// rolls, and the match comes back for their turn. That is the rule for
-/// every game in the suite, and Rolls is where it is easiest to get wrong,
-/// because Rolls has no turn order of its own and a board would happily
-/// have let the starter roll first.
-///
-/// One tap, and deliberately nothing else on the screen: picking a game
-/// from the menu and sending it to somebody is meant to be the whole of
-/// starting one.
-struct MessagesRollsInvite: View {
-
-    let opponents: [String]
-    let onSend: () -> Void
-
-    var body: some View {
-        VStack(spacing: 14) {
-            Spacer(minLength: 0)
-
-            ScriptText("Rolls", size: 44)
-                .foregroundStyle(.white)
-
-            Text(RollsGame.tagline)
-                .font(.poppins(13))
-                .foregroundStyle(.white.opacity(0.75))
-                .multilineTextAlignment(.center)
-
-            Text(invitation)
-                .font(.poppins(12))
-                .foregroundStyle(.white.opacity(0.6))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
-
-            Button {
-                SoundEngine.shared.play(.buttonTap)
-                onSend()
-            } label: {
-                Text("SEND THE GAME")
-                    .font(.poppins(14, .semibold))
-                    .foregroundStyle(AppTheme.shared.accentTextColor)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
-                    .pixelPanel(fill: .solid(AppTheme.shared.accentColor),
-                                elevation: .lifted)
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 24)
-
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var invitation: String {
-        let who = opponents.count == 1
-            ? opponents[0]
-            : "\(opponents.count) players"
-        return "\(who) rolls first. Your turn comes back to you."
     }
 }
 
@@ -461,12 +344,7 @@ struct MessagesRollsStandings: View {
                     .padding(.top, 14)
 
                 if isWaiting {
-                    Text(waitingLine)
-                        .font(.poppins(13))
-                        .foregroundStyle(.white.opacity(0.75))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 2)
+                    waitingBanner
                 }
 
                 ForEach(rolled, id: \.self) { participant in
@@ -481,6 +359,26 @@ struct MessagesRollsStandings: View {
         }
     }
 
+    /// A band across the screen, not a subtitle.
+    ///
+    /// This is the one thing a player opening their own sent message needs
+    /// told, and it has to be unmissable: a scoreboard with a quiet line
+    /// under the title reads as a result, and somebody will ask why they
+    /// lost a game nobody has finished. Drawn the way the convention draws
+    /// it — a dark band, full width, caps.
+    private var waitingBanner: some View {
+        Text(waitingLine)
+            .font(.poppins(13, .semibold))
+            .foregroundStyle(.white)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .padding(.horizontal, 12)
+            .background(Color.black.opacity(0.55))
+            .pixelWell(radius: ControlShape.cornerRadius)
+            .padding(.bottom, 2)
+    }
+
     private var heading: String {
         if game.state.isClosed { return "Final" }
         return isWaiting ? "Your roll is in" : "Standings"
@@ -492,10 +390,10 @@ struct MessagesRollsStandings: View {
     /// names — and in a two-player game the count reads naturally anyway.
     private var waitingLine: String {
         let waiting = game.match.participants.count - game.state.results.count
-        if waiting <= 0 { return "Waiting for the result." }
+        if waiting <= 0 { return "WAITING FOR THE RESULT…" }
         return waiting == 1
-            ? "Waiting for your opponent."
-            : "Waiting for \(waiting) other players."
+            ? "WAITING FOR OPPONENT…"
+            : "WAITING FOR \(waiting) OTHER PLAYERS…"
     }
 
     /// Lowest first — Rolls is golf-scored, so the smallest total leads.

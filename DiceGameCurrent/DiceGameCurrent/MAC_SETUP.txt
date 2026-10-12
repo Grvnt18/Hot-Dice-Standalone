@@ -201,7 +201,7 @@ should come to 162. By kind:
 
    162   total
 
-And 71 .swift files in SwiftFiles, plus 5 in
+And 71 .swift files in SwiftFiles, plus 6 in
 MessagesExtension.
 
 To check from a terminal, in the repo:

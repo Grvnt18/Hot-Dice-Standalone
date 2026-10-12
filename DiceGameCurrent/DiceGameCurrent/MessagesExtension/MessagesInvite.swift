@@ -18,6 +18,22 @@ import Messages
 /// nine that are not yet wired are deliberately absent rather than
 /// defaulted: sending a message nobody can open is worse than saying the
 /// game is not ready, and `MessagesGameRouter` already says so.
+///
+/// **Nothing is chosen before sending, and nothing should be.** No
+/// difficulty, no match length, no loadout: the opening message carries an
+/// empty game and the settings each game needs are taken inside it, before
+/// its first roll. Rollbots' weapon and cyberware are per player, so each
+/// picks their own on their own first turn.
+///
+/// Baseball Dice is the one with a shared setting — 3, 6 or 9 innings,
+/// `BaseballDiceScreen.Phase.setup`, "before anything else". Note who
+/// picks it: the recipient is player 1 and takes the first turn, so THEY
+/// choose the length, not whoever started the game. That is fine, and it
+/// carries one requirement for whoever wires Baseball up — the length is
+/// already in `BaseballDiceState` and travels with the match, so the
+/// second player must be dropped past the setup phase rather than shown
+/// the picker again. A game that asks both players how long it is would
+/// have two answers and no way to choose between them.
 enum MessagesInvite {
 
     /// Whether picking this game sends an invitation straight away.

@@ -794,6 +794,32 @@ def check_extension():
           "MessagesRollsHost no longer distinguishes a new match from a "
           "continuing one")
 
+    # --- what the thread itself looks like -------------------------------
+    #
+    # Three things a working transcript needs that nothing else checks,
+    # all of them invisible from inside the extension's own screens.
+
+    # A message with no image is a row of text. MSMessageTemplateLayout
+    # draws a generic placeholder for a nil image, so every turn would have
+    # looked like a system notice rather than a game.
+    check("a turn carries artwork",
+          "layout.image = bubbleImage(for: game)" in chain,
+          "messages go out with no picture, so a Hot Dice bubble looks "
+          "like a system notice")
+
+    # The first message of a match is an invitation; every one after it is
+    # a status. A thread full of other conversations needs the difference.
+    check("the first message invites",
+          '"Let\'s play Rolls!"' in code,
+          "the opening message reads as a status rather than an invitation")
+
+    # Tapping a message you SENT has to say it is with the other player.
+    # A bare scoreboard on an unfinished game reads as a result.
+    check("your own turn says it is waiting",
+          "isWaiting" in code and "Waiting for your opponent." in code,
+          "a sent turn shows a scoreboard with no sign the game is still "
+          "running")
+
     # Same class of fix, in the app: GuideBodyView re-parsed every section
     # on every redraw of a scrolling sheet.
     check("a guide section parses once",

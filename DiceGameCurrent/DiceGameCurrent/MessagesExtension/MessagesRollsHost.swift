@@ -112,6 +112,7 @@ struct MessagesRollsHost: View {
             // END THE GAME that did nothing for anyone but the starter.
             MessagesRollsStandings(game: game,
                                    localID: localID,
+                                   isWaiting: isWaitingOnOthers(game),
                                    onEnd: canEnd(game) ? endGame : nil)
         } else {
             // The app's own Rolls screen, unchanged, with the seed the
@@ -145,6 +146,16 @@ struct MessagesRollsHost: View {
         game.match.participants
             .filter { $0 != localID }
             .map { game.match.displayName(for: $0) }
+    }
+
+    /// Whether this device has taken its turn and the match is still open.
+    ///
+    /// Tapping a message you SENT should say so. That is the whole of what
+    /// a player wants from their own bubble — not a board they cannot use,
+    /// and not a scoreboard that looks like a result when the game is still
+    /// running.
+    private func isWaitingOnOthers(_ game: LoadedGame) -> Bool {
+        !game.state.isClosed && !game.match.isOver && hasRolled(game)
     }
 
     /// Whether this device may END the match early — not close the view.
@@ -322,12 +333,18 @@ struct MessagesRollsHost: View {
 
     /// Rolls' own caption, rather than `MatchMessage.caption`.
     ///
-    /// That one names whose turn it is, which Rolls does not have. What a
-    /// participant wants to know from the transcript is whether the game is
-    /// still open and how many people are still to roll.
+    /// That one names whose turn it is, which Rolls does not have. And the
+    /// first message of a match is a different thing from the ones after
+    /// it: an INVITATION, which is what a thread full of other
+    /// conversations needs it to look like. Every turn after that is a
+    /// status — the recipient already knows what game this is, and what
+    /// they want from the transcript is whether it is on them.
     private func caption(for game: LoadedGame) -> String {
         if game.match.isOver {
             return MatchMessage.caption(for: game.match, game: "Rolls")
+        }
+        if game.state.results.isEmpty {
+            return "Let's play Rolls!"
         }
         return "Rolls — your roll"
     }
@@ -417,6 +434,16 @@ struct MessagesRollsStandings: View {
 
     let game: MessagesRollsHost.LoadedGame
     let localID: String
+
+    /// This device has rolled and the match is still running.
+    ///
+    /// Changes what the screen SAYS, not what it shows. Tapping a message
+    /// you sent has to tell you it is with the other player — the state
+    /// GamePigeon spells "waiting for opponent" — because a bare scoreboard
+    /// on an unfinished game reads as a result and invites somebody to ask
+    /// why they lost a game nobody has finished.
+    let isWaiting: Bool
+
     /// Nil unless this device is the starter and the game is still open.
     ///
     /// Ends the MATCH, which is not what the chrome bar's Close does.
@@ -433,6 +460,15 @@ struct MessagesRollsStandings: View {
                     .foregroundStyle(.white)
                     .padding(.top, 14)
 
+                if isWaiting {
+                    Text(waitingLine)
+                        .font(.poppins(13))
+                        .foregroundStyle(.white.opacity(0.75))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 2)
+                }
+
                 ForEach(rolled, id: \.self) { participant in
                     row(participant)
                 }
@@ -446,7 +482,20 @@ struct MessagesRollsStandings: View {
     }
 
     private var heading: String {
-        game.state.isClosed ? "Final" : "Standings"
+        if game.state.isClosed { return "Final" }
+        return isWaiting ? "Your roll is in" : "Standings"
+    }
+
+    /// Who is still to go.
+    ///
+    /// Counted rather than named, because Messages gives an extension no
+    /// names — and in a two-player game the count reads naturally anyway.
+    private var waitingLine: String {
+        let waiting = game.match.participants.count - game.state.results.count
+        if waiting <= 0 { return "Waiting for the result." }
+        return waiting == 1
+            ? "Waiting for your opponent."
+            : "Waiting for \(waiting) other players."
     }
 
     /// Lowest first — Rolls is golf-scored, so the smallest total leads.

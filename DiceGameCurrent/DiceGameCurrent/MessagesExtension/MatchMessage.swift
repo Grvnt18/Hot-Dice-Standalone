@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import Messages
 
 /// A turn, as a message in a thread.
@@ -60,11 +61,9 @@ enum MatchMessage {
         let layout = MSMessageTemplateLayout()
         layout.caption = caption
         layout.subcaption = subcaption
-        // No image and no trailing captions. The template draws a generic
-        // placeholder when `image` is nil, which is plainer than the
-        // alternative of shipping a second icon set at sizes Messages
-        // decides; the game's own artwork is one tap away and the caption
-        // is what gets read in a notification.
+        layout.image = bubbleImage(for: game)
+        // No trailing captions: the template stacks them under the first
+        // pair and a four-line bubble in a busy thread reads as spam.
 
         let session: MSSession
         switch chain {
@@ -80,6 +79,60 @@ enum MatchMessage {
         // waiting rather than repeating the caption.
         message.summaryText = subcaption ?? caption
         return message
+    }
+
+    // MARK: - The bubble's artwork
+
+    /// How wide and tall the transcript's artwork is drawn.
+    ///
+    /// Landscape, because `MSMessageTemplateLayout` lays its image out
+    /// across the bubble's full width and a square one would either crop to
+    /// a band or push the captions off a small screen. 3:2 at 900 points
+    /// across is comfortably above what any current device asks for and
+    /// still a small image to build.
+    private static let bubbleSize = CGSize(width: 900, height: 600)
+
+    /// The picture on the message in the thread.
+    ///
+    /// **A message with no image is a row of text.** The template draws a
+    /// generic placeholder when `image` is nil, so every Hot Dice turn
+    /// would have looked like a system notice rather than a game — which is
+    /// the whole difference between a bubble somebody taps and one they
+    /// scroll past.
+    ///
+    /// Composed rather than shipped: the game icons are square and there
+    /// are ten of them, so a second landscape set would be ten more files
+    /// to keep in step with the first ten. This draws the existing icon on
+    /// the suite's own timber tone, which is also what the launch screen
+    /// and the hub background are built from, so a bubble reads as the same
+    /// app before it is opened.
+    ///
+    /// Flat fill, not generated wood. `LowPolyTextures` would match the hub
+    /// exactly and costs a texture generation and a cache entry inside an
+    /// app extension, which is the one place in this project where memory
+    /// is genuinely scarce. The base tone is the thing that carries the
+    /// identity; the grain is not worth a jettisoned process.
+    static func bubbleImage(for game: String) -> UIImage? {
+        guard let icon = GameIcons.game(game) else { return nil }
+
+        let size = bubbleSize
+        let format = UIGraphicsImageRendererFormat()
+        format.opaque = true
+        format.scale = 1
+
+        return UIGraphicsImageRenderer(size: size, format: format).image { ctx in
+            UIColor(hex: LowPolyTextures.woodBaseHex).setFill()
+            ctx.fill(CGRect(origin: .zero, size: size))
+
+            // Square, centred, at 80% of the shorter side — the same
+            // "artwork in a known box" rule the hub tiles use, rather than
+            // letting a resizable image negotiate its own size.
+            let side = min(size.width, size.height) * 0.8
+            let rect = CGRect(x: (size.width - side) / 2,
+                              y: (size.height - side) / 2,
+                              width: side, height: side)
+            icon.draw(in: rect)
+        }
     }
 
     // MARK: - Receiving

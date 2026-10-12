@@ -67,8 +67,7 @@ struct RollbotsScreen: View {
 
     private var attacker: Int { match.activeIndex }
     private var defender: Int { 1 - match.activeIndex }
-    private var names: [String] { [match.displayName(for: match.participants[0]),
-                                   match.displayName(for: match.participants[1])] }
+    private var names: [String] { match.seatNames() }
 
     /// Whoever is looking at the screen right now, which is not always the
     /// attacker — the defence is chosen by the other seat.

@@ -337,22 +337,6 @@ enum AtBatResult: String, Codable {
         case .homeRun:   return "Home Run"
         }
     }
-
-    var isOut: Bool {
-        self == .strikeout || self == .fieldOut || self == .deepOut
-    }
-
-    /// How far the batter ends up, in bases. Zero for an out or a walk that
-    /// is handled separately.
-    var basesForBatter: Int {
-        switch self {
-        case .walk, .single: return 1
-        case .double:        return 2
-        case .triple:        return 3
-        case .homeRun:       return 4
-        default:             return 0
-        }
-    }
 }
 
 extension BaseballDiceRules {
@@ -593,13 +577,6 @@ struct BaseballDiceState: Codable, Equatable {
     /// Whose turn it is to bat. The other seat pitches.
     var battingSeat: Int { isTopHalf ? 0 : 1 }
     var pitchingSeat: Int { isTopHalf ? 1 : 0 }
-
-    var isExtraInnings: Bool { inning > innings }
-
-    /// True once the last scheduled half-inning is done and someone leads.
-    var isDecided: Bool {
-        inning > innings && runs[0] != runs[1] && isTopHalf
-    }
 
     init(innings: Int) {
         self.innings = innings

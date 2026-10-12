@@ -179,6 +179,26 @@ extension TurnMatch {
     var activeDisplayName: String {
         displayName(for: activeParticipant)
     }
+
+    /// Display names by seat, for the screens that label two sides.
+    ///
+    /// Rollbots and Baseball Dice each built this inline as
+    /// `[displayName(for: participants[0]), displayName(for:
+    /// participants[1])]` — correct for the two-player matches they get
+    /// today, and an index-out-of-range on a roster with one seat in it.
+    ///
+    /// Padded rather than clamped, so `names[1]` is always safe to write
+    /// and a short roster reads as a placeholder instead of crashing. That
+    /// matters now in a way it did not before: the Messages extension is
+    /// the first thing in this project that builds a roster from something
+    /// the app did not choose itself — a conversation's participants.
+    func seatNames(padTo minimum: Int = 2) -> [String] {
+        var names = participants.map { displayName(for: $0) }
+        while names.count < minimum {
+            names.append("Player \(names.count + 1)")
+        }
+        return names
+    }
 }
 
 // MARK: - Pass and play

@@ -743,7 +743,20 @@ enum GuideBody {
 struct GuideBodyView: View {
     let body0: String
 
-    private var lines: [GuideLine] { GuideBody.parse(body0) }
+    /// Parsed once, at init.
+    ///
+    /// This was a computed property, read from `body` — so every evaluation
+    /// re-walked the whole section through the table state machine, the
+    /// blank-line row rule and the column-offset rescue, for every section
+    /// on screen, on every redraw of a scrolling sheet. The parse is a pure
+    /// function of `body0`, which never changes for a given view, so once
+    /// is the right number of times.
+    private let lines: [GuideLine]
+
+    init(body0: String) {
+        self.body0 = body0
+        self.lines = GuideBody.parse(body0)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {

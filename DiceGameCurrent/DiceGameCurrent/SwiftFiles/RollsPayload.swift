@@ -287,10 +287,4 @@ extension RollsGameState {
         guard let best = standings.first?.score else { return [] }
         return standings.filter { $0.score == best }.map(\.participant)
     }
-
-    /// A finished game with more than one leader is a draw, which by the
-    /// game's rules restarts rather than resolving.
-    var isTie: Bool {
-        leaders.count > 1
-    }
 }

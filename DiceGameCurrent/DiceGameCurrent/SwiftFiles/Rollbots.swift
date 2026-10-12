@@ -217,16 +217,18 @@ enum Cyberware: String, CaseIterable, Codable, Identifiable {
 
 extension Cyberware {
 
-    /// Self-damage on activation.
-    ///
-    /// The document gave the Overclock 4 IP of self-damage *and* an
-    /// undefended turn. Together that is 8 to 10 IP of strain against a
-    /// reward worth about 2, which is why it won 24% of matches. The
-    /// self-damage went and the undefended turn stayed: the cost then
-    /// lands on the opponent's turn, where they get to swing at an open
-    /// target, which is worth more to this game than a private number
-    /// going down. That measures 50.3%.
-    var selfDamage: Int { 0 }
+    // No ability costs self-damage, and the Overclock is why that is worth
+    // writing down. The document gave it 4 IP of self-damage *and* an
+    // undefended turn: together, 8 to 10 IP of strain against a reward
+    // worth about 2, which is how it came to win 24% of matches. The
+    // self-damage went and the undefended turn stayed, so the cost lands on
+    // the opponent's turn, where they get to swing at an open target —
+    // worth more to this game than a private number going down. That
+    // measures 50.3%.
+    //
+    // This used to be a `selfDamage: Int { 0 }` nothing read. A knob fixed
+    // at zero that no code consults is not a rule, it is a note, so it is
+    // one now.
 
     /// Turns the Corrosive Virus runs for, at 3 IP a turn.
     static let virusTurns = 3

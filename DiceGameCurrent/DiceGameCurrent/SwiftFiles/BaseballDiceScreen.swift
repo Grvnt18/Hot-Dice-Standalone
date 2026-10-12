@@ -67,10 +67,7 @@ struct BaseballDiceScreen: View {
         case finished
     }
 
-    private var names: [String] {
-        [match.displayName(for: match.participants[0]),
-         match.displayName(for: match.participants[1])]
-    }
+    private var names: [String] { match.seatNames() }
 
     private var batter: Int { state.battingSeat }
     private var pitcher: Int { state.pitchingSeat }

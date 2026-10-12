@@ -148,10 +148,6 @@ struct BoneheadsState: Codable, Equatable {
         grids[seat].allSatisfy { $0.count == BoneheadsRules.slotsPerColumn }
     }
 
-    var filledSeat: Int? {
-        [0, 1].first { isFull(seat: $0) }
-    }
-
     // MARK: Placing
 
     /// What a placement did to the opponent.

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The App Group that lets the app and the Messages extension read the
+	     same settings. UserDefaults.standard is NOT shared between a host
+	     app and its extension, so without this a player's dice colour,
+	     volumes and per-game scope exist twice and never meet.
+
+	     This id must match SharedDefaults.appGroupID and the group you
+	     register with Apple. Change all three together — a mismatch does
+	     not fail the build, it just quietly stops sharing. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.example.hotdice</string>
+	</array>
+</dict>
+</plist>

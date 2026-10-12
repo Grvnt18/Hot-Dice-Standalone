@@ -95,6 +95,7 @@ targets:
         # a narrow phone, and tools_bandlayout_verify.py checks that case.
         INFOPLIST_KEY_UIRequiresFullScreen: NO
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: HotDice.entitlements
     dependencies:
       - target: HotDiceMessages
         embed: true
@@ -111,11 +112,25 @@ targets:
       - path: SwiftFiles
       - path: Resources
         buildPhase: resources
+        # The eight music tracks are 13 MB of the 20 MB Resources folder,
+        # and the extension has no business playing them: a Messages
+        # extension that starts background music is fighting the host app
+        # for the audio session, and it ships inside the app's own download
+        # on top of the app's copy. Excluded, so the extension carries the
+        # dice, the fonts, the artwork and the effects and nothing else.
+        #
+        # SoundEngine already copes: `url(forResource:)` returns nil for a
+        # missing file and `BundleCheck` reports what is absent rather than
+        # crashing, which is the behaviour the whole resource layer is
+        # built on.
+        excludes:
+          - "*.m4a"
     settings:
       base:
         # The extension's id must be the app's with a suffix.
         PRODUCT_BUNDLE_IDENTIFIER: com.example.hotdice.messages
         INFOPLIST_KEY_CFBundleDisplayName: Hot Dice
+        CODE_SIGN_ENTITLEMENTS: HotDiceMessages.entitlements
         # The iMessage app icon is a DIFFERENT asset type from the app's:
         # it is not square, it does not support Single Size, and the whole
         # ladder is required. tools_icon_export.py writes all 16 slots —

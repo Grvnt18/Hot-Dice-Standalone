@@ -17,18 +17,33 @@ enum MatchMessage {
 
     // MARK: - Sending
 
+    /// Which bubble a message belongs to.
+    ///
+    /// **One match is one bubble, and this is what decides it.** An
+    /// `MSMessage` built with another message's `MSSession` REPLACES that
+    /// bubble in the transcript rather than adding one; built with a fresh
+    /// session it starts a bubble of its own.
+    ///
+    /// Both halves matter, in opposite directions. Continuing is what keeps
+    /// a Royal UR match — 21.9 messages at the measured average — from
+    /// leaving twenty-two bubbles in the thread and burying every other
+    /// conversation the two people were having. Starting fresh is what lets
+    /// a player open a second game without finishing the first: pick it
+    /// from the menu, send it, and it is its own chain in the same thread.
+    ///
+    /// Spelled as a choice rather than an optional `MSMessage?`, because
+    /// the two are a sentence apart and the wrong one is silent: passing
+    /// the selected message while starting a NEW match would mint the new
+    /// game into the old game's session and the first match would vanish
+    /// from the thread.
+    enum Chain {
+        /// Its own bubble. The first message of a match.
+        case new
+        /// Updates the bubble this message came from.
+        case continuing(MSMessage)
+    }
+
     /// Packs a turn into a message ready to insert into the conversation.
-    ///
-    /// **The session is reused, and that is the whole point.** An
-    /// `MSMessage` created with the session of the message that was
-    /// selected REPLACES that bubble in the transcript rather than adding
-    /// another one. Without it, a Royal UR match — 21.9 messages at the
-    /// measured average — would leave twenty-two bubbles in the thread and
-    /// bury every other conversation the two people were having. With it,
-    /// a match is one bubble that updates.
-    ///
-    /// `MSSession()` is only created when there is nothing to continue,
-    /// which is the first turn of a new match.
     static func message<State: Codable & Equatable>(
         game: String,
         version: Int,
@@ -37,7 +52,7 @@ enum MatchMessage {
         state: State,
         caption: String,
         subcaption: String? = nil,
-        continuing selected: MSMessage?
+        chain: Chain
     ) throws -> MSMessage {
         let url = try GameTransport.send(game: game, version: version,
                                          seed: seed, match: match, state: state)
@@ -51,7 +66,13 @@ enum MatchMessage {
         // decides; the game's own artwork is one tap away and the caption
         // is what gets read in a notification.
 
-        let message = MSMessage(session: selected?.session ?? MSSession())
+        let session: MSSession
+        switch chain {
+        case .new:                  session = MSSession()
+        case .continuing(let from): session = from.session ?? MSSession()
+        }
+
+        let message = MSMessage(session: session)
         message.url = url
         message.layout = layout
         // A summary is what VoiceOver reads and what appears in the

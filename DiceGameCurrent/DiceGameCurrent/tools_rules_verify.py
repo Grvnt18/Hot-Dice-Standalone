@@ -743,11 +743,11 @@ def check_extension():
           "MessagesSeating.isSeated(" in code,
           "MessagesRollsHost no longer asks whether this device has a seat")
 
-    check("only the starter may close", "canClose(" in code,
-          "the close button and close() can disagree again")
-    check("close() shares that test",
-          "guard var next = game, canClose(next)" in code,
-          "close() has its own starter test rather than the shared one")
+    check("only the starter may end a match", "canEnd(" in code,
+          "the end button and endGame() can disagree again")
+    check("endGame() shares that test",
+          "guard var next = game, canEnd(next)" in code,
+          "endGame() has its own starter test rather than the shared one")
 
     check("the board re-reads on a new turn",
           "onValueChange(of: store.selectedKey)" in code,
@@ -761,6 +761,38 @@ def check_extension():
     check("the envelope header is cached",
           "@Published private(set) var receivedHeader" in strip_comments(store),
           "receivedHeader is computed again, so every redraw re-parses")
+
+    # --- the seating rule, and the chains -------------------------------
+    #
+    # Two rules that are one word each to invert and silent when wrong.
+
+    seating = strip_comments(source("MessagesExtension/MessagesSeating.swift"))
+
+    # The sender of the invitation is player 2 and moves second, so the
+    # local participant is LAST in the roster and seat 0 is the opponent.
+    # The obvious spelling — local first, then the remotes — reads fine and
+    # would hand the first turn to whoever started the game, on every game
+    # in the suite, with nothing to catch it.
+    check("the sender is seated last",
+          "return remote + [localID(in: conversation)]" in seating,
+          "the roster no longer puts the sender in the last seat, so the "
+          "player who sends the invitation would move first")
+    check("the recipient opens",
+          "startingIndex: firstSeat" in seating and "firstSeat = 0" in seating,
+          "the first turn is no longer seat 0's")
+
+    # One match is one bubble. A new game built with the selected message's
+    # session REPLACES that message in the transcript, so the first match
+    # would disappear the moment somebody started a second one.
+    chain = strip_comments(source("MessagesExtension/MatchMessage.swift"))
+    check("a chain is chosen, not inferred",
+          "enum Chain" in chain and "case continuing(MSMessage)" in chain,
+          "MatchMessage takes an optional message again, so starting a new "
+          "match can silently overwrite an existing one")
+    check("an unsent match starts its own chain",
+          "if let selected = store.selected, !game.isUnsent" in code,
+          "MessagesRollsHost no longer distinguishes a new match from a "
+          "continuing one")
 
     # Same class of fix, in the app: GuideBodyView re-parsed every section
     # on every redraw of a scrolling sheet.

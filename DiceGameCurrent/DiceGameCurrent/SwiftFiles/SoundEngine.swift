@@ -73,7 +73,9 @@ final class SoundEngine: ObservableObject {
         static let selectedTrack = "audio.selectedTrack"
     }
 
-    private let defaults = UserDefaults.standard
+    // Shared with the Messages extension when the App Group is
+    // configured, `.standard` until then — see SharedDefaults.
+    private let defaults = SharedDefaults.store
 
     // MARK: Players
 

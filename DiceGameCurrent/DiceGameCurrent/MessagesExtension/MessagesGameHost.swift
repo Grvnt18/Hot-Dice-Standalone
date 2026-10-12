@@ -23,9 +23,15 @@ final class MessagesStore: ObservableObject {
     /// they believe they made.
     @Published var sendError: String?
 
-    /// Which game the player picked for a new match. Nil while the picker
-    /// is up.
-    @Published var chosenGameID: String?
+    /// Which game the player picked from the menu, for a NEW match.
+    ///
+    /// Set only by `startNew`. While it holds a value the player is
+    /// composing a fresh chain, whatever message happens to be selected —
+    /// which is the whole of "start a second game without finishing the
+    /// first". It takes precedence over the selected message's own game
+    /// precisely because an explicit pick is a newer intention than the
+    /// bubble that was tapped to get here.
+    @Published private(set) var chosenGameID: String?
 
     private(set) var conversation: MSConversation?
 
@@ -33,6 +39,16 @@ final class MessagesStore: ObservableObject {
     /// insert path itself.
     var onSend: ((MSMessage) -> Void)?
     var onRequestExpanded: (() -> Void)?
+
+    /// Puts the extension back to the strip above the thread.
+    ///
+    /// This is what the close control does, and the distinction matters:
+    /// it closes the VIEW, not the match. A match lives in its message, so
+    /// leaving one is just leaving it — and a player quits by not replying,
+    /// the same way they would abandon any conversation. There is nothing
+    /// to confirm and nothing to lose, which is why there is no "are you
+    /// sure".
+    var onClose: (() -> Void)?
 
     func update(conversation: MSConversation?,
                 selected: MSMessage?,
@@ -43,9 +59,43 @@ final class MessagesStore: ObservableObject {
         // A tapped message decides the game; the picker is for new matches
         // only. Cleared here so a stale choice cannot survive into a
         // received turn of a different game.
-        if selected != nil { self.chosenGameID = nil }
+        // Cleared when the player taps a DIFFERENT message, which is a new
+        // intention and overrides an earlier pick. Not cleared on every
+        // update: `willBecomeActive` and `didReceive` both come through
+        // here, and either wiping the pick would drop a player out of the
+        // game they had just chosen and back to the menu.
+        if selectedKey != previousSelectedKey {
+            self.chosenGameID = nil
+            self.previousSelectedKey = selectedKey
+        }
         // Decoded once per change, not once per redraw.
         self.receivedHeader = try? MatchMessage.header(from: selected)
+    }
+
+    private var previousSelectedKey = ""
+
+    /// The player picked a game from the menu: start a fresh chain.
+    func startNew(gameID: String) {
+        chosenGameID = gameID
+        sendError = nil
+    }
+
+    /// Back to the menu, to pick a game for a new chain.
+    func showPicker() {
+        chosenGameID = nil
+        selected = nil
+        receivedHeader = nil
+        sendError = nil
+    }
+
+    /// Whether what is on screen is a new match being composed rather than
+    /// the selected one being continued. `MatchMessage.Chain` is built from
+    /// this, and getting it wrong would mint a new game into an existing
+    /// game's bubble.
+    var isComposingNew: Bool { chosenGameID != nil }
+
+    func close() {
+        onClose?()
     }
 
     func clearConversation() {
@@ -183,6 +233,7 @@ struct MessagesExpandedView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            MessagesChromeBar(store: store, showNewGame: gameID != nil)
             if let error = store.sendError {
                 Text(error)
                     .font(.poppins(12))
@@ -198,7 +249,10 @@ struct MessagesExpandedView: View {
     /// The game to show: the one in the tapped message, or the one the
     /// player picked from the list.
     private var gameID: String? {
-        store.receivedHeader?.game ?? store.chosenGameID
+        // The pick first. A player who tapped a game bubble and then chose
+        // "New game" means the new one, and the old message is still
+        // selected underneath — see MessagesStore.chosenGameID.
+        store.chosenGameID ?? store.receivedHeader?.game
     }
 
     /// Named `gameBody`, not `body(forGame:)`: a `View` already has a
@@ -208,7 +262,7 @@ struct MessagesExpandedView: View {
     private func gameBody(_ id: String?) -> some View {
         if let id {
             MessagesGameRouter(store: store, gameID: id)
-        } else if store.selected != nil {
+        } else if store.selected != nil, !store.isComposingNew {
             // A message was tapped and its payload would not read. Falling
             // through to the game list here showed somebody who tapped a
             // damaged turn a cheerful menu of new games, with no hint that
@@ -220,6 +274,69 @@ struct MessagesExpandedView: View {
         } else {
             MessagesGamePicker(store: store)
         }
+    }
+}
+
+// MARK: - Chrome
+
+/// Close on the left, New game on the right.
+///
+/// The two controls a player needs at every moment in a thread, and
+/// neither is a game's business — which is why they live here, above
+/// whatever `gameBody` draws, rather than being added to ten screens.
+///
+/// **Close does not end anything.** A match is its message: it stays in
+/// the transcript whether anyone is looking at it or not, so closing the
+/// view is just closing the view. Quitting a game means not replying to
+/// it, the same way you abandon any conversation. Nothing to confirm.
+///
+/// **New game is always one tap.** Pick from the menu, send it, and it is
+/// its own chain in the same thread — no need to finish, or even to touch,
+/// whatever is already going on. Hidden only when the menu is already what
+/// is on screen, where it would do nothing.
+struct MessagesChromeBar: View {
+
+    @ObservedObject var store: MessagesStore
+    let showNewGame: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            chip("Close", icon: "chevron.down") {
+                store.close()
+            }
+            Spacer(minLength: 8)
+            if showNewGame {
+                chip("New game", icon: "plus") {
+                    store.showPicker()
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+
+    private func chip(_ title: String,
+                      icon: String,
+                      action: @escaping () -> Void) -> some View {
+        Button {
+            SoundEngine.shared.play(.buttonTap)
+            action()
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .semibold))
+                Text(title)
+                    .font(.poppins(12, .semibold))
+            }
+            .foregroundStyle(.white.opacity(0.9))
+            .padding(.horizontal, 12)
+            // 44pt is the tap-target floor the suite checks everywhere
+            // else — see tools_bandlayout_verify.
+            .frame(height: 44)
+            .contentShape(Rectangle())
+            .pixelPanel(elevation: .lifted)
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -256,7 +373,7 @@ struct MessagesGamePicker: View {
     private func tile(_ entry: GameCatalogEntry) -> some View {
         Button {
             SoundEngine.shared.play(.buttonTap)
-            store.chosenGameID = entry.id
+            store.startNew(gameID: entry.id)
         } label: {
             Text(entry.tileName.uppercased())
                 .font(.poppins(14, .semibold))

@@ -18,30 +18,46 @@ enum MessagesSeating {
         conversation.localParticipantIdentifier.uuidString
     }
 
-    /// Every participant, in an order every device agrees on.
+    /// Every participant, in an order every device agrees on, with the
+    /// SENDER LAST.
     ///
-    /// **Why sorted.** The tempting spelling is local first, then
-    /// `remoteParticipantIdentifiers` — and it is wrong twice over. The
-    /// local participant is a different person on each device, so seat 0
-    /// would be "me" on both phones and the two devices would disagree
-    /// about whose score is whose. And Messages does not promise the
-    /// remote order is stable between devices either.
+    /// **The seating rule: whoever sends the invitation is player 2 and
+    /// moves second.** The person who receives it is player 1 and takes the
+    /// first turn — which is also what decides when a match has begun. So
+    /// the local participant goes on the end of the roster, and seat 0 is
+    /// the opponent.
     ///
-    /// Sorting the UUID strings gives one roster that both devices compute
-    /// identically from the same set of people, without either having to
-    /// be told. The order is arbitrary — a UUID carries no meaning — but
-    /// arbitrary and agreed is the whole requirement.
+    /// That is the opposite of the obvious spelling (local first, then
+    /// `remoteParticipantIdentifiers`) and it is load-bearing in two ways.
+    /// The order is the seating, so it decides who rolls first. And it has
+    /// to be the same on both devices: the local participant is a different
+    /// person on each phone, so a locally-ordered roster would have each
+    /// device calling itself seat 0, and the two would disagree about whose
+    /// score is whose.
     ///
-    /// In practice only the starter builds this: after the first turn the
-    /// roster travels inside `TurnMatch.participants` and is read from the
-    /// message. This matters for the one case where it does not — a
-    /// participant leaving a group thread mid-match — where both devices
-    /// must still agree, and a locally-ordered roster would not.
+    /// It works because only the SENDER ever builds this. After the invite,
+    /// the roster travels inside `TurnMatch.participants` and every device
+    /// reads it from the message rather than recomputing it. The remote ids
+    /// are still sorted, because Messages does not promise their order is
+    /// stable between devices and a group match must not reshuffle its
+    /// middle seats if anyone ever does rebuild it.
+    ///
+    /// Two-player games, which is nine of the ten, come out as
+    /// `[them, me]`.
     static func roster(in conversation: MSConversation) -> [String] {
-        var ids = conversation.remoteParticipantIdentifiers.map { $0.uuidString }
-        ids.append(localID(in: conversation))
-        return ids.sorted()
+        let remote = conversation.remoteParticipantIdentifiers
+            .map { $0.uuidString }
+            .sorted()
+        return remote + [localID(in: conversation)]
     }
+
+    /// Which seat takes the first turn.
+    ///
+    /// Zero, always: seat 0 is the invitation's recipient. Named rather
+    /// than written as a literal at the call site, because "player 1 goes
+    /// first and player 1 is not the sender" is the kind of rule that gets
+    /// quietly inverted by somebody tidying up.
+    static let firstSeat = 0
 
     /// A fresh match for this conversation, or nil when the thread cannot
     /// seat this game.
@@ -56,7 +72,22 @@ enum MessagesSeating {
                          seatSequence: [Int]? = nil) -> TurnMatch? {
         let ids = roster(in: conversation)
         guard ids.count >= 2, ids.count <= maxPlayers else { return nil }
-        return TurnMatch(participants: ids, seatSequence: seatSequence)
+        // `startingIndex`, explicitly: the recipient of the invitation
+        // opens. TurnMatch defaults to 0 anyway, but the default and the
+        // rule agreeing by coincidence is not the same as saying so.
+        return TurnMatch(participants: ids,
+                         startingIndex: firstSeat,
+                         seatSequence: seatSequence)
+    }
+
+    /// Whether this device sent the invitation — player 2.
+    ///
+    /// The sender is the last seat by construction (see `roster`), so this
+    /// is a question about the roster rather than about anything stored.
+    static func isSender(_ match: TurnMatch,
+                         in conversation: MSConversation?) -> Bool {
+        guard let conversation else { return false }
+        return match.participants.last == localID(in: conversation)
     }
 
     /// Whether the person holding this device is the one to move.

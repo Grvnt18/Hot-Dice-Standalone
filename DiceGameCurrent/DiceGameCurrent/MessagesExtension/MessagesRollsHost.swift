@@ -32,6 +32,15 @@ struct MessagesRollsHost: View {
         var seed: UInt64
         var match: TurnMatch
         var state: RollsGameState
+
+        /// Minted on this device and not sent yet.
+        ///
+        /// Decides two things that must not be decided separately: whether
+        /// the player sees an invitation rather than a board, and whether
+        /// the message starts its own chain or updates the one it came
+        /// from. A new match that continued an existing session would
+        /// replace that match's bubble in the thread.
+        var isUnsent: Bool
     }
 
     var body: some View {
@@ -70,28 +79,40 @@ struct MessagesRollsHost: View {
         }
     }
 
+    /// Three screens, in order of who is looking.
+    ///
+    /// **An invitation, for a match this device has minted and not sent.**
+    /// The sender of the first message is player 2 and moves second — see
+    /// `MessagesSeating.roster` — so whoever starts a Rolls game does not
+    /// roll when they start it: they send it, player 1 rolls, and the match
+    /// comes back for their turn. A board here would make the starter
+    /// player 1 and invert the rule for every game in the suite. Rolls is
+    /// where that is easiest to get wrong, because Rolls has no turn order
+    /// of its own.
+    ///
+    /// **Standings, for anyone who cannot or need not roll.** `isSeated`
+    /// is the one that was missing: somebody added to the thread after the
+    /// match began is not in `participants`, so `hasRolled` was false for
+    /// them and the old condition handed them a board. They could roll, and
+    /// `send` would write a result and a score under an id the match does
+    /// not contain — and `results.count >= participants.count` could then
+    /// resolve the match while a real player still had a turn to take.
+    ///
+    /// **The board, for the seat whose roll it is.**
     @ViewBuilder
     private func loaded(_ game: LoadedGame) -> some View {
-        // Standings, not a board, for anyone who cannot or need not roll.
-        //
-        // `isSeated` is the one that was missing. Somebody added to the
-        // thread after the match began is not in `participants`, so
-        // `hasRolled` is false for them and the old condition handed them
-        // the board: they could roll, and `send` would write a result and a
-        // score under an id the match does not contain. Worse than a stray
-        // score — `results.count >= participants.count` could then close the
-        // game while a real player still had a turn to take.
-        if !MessagesSeating.isSeated(game.match, in: store.conversation)
-            || hasRolled(game) || game.state.isClosed {
+        if game.isUnsent {
+            MessagesRollsInvite(opponents: opponentNames(game)) {
+                insert(game)
+            }
+        } else if !MessagesSeating.isSeated(game.match, in: store.conversation)
+                    || hasRolled(game) || game.state.isClosed {
+            // `canEnd`, not a second copy of the starter test: the button
+            // and the action used to disagree, so every participant saw an
+            // END THE GAME that did nothing for anyone but the starter.
             MessagesRollsStandings(game: game,
                                    localID: localID,
-                                   // Bug: this used to be offered to
-                                   // everyone, and `close` silently returns
-                                   // for anyone but the starter — so every
-                                   // participant saw a button that did
-                                   // nothing. Only the starter can close a
-                                   // game, so only the starter is shown it.
-                                   onClose: canClose(game) ? close : nil)
+                                   onEnd: canEnd(game) ? endGame : nil)
         } else {
             // The app's own Rolls screen, unchanged, with the seed the
             // match was dealt from. `onExit` stays nil: Messages supplies
@@ -114,12 +135,28 @@ struct MessagesRollsHost: View {
         game.state.results[localID] != nil
     }
 
-    /// Whether this device may close the game early.
+    /// Everyone but this device, by seat label.
     ///
-    /// The starter, and only while it is still open. Stated once so the
-    /// button and the action cannot disagree — which is exactly how the
+    /// Messages hands an extension opaque per-conversation UUIDs and no
+    /// names, so these are positional — the same labelling the app uses.
+    /// The real attribution comes free in the thread: the bubble sits under
+    /// the sender's name.
+    private func opponentNames(_ game: LoadedGame) -> [String] {
+        game.match.participants
+            .filter { $0 != localID }
+            .map { game.match.displayName(for: $0) }
+    }
+
+    /// Whether this device may END the match early — not close the view.
+    ///
+    /// Two different things now share the word "close": the chrome bar's
+    /// Close puts the extension back to the thread and changes nothing,
+    /// while this resolves the match for everyone. Named apart on purpose.
+    ///
+    /// The starter, and only while the game is still open. Stated once so
+    /// the button and the action cannot disagree — which is exactly how the
     /// button came to be shown to people it did nothing for.
-    private func canClose(_ game: LoadedGame) -> Bool {
+    private func canEnd(_ game: LoadedGame) -> Bool {
         !game.state.isClosed && game.state.startedBy == localID
     }
 
@@ -145,7 +182,11 @@ struct MessagesRollsHost: View {
             return
         }
 
-        if store.selected != nil {
+        // The selected message, unless the player has explicitly asked for
+        // a new game from the menu — which is how a second match starts
+        // without the first one being finished or even touched. See
+        // MessagesStore.isComposingNew.
+        if store.selected != nil, !store.isComposingNew {
             loadReceived()
             return
         }
@@ -170,7 +211,8 @@ struct MessagesRollsHost: View {
         let me = MessagesSeating.localID(in: conversation)
         game = LoadedGame(seed: SeededGenerator.newSeed(),
                           match: match,
-                          state: RollsGameState(startedBy: me))
+                          state: RollsGameState(startedBy: me),
+                          isUnsent: true)
     }
 
     private func loadReceived() {
@@ -181,7 +223,8 @@ struct MessagesRollsHost: View {
                 expecting: RollsGameState.gameID,
                 supportedVersion: RollsGameState.schemaVersion
             )
-            game = LoadedGame(seed: turn.seed, match: turn.match, state: turn.state)
+            game = LoadedGame(seed: turn.seed, match: turn.match,
+                              state: turn.state, isUnsent: false)
         } catch {
             // `GamePayloadError`'s descriptions are written for a player —
             // an unknown game and a newer schema both say what to do — so
@@ -232,8 +275,8 @@ struct MessagesRollsHost: View {
     /// leave a thread, and someone may simply never open the message — so
     /// waiting for every participant would hang it forever. Whoever has
     /// rolled is who counts.
-    private func close() {
-        guard var next = game, canClose(next) else { return }
+    private func endGame() {
+        guard var next = game, canEnd(next) else { return }
         next.state.isClosed = true
         next.match.finish(lowestScoreWins: RollsGame.lowestScoreWins)
         self.game = next
@@ -250,12 +293,29 @@ struct MessagesRollsHost: View {
                 state: game.state,
                 caption: caption(for: game),
                 subcaption: subcaption(for: game),
-                continuing: store.selected
+                chain: chain(for: game)
             )
+            // Sent: it has a bubble of its own now, so a later turn in this
+            // same match must continue that bubble rather than start a
+            // third one. Set before `store.send`, which is asynchronous.
+            self.game?.isUnsent = false
             store.send(message)
         } catch {
             problem = "That turn couldn't be packed: \(error)"
         }
+    }
+
+    /// Which bubble this message belongs to.
+    ///
+    /// A match that has never been sent starts its own chain. One that
+    /// arrived updates the bubble it arrived in. The two are a word apart
+    /// and the wrong one is silent — a new game minted into an old game's
+    /// session replaces it in the transcript, and the first match is gone.
+    private func chain(for game: LoadedGame) -> MatchMessage.Chain {
+        if let selected = store.selected, !game.isUnsent {
+            return .continuing(selected)
+        }
+        return .new
     }
 
     // MARK: - Captions
@@ -280,6 +340,70 @@ struct MessagesRollsHost: View {
     }
 }
 
+// MARK: - The invitation
+
+/// What the player who starts a game sees: a send button, not a board.
+///
+/// **The sender is player 2.** They do not roll here — they send, player 1
+/// rolls, and the match comes back for their turn. That is the rule for
+/// every game in the suite, and Rolls is where it is easiest to get wrong,
+/// because Rolls has no turn order of its own and a board would happily
+/// have let the starter roll first.
+///
+/// One tap, and deliberately nothing else on the screen: picking a game
+/// from the menu and sending it to somebody is meant to be the whole of
+/// starting one.
+struct MessagesRollsInvite: View {
+
+    let opponents: [String]
+    let onSend: () -> Void
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Spacer(minLength: 0)
+
+            ScriptText("Rolls", size: 44)
+                .foregroundStyle(.white)
+
+            Text(RollsGame.tagline)
+                .font(.poppins(13))
+                .foregroundStyle(.white.opacity(0.75))
+                .multilineTextAlignment(.center)
+
+            Text(invitation)
+                .font(.poppins(12))
+                .foregroundStyle(.white.opacity(0.6))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+
+            Button {
+                SoundEngine.shared.play(.buttonTap)
+                onSend()
+            } label: {
+                Text("SEND THE GAME")
+                    .font(.poppins(14, .semibold))
+                    .foregroundStyle(AppTheme.shared.accentTextColor)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .pixelPanel(fill: .solid(AppTheme.shared.accentColor),
+                                elevation: .lifted)
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 24)
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var invitation: String {
+        let who = opponents.count == 1
+            ? opponents[0]
+            : "\(opponents.count) players"
+        return "\(who) rolls first. Your turn comes back to you."
+    }
+}
+
 // MARK: - Standings
 
 /// Who has rolled, and what they scored.
@@ -294,7 +418,9 @@ struct MessagesRollsStandings: View {
     let game: MessagesRollsHost.LoadedGame
     let localID: String
     /// Nil unless this device is the starter and the game is still open.
-    let onClose: (() -> Void)?
+    ///
+    /// Ends the MATCH, which is not what the chrome bar's Close does.
+    let onEnd: (() -> Void)?
 
     var body: some View {
         ScrollView {
@@ -311,8 +437,8 @@ struct MessagesRollsStandings: View {
                     row(participant)
                 }
 
-                if let onClose {
-                    closeButton(onClose)
+                if let onEnd {
+                    endButton(onEnd)
                 }
             }
             .padding(14)
@@ -345,12 +471,12 @@ struct MessagesRollsStandings: View {
         .pixelWell(radius: ControlShape.cornerRadius)
     }
 
-    private func closeButton(_ action: @escaping () -> Void) -> some View {
+    private func endButton(_ action: @escaping () -> Void) -> some View {
         Button {
             SoundEngine.shared.play(.buttonTap)
             action()
         } label: {
-            Text("CLOSE THE GAME")
+            Text("END THE GAME NOW")
                 .font(.poppins(13, .semibold))
                 .foregroundStyle(AppTheme.shared.accentTextColor)
                 .frame(maxWidth: .infinity)

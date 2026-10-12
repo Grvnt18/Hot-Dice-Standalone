@@ -67,7 +67,9 @@ final class AppTheme: ObservableObject {
         static let colorwayIndex = "theme.colorwayIndex"
     }
 
-    private let defaults = UserDefaults.standard
+    // Shared with the Messages extension when the App Group is
+    // configured, `.standard` until then — see SharedDefaults.
+    private let defaults = SharedDefaults.store
 
     /// Written through `GameScope`, so a colour chosen inside a game stays
     /// that game's. See `reloadForScope()`.

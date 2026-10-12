@@ -23,7 +23,9 @@ enum GameScope {
     /// The game whose settings are in force, or nil for the hub.
     private(set) static var activeGameID: String?
 
-    private static let defaults = UserDefaults.standard
+    // Shared with the Messages extension when the App Group is
+    // configured, `.standard` until then — see SharedDefaults.
+    private static let defaults = SharedDefaults.store
 
     /// Called as a game is opened, BEFORE its view is built — the scene
     /// reads `AppTheme.floorBaseColor` while assembling, so a scope entered

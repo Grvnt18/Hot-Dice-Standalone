@@ -33,6 +33,13 @@ final class MessagesViewController: MSMessagesAppViewController {
         store.onRequestExpanded = { [weak self] in
             self?.requestPresentationStyle(.expanded)
         }
+        // Closing the view, not the match. The match is its message and
+        // stays in the thread; this just puts the player back to the
+        // conversation, which is also how they abandon one — by not
+        // replying. See MessagesStore.onClose.
+        store.onClose = { [weak self] in
+            self?.requestPresentationStyle(.compact)
+        }
 
         let root = MessagesRootView(store: store)
         let controller = UIHostingController(rootView: root)

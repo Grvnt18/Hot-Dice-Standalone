@@ -201,12 +201,13 @@ should come to 162. By kind:
 
    162   total
 
-And 70 .swift files in SwiftFiles.
+And 71 .swift files in SwiftFiles, plus 5 in
+MessagesExtension.
 
 To check from a terminal, in the repo:
 
     ls DiceGameCurrent/DiceGameCurrent/Resources | wc -l        # 162
-    ls DiceGameCurrent/DiceGameCurrent/SwiftFiles/*.swift | wc -l   # 70
+    ls DiceGameCurrent/DiceGameCurrent/SwiftFiles/*.swift | wc -l   # 71
 
 
 ===============================================================================

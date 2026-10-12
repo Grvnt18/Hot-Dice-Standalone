@@ -249,6 +249,33 @@ enum GameBandLayout {
             - scene(in: size, fraction: fraction)
     }
 
+    /// The header fraction the alternating games share.
+    ///
+    /// Five screens had the literal `0.17` written three times each — the
+    /// same number in fifteen places, and no way to change it without
+    /// finding all of them. Free Roll is the exception and still passes its
+    /// own, because its header genuinely moves when the totals panel opens.
+    static let scoreboardFraction: CGFloat = 0.17
+
+    /// All three band heights at once.
+    ///
+    /// The five scoreboard games computed the same three values from the
+    /// same fraction in the same order, four lines apiece. They each ask one
+    /// question — how do I divide this screen — so there is one call that
+    /// answers it.
+    struct Bands {
+        let header: CGFloat
+        let scene: CGFloat
+        let buttonBand: CGFloat
+    }
+
+    static func bands(in size: CGSize,
+                      fraction: CGFloat = scoreboardFraction) -> Bands {
+        Bands(header: header(in: size, fraction: fraction),
+              scene: scene(in: size, fraction: fraction),
+              buttonBand: buttonBand(in: size, fraction: fraction))
+    }
+
     /// Whether a fixed band height still holds its content.
     ///
     /// For the three screens that set their own rather than taking the

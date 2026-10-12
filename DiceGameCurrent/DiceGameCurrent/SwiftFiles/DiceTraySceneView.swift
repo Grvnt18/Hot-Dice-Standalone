@@ -8,12 +8,17 @@ import SceneKit
 ///
 /// Separate from Rolls' `DiceSceneView` rather than generic over the
 /// session type, because the two wire up genuinely different things —
-/// Rolls needs a turn controller and tap handling, a tray needs neither. What they do share is the assembly
-/// timing, and that is the part worth getting identical: assembly is
-/// deferred until the view has real bounds, and `LayoutReportingSCNView`
-/// reports when that happens rather than leaving it to chance. See the long
-/// note on `DiceSceneView.assembleIfReady` for what goes wrong otherwise —
-/// a blank black playfield until something unrelated forces a redraw.
+/// Rolls needs a turn controller and tap handling, a tray needs neither.
+///
+/// What they do share is the view itself and the assembly timing, and that
+/// is the part worth getting identical. The view now comes from
+/// `LayoutReportingSCNView.makeConfigured()`, one copy for both. The timing
+/// is still spelled twice because each calls a different assembler:
+/// assembly waits until the view has real bounds, which
+/// `LayoutReportingSCNView` reports rather than leaving to chance. See the
+/// long note on `DiceSceneView.assembleIfReady` for what goes wrong
+/// otherwise — a blank black playfield until something unrelated forces a
+/// redraw.
 struct DiceTraySceneView: UIViewRepresentable {
     @Binding var session: DiceTraySession?
 
@@ -38,21 +43,7 @@ struct DiceTraySceneView: UIViewRepresentable {
     let onSessionCreated: (DiceTraySession) -> Void
 
     func makeUIView(context: Context) -> SCNView {
-        let view = LayoutReportingSCNView()
-        // Never black. If any sliver of backdrop is ever visible — an aspect
-        // ratio the overscanned floor somehow does not cover, a frame during
-        // rotation, the instant before assembly finishes — it should read as
-        // part of the field rather than as a hole punched in it.
-        view.backgroundColor = SmokeFloor.backdrop(from: AppTheme.shared.floorBaseColor)
-        // Off, for the pixel-art edge and because the Simulator aborts on
-        // any multisampling — see SceneAntialiasing.
-        view.antialiasingMode = SceneAntialiasing.mode
-        // Coarse render, magnified with no interpolation — the screen-space
-        // pixel grid the dice's drawn edges need to read as lines rather
-        // than hairlines. See SceneRenderScale.
-        SceneRenderScale.apply(to: view)
-        view.isPlaying = true
-        return view
+        LayoutReportingSCNView.makeConfigured()
     }
 
     func updateUIView(_ uiView: SCNView, context: Context) {

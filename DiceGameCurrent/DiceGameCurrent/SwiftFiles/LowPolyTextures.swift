@@ -1074,8 +1074,8 @@ enum SmokeFloor {
     /// the right floor in the right four colours, just still. Cached, because
     /// `retint` asks for it on every swatch change.
     static func fallbackTexture(tones: [UIColor]) -> UIImage {
-        let key = tones.map { $0.description }.joined(separator: "|")
-        if let hit = stillCache[key] { return hit }
+        let key = tones.map { "\($0)" }.joined(separator: "|")
+        if let hit = stillCache.value(key) { return hit }
 
         let cells = 128
         let size = CGSize(width: cells, height: cells)
@@ -1095,12 +1095,23 @@ enum SmokeFloor {
             }
         }
 
-        if stillCache.count > 8 { stillCache.removeAll() }
-        stillCache[key] = image
+        // The same bounded cache TYPE as every other generated image in
+        // this file, rather than a second caching strategy. This used to
+        // keep a plain dictionary and flush the whole thing at eight
+        // entries — throwing away seven live images to make room for the
+        // eighth — thirty lines below the type written to avoid that.
+        //
+        // Its own instance, not LowPolyTextures': that one is private to
+        // that enum, and these are a different working set. One strategy,
+        // two stores.
+        stillCache.insert(image, for: key)
         return image
     }
 
-    private static var stillCache: [String: UIImage] = [:]
+    /// Bounded, like LowPolyTextures'. Eight swatches' worth at 128x128,
+    /// which is both more than `retint` asks for between launches and a
+    /// fraction of a megabyte.
+    private static var stillCache = BoundedImageCache(limit: 8)
 
     // MARK: - The same field, in Swift
     //

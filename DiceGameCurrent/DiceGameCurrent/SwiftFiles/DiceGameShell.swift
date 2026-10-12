@@ -25,21 +25,7 @@ struct DiceSceneView: UIViewRepresentable {
     let onSessionCreated: (DiceGameSession) -> Void
 
     func makeUIView(context: Context) -> SCNView {
-        let view = LayoutReportingSCNView()
-        // Never black. If any sliver of backdrop is ever visible — an aspect
-        // ratio the overscanned floor somehow does not cover, a frame during
-        // rotation, the instant before assembly finishes — it should read as
-        // part of the field rather than as a hole punched in it.
-        view.backgroundColor = SmokeFloor.backdrop(from: AppTheme.shared.floorBaseColor)
-        // Off, for the pixel-art edge and because the Simulator aborts on
-        // any multisampling — see SceneAntialiasing.
-        view.antialiasingMode = SceneAntialiasing.mode
-        // Coarse render, magnified with no interpolation — the screen-space
-        // pixel grid the dice's drawn edges need to read as lines rather
-        // than hairlines. See SceneRenderScale.
-        SceneRenderScale.apply(to: view)
-        view.isPlaying = true // ensures the physics/render loop actually runs continuously
-        return view
+        LayoutReportingSCNView.makeConfigured()
     }
 
     func updateUIView(_ uiView: SCNView, context: Context) {
@@ -128,6 +114,36 @@ final class LayoutReportingSCNView: SCNView {
         super.layoutSubviews()
         guard bounds.width > 0, bounds.height > 0 else { return }
         onLayout?(self)
+    }
+
+    /// One configured scene view, for both hosts that make one.
+    ///
+    /// `DiceSceneView` and `DiceTraySceneView` are deliberately separate —
+    /// Rolls wires a turn controller and tap handling, a tray wires
+    /// neither — but their `makeUIView` bodies were byte-identical, and
+    /// `DiceTraySceneView`'s own comment says the setup is "the part worth
+    /// getting identical". Two copies of a thing that must not differ is
+    /// the shape that eventually differs: `SceneAntialiasing` and
+    /// `SceneRenderScale` are both here because the Simulator aborts
+    /// without them, and a third host that forgot one would present as a
+    /// blank screen rather than as a mistake.
+    static func makeConfigured() -> LayoutReportingSCNView {
+        let view = LayoutReportingSCNView()
+        // Never black. If any sliver of backdrop is ever visible — an aspect
+        // ratio the overscanned floor somehow does not cover, a frame during
+        // rotation, the instant before assembly finishes — it should read as
+        // part of the field rather than as a hole punched in it.
+        view.backgroundColor = SmokeFloor.backdrop(from: AppTheme.shared.floorBaseColor)
+        // Off, for the pixel-art edge and because the Simulator aborts on
+        // any multisampling — see SceneAntialiasing.
+        view.antialiasingMode = SceneAntialiasing.mode
+        // Coarse render, magnified with no interpolation — the screen-space
+        // pixel grid the dice's drawn edges need to read as lines rather
+        // than hairlines. See SceneRenderScale.
+        SceneRenderScale.apply(to: view)
+        // Keeps the physics and render loop running continuously.
+        view.isPlaying = true
+        return view
     }
 }
 

@@ -166,14 +166,20 @@ extension TurnMatch {
 
     /// What to call a participant on screen.
     ///
-    /// Positional, because that is all the Messages extension will be able
-    /// to offer: it gets opaque per-conversation UUIDs and no names or
-    /// avatars. Using the same labelling in pass-and-play keeps the two
-    /// consistent, and in a thread the real attribution comes free — each
-    /// turn is its own message bubble under that person's name.
+    /// Their typed name, or the positional label if they have not set one.
+    ///
+    /// It used to be positional and nothing else, because this suite was
+    /// becoming an iMessage game and an extension is handed opaque
+    /// per-conversation UUIDs with no names or avatars attached — "Player
+    /// 1" is genuinely the best it can do. This is the standalone, where
+    /// two people are sat at one table and the app can just ask them.
+    ///
+    /// Every screen that labels a seat comes through here, so this one
+    /// function is what names the scoreboards, the handover gates, the
+    /// result screens and Rollbots' own chrome.
     func displayName(for participant: String) -> String {
         guard let index = participants.firstIndex(of: participant) else { return "Player" }
-        return "Player \(index + 1)"
+        return PlayerNames.label(seat: index)
     }
 
     var activeDisplayName: String {
@@ -195,7 +201,7 @@ extension TurnMatch {
     func seatNames(padTo minimum: Int = 2) -> [String] {
         var names = participants.map { displayName(for: $0) }
         while names.count < minimum {
-            names.append("Player \(names.count + 1)")
+            names.append(PlayerNames.label(seat: names.count))
         }
         return names
     }

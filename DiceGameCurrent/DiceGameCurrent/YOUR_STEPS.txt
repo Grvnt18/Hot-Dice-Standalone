@@ -1,4 +1,4 @@
-WHAT YOU NEED TO DO
+WHAT YOU NEED TO DO — HOT DICE (STANDALONE)
 ===============================================================================
 
 Everything in this list is something only you can do: it happens on your
@@ -108,47 +108,25 @@ PART 3 — THE ICON  (10 minutes)
 18. In Xcode, open the asset catalog, select AppIcon, and in the panel on
     the right set it to "Single Size". Drag in the 1024 file.
 
-19. The iMessage icon is separate and fussier: it is not square and needs
-    all 14 sizes. The files are all in Icons/export/ already — drag each
-    into the slot with the matching size.
-
-    Do not skip the 1024 x 768 one. It is the one that fails much later,
-    at upload, with a confusing message.
-
-
 -------------------------------------------------------------------------------
 PART 4 — TEST IT  (this is the actual testing)
 -------------------------------------------------------------------------------
 
-20. ON THE SIMULATOR, test the Messages part only:
-    open Messages in the simulator, start a conversation, open Hot Dice
-    from the app row, start a Rolls game, play it, send it.
-
-    Rolls is the only game that works in Messages. The other nine say
-    "isn't playable in Messages yet" — that is expected, not a bug.
-
-21. ON THE IPAD, test everything else. All eleven games, pass-and-play.
+19. ON THE IPAD, test everything. All eleven games, pass-and-play.
 
     This matters: the simulator's graphics are missing features every
     real device has, and dice are the thing that breaks there. If the
     playfield is blank or the buttons stop responding IN THE SIMULATOR,
     try it on the iPad before reporting it.
 
-22. The Messages behaviour to check specifically, because it is new:
-      - "Close" puts you back to the thread and the game stays in it.
-        Reopening the bubble should show the same match where you left it.
-      - "New game" starts a SECOND game in the same thread without
-        touching the first. Both bubbles should be there, both playable,
-        neither overwriting the other. This is the one most likely to be
-        wrong.
-      - Whoever SENDS the first message is player 2 and rolls second. The
-        person who receives it goes first.
-      - Watch Xcode's memory gauge while the extension is open. A Messages
-        extension gets a tighter budget than an app and is killed rather
-        than warned, and this one runs 3D dice. If it vanishes mid-game,
-        that is what happened.
+20. The two things that are new in this version:
+      - Settings → Players. Type two names. They should appear on every
+        scoreboard, both handover screens and the result — including
+        Rollbots, which draws its own chrome.
+      - The handover screen says "Pass to <name>", not "Over to". That is
+        the whole point of this version: one device, going round.
 
-23. Things worth checking because no automated check can:
+21. Things worth checking because no automated check can:
       - does every game's roll button look the same as Rolls'
       - is any text cut off or overlapping on the smallest screen
       - do the How to Play guides match GAME_RULES.txt
@@ -166,45 +144,23 @@ PART 5 — APPLE PAPERWORK  (do while builds run)
 
 24. In App Store Connect, create the app record.
 
-25. Register TWO bundle IDs — one for the app, one for the Messages
-    extension. The extension's must be the app's with something added on
-    the end, for example:
+25. Register ONE bundle ID for the app, for example:
 
         com.yourname.hotdice
-        com.yourname.hotdice.messages
 
-26. Register ONE App Group, in the same place. It must start with
-    "group.", so:
+    Then open project.yml and replace the `com.example.hotdice`
+    placeholder with it.
 
-        group.com.yourname.hotdice
+    No App Group here. That exists in the iMessage version so the app and
+    its extension can share the player's settings; a standalone app has
+    nothing to share with, and SharedDefaults already falls back to
+    ordinary storage when no group is configured.
 
-    This is what lets the app and the Messages extension share the
-    player's settings. Without it, dice colours and volumes set in the app
-    do not show up in a text thread, and vice versa — two sets of
-    settings for one game.
-
-27. Replace the placeholders in THREE files. They must all match or the
-    sharing silently stops working:
-
-        project.yml                  both bundle ids
-        HotDice.entitlements         the group id
-        HotDiceMessages.entitlements the group id
-        SwiftFiles/SharedDefaults.swift   `appGroupID`
-
-    (That is four files — the two entitlements are one id typed twice.)
-    Everything says `com.example.hotdice` today. Find and replace.
-
-28. In Xcode, on BOTH targets: Signing & Capabilities → + Capability →
-    App Groups → tick the group you registered.
-
-    If you forget this, nothing breaks and nothing shares. The app just
-    keeps its own settings, which is how it behaves today.
-
-29. Fill in App Privacy. This app collects nothing and makes no network
+26. Fill in App Privacy. This app collects nothing and makes no network
     calls, so it is a short form — but it blocks the upload until it is
     answered.
 
-30. Answer the export compliance question: no encryption beyond what
+27. Answer the export compliance question: no encryption beyond what
     Apple exempts.
 
 
@@ -216,25 +172,25 @@ Your Mac cannot do this part. Xcode 14.2 is too old to upload to Apple,
 and too old to install onto an iPad running iOS 18. A cloud build does
 both.
 
-31. In App Store Connect: Users and Access → Integrations → App Store
+28. In App Store Connect: Users and Access → Integrations → App Store
     Connect API → generate a key with the "App Manager" role.
     Download the .p8 file. Apple lets you download it ONCE.
 
-32. On your Mac, in Keychain Access, export your "Apple Distribution"
+29. On your Mac, in Keychain Access, export your "Apple Distribution"
     certificate and its private key together as one .p12 file, with a
     password. Then in Terminal:
 
         base64 -i <that file>.p12 | pbcopy
 
-33. On GitHub, in this repository: Settings → Secrets and variables →
+30. On GitHub, in this repository: Settings → Secrets and variables →
     Actions. Add six secrets. The exact names and what goes in each are
     listed in the comments at the top of:
 
         .github/workflows/testflight.yml
 
-34. On GitHub: Actions → TestFlight → "Run workflow".
+31. On GitHub: Actions → TestFlight → "Run workflow".
 
-35. When it finishes, the build appears in TestFlight. Install
+32. When it finishes, the build appears in TestFlight. Install
     TestFlight on your iPad from the App Store and the build will be
     there.
 

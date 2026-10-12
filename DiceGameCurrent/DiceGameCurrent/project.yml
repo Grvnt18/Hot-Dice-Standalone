@@ -1,5 +1,11 @@
 # The Xcode project, as a file rather than as a file nobody can read.
 #
+# THIS IS THE STANDALONE. Hot Dice as an app you open: eleven games,
+# pass-and-play, the device going round the table. The Messages version is
+# its own repository — see README.md — because the two ship on different
+# schedules and the thing that differs between them is not a setting, it is
+# how a turn travels.
+#
 # WHY THIS EXISTS
 #
 # MAC_SETUP.txt has you create the project in Xcode and save it OUTSIDE the
@@ -95,59 +101,3 @@ targets:
         # a narrow phone, and tools_bandlayout_verify.py checks that case.
         INFOPLIST_KEY_UIRequiresFullScreen: NO
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        CODE_SIGN_ENTITLEMENTS: HotDice.entitlements
-    dependencies:
-      - target: HotDiceMessages
-        embed: true
-
-  # ---------------------------------------------- the Messages extension
-  HotDiceMessages:
-    type: app-extension.messages
-    platform: iOS
-    sources:
-      - path: MessagesExtension
-      # The SAME shared source, not a copy. The extension hosts the app's
-      # own screens — DiceGameScreen is what a Rolls turn is played on in a
-      # conversation — so it needs the suite, not a second one.
-      - path: SwiftFiles
-      - path: Resources
-        buildPhase: resources
-        # The eight music tracks are 13 MB of the 20 MB Resources folder,
-        # and the extension has no business playing them: a Messages
-        # extension that starts background music is fighting the host app
-        # for the audio session, and it ships inside the app's own download
-        # on top of the app's copy. Excluded, so the extension carries the
-        # dice, the fonts, the artwork and the effects and nothing else.
-        #
-        # SoundEngine already copes: `url(forResource:)` returns nil for a
-        # missing file and `BundleCheck` reports what is absent rather than
-        # crashing, which is the behaviour the whole resource layer is
-        # built on.
-        excludes:
-          - "*.m4a"
-    settings:
-      base:
-        # The extension's id must be the app's with a suffix.
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.hotdice.messages
-        INFOPLIST_KEY_CFBundleDisplayName: Hot Dice
-        CODE_SIGN_ENTITLEMENTS: HotDiceMessages.entitlements
-        # The iMessage app icon is a DIFFERENT asset type from the app's:
-        # it is not square, it does not support Single Size, and the whole
-        # ladder is required. tools_icon_export.py writes all 16 slots —
-        # the 1024x768 App Store one is the one that fails validation late.
-        ASSETCATALOG_COMPILER_APPICON_NAME: iMessage App Icon
-      # NSExtension's own keys. XcodeGen writes the rest of the plist; this
-      # is the part that makes it a Messages extension rather than a
-      # bundle Messages ignores.
-    info:
-      # Deliberately NOT inside MessagesExtension/, which is a `sources`
-      # folder for this target: a generated plist sitting in a compiled
-      # source directory is at best noise in the build and at worst copied
-      # in as a resource. Kept beside project.yml, which is what generates
-      # it.
-      path: HotDiceMessages-Info.plist
-      properties:
-        CFBundleDisplayName: Hot Dice
-        NSExtension:
-          NSExtensionPointIdentifier: com.apple.message-payload-provider
-          NSExtensionPrincipalClass: MessagesViewController

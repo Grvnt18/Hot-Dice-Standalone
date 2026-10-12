@@ -227,12 +227,15 @@ struct HandoverGate: View {
                         .padding(.horizontal, 28)
                 }
 
-                // Names whose turn it is now. It used to read "Pass to",
-                // which describes handing a physical device across a table —
-                // true of this screen today and wrong about the game this is
-                // becoming, where a turn arrives in a message. Note the view
-                // is under .textCase(.uppercase).
-                Text("Over to \(match.activeDisplayName)")
+                // "Pass to", because that is exactly what happens: this
+                // is the standalone, where one device goes round a table.
+                //
+                // It read "Over to" for a while, when one codebase was
+                // becoming an iMessage game and a turn was going to arrive
+                // in a message rather than in somebody's hand. That version
+                // is its own repository now, and this one can say the true
+                // thing again. Note the view is under .textCase(.uppercase).
+                Text("Pass to \(match.activeDisplayName)")
                     .font(.poppins(46, .semibold))
                     .lineLimit(2)
                     .multilineTextAlignment(.center)

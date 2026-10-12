@@ -1,4 +1,4 @@
-ROLLS — THE SPOKEN SCRIPT
+HOT DICE — THE SPOKEN SCRIPT
 Every line of text the app says, where it says it, and what makes it appear.
 Taken from the shipped code, not from memory. Plain text, for copy and paste.
 
@@ -26,7 +26,9 @@ THE ROLL BUTTON (the big one at the bottom)
 THE HANDOVER GATE (full screen, black over the wood)
   Appears the moment a turn ends in any two-player game.
   Line 1  The turn summary — see each game below. Absent on the first turn.
-  Line 2  "Pass to Ada"      — the name of whoever is up next.
+  Line 2  "Pass to Ada"      — the name of whoever is up next. Literally
+                               that: this is the standalone, and the
+                               device goes round the table.
   Line 3  Both players' names and scores.
   Button  "I'm Ready"        — tapping it starts the next turn and is what
                                stops the next player seeing the last one's

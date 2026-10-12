@@ -58,7 +58,7 @@
 # uploads a build to TestFlight, which is as far as an automated job should
 # go on its own.
 
-name: TestFlight
+name: TestFlight (Hot Dice, standalone)
 
 on:
   # Deliberately manual. A push-triggered upload burns a build number on
@@ -167,8 +167,6 @@ jobs:
             <key>method</key><string>app-store</string>
             <key>destination</key><string>upload</string>
             <key>uploadSymbols</key><true/>
-            <!-- Automatic, so the extension's profile is fetched alongside
-                 the app's rather than being the one nobody remembered. -->
             <key>signingStyle</key><string>automatic</string>
           </dict>
           </plist>

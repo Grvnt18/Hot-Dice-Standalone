@@ -433,7 +433,8 @@ struct NetHandoverGate: View {
                         .padding(.horizontal, 28)
                 }
 
-                Text("Over to")
+                // "Pass to" — see HandoverGate. One device, one table.
+                Text("Pass to")
                     .font(.poppins(13))
                     .foregroundStyle(NetArt.text.opacity(0.6))
 

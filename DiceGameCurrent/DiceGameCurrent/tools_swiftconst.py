@@ -27,6 +27,11 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SWIFT = os.path.join(HERE, "SwiftFiles")
+# The standalone has no second target. Kept as a path rather than deleted
+# because `swift_names` still looks for it: this repository and the
+# Messages one share every verifier, and a check that silently scans a
+# different set of files in each would be worse than one that finds
+# nothing here.
 EXTENSION = os.path.join(HERE, "MessagesExtension")
 RESOURCES = os.path.join(HERE, "Resources")
 

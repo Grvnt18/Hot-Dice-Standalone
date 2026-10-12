@@ -1,6 +1,15 @@
-# Hot Dice — a dice game suite
+# Hot Dice — a dice game suite (standalone)
 
-Full project state. 72 Swift files, 119 resources.
+> **This is the standalone.** Hot Dice as an app you open: eleven
+> games, pass-and-play, the device going round the table.
+>
+> The iMessage version is a separate repository. The two share the
+> games, the art and the verifiers, and differ in the one thing that
+> is not a setting — how a turn travels. They were split so this one
+> can ship while that one is still being built; the cost is that a
+> visual fix has to be made in both.
+
+Full project state. 71 Swift files, 162 resources. Eleven games, pass-and-play on one device.
 
 ## Setup
 

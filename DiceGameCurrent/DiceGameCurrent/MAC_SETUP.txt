@@ -201,8 +201,7 @@ should come to 162. By kind:
 
    162   total
 
-And 71 .swift files in SwiftFiles, plus 6 in
-MessagesExtension.
+And 71 .swift files in SwiftFiles.
 
 To check from a terminal, in the repo:
 
@@ -412,49 +411,15 @@ a suffix — to whatever you register with Apple.
 WHAT COMES AFTER THIS
 ===============================================================================
 
-The Messages extension is no longer a later step: `MessagesExtension/`
-holds five files and Rolls plays end to end in a conversation. If you are
-building the project by hand, File → New → Target → iMessage Extension
-and add that folder, SwiftFiles and Resources to it; XcodeGen does it
-from project.yml. Set the extension's principal class to
-`MessagesViewController`.
+This repository is the STANDALONE: Hot Dice as an app you open, eleven
+games, one device going round the table. There is no Messages extension
+here and nothing in it needs one.
 
-Xcode 14.2 can build and test all of it — the Simulator runs Messages
-with two conversations, which is how Apple intends these to be tested.
-That is also the only reason to use the Simulator at all: PLATFORM.txt's
-rule still holds, and anything touching SceneKit is cheaper to shake out
-on the iPad.
-
-Nine games show "isn't playable in Messages yet" when tapped. An earlier
-version of this note said they had no seam for it. They do — each of the
-nine carries a matched pair, written when the Codable state was:
-
-    var wireTurn: MatchPayload<HogState> { ... }   // pack this turn
-    func adopt(_ incoming: MatchPayload<HogState>) // take one that arrived
-
-Nothing calls either, anywhere. The reason is not that the pack and unpack
-logic is missing — it is written, per game, and it is the part that would
-have taken the longest. It is that `adopt` mutates `@State` on a `View`
-struct, and nothing outside can get a handle on the instance SwiftUI is
-actually rendering in order to call it. The shape is right and the
-mechanism is not.
-
-Two ways to finish it, neither started, because both are a refactor rather
-than a wiring job and this is the wrong side of the first real build to be
-doing one:
-
-  * Seed at init. Each screen takes an optional `MatchPayload<State>` and
-    an `onTurn` callback — the pattern `DiceGameScreen` already uses for
-    Rolls (`onRoundFinished` and `seed`). Additive, defaults keep every
-    existing call site working.
-  * Lift the state. Move each screen's `@State` into an `ObservableObject`
-    the host owns, which is what `adopt` was shaped for.
-
-Rolls needed neither, because its state was designed for a thread rather
-than adapted to one.
-
-So the beta runs ten games pass-and-play and Rolls in a conversation. That
-is a real beta; it is not the finished multiplayer.
+The iMessage version lives in its own repository. It shares this suite's
+games, art and verifiers, and differs in the one thing that is not a
+setting: how a turn travels. A visual fix made here has to be ported there
+by hand, and the reverse — that is the cost of the split, and it was taken
+deliberately so this one can ship while that one is still being built.
 
 The two things this Mac cannot do — installing on your iOS 18 iPad, and
 uploading to the App Store — are handled by the cloud build in

@@ -161,6 +161,22 @@ PART 4 — TEST IT  (this is the actual testing)
         (triangle, diamond, pentagon) should have the same edge as the
         twelve squares: no spikes poking out of the corners.
 
+20b. SCALING, if you ever get hold of a foldable.
+
+    The hub grid and the three band layouts are now checked at the iPhone
+    Duo's two sizes as well — 466x678 folded and 626x890 open — and both
+    pass on arithmetic. Those point sizes are DERIVED from Apple's pixel
+    and ppi figures, not published, so correct them in
+    tools_bandlayout_verify.py once a build has actually run on one.
+
+    One behaviour to watch there specifically: opening the device while
+    FREE ROLL is on screen re-deals its tray. That is deliberate — the
+    playfield's shape changes, and an arena built for the folded shape has
+    its walls in the wrong place — and Free Roll is the only screen it can
+    happen to, because it is the only one whose playfield is not square.
+    If it ever happens in a SCORED game, that is a bug: say so, because
+    tools_bandlayout_verify.py is supposed to make it impossible.
+
 21. Things worth checking because no automated check can:
       - does every game's roll button look the same as Rolls'
       - is any text cut off or overlapping on the smallest screen

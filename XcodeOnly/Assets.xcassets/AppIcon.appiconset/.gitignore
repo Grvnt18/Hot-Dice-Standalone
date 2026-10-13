@@ -1,0 +1,18 @@
+# The artwork is DERIVED, and deliberately not committed.
+#
+# `tools_icon_export.py` builds it from Icons/Master icon Default.png,
+# flattening the alpha and cropping the master's bevel — see that file,
+# which explains why an exported copy in git is a copy that stops matching
+# its source. The Contents.json beside this is hand-written and IS
+# committed; only the PNG it names is generated.
+#
+# Put it here before an Xcode build:
+#   cd DiceGameCurrent/DiceGameCurrent && python3 tools_icon_export.py
+#   cp Icons/export/AppIcon-1024.png \
+#      ../../XcodeOnly/Assets.xcassets/AppIcon.appiconset/
+#
+# Exported to Icons/export and copied, NOT exported straight in here: the
+# same run also writes the eleven Messages slots, and an .appiconset with
+# PNGs no Contents.json mentions is a pile of "unassigned children"
+# warnings on every build.
+AppIcon-1024.png

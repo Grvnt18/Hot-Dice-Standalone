@@ -1,0 +1,222 @@
+===============================================================================
+HOT DICE (STANDALONE) — FROM HERE TO TESTERS
+===============================================================================
+
+Everything in this file is yours because it lives on your Mac, on your
+iPad, or on Apple's website. Nothing in it can be done from the repo.
+
+Do the parts in order. Each one is needed by the one after it.
+
+There are three documents and they do not overlap:
+
+  MAC_SETUP.txt    building the project on the Mac, and the symptom table
+                   for when a resource is quietly missing
+  YOUR_STEPS.txt   what to actually test, and what is new in this build
+  TESTFLIGHT.txt   this one: getting a build to testers
+
+One honest frame before you start. The Mac can build and test everything.
+It cannot upload: Monterey's last Xcode is 14.2, and Apple requires a far
+newer SDK to accept a build. So the Mac is where you find bugs and the
+cloud is where you ship. That split is the whole reason
+.github/workflows/testflight.yml exists.
+
+-------------------------------------------------------------------------------
+PART 0 — THE ONE THING THAT BLOCKS EVERYTHING
+-------------------------------------------------------------------------------
+
+0. CHOOSE YOUR BUNDLE IDENTIFIER, and change it in the repo.
+
+   Right now it is `com.example.hotdice`. That is a placeholder nobody
+   owns and Apple will not accept it.
+
+   Convention is your domain backwards. You do not need to own the
+   domain — it only has to be unique and yours by claim — so if you have
+   no domain, something like `com.grvnt18.hotdice` is fine. All lower
+   case, letters, digits, hyphens and dots only.
+
+   THIS IS EFFECTIVELY PERMANENT. Once a build exists under an
+   identifier, changing it means a new app record and a fresh TestFlight
+   history. Decide once.
+
+   Change it in TWO places in DiceGameCurrent/DiceGameCurrent/project.yml:
+
+       bundleIdPrefix: com.example.hotdice          <- here
+       PRODUCT_BUNDLE_IDENTIFIER: com.example.hotdice   <- and here
+
+   Then check it took:
+
+       cd DiceGameCurrent/DiceGameCurrent
+       python3 tools_release_verify.py
+
+   It fails today on exactly this and passes on everything else. When it
+   says PASS, the repo is shippable. Nothing below works until it does.
+
+-------------------------------------------------------------------------------
+PART 1 — ON THE MAC (once)
+-------------------------------------------------------------------------------
+
+1. Install Xcode 14.2 from developer.apple.com/download/all — NOT the App
+   Store, which only offers the newest, which will not install on
+   Monterey. It is a ~7 GB .xip. Unpacking looks frozen for several
+   minutes; it is not.
+
+2. Drag Xcode.app into /Applications. Not Downloads.
+
+3. In Terminal, once:
+
+       sudo xcode-select --switch /Applications/Xcode.app
+
+4. Open Xcode once and let it install the extra components it asks for.
+   Then turn OFF automatic updates, so it never replaces itself with a
+   version Monterey cannot run.
+
+5. Install XcodeGen, which turns project.yml into an Xcode project:
+
+       brew install xcodegen
+
+   If you have no Homebrew, MAC_SETUP.txt steps 2-6 build the project by
+   hand instead. Either route works. XcodeGen is the one the cloud uses,
+   so using it on the Mac too means both machines build the same thing.
+
+-------------------------------------------------------------------------------
+PART 2 — BUILD IT ON THE MAC
+-------------------------------------------------------------------------------
+
+6. Clone the repo, then:
+
+       cd DiceGameCurrent/DiceGameCurrent
+       python3 tools_icon_export.py
+       cp Icons/export/AppIcon-1024.png \
+          ../../XcodeOnly/Assets.xcassets/AppIcon.appiconset/
+       xcodegen generate
+       open HotDice.xcodeproj
+
+   The icon step is not optional and it is not in git on purpose: the
+   icon is generated from Icons/Master icon Default.png, and a committed
+   copy is a copy that stops matching its master. Skip it and the app
+   builds, archives, and is rejected by Apple for having no icon.
+
+7. Press Cmd-B. Expect no red.
+
+   If you get "cannot find X in scope" on many lines, you are on the
+   hand-built project from MAC_SETUP.txt and a new .swift file is on disk
+   but not in the target. That is the whole reason project.yml exists —
+   it takes folders, not file lists. Regenerate with xcodegen and it goes
+   away.
+
+8. Cmd-R on an iPhone 14 simulator. You should get the hub: eleven tiles
+   on wood, the HOT DICE mark above them.
+
+   DO NOT judge the dice in the Simulator. PLATFORM.txt's rule stands:
+   the Simulator's graphics are missing features every real device has,
+   and dice are the thing that breaks there. A blank playfield in the
+   Simulator is not a bug until you have seen it on the iPad.
+
+9. Test on the iPad, against YOUR_STEPS.txt. That file lists what is new
+   and what no automated check can see. The two things most worth your
+   time in this build:
+
+     - Rolls pass-and-play, three or four full matches back to back. The
+       dice scene is torn down and rebuilt between seats and nothing in
+       the repo can test that.
+     - The setup popup with four players, and typing long names.
+
+-------------------------------------------------------------------------------
+PART 3 — APPLE'S WEBSITE (can be done while builds run)
+-------------------------------------------------------------------------------
+
+10. At developer.apple.com → Certificates, Identifiers & Profiles →
+    Identifiers, register your bundle identifier from step 0. One only —
+    the standalone has no Messages extension, so there is no second one
+    to register. (The Messages repository will need its own pair later.)
+
+11. At appstoreconnect.apple.com → Apps → +, create the app record.
+    Name "Hot Dice", pick the identifier you just registered, and give it
+    an SKU (any private string — "hotdice" is fine).
+
+12. Fill in App Privacy. This app collects nothing: no analytics, no
+    account, no network calls at all — verified, there is no URLSession
+    and no CryptoKit anywhere in the source. It is a short form, and it
+    BLOCKS distribution until answered.
+
+13. Export compliance is already answered in the build
+    (INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO), so you should not
+    be asked per upload. If App Store Connect asks anyway, the answer is
+    that the app uses no non-exempt encryption.
+
+-------------------------------------------------------------------------------
+PART 4 — THE SIX SECRETS
+-------------------------------------------------------------------------------
+
+14. In App Store Connect → Users and Access → Integrations → App Store
+    Connect API, generate a key with the "App Manager" role. You can
+    download the .p8 EXACTLY ONCE. Save it somewhere you will not lose it.
+
+15. On the Mac, in Keychain Access, you need an "Apple Distribution"
+    certificate. Apple will not sign a store build with a development
+    certificate. Export the certificate AND its private key together as
+    one .p12 and set a password on it. Then:
+
+        base64 -i cert.p12 | pbcopy
+
+16. In the GitHub repo → Settings → Secrets and variables → Actions →
+    New repository secret, add all six:
+
+        ASC_KEY_ID                     the key id, ten characters
+        ASC_ISSUER_ID                  on the same page; one per account
+        ASC_PRIVATE_KEY                the WHOLE .p8, BEGIN/END lines and all
+        SIGNING_CERTIFICATE_P12        the base64 from step 15
+        SIGNING_CERTIFICATE_PASSWORD   the password you set on the export
+        KEYCHAIN_PASSWORD              any string; it unlocks a throwaway
+                                       keychain on the runner and protects
+                                       nothing outside it
+
+    Provisioning profiles are NOT secrets here. The workflow passes
+    -allowProvisioningUpdates with the API key, so Xcode fetches or
+    creates them itself — which is also what stops a stored profile going
+    stale.
+
+-------------------------------------------------------------------------------
+PART 5 — UPLOAD
+-------------------------------------------------------------------------------
+
+17. Push your bundle-identifier change.
+
+18. GitHub → Actions → "TestFlight (Hot Dice, standalone)" → Run
+    workflow. It is deliberately manual: a push-triggered upload burns a
+    build number on every commit, and TestFlight build numbers cannot be
+    reused.
+
+    The job runs every verifier first, including the release gate — so if
+    step 0 is not done, it stops there instead of ten minutes later at
+    Apple's validator.
+
+19. Expect 15-25 minutes. The build number is the GitHub run number, so
+    it increases on its own and cannot collide. The version testers see
+    (MARKETING_VERSION, currently 1.0) stays where project.yml puts it —
+    bump that by hand when you mean to.
+
+20. If it fails, Actions → the run → "build-logs" artifact. Signing and
+    validation complaints are only explained in there.
+
+21. On success the build appears in App Store Connect → TestFlight within
+    a few minutes, then goes to "Processing" for up to an hour.
+
+22. Internal testing first: TestFlight → Internal Testing → add yourself.
+    Internal testers need no review and get the build as soon as
+    processing ends. Install TestFlight on the iPad and accept.
+
+23. External testers (up to 10,000) need a one-time Beta App Review per
+    version — usually a day or two. You need a description of what to
+    test and a contact email. Internal testing does not wait for this, so
+    do your own round first.
+
+-------------------------------------------------------------------------------
+WHAT IS NOT IN THIS FILE
+-------------------------------------------------------------------------------
+
+Submitting for App Store review. That is a different checklist —
+screenshots at required sizes, a description, keywords, an age rating, a
+support URL — and it is worth doing after testers have actually played
+it. The workflow deliberately stops at TestFlight: uploading a build is
+as far as an automated job should go by itself.

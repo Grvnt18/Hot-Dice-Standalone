@@ -59,10 +59,32 @@ struct DiceTraySceneView: UIViewRepresentable {
     }
 
     private func assembleIfReady(_ uiView: SCNView, coordinator: Coordinator) {
-        guard !coordinator.hasStartedAssembly else { return }
         guard uiView.bounds.width > 0, uiView.bounds.height > 0 else { return }
 
+        let aspect = PlayfieldLayout.aspect(of: uiView.bounds.size)
+
+        // The arena is built for a SHAPE, not a size — see
+        // PlayfieldLayout.needsRebuild. A view that changed shape since
+        // assembly is showing walls and a camera for the shape it used to
+        // be, which on a foldable happens every time the device opens.
+        //
+        // Of the eight screens on this path only Free Roll ever crosses
+        // the threshold, and Free Roll is a sandbox: re-dealing its tray
+        // costs nothing. The seven that would lose a scored turn have a
+        // square playfield at every supported size and so a constant
+        // aspect of 1.0 — asserted in tools_bandlayout_verify.py, because
+        // "only Free Roll reaches it" is a claim about five header
+        // fractions and two device tables, not something to assume.
+        if coordinator.hasStartedAssembly,
+           PlayfieldLayout.needsRebuild(assembled: coordinator.assembledAspect,
+                                        now: aspect) {
+            coordinator.hasStartedAssembly = false
+        }
+
+        guard !coordinator.hasStartedAssembly else { return }
+
         coordinator.hasStartedAssembly = true
+        coordinator.assembledAspect = aspect
 
         let newSession = DiceSceneAssembler.assembleTray(
             into: uiView,
@@ -79,6 +101,10 @@ struct DiceTraySceneView: UIViewRepresentable {
 
     final class Coordinator {
         var hasStartedAssembly = false
+
+        /// The aspect ratio the arena in this view was built for. On the
+        /// Coordinator because that is what survives a SwiftUI update.
+        var assembledAspect: Float?
     }
 
     func makeCoordinator() -> Coordinator {

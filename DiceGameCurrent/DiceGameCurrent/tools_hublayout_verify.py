@@ -51,6 +51,12 @@ WIDTHS = [
     ("iPad Air portrait", 820),
     ("iPad Air landscape", 1180),
     ("iPad Pro landscape", 1366),
+    # The iPhone Duo in both states — the first device that is a phone at
+    # one width and a small tablet at another, with no relaunch between.
+    # Points are 1398x2034 and 1878x2670 divided by three; see the note in
+    # tools_bandlayout_verify.py, which carries the same two sizes.
+    ("iPhone Duo folded", 466),
+    ("iPhone Duo open", 626),
 ]
 
 # The smallest share of a tile the artwork may take. Below this the icon

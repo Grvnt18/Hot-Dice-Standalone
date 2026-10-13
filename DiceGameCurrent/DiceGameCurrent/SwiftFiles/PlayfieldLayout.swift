@@ -52,6 +52,61 @@ enum PlayfieldLayout {
 
         return Result(bounds: bounds, orthographicScale: orthographicScale)
     }
+
+    // MARK: Staying right when the window changes size
+
+    /// **The arena depends on the view's SHAPE, never on its size.** Read
+    /// `compute` above: `targetWorldWidth` is a design constant, and both
+    /// the bounds and the camera scale come from it and the aspect ratio
+    /// alone. Nothing in there is in points.
+    ///
+    /// That is what makes the next part small. `DiceSceneAssembler`
+    /// derives the aspect once, at assembly, and `assembleIfReady` is
+    /// guarded so a later layout pass does nothing — so a view that
+    /// changes shape after assembly keeps walls and a camera built for the
+    /// shape it used to be. A view that merely changes SIZE is already
+    /// correct and needs nothing.
+    ///
+    /// Until a foldable existed that was close to unreachable: the app is
+    /// portrait-only, so the shape only moved on a Split View drag. The
+    /// iPhone Duo changes it by folding. Measured across every size in
+    /// `tools_bandlayout_verify.py`, including both of the Duo's:
+    ///
+    ///   | header fraction        | folded | open  | drift |
+    ///   |------------------------|--------|-------|-------|
+    ///   | Boneheads 0.14         | 1.000  | 1.000 | 0     |
+    ///   | Rolls, Royal UR 0.15   | 1.000  | 1.000 | 0     |
+    ///   | the five at 0.17       | 1.000  | 1.000 | 0     |
+    ///   | Free Roll 0.30         | 1.228  | 1.186 | 0.042 |
+    ///
+    /// So ten of the eleven cannot drift at all: their playfield is square
+    /// at both of the Duo's sizes, and a square is a square at any size.
+    /// Free Roll's header takes 0.30 against everyone else's 0.14 to 0.17,
+    /// which is what pushes its playfield off square — and it moves on an
+    /// iPad today too, by 0.066 across a Split View drag from 320 to 744.
+    static let aspectRebuildThreshold: Float = 0.02
+
+    static func aspect(of size: CGSize) -> Float {
+        Float(size.width / max(size.height, 1))
+    }
+
+    /// Whether the arena was built for a materially different shape.
+    ///
+    /// The threshold is doing real work rather than padding a comparison.
+    /// Re-assembly throws the dice away and re-deals them, which is
+    /// acceptable in a sandbox and NOT acceptable part way through a
+    /// scored round — so this has to be a test the games that would be
+    /// hurt by it cannot pass. At 0.02 the only screen that ever reaches
+    /// it is Free Roll, which has no score and no turn;
+    /// `tools_bandlayout_verify.py` asserts exactly that, at every size,
+    /// so the day somebody moves a header fraction the check says which
+    /// game just became resettable rather than a player finding out.
+    ///
+    /// Nil means nothing has been assembled yet, which is not a rebuild.
+    static func needsRebuild(assembled: Float?, now: Float) -> Bool {
+        guard let assembled else { return false }
+        return abs(now - assembled) > aspectRebuildThreshold
+    }
 }
 
 /// Single definition of the playfield rim, shared by the visible walls

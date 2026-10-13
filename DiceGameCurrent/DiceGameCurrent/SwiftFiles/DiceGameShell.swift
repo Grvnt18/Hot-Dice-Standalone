@@ -70,12 +70,33 @@ struct DiceSceneView: UIViewRepresentable {
         // assembled on top of the first. The Coordinator's flag is set
         // synchronously, immediately, closing that window — it's not
         // subject to the same async race since nothing here awaits it.
-        guard !coordinator.hasStartedAssembly else { return }
-
-        // Bounds can legitimately be zero on the first layout pass.
+        // Bounds can legitimately be zero on the first layout pass. Moved
+        // above the assembly guard so the shape test below has a size to
+        // read; the guard still runs before the flag is set, so the race
+        // the note above describes is unchanged.
         guard uiView.bounds.width > 0, uiView.bounds.height > 0 else { return }
 
+        let aspect = PlayfieldLayout.aspect(of: uiView.bounds.size)
+
+        // A view that changed SHAPE since assembly has an arena built for
+        // the old one — see PlayfieldLayout.needsRebuild, which also has
+        // the measurements. Clearing the flag re-enters assembly below
+        // rather than adding a second path into it.
+        //
+        // This cannot fire on Rolls: its playfield is square at every
+        // supported size, so the aspect is 1.0 whatever the window does,
+        // and a rebuild here would throw away a round in progress. That is
+        // asserted rather than hoped — tools_bandlayout_verify.py.
+        if coordinator.hasStartedAssembly,
+           PlayfieldLayout.needsRebuild(assembled: coordinator.assembledAspect,
+                                        now: aspect) {
+            coordinator.hasStartedAssembly = false
+        }
+
+        guard !coordinator.hasStartedAssembly else { return }
+
         coordinator.hasStartedAssembly = true
+        coordinator.assembledAspect = aspect
 
         let newSession = DiceSceneAssembler.assemble(
             into: uiView,
@@ -93,6 +114,14 @@ struct DiceSceneView: UIViewRepresentable {
 
     final class Coordinator {
         var hasStartedAssembly = false
+
+        /// The aspect ratio the arena in this view was built for.
+        ///
+        /// On the Coordinator rather than in the view struct because a
+        /// UIViewRepresentable is recreated on every SwiftUI update and
+        /// the Coordinator is not — the same reason `hasStartedAssembly`
+        /// lives here.
+        var assembledAspect: Float?
     }
 
     func makeCoordinator() -> Coordinator {

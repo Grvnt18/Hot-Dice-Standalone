@@ -9,14 +9,24 @@
 > can ship while that one is still being built; the cost is that a
 > visual fix has to be made in both.
 
-Full project state. 71 Swift files, 162 resources. Eleven games, pass-and-play on one device.
+Full project state. 72 Swift files, 156 resources. Eleven games,
+pass-and-play on one device.
+
+## The four documents
+
+| | |
+|---|---|
+| `MAC_SETUP.txt`  | building it on the Mac, and the symptom table for a quietly missing resource |
+| `YOUR_STEPS.txt` | what to test, and what each build changed |
+| `TESTFLIGHT.txt` | getting a build to testers, start to finish |
+| `PLATFORM.txt`   | the iOS 16 / Swift 5.7 / Xcode 14.2 floor and what it costs |
 
 ## Setup
 
 1. Swift Playgrounds → Create → App (blank template), saved "On My iPad."
 2. Delete the default generated files.
 3. Add all 72 files from `SwiftFiles/`.
-4. Add all 119 files from `Resources/`.
+4. Add all 156 files from `Resources/`.
 5. Run.
 
 ## Audio
@@ -314,8 +324,10 @@ narrowest the app runs on), with roughly 620pt of usable height.
   variable font, because SwiftUI's `Font.custom` does not drive variable
   weight axes — which is exactly why the previous face shipped at a single
   ExtraLight weight at every size. A weight is now a file.
-- `.dae` mesh files are kept in Resources as a defensive last-resort
-  fallback (`DieMeshLibrary` tries `.scn`, then `.obj`, then `.dae`) even
-  though `.obj` is what's actually loading successfully — intentionally
-  kept, unlike the numbered PNGs, since this fallback path is still live
-  code, just not currently exercised.
+- The `.dae` meshes are **gone**, and this bullet used to say they were
+  kept as a last-resort fallback. They were six files that nothing ever
+  loaded: the loader tries `.scn` then `.obj`, `.obj` is what succeeds,
+  and SceneKit's COLLADA importer was already recorded two files away as
+  throwing a generic failure on device. A fallback that cannot run is not
+  a fallback. (The `.dae` mentions still in `DiceSceneBuilder` are the
+  history of how the meshes were measured, which is worth keeping.)

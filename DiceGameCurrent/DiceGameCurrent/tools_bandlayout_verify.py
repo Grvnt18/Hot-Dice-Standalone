@@ -18,7 +18,7 @@ the only screen in the app with a device matrix behind it.
 import re
 import sys
 
-from tools_swiftconst import source
+from tools_swiftconst import constant, source
 
 LAYOUT = "PlayfieldLayout.swift"
 
@@ -39,6 +39,32 @@ SIZES = [
     # is the only shape where the band bottoms out, so it is the one that
     # says how much margin the floor really has.
     ("iPad Pro landscape", 1366, 1024),
+    # The iPhone Duo, Apple's first foldable, in both states. It is the
+    # squattest thing the app meets in PORTRAIT — 1.46 and 1.42, where
+    # every other iPhone is about 2.16 — and the only device whose window
+    # changes size while the app is open, which is why check 4 below
+    # exists.
+    #
+    # Points derived, not published: Apple gives 1398x2034 at 460ppi
+    # folded and 1878x2670 at 430ppi open, and both ppi figures are the
+    # @3x family, so these are those divided by three. Correct them from
+    # the SDK once a build has actually run on one — the aspect ratios,
+    # which are what check 4 reads, barely move if the scale factor turns
+    # out to differ.
+    ("iPhone Duo folded", 466, 678),
+    ("iPhone Duo open", 626, 890),
+]
+
+# Sizes one device can move BETWEEN without the app being relaunched, as
+# (label, [size names]). Everything else in SIZES is a different device.
+#
+# This is the list that did not need to exist before a foldable did. The
+# app is portrait-only, so a window used to change size only when an iPad
+# Split View divider was dragged; a Duo changes it by being opened.
+RESIZE_GROUPS = [
+    ("folding a Duo", ["iPhone Duo folded", "iPhone Duo open"]),
+    ("dragging an iPad Split View divider",
+     ["iPad Slide Over", "iPad 1/2 split", "iPad mini"]),
 ]
 
 # How small the square playfield may get before a tray of dice stops
@@ -234,6 +260,65 @@ def main():
     print("  %-26s %s on %s at %.1f (minimum %d)"
           % ("smallest playfield", tightest[0], tightest[1], tightest[2],
              MIN_SCENE))
+
+    # --- 4. Only a sandbox may be reset by a resize. ------------------
+    #
+    # The arena is built for a SHAPE — PlayfieldLayout.compute takes an
+    # aspect ratio and a world-width constant, and nothing in it is in
+    # points — so a view that changes size keeps a valid arena and a view
+    # that changes SHAPE does not. DiceSceneView and DiceTraySceneView
+    # therefore re-assemble when the aspect drifts past
+    # `aspectRebuildThreshold`.
+    #
+    # Re-assembly re-deals the dice. In Free Roll that costs nothing; part
+    # way through a scored round it would throw the round away. So the
+    # threshold is only safe while the games that would be hurt by it
+    # CANNOT reach it, and that is a claim about five header fractions
+    # against every size a single device can move between — exactly the
+    # kind of claim that is true when written and false two commits later.
+    threshold = constant(source("PlayfieldLayout.swift"),
+                         "aspectRebuildThreshold")
+    # Rolls is not in SCREENS: it splits its bands inline, with its own
+    # fraction and its own 100, rather than through GameBandLayout. It is
+    # also the screen a reset would cost the most, so it is checked here
+    # explicitly rather than left out.
+    shell = code("DiceGameShell.swift")
+    rolls_fraction = float(re.search(
+        r"geo\.size\.height \* (0\.\d+)", shell).group(1))
+    rolls_floor = float(re.search(
+        r"minButtonHeight: CGFloat = (\d+)", shell).group(1))
+
+    by_name = {name: (w, h) for name, w, h in SIZES}
+    resettable = []
+    for label, fraction, band in (
+            [("Rolls", rolls_fraction, rolls_floor)]
+            + [(f.replace("Screen.swift", ""), fr, floor)
+               for f, fr in sorted(SCREENS.items())]):
+        for group, members in RESIZE_GROUPS:
+            ratios = []
+            for name in members:
+                width, height = by_name[name]
+                scene = min(width, max(height - height * fraction - band, 0))
+                ratios.append(width / scene if scene > 0 else float("inf"))
+            drift = max(ratios) - min(ratios)
+            if drift > threshold:
+                resettable.append((label, group, drift))
+
+    unexpected = [r for r in resettable if r[0] != "FreeRoll"]
+    for label, group, drift in unexpected:
+        failed.append("%s now re-assembles its arena on %s — the aspect "
+                      "drifts %.3f, past the %.3f threshold — so a resize "
+                      "would re-deal the dice part way through a scored "
+                      "turn. Either hold its playfield square at those "
+                      "sizes or give that screen a resize that does not "
+                      "reset it" % (label, group, drift, threshold))
+    if resettable and not unexpected:
+        print("  %-26s only FreeRoll, on %s (drift %.3f past %.3f)"
+              % ("resize re-deals", resettable[0][1], resettable[0][2],
+                 threshold))
+    elif not resettable:
+        print("  %-26s none at any size (threshold %.3f)"
+              % ("resize re-deals", threshold))
 
     if failed:
         print()

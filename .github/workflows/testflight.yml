@@ -90,9 +90,40 @@ jobs:
       # repo's verification — there is no Swift toolchain in the authoring
       # environment, so these run before the one place that can actually
       # build, not after.
+      # All of them, not a chosen two. They are the whole of this repo's
+      # verification — there is no Swift toolchain in the authoring
+      # environment — so they run before the one machine that can
+      # actually build, not after.
+      #
+      # tools_release_verify.py is the gate that matters most here: it
+      # fails while the bundle identifier is still the scaffold's
+      # placeholder, which is the one mistake that costs an app record
+      # rather than a build.
       - name: Run the verifiers
         working-directory: DiceGameCurrent/DiceGameCurrent
-        run: python3 tools_qualcheck.py && python3 tools_platform_verify.py
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet --upgrade pillow
+          for check in tools_*_verify.py; do
+            echo "--- $check"
+            python3 "$check"
+          done
+          python3 tools_qualcheck.py
+          python3 tools_guides_export.py --check
+
+      # The app icon is DERIVED and git-ignored — see the note in the
+      # .appiconset. Without this step the catalog is empty at build
+      # time, the archive succeeds, and Apple rejects it for having no
+      # icon. Exported to Icons/export and copied, because the same run
+      # also writes the Messages slots and a catalog full of files no
+      # Contents.json mentions warns on every build.
+      - name: Build the app icon
+        working-directory: DiceGameCurrent/DiceGameCurrent
+        run: |
+          set -euo pipefail
+          python3 tools_icon_export.py
+          cp Icons/export/AppIcon-1024.png \
+             ../../XcodeOnly/Assets.xcassets/AppIcon.appiconset/
 
       - name: Generate the project
         working-directory: DiceGameCurrent/DiceGameCurrent
@@ -140,8 +171,17 @@ jobs:
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          # TestFlight will not take a build number twice, and
+          # project.yml states 1. The run number only ever increases and
+          # is unique within the repository, so it cannot collide with
+          # itself the way a date or a commit count can. MARKETING_VERSION
+          # stays whatever project.yml says: that is the version testers
+          # see, and bumping it is a decision, not a side effect of
+          # pressing the button.
+          BUILD_NUMBER: ${{ github.run_number }}
         run: |
           set -euo pipefail
+          echo "Build number $BUILD_NUMBER"
           xcodebuild archive \
             -project HotDice.xcodeproj \
             -scheme HotDice \
@@ -151,7 +191,8 @@ jobs:
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
-            CODE_SIGN_STYLE=Automatic
+            CODE_SIGN_STYLE=Automatic \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
 
       - name: Export and upload to TestFlight
         env:

@@ -286,18 +286,38 @@ one file:
 iOS draws the rounded corners and the mask itself. An icon with an alpha
 channel fails App Store validation rather than looking wrong, so flatten it.
 
-  1. In the asset catalog select AppIcon.
-  2. In the Attributes inspector set  Single Size.
-  3. Drop the 1024 in.
+THE CATALOG IS NOW IN THE REPO. You no longer make it by hand:
 
-The masters live in Icons/, and the exported slots are built from them:
+    XcodeOnly/Assets.xcassets/AppIcon.appiconset/Contents.json
+
+is committed, already set to Single Size, and project.yml includes it. It
+sits in XcodeOnly/ for the same reason the launch storyboard does — Swift
+Playgrounds syncs the app folder and refused the storyboard outright, so
+anything only Xcode reads lives where only Xcode looks.
+
+What is NOT committed is the PNG the catalog names, because it is derived
+from Icons/Master icon Default.png and a committed copy is a copy that
+stops matching its master. So before every Xcode build:
 
     python3 tools_icon_export.py
+    cp Icons/export/AppIcon-1024.png \
+       ../../XcodeOnly/Assets.xcassets/AppIcon.appiconset/
 
 That writes Icons/export/ — the 1024 app icon and every Messages slot,
-all flattened, all square-cornered, none carrying alpha. Run it again
-whenever a master changes; the exports are derived files and are not
-meant to be edited.
+all flattened, all square-cornered, none carrying alpha — and copies the
+one file the catalog wants. Exported and copied rather than written
+straight into the catalog, because the same run also produces the eleven
+Messages slots and an .appiconset full of files no Contents.json mentions
+warns on every build.
+
+SKIPPING THE COPY IS NOT A BUILD ERROR. The app compiles, runs, archives
+— and Apple rejects the upload for having no icon. `tools_release_verify.py`
+checks that the catalog exists and asks for the filename the exporter
+actually writes; it cannot check that you ran it, because in a fresh
+clone the PNG is correctly absent.
+
+Run the exporter again whenever a master changes; the exports are derived
+files and are not meant to be edited.
 
 Icons/ also holds Dark and Clear masters. They are NOT exported and
 cannot be used here: dark, tinted and clear app icons are an iOS 18

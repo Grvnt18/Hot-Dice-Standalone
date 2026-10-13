@@ -37,10 +37,12 @@ Run this once from Terminal so the command line knows where Xcode is:
 
     sudo xcode-select --switch /Applications/Xcode.app
 
-(The build step that used to shout about this was the .dae conversion,
-and those files are no longer shipped — see the count below — so the
-log should be quiet either way now. Set it anyway: the next tool that
-shells out will want it too.)
+(The build step that shouts about this is the .dae conversion. This
+document used to claim those files were no longer shipped; six of them
+still were, so the warning appeared anyway. They are gone now — nothing
+ever loaded them, since the lookup finds the .obj first — and the log
+should be quiet. Set it anyway: the next tool that shells out will want
+it too.)
 
 
 ===============================================================================
@@ -184,7 +186,7 @@ WHAT SHOULD BE IN THE PROJECT — THE FULL COUNT
 ===============================================================================
 
 Select the Resources group in Xcode and the file count at the bottom
-should come to 162. By kind:
+should come to 156. By kind:
 
     70   .wav    sound effects — dice impacts, bats, gloves, pistols,
                  and the nine Royal UR piece moves sliced out of one take
@@ -199,13 +201,19 @@ should come to 162. By kind:
      6   .ttf    Poppins in five weights, and Lobster for the script
                  headings
 
-   162   total
+   156   total
+
+The rows above add up to the total, which they did not before: six .dae
+meshes were in the folder and in the total but had no row of their own,
+which is how they survived unnoticed. Nothing loaded them —
+DiceSceneBuilder tries .scn, then .obj, then .dae, and all six .obj are
+present — so they cost a build step and a warning and bought nothing.
 
 And 72 .swift files in SwiftFiles.
 
 To check from a terminal, in the repo:
 
-    ls DiceGameCurrent/DiceGameCurrent/Resources | wc -l        # 162
+    ls DiceGameCurrent/DiceGameCurrent/Resources | wc -l        # 156
     ls DiceGameCurrent/DiceGameCurrent/SwiftFiles/*.swift | wc -l   # 72
 
 

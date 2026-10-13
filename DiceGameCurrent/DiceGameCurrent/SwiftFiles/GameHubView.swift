@@ -323,6 +323,16 @@ private struct HubTitle: View {
                 // not just another tile at the top of the grid.
                 .frame(width: HubLayout.headerMark(forWidth: width),
                        height: HubLayout.headerMark(forWidth: width))
+                // The mark takes the shadow too, and AFTER the frame so it
+                // is cast by the artwork at the size it is drawn.
+                //
+                // The wordmark below got this and the mark above it did
+                // not, which is the half-fix: these are two halves of one
+                // logo, and the die is the larger half. The eleven tile
+                // icons use this exact line — same height, same pale ink —
+                // so the suite's own mark now sits on the hub the way its
+                // games do.
+                .elevated(.lifted, ink: .light)
 
             // The SUITE's name. Rolls is still a game in it — see
             // RollsGame.displayName, which keeps that title — but it stopped

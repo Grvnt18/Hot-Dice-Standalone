@@ -21,6 +21,43 @@ cloud is where you ship. That split is the whole reason
 .github/workflows/testflight.yml exists.
 
 -------------------------------------------------------------------------------
+EVERY DECISION, IN ONE PLACE
+-------------------------------------------------------------------------------
+
+Nine things are yours to choose. Seven of them are permanent or nearly
+so. Decide them before you start typing, because three of the forms below
+will not let you go back.
+
+  WHAT                   PERMANENT?   RECOMMENDATION
+  ---------------------------------------------------------------------------
+  Bundle identifier      YES          com.<yourname>.hotdice
+  App Store name         changeable   "Hot Dice" if free; have a fallback
+  SKU                    YES          hotdice
+  Primary category       changeable   Games, then a subcategory
+  Price                  changeable   Free
+  Version (1.0)          n/a          leave it; bump when you mean to
+  API key role           revocable    App Manager
+  Certificate type       n/a          Apple Distribution (NOT Development)
+  First tester group     n/a          Internal only, for the first build
+
+Three of these are worth a sentence each because the wrong answer costs
+real time:
+
+  * The BUNDLE IDENTIFIER cannot be changed once a build exists under it.
+    Not "is awkward to change" — you get a new app record and a fresh
+    TestFlight history.
+
+  * The APP STORE NAME must be unique across the whole App Store. "Hot
+    Dice" is a common phrase and may well be taken. Decide a fallback now
+    ("Hot Dice: Eleven Games", "Hot Dice Suite") so you are not inventing
+    one at the form. This is NOT the name on the home screen — that is
+    INFOPLIST_KEY_CFBundleDisplayName in project.yml, already "Hot Dice",
+    and it does not have to match.
+
+  * The SKU is permanent, private, and never shown to anyone. It exists
+    only so your own sales reports have a stable key. Do not overthink it.
+
+-------------------------------------------------------------------------------
 PART 0 — THE ONE THING THAT BLOCKS EVERYTHING
 -------------------------------------------------------------------------------
 

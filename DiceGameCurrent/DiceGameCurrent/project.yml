@@ -72,7 +72,12 @@ targets:
         # Resources are copied, not compiled — .obj and .ttf would
         # otherwise be handed to the Swift compiler.
         buildPhase: resources
-      - path: LaunchScreen.storyboard
+      # OUTSIDE the app folder on purpose. Swift Playgrounds refuses
+      # Interface Builder documents outright — "not supported" — and
+      # it syncs this folder, so a .storyboard sitting in it stops the
+      # iPad building the app at all. Xcode needs one and Playgrounds
+      # cannot have one, so it lives where only Xcode looks.
+      - path: ../../XcodeOnly/LaunchScreen.storyboard
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.example.hotdice

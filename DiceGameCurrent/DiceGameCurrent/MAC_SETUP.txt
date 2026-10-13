@@ -353,7 +353,14 @@ Match these or the handoff reads as a jump:
 THE LAUNCH SCREEN IS NOW IN THE REPO
 ===============================================================================
 
-`LaunchScreen.storyboard` is in the project folder, written to the spec
+`XcodeOnly/LaunchScreen.storyboard` is at the top of the repository — NOT
+in the project folder — and that location is the point. Swift Playgrounds
+refuses Interface Builder documents outright ("Interface Builder document
+not supported") and it syncs the project folder, so a .storyboard sitting
+in there stops the iPad building the app at all. Xcode needs one and
+Playgrounds cannot have one, so it lives where only Xcode looks.
+
+It is written to the spec
 above rather than laid out by hand. Drag it in and set it as the target's
 Launch Screen File (General tab); the XcodeGen route below does both.
 

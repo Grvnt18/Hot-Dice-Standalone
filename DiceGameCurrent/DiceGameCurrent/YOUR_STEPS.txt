@@ -74,7 +74,11 @@ There are two ways. The first is less clicking and I recommend it.
 
 12. Target → Deployment Info → tick PORTRAIT ONLY, untick the rest.
 
-13. Add LaunchScreen.storyboard and set it as the Launch Screen File.
+13. Add XcodeOnly/LaunchScreen.storyboard (it is at the TOP of the repo,
+    not in the project folder) and set it as the Launch Screen File.
+
+    It lives up there because Swift Playgrounds refuses storyboards and
+    syncs the project folder — one in there stops the iPad building.
 
   BOTH WAYS
 

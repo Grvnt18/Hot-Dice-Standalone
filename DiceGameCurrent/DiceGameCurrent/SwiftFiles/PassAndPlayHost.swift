@@ -312,7 +312,14 @@ struct HandoverGate: View {
 /// bands are explicitly golf-scored for Rolls ("Lower is better… bands run
 /// from 0 up"), which is wrong for every game but Rolls, so rather than
 /// generalise a Rolls-shaped thing this reads the winner off `TurnMatch`
-/// and says who won. Rolls keeps its own overlay untouched.
+/// and says who won.
+///
+/// Rolls now uses BOTH, and they are not in competition: the overlay ends
+/// a ROUND and praises the score that seat just made, and this ends the
+/// MATCH and says which of the seats won it. `RollsPassAndPlayHost` shows
+/// the first after every turn and the second after the last one. The
+/// direction comes from `RollsGame.lowestScoreWins`, so the lowest total
+/// wins here exactly as the overlay's bands assume.
 struct MatchResultView: View {
     let match: TurnMatch
     let onPlayAgain: () -> Void
@@ -420,5 +427,124 @@ struct MatchResultView: View {
         guard let outcome = match.outcome,
               case .special(_, let reason) = outcome else { return nil }
         return reason
+    }
+}
+
+// MARK: - Rolls
+
+/// Rolls, round the table.
+///
+/// **Rolls was the only game in the suite with no second player.** Its
+/// rules say two or more and `RollsGame.maxPlayers` is `Int.max`, but
+/// `DiceGameScreen` had no `TurnMatch`: one person banked fifteen dice,
+/// `TurnCompleteOverlay` showed a score and a praise word, and that was
+/// the whole game. The N-player part existed only in the Messages
+/// version, which reads seats off a conversation. So the standalone
+/// shipped the one game whose own guide describes an opponent without
+/// having one.
+///
+/// This is that opponent, and it is a HOST rather than a change to the
+/// Rolls screen. `DiceGameScreen` already has the seam — `onRoundFinished`
+/// hands back a `RollsPlayerResult` with the banked total on it, which is
+/// exactly what the extension consumes — so nothing inside the screen,
+/// its scene, its physics or its layout is touched. That matters more here
+/// than it would elsewhere: this is the code path that produced the settle
+/// crash, and the cheapest change to it is no change at all.
+///
+/// **One seed for the table.** Every seat is dealt the same fifteen dice,
+/// which is what makes the scores comparable — it is also what
+/// `RollsPayload` does for a conversation, for the same reason.
+///
+/// **No scoreboard strip over the board.** Every other game puts
+/// `MatchScoreboard` above its playfield; this one must not, because
+/// `DiceGameScreen` derives its square playfield from the height it is
+/// handed and a strip would quietly reshape the board — the same reason
+/// its own comment gives for drawing the back button in an overlay rather
+/// than a navigation bar. The handover gate before each turn and the
+/// result after the last one both show every seat's total, so nothing is
+/// hidden; it is just not shown while you roll.
+struct RollsPassAndPlayHost: View {
+
+    let onExit: () -> Void
+
+    @State private var match = TurnMatch.passAndPlay()
+
+    /// The deal, shared by every seat and re-minted per match.
+    @State private var seed = SeededGenerator.newSeed()
+
+    /// Forces a fresh `DiceGameScreen` for each seat.
+    ///
+    /// A finished round leaves its pool empty and its screen showing a
+    /// score, and the screen has no reset of its own — dismissing the
+    /// overlay only hides the overlay. Rebuilding the view is therefore
+    /// how a seat gets a round, and it has to be a token that only ever
+    /// counts up: `match.activeIndex` returns to 0 on "play again" and
+    /// `match.turnNumber` resets with the match, so either would hand the
+    /// first seat of the second match the spent screen from the first.
+    @State private var roundToken = 0
+
+    /// What the last seat scored, for the gate between turns.
+    @State private var lastSummary: String?
+
+    /// Whether the active seat is between the gate and their round.
+    ///
+    /// True at the start, so the first seat begins rolling rather than
+    /// being told to pass the device to themselves — which is what the
+    /// other ten games do, and why `HogScreen` starts at `.ready` rather
+    /// than `.handover`.
+    @State private var seatReady = true
+
+    var body: some View {
+        ZStack {
+            DiceGameScreen(onExit: onExit,
+                           onRoundFinished: { result in bank(result) },
+                           onRoundDismissed: { endTurn() },
+                           seed: seed)
+                .id(roundToken)
+
+            if match.isOver {
+                MatchResultView(match: match,
+                                onPlayAgain: startNewMatch,
+                                onExit: onExit)
+                    .transition(.opacity)
+            } else if !seatReady {
+                HandoverGate(match: match, lastTurnSummary: lastSummary) {
+                    seatReady = true
+                    roundToken += 1
+                }
+                .transition(.opacity)
+            }
+        }
+    }
+
+    /// The active seat's round is over. Records it; does NOT advance.
+    ///
+    /// Advancing here would be the bug this split exists to avoid: the
+    /// screen is still showing the player their own score at this point.
+    /// See `DiceGameScreen.onRoundDismissed`.
+    private func bank(_ result: RollsPlayerResult) {
+        lastSummary = "\(match.activeDisplayName) scored \(result.score)"
+        match.addScore(result.score)
+    }
+
+    /// The player has read their score. Next seat, or the result.
+    private func endTurn() {
+        if match.activeIsLastInRound {
+            // One round each — see GAME_RULES.txt, "Bank all 15 dice;
+            // lowest cumulative score wins". So the last seat's dismissal
+            // ends the match rather than opening a second round.
+            match.finish(lowestScoreWins: RollsGame.lowestScoreWins)
+            return
+        }
+        match.advanceTurn()
+        seatReady = false
+    }
+
+    private func startNewMatch() {
+        match = TurnMatch.passAndPlay()
+        seed = SeededGenerator.newSeed()
+        lastSummary = nil
+        seatReady = true
+        roundToken += 1
     }
 }

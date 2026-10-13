@@ -130,8 +130,24 @@ PART 4 — TEST IT  (this is the actual testing)
         handover screens and the result — including Rollbots, which draws
         its own chrome. (This used to be Settings → Players and is not
         there any more.)
-      - Rolls and Free Roll should go STRAIGHT in, with no setup screen.
-        Neither has a second player on this version.
+      - Free Roll should go STRAIGHT in, with no setup screen. It is a
+        sandbox with no scoring, so there is nobody to name.
+      - ROLLS NOW HAS PASS-AND-PLAY, and it is the thing most worth
+        testing in this build. It had none before: one person rolled
+        fifteen dice, got a score, and that was the game, even though its
+        own guide says two or more players.
+        Each seat rolls the SAME fifteen dice (one deal per match, which
+        is what makes the scores comparable), you get your own score
+        overlay, you tap it away, and then the handover screen names the
+        next player. Lowest total wins.
+        Watch for this specifically: the dice scene is torn down and
+        rebuilt between seats. That is the code path that produced the
+        settle crash, so play three or four full rounds back to back and
+        watch for a blank playfield, dice that never settle, or the Roll
+        button going dead on the second or third seat. Nothing in this
+        container can test that.
+        There is no SOLO Rolls any more — the picker starts at 2. Say so
+        if you want 1 back as an option.
       - Try Hog with four. The scoreboard should show four seats in one
         row and the turn should go round all four before the round
         number moves.

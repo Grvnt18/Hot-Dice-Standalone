@@ -246,8 +246,11 @@ enum GameCatalog {
     /// Hub order. Rolls and Free Roll open; the rest render as "Soon"
     /// tiles until each is built, in the order listed here.
     static let all: [GameCatalogEntry] = [
+        // The host, not the screen. `DiceGameScreen` is still the whole of
+        // Rolls and is untouched — see RollsPassAndPlayHost, which drives
+        // one of them per seat.
         GameCatalogEntry(RollsGame.self) { onExit in
-            AnyView(DiceGameScreen(onExit: onExit))
+            AnyView(RollsPassAndPlayHost(onExit: onExit))
         },
         GameCatalogEntry(GeneralsGame.self) { onExit in
             AnyView(GeneralsScreen(onExit: onExit))
@@ -338,13 +341,18 @@ enum RollsGame: SuiteGame {
     /// order, so a whole group chat can play at once.
     static let maxPlayers = Int.max
 
-    /// And one seat here, which is not a contradiction — see
-    /// `SuiteGame.localSeats`. `maxPlayers` is what the rules allow and is
-    /// what the Messages version acts on, reading seats off the
-    /// conversation. `DiceGameScreen` has no `TurnMatch`: it is one tray,
-    /// one running score and `TurnCompleteOverlay`. Until that changes
-    /// there is nobody for the setup gate to name.
-    static let localSeats = 1
+    /// Pass-and-play seats, as many as the scoreboard fits.
+    ///
+    /// This was 1, on the true-at-the-time reading that `DiceGameScreen`
+    /// has no `TurnMatch` — one tray, one score, `TurnCompleteOverlay`,
+    /// nobody to name. That made Rolls the one game in the suite whose own
+    /// guide describes an opponent it did not have, and skipping the setup
+    /// gate hid the gap rather than closing it.
+    ///
+    /// `RollsPassAndPlayHost` closes it: one `DiceGameScreen` per seat,
+    /// one shared deal, the handover gate between rounds. The screen
+    /// itself is still untouched.
+    static let localSeats = Int.max
 
     /// Points are penalties here — rolling a die's highest face scores 0.
     static let lowestScoreWins = true

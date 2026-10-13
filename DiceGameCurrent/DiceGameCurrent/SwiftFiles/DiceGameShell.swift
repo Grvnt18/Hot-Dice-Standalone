@@ -865,6 +865,20 @@ struct DiceGameScreen: View {
     /// `DiceTurnController.wireResult`.
     var onRoundFinished: ((RollsPlayerResult) -> Void)? = nil
 
+    /// Called when the player taps the finished-round overlay away.
+    ///
+    /// Separate from `onRoundFinished`, which fires the instant the last
+    /// die is banked — deliberately, so a Messages turn is sent whether
+    /// the player dismisses the overlay or walks off. Pass-and-play needs
+    /// the other moment: the score and its praise band are the player's
+    /// own reward for the round, and a host that advanced on
+    /// `onRoundFinished` would replace them with "Pass to <next>" before
+    /// they had been read.
+    ///
+    /// Nil everywhere else, including in the extension, which has nothing
+    /// to do at dismissal.
+    var onRoundDismissed: (() -> Void)? = nil
+
     /// The seed this round is dealt from.
     ///
     /// Fresh by default. The Messages extension passes the one carried in
@@ -1017,6 +1031,7 @@ struct DiceGameScreen: View {
             if let finishedScore {
                 TurnCompleteOverlay(score: finishedScore) {
                     self.finishedScore = nil
+                    onRoundDismissed?()
                 }
                 .transition(.opacity)
             }

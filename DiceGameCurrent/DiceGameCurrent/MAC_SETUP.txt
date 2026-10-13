@@ -431,15 +431,21 @@ Either route works. This one is worth knowing about for three reasons:
      many lines, with no usable error. It has broken the build on both
      machines at once. project.yml uses folder references, which cannot.
 
-  3. It states the Messages extension and the app together, including the
-     fact that both need the resources. `Bundle.main` inside an app
-     extension is the EXTENSION's bundle — eight call sites go through it
-     — so the 162 files genuinely have to be in both targets, and
-     remembering that by hand twice is how one of them ends up with 161.
+  3. It states the resources ONCE, as a folder, so the count cannot
+     drift. There are 156 of them and eight call sites reach them through
+     `Bundle.main`; a file on disk and not in the target produces no
+     error at all, just a missing texture or a silent sound. (This used to
+     describe a Messages extension needing its own copy, because
+     `Bundle.main` inside an app extension is the extension's own bundle.
+     That is true and it belongs to the OTHER repository — this one has a
+     single target.)
 
-The bundle identifiers in it are placeholders (`com.example.hotdice`).
-Change both — the app's and the extension's, which must be the app's with
-a suffix — to whatever you register with Apple.
+The bundle identifier is `com.solid.hotdice`, set in both of the places
+project.yml has to state it, and `tools_release_verify.py` passes on it.
+One identifier, not two: the standalone has no extension to give a
+suffixed one to. Registering it at developer.apple.com is still yours —
+see TESTFLIGHT.txt part 0, which is also the only moment it is free to
+change.
 
 
 ===============================================================================

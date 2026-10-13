@@ -30,7 +30,7 @@ will not let you go back.
 
   WHAT                   PERMANENT?   RECOMMENDATION
   ---------------------------------------------------------------------------
-  Bundle identifier      YES          com.<yourname>.hotdice
+  Bundle identifier      YES          com.solid.hotdice — SET
   App Store name         changeable   "Hot Dice" if free; have a fallback
   SKU                    YES          hotdice
   Primary category       changeable   Games, then a subcategory
@@ -43,9 +43,11 @@ will not let you go back.
 Three of these are worth a sentence each because the wrong answer costs
 real time:
 
-  * The BUNDLE IDENTIFIER cannot be changed once a build exists under it.
-    Not "is awkward to change" — you get a new app record and a fresh
-    TestFlight history.
+  * The BUNDLE IDENTIFIER is set to com.solid.hotdice and cannot be
+    changed once a build exists under it. Not "is awkward to change" —
+    you get a new app record and a fresh TestFlight history. It still
+    has to be REGISTERED at developer.apple.com, and that is the last
+    moment it is free to change: see part 0.
 
   * The APP STORE NAME must be unique across the whole App Store. "Hot
     Dice" is a common phrase and may well be taken. Decide a fallback now
@@ -58,35 +60,32 @@ real time:
     only so your own sales reports have a stable key. Do not overthink it.
 
 -------------------------------------------------------------------------------
-PART 0 — THE ONE THING THAT BLOCKS EVERYTHING
+PART 0 — THE BUNDLE IDENTIFIER (done in the repo, not yet at Apple)
 -------------------------------------------------------------------------------
 
-0. CHOOSE YOUR BUNDLE IDENTIFIER, and change it in the repo.
+0. com.solid.hotdice
 
-   Right now it is `com.example.hotdice`. That is a placeholder nobody
-   owns and Apple will not accept it.
+   Set in project.yml, in both of the places it has to be stated, and
+   `tools_release_verify.py` passes. Nothing is left to do here.
 
-   Convention is your domain backwards. You do not need to own the
-   domain — it only has to be unique and yours by claim — so if you have
-   no domain, something like `com.grvnt18.hotdice` is fine. All lower
-   case, letters, digits, hyphens and dots only.
+   What is NOT done is registering it, which is part 3 step 10 and is
+   yours — the gate cannot see Apple's side. Until that registration
+   exists, the archive step fails with a provisioning complaint rather
+   than anything that names the real cause.
 
-   THIS IS EFFECTIVELY PERMANENT. Once a build exists under an
-   identifier, changing it means a new app record and a fresh TestFlight
-   history. Decide once.
+   ONE THING TO WATCH AT REGISTRATION. A bundle identifier has to be
+   unique across every Apple developer account, not just yours, and
+   `com.solid.*` is a generic enough prefix that somebody may already
+   hold it. If developer.apple.com refuses the registration, that is
+   what happened, and the moment to pick another string is THEN —
+   before any build exists under it. After the first upload the
+   identifier is effectively permanent: changing it means a new app
+   record and a fresh TestFlight history.
 
-   Change it in TWO places in DiceGameCurrent/DiceGameCurrent/project.yml:
-
-       bundleIdPrefix: com.example.hotdice          <- here
-       PRODUCT_BUNDLE_IDENTIFIER: com.example.hotdice   <- and here
-
-   Then check it took:
+   If you do change it, change it in the same two places and re-run:
 
        cd DiceGameCurrent/DiceGameCurrent
        python3 tools_release_verify.py
-
-   It fails today on exactly this and passes on everything else. When it
-   says PASS, the repo is shippable. Nothing below works until it does.
 
 -------------------------------------------------------------------------------
 PART 1 — ON THE MAC (once)

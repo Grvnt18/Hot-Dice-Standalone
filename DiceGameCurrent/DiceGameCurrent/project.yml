@@ -45,25 +45,27 @@
 
 name: HotDice
 # ----------------------------------------------------------------------
-# THE ONE THING YOU MUST CHANGE BEFORE A RELEASE BUILD
+# THE BUNDLE IDENTIFIER — com.solid.hotdice
 #
-# `com.example.hotdice` is a placeholder and Apple will not take it: the
-# bundle identifier has to be one registered to your team, conventionally
-# your domain backwards. Change it in BOTH places below — the prefix here
-# and PRODUCT_BUNDLE_IDENTIFIER on the target — and register the same
-# string in App Store Connect before the first upload.
+# Set, and stated TWICE on purpose: the prefix below and
+# PRODUCT_BUNDLE_IDENTIFIER on the target. Which one Apple reads depends
+# on the target, and a target whose identifier is not under the project's
+# prefix is the shape that gets one of two bundle ids registered and not
+# the other. `tools_release_verify.py` checks they agree.
 #
-# It is effectively permanent. Once a build exists under an identifier,
-# changing it means a new app record and a new TestFlight history, so this
-# is worth getting right rather than fast.
+# **Treat it as permanent.** Once a build exists under an identifier,
+# changing it means a new app record and a fresh TestFlight history. The
+# one moment it is still free to change is before the first upload: if
+# Apple refuses the registration because somebody else holds
+# `com.solid.*`, pick another now rather than working around it later.
 #
-# `tools_release_verify.py` FAILS while the placeholder is still here, and
-# the TestFlight workflow runs it before it archives — so a build cannot
-# reach Apple under a name that is not yours.
+# It also has to be registered, by hand, at developer.apple.com ->
+# Identifiers, with this exact string. The gate cannot check that for
+# you; the archive step is where a missing registration shows up.
 # ----------------------------------------------------------------------
 
 options:
-  bundleIdPrefix: com.example.hotdice
+  bundleIdPrefix: com.solid.hotdice
   deploymentTarget:
     iOS: "16.0"
   createIntermediateGroups: true
@@ -113,7 +115,7 @@ targets:
       - path: ../../XcodeOnly/Assets.xcassets
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.hotdice
+        PRODUCT_BUNDLE_IDENTIFIER: com.solid.hotdice
         # The INFOPLIST_KEY_* settings below only do anything when this is
         # on: they are inputs to a GENERATED Info.plist, not edits to a
         # file. Without it they are silently ignored — and the one that

@@ -120,21 +120,19 @@ struct SettingsView: View {
                         // scroll.
                         howToPlayButton
 
-                        // Players first, under How to Play: it is the one
-                        // panel here that changes what the games SAY rather
-                        // than how they sound or look, and it is the first
-                        // thing two people setting up a match want.
-                        panel("Players",
-                              footer: AnyView(
-                                Text("Used on the scoreboards, the handover "
-                                     + "screens and the result. Leave one "
-                                     + "blank for \"Player 1\" and "
-                                     + "\"Player 2\".")
-                                    .font(.poppins(11)))) {
-                            ForEach(0..<PlayerNames.seatCount, id: \.self) { seat in
-                                PlayerNameField(seat: seat)
-                            }
-                        }
+                        // No Players panel. It was here, directly under How
+                        // to Play, and it asked the right question in the
+                        // wrong place: a player had to find a setting
+                        // before their first game to be called anything
+                        // but "Player 1", and the panel asked for exactly
+                        // two names in a suite where four of the games
+                        // seat more than two.
+                        //
+                        // `MatchSetupView` asks instead, as the game
+                        // opens, and asks for as many names as the match
+                        // actually has. `PlayerNameField` moved with it
+                        // unchanged — this was only ever where it was
+                        // shown.
 
                         panel("Music", footer: AnyView(scopeNote(perGame: !sharedAudio))) {
                             Toggle("Music", isOn: $sound.musicEnabled)

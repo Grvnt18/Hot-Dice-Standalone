@@ -204,6 +204,11 @@ enum FreighterYachtDinghyGame: SuiteGame {
     /// TurnMatch.local(playerCount:).
     static let maxPlayers = Int.max
 
+    /// Pass-and-play seats the gate offers: as many as the scoreboard
+    /// fits, which `MatchSetup.maxSeats` decides. `Int.max` here is the
+    /// same claim `maxPlayers` makes, and it is true of this screen too —
+    /// it hosts a `TurnMatch` and labels every seat in it.
+    static let localSeats = Int.max
 
     /// The full name is three words and two full stops, which at 45% of
     /// the playfield width would be unreadable under the dice.

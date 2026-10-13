@@ -4,7 +4,7 @@ struct GeneralsScreen: View {
 
     var onExit: (() -> Void)? = nil
 
-    @State private var match = TurnMatch.localTwoPlayer(seatSequence: GeneralsRules.snakeOrder)
+    @State private var match = TurnMatch.passAndPlay(seatSequence: GeneralsRules.snakeOrder)
     @State private var card = GeneralsCard()
     @State private var session: DiceTraySession?
     @State private var hand: [Int] = []
@@ -304,7 +304,7 @@ struct GeneralsScreen: View {
     }
 
     private func startNewMatch() {
-        match = TurnMatch.localTwoPlayer(seatSequence: GeneralsRules.snakeOrder)
+        match = TurnMatch.passAndPlay(seatSequence: GeneralsRules.snakeOrder)
         card = GeneralsCard()
         lastSummary = nil
         session?.setPool(GeneralsRules.makeDice())

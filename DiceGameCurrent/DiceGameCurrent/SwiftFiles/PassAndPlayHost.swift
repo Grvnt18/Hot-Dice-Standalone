@@ -30,7 +30,14 @@ struct MatchScoreboard: View {
             VStack(spacing: 4) {
                 if let totalRounds {
                     Text("Round \(min(match.round, totalRounds)) of \(totalRounds)")
-                        .font(.poppins(12))
+                        // Semibold throughout this strip and the bar below
+                        // it. Everything here is small white type over
+                        // timber at reduced opacity, and regular Poppins at
+                        // 11 and 12 has strokes narrower than the grain it
+                        // is printed on — which is exactly the state the
+                        // header of Rolls was in, and the same fix applies
+                        // to the ten games that use this instead.
+                        .font(.poppins(12, .semibold))
                         .foregroundStyle(.white.opacity(0.75))
                         .frame(maxWidth: .infinity)
                         .multilineTextAlignment(.center)
@@ -43,8 +50,11 @@ struct MatchScoreboard: View {
                 }
 
                 if let subtitle, !subtitle.isEmpty {
+                    // "<name> to roll" and the other phase lines — see
+                    // each screen's `statusLine`. The white text the
+                    // request named.
                     Text(subtitle)
-                        .font(.poppins(11))
+                        .font(.poppins(11, .semibold))
                         .foregroundStyle(.white.opacity(0.7))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
@@ -68,8 +78,26 @@ struct MatchScoreboard: View {
         let isActive = participant == match.activeParticipant && !match.isOver
         return VStack(spacing: 1) {
             Text(match.displayName(for: participant))
-                .font(.poppins(11))
+                .font(.poppins(11, .semibold))
                 .foregroundStyle(.white.opacity(isActive ? 0.95 : 0.6))
+                // Shrink rather than wrap, now that these are typed names
+                // at up to twelve characters and there can be four of them
+                // across the strip.
+                //
+                // Measured off Poppins-SemiBold at 11pt: four tiles on the
+                // narrowest phone this app meets (375pt, iPhone SE) come to
+                // 80.2pt each, and a twelve-character name sets at about
+                // 75pt — "Alexandria W" is 74.7. So it fits, and this fires
+                // only for a name of unusually wide glyphs: twelve capital
+                // Ms is 118.7pt, which scales to 83pt at the 0.7 floor and
+                // still truncates. Without the two lines the tile grows a
+                // SECOND LINE instead, and the whole strip changes height
+                // the moment somebody types a long name.
+                //
+                // Four is also why `MatchSetup.maxSeats` is four — see
+                // there; this is the measurement it is standing on.
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
             Text("\(match.score(for: participant))")
                 .font(.poppins(22, .semibold))
                 .foregroundStyle(.white.opacity(isActive ? 1 : 0.65))
@@ -167,8 +195,10 @@ struct TurnActionBar: View {
             }
 
             if !subtitle.isEmpty {
+                // The line beneath the buttons, matching the roll button's
+                // own — see DiceRollButton.
                 Text(subtitle)
-                    .font(.poppins(12))
+                    .font(.poppins(12, .semibold))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -245,7 +275,7 @@ struct HandoverGate: View {
                     ForEach(match.participants, id: \.self) { participant in
                         VStack(spacing: 2) {
                             Text(match.displayName(for: participant))
-                                .font(.poppins(11))
+                                .font(.poppins(11, .semibold))
                                 .foregroundStyle(.white.opacity(0.7))
                             Text("\(match.score(for: participant))")
                                 .font(.poppins(24, .bold))
@@ -317,7 +347,7 @@ struct MatchResultView: View {
 
                 if let reason {
                     Text(reason)
-                        .font(.poppins(14))
+                        .font(.poppins(14, .semibold))
                         .foregroundStyle(.white.opacity(0.85))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 30)
@@ -327,7 +357,7 @@ struct MatchResultView: View {
                     ForEach(match.participants, id: \.self) { participant in
                         VStack(spacing: 2) {
                             Text(match.displayName(for: participant))
-                                .font(.poppins(11))
+                                .font(.poppins(11, .semibold))
                                 .foregroundStyle(.white.opacity(0.7))
                             Text("\(match.score(for: participant))")
                                 .font(.poppins(30, .bold))

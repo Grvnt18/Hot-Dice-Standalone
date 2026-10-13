@@ -112,6 +112,11 @@ enum FreeRollGame: SuiteGame {
     /// protocol honest rather than letting the two-player default stand.
     static let maxPlayers = 1
 
+    /// Nobody to seat, so the setup gate skips itself — see
+    /// `MatchSetupGate`. There is no `TurnMatch` on this screen and
+    /// nothing on it is labelled with a name.
+    static let localSeats = 1
+
     static let rules: [GameRuleSection] = [
         GameRuleSection(
             title: "Overview",

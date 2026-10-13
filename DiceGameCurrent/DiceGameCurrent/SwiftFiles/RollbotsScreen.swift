@@ -4,7 +4,7 @@ struct RollbotsScreen: View {
 
     var onExit: (() -> Void)? = nil
 
-    @State private var match = TurnMatch.localTwoPlayer()
+    @State private var match = TurnMatch.passAndPlay()
     @State private var state = RollbotsState(
         weapons: [.monoBlade, .monoBlade],
         ware: [.corrosiveVirus, .corrosiveVirus]
@@ -867,7 +867,7 @@ struct RollbotsScreen: View {
     }
 
     private func startNewMatch() {
-        match = TurnMatch.localTwoPlayer()
+        match = TurnMatch.passAndPlay()
         state = RollbotsState(weapons: [.monoBlade, .monoBlade],
                               ware: [.corrosiveVirus, .corrosiveVirus])
         setupSeat = 0

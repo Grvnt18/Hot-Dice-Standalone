@@ -127,7 +127,13 @@ struct GameHubView: View {
         // exactly as it had when it was the root, and the game draws its
         // own back control via onExit.
         .fullScreenCover(item: $openGame) { entry in
-            entry.makeView({ openGame = nil })
+            // Through the setup gate, not straight to the game: the names
+            // and the seat count have to be answered BEFORE the game's
+            // view is constructed, because each screen builds its
+            // `TurnMatch` in a property initialiser. See MatchSetupGate,
+            // which also skips itself for the two screens that seat
+            // nobody — Rolls and Free Roll.
+            MatchSetupGate(entry: entry, onExit: { openGame = nil })
                 // One border round the whole game — see .gameFrame. Here
                 // rather than on each of the eleven screens, because this
                 // is the one place every one of them is presented.
@@ -160,23 +166,21 @@ struct GameHubView: View {
     }
 
     private var settingsButton: some View {
-        Button {
-            SoundEngine.shared.play(.buttonTap)
+        // `OverlayChromeButton` itself, not a copy of it.
+        //
+        // This was a hand-built lookalike: the same glyph at the same size
+        // with the same padding, over a `.solid` fill of the floor's
+        // backdrop colour at 0.85. That is a different plate from the one
+        // the ten in-game buttons wear — a black wash at 0.5 over whatever
+        // is behind it — and the tone was tuned twice trying to close a gap
+        // that only existed because there were two implementations.
+        //
+        // There is now one. The hub's gear and a game's gear are the same
+        // control, so they cannot drift again, and the sound and the 10pt
+        // margin come with it rather than being repeated here.
+        OverlayChromeButton(systemName: "gearshape.fill") {
             showingSettings = true
-        } label: {
-            // The same control as the one in a game — see DiceGameShell's
-            // back and settings buttons. It was a plain black wash on a
-            // rounded rectangle, which is the only chrome in the app that
-            // was neither a pixelPanel nor the floor's own tone.
-            Image(systemName: "gearshape.fill")
-                .font(.system(size: 18))
-                .foregroundStyle(.white.opacity(0.9))
-                .padding(9)
-                .pixelPanel(fill: .solid(SmokeFloor.backdropColor
-                                            .opacity(HubLayout.chromePlate)),
-                            elevation: .piece)
         }
-        .padding(10)
     }
 }
 
@@ -291,42 +295,6 @@ enum HubLayout {
     static func iconSide(tile: CGFloat) -> CGFloat {
         max(40, tile - inset * 2 - labelHeight(tile: tile) - gap)
     }
-
-    // MARK: Chrome over timber
-    //
-    // The in-game back and settings buttons wear the field's darkest tone
-    // at 0.85 (DiceGameShell). The hub wears the SAME control over the
-    // timber instead of over the field, and 0.85 of a near-black tone on
-    // light timber is not translucent — it is a dark block. Matching the
-    // in-game button means matching how it READS, which is a lower number
-    // here, not the same number.
-    //
-    // Measured, compositing SmokeFloor.backdrop over the #AE7B5B timber
-    // and taking the WCAG ratio against the glyph:
-    //
-    //            white glyph        black artwork
-    //   0.10     4.1 : 1  (fails)   5.1 : 1
-    //   0.20     4.7 : 1            4.4 : 1
-    //   0.30     5.3 : 1            3.8 : 1
-    //   0.55     7.3 : 1            2.6 : 1
-    //
-    // (Green, Midnight Navy and Crimson all within 0.2 of each other, so
-    // the choice holds for every swatch.)
-
-    /// Behind the settings gear.
-    ///
-    /// **The same number as the in-game button, deliberately.** This was
-    /// 0.30 for a measured reason — 0.85 of a near-black tone over light
-    /// timber is a dark block rather than a translucent plate — but
-    /// "matches the in-game button" was the actual requirement and 0.30
-    /// did not match it. Two controls that are the same control have to
-    /// look the same; the tone is the thing being matched, not the
-    /// translucency, and at 0.85 the white glyph sits at 10.4:1 rather
-    /// than 5.3:1, so nothing is lost on legibility either.
-    ///
-    /// If this ever moves, the in-game buttons in DiceGameShell move with
-    /// it or they stop matching again.
-    static let chromePlate: Double = 0.85
 }
 
 // MARK: - Title
@@ -377,11 +345,23 @@ private struct HubTitle: View {
                 .foregroundStyle(.black)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
-                // No shadow. It had a pale one, which is what made it read
-                // as a different KIND of text from the eleven names below
-                // it — those sit flat on the timber in the same ink and the
-                // same weight, and the mark is now one of them rather than
-                // a sign hung above them.
+                // The pale shadow, back — and it is the eleven tiles below
+                // that decide this, not a preference about the mark.
+                //
+                // It was taken off on the reasoning that the mark should
+                // read as one of the eleven names rather than as a sign
+                // hung above them. The names are not what sits under it:
+                // each tile's ARTWORK carries `.elevated(.lifted, ink:
+                // .light)` and its own comment says "pale, matching the
+                // wordmark above". Removing this made that comment false
+                // and left the one black element on the screen without the
+                // treatment every other black element on it has.
+                //
+                // `.lifted` because the ladder names this exact use — see
+                // Elevation, "the hub's wordmark, a card held out" — and
+                // `.light` because the hub is the one screen where the ink
+                // and a dark shadow would be the same colour.
+                .elevated(.lifted, ink: .light)
         }
     }
 }

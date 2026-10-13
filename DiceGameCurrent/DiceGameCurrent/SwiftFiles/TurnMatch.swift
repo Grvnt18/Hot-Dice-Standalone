@@ -211,10 +211,23 @@ extension TurnMatch {
 
 extension TurnMatch {
 
-    /// A local two-player match. Ids are arbitrary but stable within the
-    /// match, which is all anything here needs.
-    static func localTwoPlayer(seatSequence: [Int]? = nil) -> TurnMatch {
-        local(playerCount: 2, seatSequence: seatSequence)
+    /// The match the eleven screens open with. Ids are arbitrary but
+    /// stable within the match, which is all anything here needs.
+    ///
+    /// This was `localTwoPlayer()`, which took no argument and built two
+    /// seats — correct while two was the only number the app could ask
+    /// for. `MatchSetupView` now asks, so the count comes from
+    /// `MatchSetup`, and every screen's "play again" path gets the same
+    /// roster back for free because it reads the same stored answer rather
+    /// than a literal.
+    ///
+    /// Nothing is passed in because there is nothing to pass: each screen
+    /// builds this in a property initialiser, before it has an
+    /// environment, a geometry or a reference to the hub. See
+    /// `MatchSetup.currentSeatCount` for how that resolves.
+    static func passAndPlay(seatSequence: [Int]? = nil) -> TurnMatch {
+        local(playerCount: MatchSetup.currentSeatCount,
+              seatSequence: seatSequence)
     }
 
     /// A local match for any number of seats.

@@ -347,7 +347,7 @@ enum GameWireCheck {
     /// Free Roll is absent on purpose: it is solo and `isSendable` is false,
     /// so it has no turn to send and no state to carry.
     static func runAll() -> [Result] {
-        // `messagesShaped`, not `localTwoPlayer`. This panel existed to
+        // `messagesShaped`, not `passAndPlay`. This panel existed to
         // report the real byte cost and was reporting the cost of
         // pass-and-play instead: `local.1` is seven characters where an
         // `MSConversation` participant is a 36-character UUID, and each

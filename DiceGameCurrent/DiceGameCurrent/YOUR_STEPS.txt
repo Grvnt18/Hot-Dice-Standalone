@@ -123,12 +123,27 @@ PART 4 — TEST IT  (this is the actual testing)
     playfield is blank or the buttons stop responding IN THE SIMULATOR,
     try it on the iPad before reporting it.
 
-20. The two things that are new in this version:
-      - Settings → Players. Type two names. They should appear on every
-        scoreboard, both handover screens and the result — including
-        Rollbots, which draws its own chrome.
+20. The things that are new in this version:
+      - Tap any game and a setup screen appears BEFORE it: names, and a
+        2/3/4 picker on Hog, Three Thousand and Freighter.Yacht.Dinghy.
+        Type two names. They should appear on every scoreboard, both
+        handover screens and the result — including Rollbots, which draws
+        its own chrome. (This used to be Settings → Players and is not
+        there any more.)
+      - Rolls and Free Roll should go STRAIGHT in, with no setup screen.
+        Neither has a second player on this version.
+      - Try Hog with four. The scoreboard should show four seats in one
+        row and the turn should go round all four before the round
+        number moves.
       - The handover screen says "Pass to <name>", not "Over to". That is
         the whole point of this version: one device, going round.
+      - The gear on the hub should now be identical to the gear inside a
+        game — same plate, same tone. Hold the two screens side by side.
+      - "HOT DICE" at the top should carry the same pale drop shadow the
+        eleven tile icons under it have.
+      - In Rolls, the three odd-shaped empty slots at the end of the bank
+        (triangle, diamond, pentagon) should have the same edge as the
+        twelve squares: no spikes poking out of the corners.
 
 21. Things worth checking because no automated check can:
       - does every game's roll button look the same as Rolls'

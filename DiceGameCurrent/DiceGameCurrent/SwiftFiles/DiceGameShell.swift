@@ -306,7 +306,12 @@ struct DiceScoreBar: View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Score")
-                    .font(.poppins(14))
+                    // Semibold, like every other small caption in the two
+                    // bands — see TurnActionBar and the roll button's own
+                    // subtitle. Regular Poppins at 14 on timber is the one
+                    // weight in the app that loses to its background: the
+                    // strokes are thinner than the wood grain behind them.
+                    .font(.poppins(14, .semibold))
                     .foregroundStyle(.secondary)
                 Text("\(score)")
                     .font(.poppins(40, .bold)) // was 36 — enlarged further alongside the cells
@@ -445,12 +450,39 @@ struct DiceScoreBar: View {
             // border this replaces was the one piece of chrome that could not
             // survive the restyle: a 0.5pt dashed stroke is sub-pixel on every
             // device the app runs on, which is the opposite of pixel art.
+            //
+            // That comment described two layers and only one was here: a
+            // bare `stroke` and no bevel at all. Both halves of the gap
+            // showed on the three RESERVED slots and not on the twelve
+            // squares, which is why this read as a d8/d10/d12 problem —
+            //
+            //   * `stroke` centres the line on the path, so half of it
+            //     falls OUTSIDE the shape. On a rounded rectangle that is
+            //     half a point of overhang nobody sees. On a polygon it is
+            //     a mitre: three acute vertices, each throwing a spike well
+            //     past the slot it belongs to. `strokeBorder` — which is
+            //     what every filled slot already uses, and what `DieSlot`
+            //     is an InsettableShape in order to allow — draws the line
+            //     wholly inside instead.
+            //   * and with no bevel the outline is a border rather than a
+            //     turned edge, so a polygon whose only cue is its outline
+            //     lost more of its form than a square did.
+            //
+            // So: the filled slot's composition exactly, with the bevel
+            // reversed because this one is sunk. Same shape, same widths,
+            // same order — bevel inset inside the outline, outline over it.
             Color.clear
                 .frame(width: width, height: height)
                 .overlay(
                     DieSlot(kind: shape(at: index))
-                        .stroke(PixelPanel.outlineColor.opacity(0.55),
-                                lineWidth: PixelPanel.cellOutline)
+                        .inset(by: PixelPanel.cellOutline)
+                        .strokeBorder(PieceSheen.bevelSunk,
+                                      lineWidth: PixelPanel.cellBevel)
+                )
+                .overlay(
+                    DieSlot(kind: shape(at: index))
+                        .strokeBorder(PixelPanel.outlineColor.opacity(0.55),
+                                      lineWidth: PixelPanel.cellOutline)
                 )
         }
     }
@@ -515,7 +547,13 @@ struct DiceRollButton: View {
 
             if !subtitle.isEmpty {
                 Text(subtitle)
-                    .font(.poppins(12))
+                    // Semibold. This is the line under the roll button —
+                    // the selection count, the bust warning, whose turn it
+                    // is — and it sits on timber in `.secondary`, which is
+                    // already a reduced ink. Regular weight on top of that
+                    // was two reductions on the one line in the band that
+                    // says what to do next.
+                    .font(.poppins(12, .semibold))
                     .foregroundStyle(.secondary)
                     // One line, like TurnActionBar's. Without this it
                     // wraps on a narrow screen and the band it sits in —

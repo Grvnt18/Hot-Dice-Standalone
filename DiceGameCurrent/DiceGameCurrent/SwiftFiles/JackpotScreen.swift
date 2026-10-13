@@ -4,7 +4,7 @@ struct JackpotScreen: View {
 
     var onExit: (() -> Void)? = nil
 
-    @State private var match = TurnMatch.localTwoPlayer()
+    @State private var match = TurnMatch.passAndPlay()
     @State private var session: DiceTraySession?
     @State private var phase: Phase = .ready
     @State private var lastSummary: String?
@@ -273,7 +273,7 @@ struct JackpotScreen: View {
     }
 
     private func startNewMatch() {
-        match = TurnMatch.localTwoPlayer()
+        match = TurnMatch.passAndPlay()
         jackpotsThisRound.removeAll()
         lastSummary = nil
         session?.setPool(JackpotRules.makeDice())

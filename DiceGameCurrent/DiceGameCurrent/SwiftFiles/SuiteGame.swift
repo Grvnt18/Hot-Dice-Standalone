@@ -36,6 +36,22 @@ protocol SuiteGame {
     /// has no ceiling beyond what a group chat contains.
     static var maxPlayers: Int { get }
 
+    /// How many seats this game's PASS-AND-PLAY screen actually runs.
+    ///
+    /// Not the same claim as `maxPlayers`, and conflating the two would
+    /// have shipped a bug. `maxPlayers` is what the RULES allow, which is
+    /// why Rolls is `Int.max` — a single round has no turn order, so a
+    /// whole group chat can play it. But Rolls' standalone screen has no
+    /// `TurnMatch` at all: it is one tray, one score and
+    /// `TurnCompleteOverlay`, and multi-seat Rolls is a thing the Messages
+    /// version does by reading a conversation's participants. Asking who
+    /// is playing before it would be asking a question with no consumer.
+    ///
+    /// So this is what `MatchSetupView` offers, and it is a claim about
+    /// the screen rather than about the game. One means "does not seat
+    /// anybody" and skips the gate entirely — Free Roll and Rolls.
+    static var localSeats: Int { get }
+
     /// Whether the lowest score wins.
     ///
     /// Rolls is golf-scored — its points are penalties, so 0 is perfect.
@@ -74,6 +90,12 @@ extension SuiteGame {
     // Sensible defaults: two players, high score wins, sendable. A game only
     // states what makes it unusual.
     static var maxPlayers: Int { 2 }
+
+    /// Two, which is right for six of the eleven and for every game whose
+    /// screen hosts a `TurnMatch` with a fixed pair. The three that seat
+    /// more say so; the two that seat nobody say one.
+    static var localSeats: Int { 2 }
+
     static var floorTitle: String { displayName }
 
     /// The full name, for the ten games it fits.
@@ -171,6 +193,12 @@ struct GameCatalogEntry: Identifiable {
     /// truncated into a game two of the five participants are playing.
     let maxPlayers: Int
 
+    /// How many seats pass-and-play offers — `SuiteGame.localSeats`.
+    ///
+    /// Carried here because the hub's setup gate is the only thing that
+    /// reads it, and the hub has an entry rather than a type.
+    let localSeats: Int
+
     init(
         id: String,
         displayName: String,
@@ -179,6 +207,7 @@ struct GameCatalogEntry: Identifiable {
         rules: [GameRuleSection] = [],
         isSendable: Bool = true,
         maxPlayers: Int = 2,
+        localSeats: Int = 2,
         makeView: @escaping (@escaping () -> Void) -> AnyView
     ) {
         self.id = id
@@ -188,6 +217,7 @@ struct GameCatalogEntry: Identifiable {
         self.rules = rules
         self.isSendable = isSendable
         self.maxPlayers = maxPlayers
+        self.localSeats = localSeats
         self.makeView = makeView
     }
 
@@ -205,6 +235,7 @@ struct GameCatalogEntry: Identifiable {
             rules: G.rules,
             isSendable: G.isSendable,
             maxPlayers: G.maxPlayers,
+            localSeats: G.localSeats,
             makeView: makeView
         )
     }
@@ -242,11 +273,14 @@ enum GameCatalog {
         GameCatalogEntry(BaseballDiceGame.self) { onExit in
             AnyView(BaseballDiceScreen(onExit: onExit))
         },
-        GameCatalogEntry(FreeRollGame.self) { onExit in
-            AnyView(FreeRollScreen(onExit: onExit))
-        },
         GameCatalogEntry(JackpotGame.self) { onExit in
             AnyView(JackpotScreen(onExit: onExit))
+        },
+        // Last, and that is the point: Free Roll is the only solo entry —
+        // a sandbox with no opponent and no win condition — so it sits
+        // below the ten games rather than between two of them.
+        GameCatalogEntry(FreeRollGame.self) { onExit in
+            AnyView(FreeRollScreen(onExit: onExit))
         }
     ]
 }
@@ -303,6 +337,14 @@ enum RollsGame: SuiteGame {
     /// The only game with no player ceiling: a single round has no turn
     /// order, so a whole group chat can play at once.
     static let maxPlayers = Int.max
+
+    /// And one seat here, which is not a contradiction — see
+    /// `SuiteGame.localSeats`. `maxPlayers` is what the rules allow and is
+    /// what the Messages version acts on, reading seats off the
+    /// conversation. `DiceGameScreen` has no `TurnMatch`: it is one tray,
+    /// one running score and `TurnCompleteOverlay`. Until that changes
+    /// there is nobody for the setup gate to name.
+    static let localSeats = 1
 
     /// Points are penalties here — rolling a die's highest face scores 0.
     static let lowestScoreWins = true

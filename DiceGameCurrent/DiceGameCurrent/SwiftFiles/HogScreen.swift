@@ -4,7 +4,7 @@ struct HogScreen: View {
 
     var onExit: (() -> Void)? = nil
 
-    @State private var match = TurnMatch.localTwoPlayer()
+    @State private var match = TurnMatch.passAndPlay()
     @State private var session: DiceTraySession?
     @State private var turnTotal = 0
     @State private var phase: Phase = .ready
@@ -278,7 +278,7 @@ struct HogScreen: View {
     }
 
     private func startNewMatch() {
-        match = TurnMatch.localTwoPlayer()
+        match = TurnMatch.passAndPlay()
         lastSummary = nil
         session?.setPool(HogRules.makeDice())
         beginTurn()

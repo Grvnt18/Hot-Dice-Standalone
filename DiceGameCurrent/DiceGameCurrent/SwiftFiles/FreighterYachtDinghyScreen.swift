@@ -4,7 +4,7 @@ struct FreighterYachtDinghyScreen: View {
 
     var onExit: (() -> Void)? = nil
 
-    @State private var match = TurnMatch.localTwoPlayer()
+    @State private var match = TurnMatch.passAndPlay()
     @State private var session: DiceTraySession?
     @State private var turn = FreighterYachtDinghyRules.Turn()
     @State private var phase: Phase = .ready
@@ -408,7 +408,7 @@ struct FreighterYachtDinghyScreen: View {
     }
 
     private func startNewMatch() {
-        match = TurnMatch.localTwoPlayer()
+        match = TurnMatch.passAndPlay()
         roundsThisMatch = FreighterYachtDinghyRules.roundsPerPlayer
         lastSummary = nil
         session?.setPool(FreighterYachtDinghyRules.makeDice())

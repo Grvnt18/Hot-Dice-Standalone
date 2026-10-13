@@ -104,6 +104,33 @@ enum PieceSheen {
             endPoint: litFromTop ? .bottom : .top
         )
     }
+
+    /// `bevel` with the light the other way — an edge sunk INTO a surface
+    /// rather than standing out of it.
+    ///
+    /// `pixelWell` reaches the same place by rotating the overlay half a
+    /// turn, which works only because a rounded rectangle is its own 180°
+    /// rotation. Rolls' empty banking slots are not: a triangle turned
+    /// half a turn points at the floor. So the sunk direction has to be a
+    /// paint rather than a transform, and this is it — the same two flat
+    /// halves and the same hard step, read from the far end.
+    ///
+    /// Deliberately the same stops as `bevel`, not a second set of
+    /// numbers. One bevel with two directions stays one decision; two
+    /// gradients with their own opacities would be the drift
+    /// `tools_cohesion_verify.py` exists to catch.
+    static var bevelSunk: LinearGradient {
+        LinearGradient(
+            stops: [
+                .init(color: .white.opacity(highlight * 1.6), location: 0.0),
+                .init(color: .white.opacity(highlight * 1.6), location: 0.5),
+                .init(color: .black.opacity(shade * 1.4), location: 0.5),
+                .init(color: .black.opacity(shade * 1.4), location: 1.0)
+            ],
+            startPoint: litFromTop ? .bottom : .top,
+            endPoint: litFromTop ? .top : .bottom
+        )
+    }
 }
 
 extension View {

@@ -5,7 +5,7 @@ struct RoyalUrScreen: View {
     var onExit: (() -> Void)? = nil
 
     /// Scores are pieces brought home, so the scoreboard is the race.
-    @State private var match = TurnMatch.localTwoPlayer()
+    @State private var match = TurnMatch.passAndPlay()
     @State private var state = RoyalUrState()
     @State private var session: DiceTraySession?
     @State private var steps = 0
@@ -499,7 +499,7 @@ struct RoyalUrScreen: View {
     }
 
     private func startNewMatch() {
-        match = TurnMatch.localTwoPlayer()
+        match = TurnMatch.passAndPlay()
         selectedPiece = nil
         state = RoyalUrState()
         lastSummary = nil

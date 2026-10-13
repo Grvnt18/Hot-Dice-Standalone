@@ -19,7 +19,7 @@ struct BaseballDiceScreen: View {
 
     var onExit: (() -> Void)? = nil
 
-    @State private var match = TurnMatch.localTwoPlayer()
+    @State private var match = TurnMatch.passAndPlay()
     @State private var state = BaseballDiceState(innings: 6)
 
     /// Which dice in the pool are the pitcher's, for this at-bat.
@@ -574,7 +574,7 @@ struct BaseballDiceScreen: View {
     }
 
     private func startNewMatch() {
-        match = TurnMatch.localTwoPlayer()
+        match = TurnMatch.passAndPlay()
         state = BaseballDiceState(innings: state.innings)
         styles = [nil, nil]
         swing = nil

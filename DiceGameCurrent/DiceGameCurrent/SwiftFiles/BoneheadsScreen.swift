@@ -220,7 +220,7 @@ struct BoneheadsScreen: View {
 
     var onExit: (() -> Void)? = nil
 
-    @State private var match = TurnMatch.localTwoPlayer()
+    @State private var match = TurnMatch.passAndPlay()
     @State private var state = BoneheadsState()
     @State private var session: DiceTraySession?
     @State private var rolled: Int?
@@ -552,7 +552,7 @@ struct BoneheadsScreen: View {
     }
 
     private func startNewMatch() {
-        match = TurnMatch.localTwoPlayer()
+        match = TurnMatch.passAndPlay()
         state = BoneheadsState()
         lastSummary = nil
         beginTurn()

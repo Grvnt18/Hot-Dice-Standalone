@@ -227,7 +227,7 @@ def check_seats():
             ("1 - activeIndex", r'\b1 - match\.activeIndex\b'),
             ("participants[1]", r'participants\[1\]'),
             ("a count of two", r'participants\.count == 2'),
-            ("localTwoPlayer with a literal pair",
+            ("a literal pair of participants",
              r'TurnMatch\(participants: \["[^"]*", "[^"]*"\]\)'),
         ):
             if re.search(pattern, code):

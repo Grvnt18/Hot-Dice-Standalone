@@ -4,7 +4,7 @@ struct ThreeThousandScreen: View {
 
     var onExit: (() -> Void)? = nil
 
-    @State private var match = TurnMatch.localTwoPlayer()
+    @State private var match = TurnMatch.passAndPlay()
     @State private var session: DiceTraySession?
 
     /// Points set aside earlier in this turn. Not yours until you bank.
@@ -384,7 +384,7 @@ struct ThreeThousandScreen: View {
     }
 
     private func startNewMatch() {
-        match = TurnMatch.localTwoPlayer()
+        match = TurnMatch.passAndPlay()
         turnsLeftAfterTarget = nil
         firstToTarget = nil
         lastSummary = nil

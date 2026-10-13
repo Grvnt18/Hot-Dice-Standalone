@@ -46,12 +46,15 @@ There are two ways. The first is less clicking and I recommend it.
 
   EASY WAY
 
-7.  In Terminal:
+7.  In Terminal, build XcodeGen 2.42.0 from source. See TESTFLIGHT.txt
+    part 1 step 5 for why it is this version and not Homebrew's:
 
-        brew install xcodegen
+        git clone https://github.com/yonaskolb/XcodeGen.git
+        cd XcodeGen && git checkout 2.42.0
+        make install PREFIX=$HOME/.local
 
-    (If `brew` is not installed, follow Part 2's hard way instead, or
-    install Homebrew from https://brew.sh first.)
+    (Homebrew no longer supports Monterey, and current XcodeGen needs
+    Swift 5.9 where Xcode 14.2 has 5.7. 2.42.0 is the last on 5.7.)
 
 8.  In Terminal, go to the project folder and run:
 

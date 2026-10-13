@@ -106,13 +106,51 @@ PART 1 — ON THE MAC (once)
    Then turn OFF automatic updates, so it never replaces itself with a
    version Monterey cannot run.
 
-5. Install XcodeGen, which turns project.yml into an Xcode project:
+5. Install XcodeGen, which turns project.yml into an Xcode project.
 
-       brew install xcodegen
+       git clone https://github.com/yonaskolb/XcodeGen.git
+       cd XcodeGen
+       git checkout 2.42.0
+       make install PREFIX=$HOME/.local
 
-   If you have no Homebrew, MAC_SETUP.txt steps 2-6 build the project by
-   hand instead. Either route works. XcodeGen is the one the cloud uses,
-   so using it on the Mac too means both machines build the same thing.
+   NOT `brew install xcodegen`, and not the current XcodeGen. Two separate
+   reasons, and together they rule out every one-line answer:
+
+     * Homebrew dropped macOS 12 Monterey. It is Tier 3 — no CI, no bottles
+       built for it — so the formula either refuses or falls back to
+       compiling, which runs into the second reason.
+     * XcodeGen's current releases are `swift-tools-version:5.9`, and Xcode
+       14.2 ships Swift 5.7. They cannot be compiled on this Mac at all.
+
+   **2.42.0 is the last release on Swift 5.7** (2.43.0 moved to 5.9), and it
+   targets macOS 10.13, so it builds and runs on Monterey. Checked against
+   each tag's own Package.swift rather than inferred from dates.
+
+   PREFIX=$HOME/.local keeps sudo out of it. With no PREFIX, `make install`
+   writes to /usr/local, which is root-owned on a clean Monterey — then it
+   has to be `make build && sudo make install`, so the compile runs as you
+   and only the copy runs as root. Either is fine; the first is tidier.
+
+   Put it on PATH if it is not already, then check the version:
+
+       echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+       exec zsh
+       xcodegen --version          # 2.42.0
+
+   `make install` copies SettingPresets as well as the binary. Pulling just
+   the executable out of .build/release is NOT enough — xcodegen reads those
+   presets every time it generates.
+
+   TWO FALLBACKS, if that goes wrong:
+
+     a. MAC_SETUP.txt steps 2-6 build the project by hand, with no
+        tooling at all. The cost is that a .swift file added later is on
+        disk and not in the target, which fails as "cannot find X in
+        scope" on many lines with nothing pointing at the cause.
+     b. Ask for a CI job that generates the project and uploads it as an
+        artifact. The cloud runner already runs xcodegen, on a macOS it
+        is supported on; you would download HotDice.xcodeproj and open
+        it. Nothing to install on the Mac. Not built yet — say the word.
 
 -------------------------------------------------------------------------------
 PART 2 — BUILD IT ON THE MAC

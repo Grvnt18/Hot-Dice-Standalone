@@ -37,7 +37,18 @@
 #     inside an app extension is the extension's own bundle. Here there is
 #     one target and one statement.)
 #
-# INSTALLING IT (once, on the Mac):     brew install xcodegen
+# INSTALLING IT (once, on the Mac):
+#
+#   NOT Homebrew, and not the current release. Homebrew dropped macOS 12
+#   Monterey, and XcodeGen's current releases are swift-tools-version 5.9
+#   where Xcode 14.2 ships Swift 5.7. 2.42.0 is the last release on 5.7
+#   and targets macOS 10.13:
+#
+#     git clone https://github.com/yonaskolb/XcodeGen.git
+#     cd XcodeGen && git checkout 2.42.0 && make install PREFIX=$HOME/.local
+#
+#   The CI runner is a supported macOS, so it just brews it.
+#
 # GENERATING THE PROJECT:               xcodegen generate
 #
 # This does not replace MAC_SETUP.txt steps 2-6. Either route works; this

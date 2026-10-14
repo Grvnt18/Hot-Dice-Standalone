@@ -367,17 +367,15 @@ struct DiceScoreBar: View {
     let bankedOrder: [Die]
 
     private let totalSlots = 15
-    // Changed from 5x3 (15 square cells) to 8x2 (16 rectangular slots,
-    // one unused) — the actual lever for "bigger cells without more
-    // vertical space" was dropping the forced-square constraint, not the
-    // row/column count by itself. A cell sized independently by width and
-    // height (rather than min() of the two, which always shrinks it down
-    // to match whichever dimension is tighter) uses the available space
-    // in both directions at once. Fewer rows on top of that means more
-    // height per cell too, and a number doesn't need a square cell to
-    // read clearly.
-    private let gridColumns = 8
-    private let gridRows = 2
+    // 5 x 3, and back again. This was briefly 8 x 2 with cells sized
+    // independently by width and height, chasing "bigger cells without
+    // more vertical space" — it worked, and what it bought was a 1.6:1
+    // rectangle. These slots hold dice; a stretched die reads as a bug in
+    // the layout rather than a bigger cell. Square cells and 5 x 3 is the
+    // arrangement that fills the header with fifteen of them and no
+    // leftovers; see the sizing note below for the measurement.
+    private let gridColumns = 5
+    private let gridRows = 3
     private let cellSpacing: CGFloat = 4
 
     var body: some View {
@@ -406,12 +404,22 @@ struct DiceScoreBar: View {
             // work with — the grid would then overflow its parent and get
             // clipped top/bottom. Sizing explicitly from the actual
             // available width/height guarantees the whole grid always
-            // fits the space it's given, while letting cellWidth and
-            // cellHeight differ (rectangular, not forced-square) so both
-            // dimensions of the available space actually get used.
+            // fits the space it's given.
             GeometryReader { geo in
-                let cellWidth = (geo.size.width - cellSpacing * CGFloat(gridColumns - 1)) / CGFloat(gridColumns)
-                let cellHeight = (geo.size.height - cellSpacing * CGFloat(gridRows - 1)) / CGFloat(gridRows)
+                let widthLimit = (geo.size.width - cellSpacing * CGFloat(gridColumns - 1)) / CGFloat(gridColumns)
+                let heightLimit = (geo.size.height - cellSpacing * CGFloat(gridRows - 1)) / CGFloat(gridRows)
+                // SQUARE, by the tighter of the two.
+                //
+                // Measured on an iPhone 14, whose header band is 17% of
+                // 844pt: 8 x 2 sized independently gives a cell 38 wide
+                // and 62 tall, a 1.6:1 stretch. Forcing that same 8 x 2
+                // square caps it by WIDTH at 38pt and the two rows then
+                // leave half the header empty. 5 x 3 is capped by HEIGHT
+                // at 40pt instead, fills the header, and holds all
+                // fifteen slots exactly — 8 x 2 always had a sixteenth
+                // cell it could not use.
+                let cellWidth = min(widthLimit, heightLimit)
+                let cellHeight = cellWidth
 
                 // Two explicit centered HStacks rather than a LazyVGrid.
                 // With 15 slots in an 8-column grid, the second row holds

@@ -224,31 +224,27 @@ targets:
         # wants for an app that does none.
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
       configs:
-        # THE RELEASE IDENTITY, AND WHY IT HAS TO BE STATED.
+        # NOTHING ABOUT SIGNING LIVES HERE.
         #
-        # XcodeGen applies setting presets, and its preset for an iOS
-        # application is two lines:
+        # It was briefly `CODE_SIGN_IDENTITY: Apple Distribution`, on the
+        # theory that the identity is what picks the profile. That is true
+        # and it was still wrong: under AUTOMATIC signing Xcode signs an
+        # archive with a DEVELOPMENT identity and applies the distribution
+        # one later, at export. Naming a distribution identity reads to
+        # Xcode as manual intent, and it says so:
         #
-        #     SettingPresets/Product_Platform/application_iOS.yml
-        #     CODE_SIGN_IDENTITY: iPhone Developer
-        #     ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        #     HotDice is automatically signed for development, but a
+        #     conflicting code signing identity Apple Distribution has
+        #     been manually specified
         #
-        # That identity lands in the BASE settings, so it applies to every
-        # configuration — Release included. Under automatic signing the
-        # identity is what decides which profile Apple is asked for, so the
-        # upload build asked for a development profile however it was
-        # archived:
+        # Which leaves automatic signing needing a DEVELOPMENT certificate
+        # on whatever machine archives — something a throwaway cloud
+        # runner cannot have, and cannot be given without revoking the
+        # one this project's Mac uses.
         #
-        #     No profiles for 'com.solid.hotdice' were found: ... any iOS
-        #     App Development provisioning profiles
-        #
-        # Which is why `-configuration Release` did not fix it, and why the
-        # error never mentions the real cause. Xcode the application hides
-        # this by rewriting the identity when you choose Distribute App;
-        # `xcodebuild archive` does not, so it has to be written down.
-        #
-        # Debug keeps the preset's value: a developer running on a device
-        # wants a development identity, and that is the configuration they
-        # run.
-        Release:
-          CODE_SIGN_IDENTITY: Apple Distribution
+        # So CI signs MANUALLY, with the distribution certificate and an
+        # App Store profile it is handed. Those settings are passed by the
+        # workflow rather than written here, because the profile's name is
+        # not known until the profile is installed. The Mac is untouched:
+        # it archives through Xcode, which manages its own signing.
+        Release: {}

@@ -245,10 +245,25 @@ PART 4 — THE SIX SECRETS
                                        keychain on the runner and protects
                                        nothing outside it
 
-    Provisioning profiles are NOT secrets here. The workflow passes
-    -allowProvisioningUpdates with the API key, so Xcode fetches or
-    creates them itself — which is also what stops a stored profile going
-    stale.
+17. There is a SEVENTH, and it arrived the hard way:
+
+        PROVISIONING_PROFILE_BASE64    an App Store provisioning profile
+
+    At developer.apple.com -> Profiles -> +, create an APP STORE profile
+    for com.solid.hotdice, pick the Apple Distribution certificate from
+    step 15, download it, then:
+
+        base64 -i HotDice.mobileprovision | pbcopy
+
+    The workflow used to sign automatically and let Xcode fetch profiles
+    itself. That cannot work on a cloud runner: automatic signing
+    archives with a DEVELOPMENT identity, so it wants a development
+    certificate for a machine that is deleted at the end of the job, and
+    offers to revoke the one your Mac uses. Manual signing with a profile
+    you hand it is deterministic instead.
+
+    The profile expires after a year, and replacing it means replacing
+    this secret. Nothing else expires except the certificate itself.
 
 -------------------------------------------------------------------------------
 PART 5 — UPLOAD

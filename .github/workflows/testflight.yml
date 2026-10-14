@@ -42,13 +42,24 @@
 #                             account password and protects nothing outside
 #                             the runner.
 #
-# (The plan said four. It is six: three to talk to App Store Connect and
-# three to sign. Writing it down wrong once is cheaper than finding out on
-# the sixth run.)
+#   PROVISIONING_PROFILE_BASE64   An APP STORE provisioning profile for
+#                             com.solid.hotdice, downloaded from
+#                             developer.apple.com and base64'd:
+#                               base64 -i HotDice.mobileprovision | pbcopy
 #
-# Provisioning profiles are NOT a secret here. `-allowProvisioningUpdates`
-# with the API key lets Xcode fetch or create them, which is also what
-# stops two bundle ids' profiles going stale in a secret store.
+# (The plan said four, then this said six. It is seven, and the seventh
+# arrived the hard way. Writing it down wrong twice is still cheaper than
+# finding out on the next run.)
+#
+# The profile IS a secret here, and that is a reversal. This job used to
+# sign automatically and let `-allowProvisioningUpdates` fetch or create
+# profiles — which cannot work, because automatic signing archives with a
+# DEVELOPMENT identity and a throwaway runner has no development
+# certificate. Manual signing with a profile that is handed over decides
+# it rather than guessing.
+#
+# The cost is the one that argument predicted: a profile expires (a year)
+# and has to be replaced in the secret, and a new bundle id needs its own.
 #
 # ----------------------------------------------------------------------
 # WHAT IT DOES NOT DO
@@ -182,6 +193,43 @@ jobs:
           security list-keychain -d user -s "$KEYCHAIN" login.keychain-db
           rm "$RUNNER_TEMP/cert.p12"
 
+      # The App Store provisioning profile, installed where Xcode looks.
+      #
+      # CI signs MANUALLY. Automatic signing archives with a DEVELOPMENT
+      # identity and only applies the distribution one at export, so it
+      # needs a development certificate on the machine that archives —
+      # which a throwaway runner cannot have, and cannot be given without
+      # revoking the one the project's Mac uses. Four runs went into
+      # learning that; manual signing decides it instead of guessing.
+      #
+      # The profile's NAME is read out of the file rather than stored
+      # beside it, so the two cannot disagree: it is what both the archive
+      # and the export have to name.
+      - name: Install the provisioning profile
+        env:
+          PROFILE: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PROFILE:-}" ]; then
+            echo "PROVISIONING_PROFILE_BASE64 is empty or not set." >&2
+            echo "Create an App Store profile for com.solid.hotdice at" >&2
+            echo "developer.apple.com, download it, and add it as that" >&2
+            echo "secret (base64 of the .mobileprovision)." >&2
+            exit 1
+          fi
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          echo "$PROFILE" | base64 --decode > "$RUNNER_TEMP/profile.mobileprovision"
+          # A .mobileprovision is a CMS-signed plist; this unwraps it.
+          security cms -D -i "$RUNNER_TEMP/profile.mobileprovision" \
+            > "$RUNNER_TEMP/profile.plist"
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$RUNNER_TEMP/profile.plist")
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$RUNNER_TEMP/profile.plist")
+          PROFILE_APP=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" "$RUNNER_TEMP/profile.plist")
+          cp "$RUNNER_TEMP/profile.mobileprovision" \
+             "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+          echo "Profile '$PROFILE_NAME' for $PROFILE_APP"
+          echo "PROFILE_NAME=$PROFILE_NAME" >> "$GITHUB_ENV"
+
       # The team, read out of the certificate rather than stored.
       #
       # Automatic signing needs a DEVELOPMENT_TEAM and nothing was giving
@@ -246,11 +294,12 @@ jobs:
             -destination 'generic/platform=iOS' \
             -configuration Release \
             -archivePath "$RUNNER_TEMP/HotDice.xcarchive" \
-            -allowProvisioningUpdates \
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
-            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
 
@@ -269,7 +318,11 @@ jobs:
             <key>method</key><string>app-store</string>
             <key>destination</key><string>upload</string>
             <key>uploadSymbols</key><true/>
-            <key>signingStyle</key><string>automatic</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.solid.hotdice</key><string>${PROFILE_NAME}</string>
+            </dict>
           </dict>
           </plist>
           PLIST
@@ -277,7 +330,6 @@ jobs:
             -archivePath "$RUNNER_TEMP/HotDice.xcarchive" \
             -exportPath "$RUNNER_TEMP/export" \
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
-            -allowProvisioningUpdates \
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"

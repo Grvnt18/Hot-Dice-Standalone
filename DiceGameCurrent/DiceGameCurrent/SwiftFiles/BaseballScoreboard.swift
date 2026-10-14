@@ -21,6 +21,16 @@ enum BaseballScoreboard {
     /// of the grass it sits on.
     private static let fieldPixels = CGSize(width: 820, height: 1100)
 
+    /// The panel's own canvas, in pixels, and so its own shape.
+    ///
+    /// Everything the board draws — the grid, the row heights, the outs
+    /// pips, the type — is laid out against this one canvas, so this
+    /// ratio IS the board's proportion. 344 x 211 at today's fractions.
+    static var panelPixels: CGSize {
+        CGSize(width: fieldPixels.width * BaseballField.boardW,
+               height: fieldPixels.height * BaseballField.boardMetrics.height)
+    }
+
     /// Clear of the floor and of the floor title, both of which sit at
     /// +0.005, so nothing z-fights.
     private static let hover: Float = 0.010
@@ -34,12 +44,24 @@ enum BaseballScoreboard {
         scene.rootNode.childNode(withName: containerName, recursively: false)?
             .removeFromParentNode()
 
-        let metrics = BaseballField.boardMetrics
         let width = bounds.x.upperBound - bounds.x.lowerBound
-        let depth = bounds.z.upperBound - bounds.z.lowerBound
 
-        let plane = SCNPlane(width: CGFloat(width) * BaseballField.boardW,
-                             height: CGFloat(depth) * metrics.height)
+        // The plane takes the PANEL's shape, not the playfield's.
+        //
+        // Its height used to be `depth * metrics.height` while its width
+        // was `width * boardW` — two different axes of two different
+        // things — so the board's proportion was the playfield's
+        // proportion rather than its own. On a phone's tall tray that is
+        // close enough to pass; on a near-square iPad playfield the same
+        // texture arrived squashed about a third, which is a scoreboard
+        // whose columns are no longer as wide as they are drawn. Taking
+        // the depth from the panel's own pixels means it fills whatever
+        // width it is given and can never stretch.
+        let panel = panelPixels
+        let boardWidth = CGFloat(width) * BaseballField.boardW
+        let boardDepth = boardWidth * (panel.height / panel.width)
+
+        let plane = SCNPlane(width: boardWidth, height: boardDepth)
         let material = SCNMaterial()
         // Unlit, like the floor title: the panel is a painted sign and
         // should read the same under any lighting.
@@ -52,12 +74,18 @@ enum BaseballScoreboard {
         node.name = containerName
         node.eulerAngles = SCNVector3(-Float.pi / 2, 0, 0)   // flat, facing up
         // The panel's CENTRE, from its top-left corner plus half its size.
+        //
+        // Both insets are fractions of the WIDTH now. boardY is a fraction
+        // of the old composition's height, and read against the depth it
+        // put the board further from the top edge on a tall tray than from
+        // the left on any of them — an uneven margin in a corner, which is
+        // the one place an uneven margin shows.
         node.position = SCNVector3(
             bounds.x.lowerBound
-                + Float(BaseballField.boardX + BaseballField.boardW / 2) * width,
+                + Float(BaseballField.boardX) * width + Float(boardWidth) / 2,
             floorY + hover,
             bounds.z.lowerBound
-                + Float(BaseballField.boardY + metrics.height / 2) * depth
+                + Float(BaseballField.boardY) * width + Float(boardDepth) / 2
         )
         // No physics body and no shadow: dice roll over the board, exactly
         // as they roll over the floor title.
@@ -77,13 +105,13 @@ enum BaseballScoreboard {
         guard let node = scene.rootNode.childNode(withName: containerName,
                                                   recursively: false) else { return }
 
-        let metrics = BaseballField.boardMetrics
-        let size = CGSize(width: fieldPixels.width * BaseballField.boardW,
-                          height: fieldPixels.height * metrics.height)
-
+        // The same canvas the plane took its shape from, so the texture
+        // arrives at the proportion it is drawn at and lands on a plane of
+        // that proportion — which is the whole of "fills rather than
+        // stretches".
         node.geometry?.firstMaterial?.diffuse.contents =
             BaseballField.renderScoreboard(
-                size: size,
+                size: panelPixels,
                 innings: state.innings,
                 lineScore: state.lineScore,
                 outs: state.outs,

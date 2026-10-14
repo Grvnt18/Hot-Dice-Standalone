@@ -300,41 +300,49 @@ def main():
     resettable = []
     for filename, fraction in sorted(SCREENS.items()):
         label = filename.replace("Screen.swift", "").replace("DiceGameShell", "Rolls")
-        squared = "square: true" in code(filename)
+        # Which screens actually hand the REGION to the well, and so have
+        # an aspect that moves with the window. Free Roll passes the
+        # square instead, and Boneheads and Royal UR do not use these
+        # bands at all — counting them was a conservative guess where the
+        # Swift gives a straight answer.
+        fills = "bands.sceneRegion" in code(filename)
         for group, members in RESIZE_GROUPS:
-            if squared:
-                # `rollingWell(square: true)` puts an aspectRatio(1, .fit)
-                # on the scene, so it is a square at every size and its
-                # aspect is 1.0 by construction. The tray around it has no
-                # aspect ratio to drift. Asserted below rather than
-                # assumed: if that modifier ever comes off, the screen
-                # stops being in this branch and starts being measured.
-                ratios = [1.0]
-            else:
-                ratios = []
-                for name in members:
-                    width, height = by_name[name]
-                    scene = min(width, max(height - height * fraction - floor, 0))
-                    ratios.append(width / scene if scene > 0 else float("inf"))
+            # The scene FILLS its region now — it was briefly squared,
+            # which left tray between it and the roll button — so its
+            # aspect is the region's and moves with the window.
+            ratios = []
+            for name in members:
+                width, height = by_name[name]
+                square = min(width, max(height - height * fraction - floor, 0))
+                if not fills:
+                    ratios.append(width / square if square > 0 else float("inf"))
+                    continue
+                band = min(max(height - height * fraction - square, floor),
+                           max(height * BAND_CEILING, floor))
+                region = max(height - height * fraction - band, 0)
+                ratios.append(width / region if region > 0 else float("inf"))
             drift = max(ratios) - min(ratios)
             if drift > threshold:
                 resettable.append((label, group, drift))
 
-    unexpected = [r for r in resettable if r[0] != "FreeRoll"]
+    # Folding a Duo must NOT re-deal: it moves the walls about 2%, which
+    # is not worth a lost turn. Dragging an iPad divider must, because it
+    # more than doubles the shape. That split is the whole reason
+    # aspectRebuildThreshold is 0.10 rather than 0.02, so it is the thing
+    # worth holding rather than a list of screen names.
+    folds = [r for r in resettable if "Duo" in r[1]]
+    unexpected = [r for r in folds if r[0] != "FreeRoll"]
     for label, group, drift in unexpected:
-        failed.append("%s now re-assembles its arena on %s — the aspect "
-                      "drifts %.3f, past the %.3f threshold — so a resize "
-                      "would re-deal the dice part way through a scored "
-                      "turn. Either hold its playfield square at those "
-                      "sizes or give that screen a resize that does not "
-                      "reset it" % (label, group, drift, threshold))
-    if resettable and not unexpected:
-        print("  %-26s only FreeRoll, on %s (drift %.3f past %.3f)"
-              % ("resize re-deals", resettable[0][1], resettable[0][2],
-                 threshold))
-    elif not resettable:
-        print("  %-26s none at any size (threshold %.3f)"
-              % ("resize re-deals", threshold))
+        failed.append("%s re-assembles its arena on %s — the aspect drifts "
+                      "%.3f, past the %.3f threshold — so merely opening "
+                      "the device would re-deal the dice part way through "
+                      "a scored turn. A fold is not worth that; raise the "
+                      "threshold or stop the bands moving with it"
+                      % (label, group, drift, threshold))
+    drags = sorted({r[0] for r in resettable if "divider" in r[1]})
+    print("  %-26s a divider drag re-deals %d screen(s); a fold re-deals "
+          "%d (threshold %.3f)"
+          % ("resize re-deals", len(drags), len(folds), threshold))
 
     if failed:
         print()

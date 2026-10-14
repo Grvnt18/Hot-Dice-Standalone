@@ -285,84 +285,51 @@ extension View {
     /// changing shape for this.
     func rollingWell(height: CGFloat? = nil,
                      material: WellMaterial = .timber,
-                     inset: CGFloat = 10,
-                     square: Bool = false,
-                     topPad: CGFloat = 0) -> some View {
+                     inset: CGFloat = 10) -> some View {
         modifier(RollingWell(height: height, material: material,
-                             inset: inset, square: square, topPad: topPad))
+                             inset: inset))
     }
 }
 
 /// The well itself.
 ///
-/// A ViewModifier rather than the one-expression extension it was, because
-/// `square` has to add a modifier or add nothing — and "nothing" is not
-/// something an expression can be. The first cut wrote
-/// `aspectRatio(1, contentMode: square ? .fit : .fill)`, which is not the
-/// same thing at all: `.fill` on the five screens that do NOT square would
-/// have grown their scene past its frame and clipped it, and four of those
-/// five are screens already signed off on the device.
+/// A ViewModifier rather than the one-expression extension it was, so the
+/// timber and the scene inside it stay one decision.
+///
+/// **The scene FILLS the well.** It was briefly squared, with the slack
+/// above and below it as tray, and that was the wrong read of "centre the
+/// playfield": it put 88 points of timber between the bottom of the tray
+/// and the top of the roll button on an iPhone 14, which is the gap that
+/// came back as the biggest remaining issue. A tray that reaches the bar
+/// is what was wanted, and a tray that reaches the bar is not square.
+///
+/// The cost is named rather than hidden. The arena's world bounds come
+/// from this view's aspect ratio, so a non-square scene means an arena
+/// whose shape depends on the window — and a window that CHANGES size
+/// mid-game then has an arena built for the old one.
+/// `PlayfieldLayout.aspectRebuildThreshold` is what decides whether that
+/// is worth re-assembling for, and its own note carries the measurements.
 struct RollingWell: ViewModifier {
     var height: CGFloat?
     var material: WellMaterial
     var inset: CGFloat
-    var square: Bool
-
-    /// Tray above the square, so its middle lands on the SCREEN's middle
-    /// rather than the region's — see GameBandLayout.sceneTopPad. Zero
-    /// for the screens that do not square, which centre as they always
-    /// did.
-    var topPad: CGFloat = 0
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        let lipped = dressed(content)
+        let lipped = content
+            // The backdrop stays directly behind the scene, inside the lip,
+            // so a sliver showing during assembly still reads as field
+            // rather than as a gap in the surround.
+            .background(SmokeFloor.backdropColor)
+            .pixelWell(radius: ControlShape.cornerRadius)
             .padding(inset)
-            .padding(.top, topPad)
-            // Top-aligned, because the padding above is what does the
-            // positioning now. Centre alignment would halve the offset
-            // and put the scene back where it was.
-            .frame(maxWidth: .infinity, maxHeight: .infinity,
-                   alignment: square ? .top : .center)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         switch material {
         case .timber:
             lipped.background(WoodTiledBackground()).frame(height: height)
         case .plate:
             lipped.background(SteelTiledBackground()).frame(height: height)
-        }
-    }
-
-    /// The scene, with its backdrop and its sunken lip — and squared, when
-    /// the caller asks.
-    ///
-    /// `square` keeps the PLAYFIELD square while the well around it fills
-    /// whatever height it is handed. The two were the same thing until the
-    /// button band became a capped share: the well is given the leftover
-    /// now, and on a phone that is taller than the screen is wide, so
-    /// without this the scene would stretch to fill it.
-    ///
-    /// That matters for more than shape. The arena's world bounds come
-    /// from this view's aspect ratio and nothing else, so a square scene
-    /// is the same arena at every size and a stretched one is not — it
-    /// would change shape when the window does, which on a foldable is
-    /// every time it opens, and `PlayfieldLayout.needsRebuild` would then
-    /// re-assemble mid-game and re-deal the dice. Square keeps that
-    /// impossible rather than unlikely, and
-    /// `tools_bandlayout_verify.py` reads this flag back to prove it.
-    @ViewBuilder
-    private func dressed(_ content: Content) -> some View {
-        let plain = content
-            // The backdrop stays directly behind the scene, inside the lip,
-            // so a sliver showing during assembly still reads as field
-            // rather than as a gap in the surround.
-            .background(SmokeFloor.backdropColor)
-            .pixelWell(radius: ControlShape.cornerRadius)
-
-        if square {
-            plain.aspectRatio(1, contentMode: .fit)
-        } else {
-            plain
         }
     }
 }
@@ -1095,8 +1062,7 @@ struct DiceGameScreen: View {
                             ui.sync(from: controller)
                         }
                     )
-                        .rollingWell(height: sceneHeight, square: true,
-                                     topPad: bands.sceneTopPad)
+                        .rollingWell(height: sceneHeight)
                         .overlay(alignment: .topLeading) {
                             if let onExit {
                                 Button {

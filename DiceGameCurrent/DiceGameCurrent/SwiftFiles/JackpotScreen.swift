@@ -96,8 +96,7 @@ struct JackpotScreen: View {
                             }
                         }
                     )
-                    .rollingWell(height: sceneHeight, square: true,
-                                 topPad: bands.sceneTopPad)
+                    .rollingWell(height: sceneHeight)
                     .overlay(alignment: .topLeading) {
                         if let onExit {
                             OverlayChromeButton(systemName: "chevron.left") { onExit() }

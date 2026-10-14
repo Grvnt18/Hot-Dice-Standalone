@@ -84,7 +84,28 @@ enum PlayfieldLayout {
     /// Free Roll's header takes 0.30 against everyone else's 0.14 to 0.17,
     /// which is what pushes its playfield off square — and it moves on an
     /// iPad today too, by 0.066 across a Split View drag from 320 to 744.
-    static let aspectRebuildThreshold: Float = 0.02
+    /// Raised from 0.02 when the playfield stopped being square.
+    ///
+    /// A square scene could not drift at all, so any movement was worth
+    /// rebuilding for. A scene that FILLS its region has an aspect that
+    /// depends on the window, and the two resizes this app can actually
+    /// meet are nothing like each other:
+    ///
+    ///     folding an iPhone Duo        0.996 -> 0.973   drift 0.024
+    ///     dragging an iPad divider     0.395 -> 0.919   drift 0.524
+    ///
+    /// Rebuilding re-deals the dice, so the question is which of those is
+    /// worth a lost turn. A fold moves the walls by about 2% of the
+    /// playfield's depth — call it nine points on a phone, which is not
+    /// worth interrupting a game for. A Split View drag more than doubles
+    /// the shape, which is, because the alternative is dice bouncing off
+    /// nothing in plain view.
+    ///
+    /// 0.10 sits between them with room either side. It is a judgement
+    /// about which error a player would rather have, not a measurement —
+    /// `tools_bandlayout_verify.py` holds it to the two numbers above so
+    /// the judgement at least stays the one that was made.
+    static let aspectRebuildThreshold: Float = 0.10
 
     static func aspect(of size: CGSize) -> Float {
         Float(size.width / max(size.height, 1))
@@ -335,33 +356,6 @@ enum GameBandLayout {
     ///
     /// The floor still wins underneath it, because a band that cannot hold
     /// a 48pt button and its caption is not a band.
-    /// How much tray sits ABOVE the scene, inside the region.
-    ///
-    /// Centring the square in the region is not the same as centring it on
-    /// the SCREEN, because the header and the band are not the same height
-    /// — and the gap grew when the band shrank. Measured, centred in the
-    /// region:
-    ///
-    ///     band at a fifth   the scene's centre sits 11-13pt ABOVE
-    ///     band at a tenth   the scene's centre sits 17-24pt BELOW
-    ///
-    /// Neither is centred, and the second is worse. So the offset is
-    /// computed rather than left to fall out: put the square's middle on
-    /// the screen's middle, and clamp it into the region so it cannot ride
-    /// up under the scoreboard or down behind the button.
-    ///
-    /// On a full-screen iPad the clamp binds at zero — the header alone is
-    /// taller than the slack — and the scene ends up a few points low.
-    /// That is the best the geometry allows without moving the header,
-    /// which has content in it.
-    static func sceneTopPad(in size: CGSize, fraction: CGFloat) -> CGFloat {
-        let square = scene(in: size, fraction: fraction)
-        let slack = sceneRegion(in: size, fraction: fraction) - square
-        let centred = size.height / 2 - square / 2
-            - header(in: size, fraction: fraction)
-        return min(max(centred, 0), max(slack, 0))
-    }
-
     static func bandShare(in size: CGSize, fraction: CGFloat) -> CGFloat {
         let leftover = size.height - header(in: size, fraction: fraction)
             - scene(in: size, fraction: fraction)
@@ -415,10 +409,10 @@ enum GameBandLayout {
         let header: CGFloat
         /// The 60% the tray fills.
         let sceneRegion: CGFloat
-        /// The square playfield.
+        /// The largest SQUARE the region could hold. Kept because the
+        /// band's own arithmetic is written against it — the scene that
+        /// actually draws fills `sceneRegion`.
         let scene: CGFloat
-        /// Tray above the square, so its middle lands on the screen's.
-        let sceneTopPad: CGFloat
         let buttonBand: CGFloat
     }
 
@@ -427,7 +421,6 @@ enum GameBandLayout {
         Bands(header: header(in: size, fraction: fraction),
               sceneRegion: sceneRegion(in: size, fraction: fraction),
               scene: scene(in: size, fraction: fraction),
-              sceneTopPad: sceneTopPad(in: size, fraction: fraction),
               buttonBand: buttonBand(in: size, fraction: fraction))
     }
 

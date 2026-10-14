@@ -225,6 +225,11 @@ KNOWN = {
     # resolved by the compiler before any code exists to declare them. The
     # same list main carries, for the same reason.
     "targetEnvironment", "canImport", "compiler", "swift", "os", "arch",
+    # `#available(iOS 17.0, *)` is the same shape and the same story: a
+    # compiler construct, not a function, and nothing can declare it. It
+    # arrived with the onChange shim, which has to ask BOTH what the
+    # compiler holds and what the deployment target may call.
+    "available",
     # standard library and Foundation
     "abs", "min", "max", "ceil", "floor", "round", "sqrt", "sin", "cos",
     "tan", "atan2", "pow", "stride", "zip", "print", "precondition",

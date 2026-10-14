@@ -115,14 +115,38 @@ extension Color {
 // never type-checked at all — so the Mac never sees the call it has no
 // SDK for.
 //
-// THE JOIN IS APPROXIMATE, AND DELIBERATELY SO. `#if swift(>=5.9)` asks
-// about the COMPILER; the API needs the iOS 17 SDK. Those are separate
-// things. They move together on the two machines this project has —
-// Xcode 14.2 is Swift 5.7 with the iOS 16 SDK, and any Playgrounds new
-// enough to be Swift 5.9 carries iOS 17 or later — so the test is
-// reliable here. A Swift 5.9 compiler pointed at an iOS 16 SDK would
-// break it. That combination does not exist in this project, and if it
-// ever does, this is the one place to fix.
+// THE JOIN USED TO BE APPROXIMATE, AND THAT BROKE. The note here said:
+//
+//     A Swift 5.9 compiler pointed at an iOS 16 SDK would break it.
+//     That combination does not exist in this project, and if it ever
+//     does, this is the one place to fix.
+//
+// It exists. The release build runs on a cloud runner with Xcode 15.4 —
+// a Swift 5.10 compiler and the iOS 17.5 SDK — compiling for an iOS 16
+// DEPLOYMENT TARGET, which is the floor this suite is written to. The
+// two-parameter `onChange` is in that SDK and is marked iOS 17, so the
+// archive stopped on:
+//
+//     'onChange(of:initial:_:)' is only available in iOS 17.0 or newer
+//
+// Compiler version was never the right question. THREE things matter and
+// they are genuinely separate: which compiler (what syntax parses),
+// which SDK (what the API exists in), and which deployment target (what
+// may be CALLED unguarded). The first attempt conflated all three.
+//
+// So the test is now both:
+//
+//   #if compiler(>=5.9)   does this toolchain's SDK HAVE the new form?
+//   if #available(iOS 17) may this DEVICE call it?
+//
+// The compiler check is still needed and `#available` alone still
+// cannot do it: availability is a runtime test, so both branches must
+// type-check, and on Xcode 14.2's iOS 16 SDK the two-parameter form does
+// not exist to type-check against. The branch not taken by `#if` is
+// never type-checked at all, which is what keeps the Mac building.
+//
+// @ViewBuilder, so the two branches may return different concrete types
+// without an AnyView around twelve call sites.
 //
 // The one-parameter closure receives the NEW value, which is exactly
 // what the second parameter of the two-parameter form is. Nothing in
@@ -131,14 +155,22 @@ extension Color {
 extension View {
 
     /// Runs `action` with the new value whenever `value` changes.
+    @ViewBuilder
     func onValueChange<V: Equatable>(
         of value: V,
         perform action: @escaping (V) -> Void
     ) -> some View {
-        #if swift(>=5.9)
-        return self.onChange(of: value) { _, newValue in action(newValue) }
+        #if compiler(>=5.9)
+        if #available(iOS 17.0, *) {
+            self.onChange(of: value) { _, newValue in action(newValue) }
+        } else {
+            // Deprecated on the iOS 17 SDK, which costs ONE warning here
+            // and is the point of the whole file: one warning in one
+            // place rather than twelve across the tree.
+            self.onChange(of: value) { newValue in action(newValue) }
+        }
         #else
-        return self.onChange(of: value) { newValue in action(newValue) }
+        self.onChange(of: value) { newValue in action(newValue) }
         #endif
     }
 }

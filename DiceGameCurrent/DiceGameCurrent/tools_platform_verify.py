@@ -263,10 +263,25 @@ def check_onchange_goes_through_the_shim():
     shim = whole[whole.index("func onValueChange"):]
     shim = shim[: shim.index("\n    }") + 6]
 
-    if "#if swift(" not in shim:
+    # BOTH tests, because the first version carried only the compiler one
+    # and the release build died on exactly the gap between them:
+    #
+    #     'onChange(of:initial:_:)' is only available in iOS 17.0 or newer
+    #
+    # Compiler version says what will PARSE and what the SDK holds.
+    # Availability says what the deployment target may CALL. The runner
+    # has a Swift 5.10 compiler and the iOS 17.5 SDK while the floor is
+    # iOS 16, so the two answers differ there and a shim that asks only
+    # the first is wrong on the machine that ships the app.
+    if "#if compiler(" not in shim:
         failures.append("onValueChange no longer tests the compiler version "
-                        "— one of the two machines is about to get the "
-                        "wrong spelling")
+                        "— the Mac's iOS 16 SDK has no two-parameter "
+                        "onChange to type-check against")
+    if "#available(iOS 17" not in shim:
+        failures.append("onValueChange no longer tests availability — a "
+                        "toolchain whose SDK has the iOS 17 form will "
+                        "call it at an iOS 16 deployment target, which "
+                        "is the error that stopped the first archive")
     for spelling in ("{ _, newValue in", "{ newValue in"):
         if spelling not in shim:
             failures.append("onValueChange no longer carries the %r branch"

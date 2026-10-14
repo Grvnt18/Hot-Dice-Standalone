@@ -772,11 +772,8 @@ enum SmokeFloor {
     /// noise sampled per cell — came out 1.36 times taller than it is
     /// wide.
     ///
-    /// Note this is NOT `fieldAspect`, which stays where it is: that is an
-    /// artistic squash that makes the smoke drift wider than it is tall,
-    /// and it is wanted on every floor whatever its shape. This is the
-    /// correction that makes a cell square in WORLD space, which is what
-    /// stops the correction and the art fighting each other.
+    /// This is the CELL's shape. `fieldAspect` was the other half of the
+    /// same complaint and is now 1 — see its own note.
     static func surfaceModifier(worldAspect: Float = 1) -> String {
         modifierSource(cellsDown: cellsAcross / max(worldAspect, 0.0001))
     }
@@ -910,7 +907,23 @@ enum SmokeFloor {
     static let originY: Float = 9.1
 
     static let fieldScale: Float = 1.5
-    static let fieldAspect: Float = 0.55
+
+    /// How much the noise DOMAIN is squashed on the depth axis, which is
+    /// to say how much the smoke is stretched along it.
+    ///
+    /// This was 0.55, to pull the structures into ribbons rather than
+    /// blobs. It is 1 now, because stretching the domain to 0.55 stretches
+    /// what is drawn by 1/0.55 — 1.8 times — and the camera is orthographic
+    /// and straight down, so that is 1.8 times taller on the screen as
+    /// well. With the cell grid corrected (see `surfaceModifier`) the
+    /// ribbons were the whole of the stretch that was left.
+    ///
+    /// 1 makes the field isotropic: equal world distances carry equal
+    /// distances through the noise on both axes, so a structure is the
+    /// shape the noise made it rather than the shape the floor is. If the
+    /// ribbons are wanted back they belong on the WIDTH — `p.x`, divided —
+    /// which elongates them across the tray instead of down it.
+    static let fieldAspect: Float = 1.0
     static let contrast: Float = 2.90
 
     /// Tones the floor is posterised to.

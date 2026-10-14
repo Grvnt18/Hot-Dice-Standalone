@@ -75,10 +75,13 @@ ORIGIN_Y = 9.1          # sin-fract value noise degenerates at the origin —
                         # the warp hides it, because it is in the noise itself.
 
 FIELD_SCALE = 1.5       # noise cells across the floor
-FIELD_ASPECT = 0.55     # squashes the field on one axis. An isotropic warp
-                        # gives round clouds; the references flow in ribbons,
-                        # and stretching the domain is what elongates the
-                        # structures into bands rather than blobs.
+FIELD_ASPECT = 1.0      # was 0.55, to pull the structures into ribbons rather
+                        # than blobs. Squashing the domain by 0.55 stretches what
+                        # is drawn by 1.8, and the camera is orthographic and
+                        # straight down, so that was 1.8x taller on the screen
+                        # too — the whole of the vertical stretch left once the
+                        # cell grid was corrected. 1 is isotropic: equal world
+                        # distances, equal distances through the noise.
 CONTRAST = 2.90         # pushes the field toward its extremes before posterising
 LEVELS = 6              # was 4, which read as four flat shelves in motion
 DITHER = 0.70           # strength of the Bayer offset, in quantisation steps

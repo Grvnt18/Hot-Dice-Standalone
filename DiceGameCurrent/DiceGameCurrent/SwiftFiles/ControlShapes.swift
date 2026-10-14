@@ -182,6 +182,38 @@ extension View {
             )
     }
 
+    /// The app's TOP edge, and deliberately nothing else.
+    ///
+    /// `gameFrame` draws all four sides on the safe-area rect, which was
+    /// the right call for a sheet and the wrong one for the whole screen.
+    /// On a phone with a Dynamic Island the top inset is about 59 points,
+    /// so the top line lands a finger's width down the display with the
+    /// timber still running past it — and what reads is not a frame but a
+    /// rule drawn across the wood. Its own comment chose that trade
+    /// ("a border under the home indicator is a border nobody sees")
+    /// without the notch in view.
+    ///
+    /// **A separate modifier rather than a change to `gameFrame`**, which
+    /// is not a style preference: `menuSheet()` uses `gameFrame` too, and
+    /// a sheet is a card that genuinely wants four sides. Editing the
+    /// shared one would have quietly stripped the border off Settings and
+    /// both guide screens.
+    ///
+    /// So: the top inset is painted over — matting, outline, bevel, in
+    /// that order outward-in — and the sides and the bottom are left to
+    /// bleed as they do now. The height comes from
+    /// `safeAreaInsets.top`, which is the real number for the real
+    /// device, so there is no corner radius to guess at and nothing to
+    /// update when a new phone ships. The iPhone Duo folding is a window
+    /// resize, and this re-reads on every layout.
+    ///
+    /// One thing it fixes beyond the line itself: the status bar's white
+    /// type was sitting on mid-tone timber, which is a poor contrast. It
+    /// sits on the matting now.
+    func screenFrame() -> some View {
+        overlay(alignment: .top) { ScreenTopCap() }
+    }
+
     /// Frames this view as a pixel panel.
     ///
     /// The one way to put a chrome edge on anything, the way `.elevated(_:)`
@@ -212,6 +244,50 @@ extension View {
             .overlay(shape.strokeBorder(PixelPanel.outlineColor.opacity(0.55),
                                         lineWidth: outline))
             .clipShape(shape)
+    }
+}
+
+/// The matting and the single edge that `screenFrame` lays over the top.
+///
+/// A view of its own rather than an inline overlay, for the reason
+/// `GameTile` and `HubTitle` are: it reads a measurement, and a view that
+/// reads a measurement is a view with a property instead of a closure the
+/// type-checker has to resolve inside somebody else's `body`.
+///
+/// `allowsHitTesting(false)` because this is paint. Without it the strip
+/// would swallow taps and pulls in the top of the screen — which on the
+/// hub is the scroll view, and on a game is nothing, until the day it is
+/// something and nobody remembers this is here.
+private struct ScreenTopCap: View {
+
+    var body: some View {
+        // The reader sits in NORMAL space so `safeAreaInsets.top` is the
+        // real inset; the stack inside it is what expands upward to cover
+        // the region that inset describes. Reading the inset from inside
+        // something that already ignores the safe area reports zero,
+        // which is the shape of this that does not work.
+        GeometryReader { geo in
+            VStack(spacing: 0) {
+                SmokeFloor.backdropColor
+                    .frame(height: geo.safeAreaInsets.top)
+
+                // Outward-in, matching gameFrame's own order: the outline
+                // is the outermost line and the bevel sits just inside
+                // it. The bevel is the shared gradient rather than a flat
+                // tone, so a 2pt bar comes out lit above and shaded
+                // below — which is what makes an edge read as turned
+                // rather than drawn.
+                PixelPanel.outlineColor
+                    .frame(height: PixelPanel.outlineWidth)
+                PieceSheen.bevel
+                    .frame(height: PixelPanel.bevelWidth)
+
+                Spacer(minLength: 0)
+            }
+            .frame(width: geo.size.width)
+            .ignoresSafeArea(edges: .top)
+        }
+        .allowsHitTesting(false)
     }
 }
 

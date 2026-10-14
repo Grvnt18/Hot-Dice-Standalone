@@ -113,13 +113,18 @@ struct GameHubView: View {
         // fixed point size, so Dynamic Type is pinned rather than
         // allowed to rescale a layout that was tuned around it.
         .dynamicTypeSize(.large)
-        // The hub takes the border too.
+        // The hub takes the top edge too.
         //
         // It was applied to `entry.makeView` inside the fullScreenCover,
         // which is every GAME and nothing else — so the frame appeared the
         // moment you opened something and was missing on the screen you
         // started from. The hub is a screen like the rest of them.
-        .gameFrame()
+        //
+        // `screenFrame`, not `gameFrame`: four sides on the safe-area rect
+        // put a line across the timber a finger's width below the Dynamic
+        // Island. See screenFrame, which also says why the sheets keep the
+        // old one.
+        .screenFrame()
         // Full-screen rather than a NavigationStack push. A pushed view
         // gets a navigation bar, and DiceGameScreen derives its square
         // playfield from the height it is handed — a bar would silently
@@ -134,10 +139,10 @@ struct GameHubView: View {
             // which also skips itself for the two screens that seat
             // nobody — Rolls and Free Roll.
             MatchSetupGate(entry: entry, onExit: { openGame = nil })
-                // One border round the whole game — see .gameFrame. Here
-                // rather than on each of the eleven screens, because this
-                // is the one place every one of them is presented.
-                .gameFrame()
+                // The same top edge the hub wears — see .screenFrame.
+                // Here rather than on each of the eleven screens, because
+                // this is the one place every one of them is presented.
+                .screenFrame()
                 // Back to the hub's own settings on the way out. One place
                 // rather than eleven, so a game added later is covered
                 // without remembering to do anything.

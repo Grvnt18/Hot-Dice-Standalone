@@ -114,12 +114,42 @@ enum BaseballColumns {
         // puts the posts under the same light as the dice.
         node.castsShadow = true
 
+        node.physicsBody = obstacleBody(for: cylinder)
+        return node
+    }
+
+    /// The post as an OBSTACLE: immovable, and something a die bounces off.
+    ///
+    /// `.static`, so no hit of any force moves it — a static body has no
+    /// velocity and ignores impulses by definition. Its whole job is to be
+    /// in the way: a die that reaches one is deflected, which is randomness
+    /// the tray itself cannot produce.
+    ///
+    /// **The three masks are set explicitly, and that is the fix.** This
+    /// body used to carry a shape and a restitution and nothing else, which
+    /// left all three to SceneKit's defaults while the dice declare theirs:
+    /// a die's `collisionBitMask` is `die | playfield`, so a body that does
+    /// not name itself as one of those categories is not reliably something
+    /// the die is told to collide with. The playfield's own walls and floor
+    /// have said so since they were written — see
+    /// `DiePhysicsFactory.staticCollider`, whose three lines these are. The
+    /// posts were the one solid thing on the table that did not.
+    ///
+    /// Restitution matched to the die's own 0.7 for the same reason it is
+    /// matched there: left unset, a bounce is governed by whatever SceneKit
+    /// defaults to rather than anything tuned.
+    private static func obstacleBody(for shape: SCNGeometry) -> SCNPhysicsBody {
         let body = SCNPhysicsBody(type: .static,
-                                  shape: SCNPhysicsShape(geometry: cylinder,
+                                  shape: SCNPhysicsShape(geometry: shape,
                                                          options: nil))
         body.restitution = 0.7
-        node.physicsBody = body
-        return node
+        body.categoryBitMask = DicePhysicsCategory.playfield
+        body.collisionBitMask = DicePhysicsCategory.die
+        // Dice-vs-post contacts are worth hearing: a die striking a runner
+        // is the same event as a die striking the rim, and the rim is
+        // already audible.
+        body.contactTestBitMask = DicePhysicsCategory.die
+        return body
     }
 
     /// The post's curved side: the base colour, darkened.
@@ -173,12 +203,30 @@ enum BaseballColumns {
 
     // MARK: Updating
 
-    /// Shows the posts that should be standing, and colours them.
+    /// Stands a post up, or takes it off the table.
     ///
-    /// The batting side's runners are the player's chosen table colour; the
-    /// other side's are black. A team's pool holds whatever is not on base,
-    /// so three posts between the diamond and the pool at all times — the
-    /// runners are conserved, which is what makes the board readable.
+    /// The body goes with the visibility rather than `isHidden` alone.
+    /// `isHidden` is a drawing flag — a hidden node's physics body is still
+    /// in the simulation — so hiding a runner who is not on base left an
+    /// obstacle standing on that base that nobody could see. A die
+    /// deflecting off empty floor is worse than one that does not deflect
+    /// at all, because the first looks like the physics is broken and the
+    /// second looks like a design choice.
+    ///
+    /// Rebuilt from the geometry rather than stashed, so there is one
+    /// description of what a post's body is — see `obstacleBody`.
+    private static func show(_ node: SCNNode?, _ standing: Bool) {
+        guard let node else { return }
+        node.isHidden = !standing
+        if standing {
+            if node.physicsBody == nil, let geometry = node.geometry {
+                node.physicsBody = obstacleBody(for: geometry)
+            }
+        } else {
+            node.physicsBody = nil
+        }
+    }
+
     /// Tints a post: a lit cap over darker sides.
     ///
     /// Walks the material array rather than `firstMaterial`, which would
@@ -194,6 +242,12 @@ enum BaseballColumns {
         materials[2].diffuse.contents = colour.darkened(by: sideDrop)
     }
 
+    /// Shows the posts that should be standing, and colours them.
+    ///
+    /// The batting side's runners are the player's chosen table colour; the
+    /// other side's are black. A team's pool holds whatever is not on base,
+    /// so three posts between the diamond and the pool at all times — the
+    /// runners are conserved, which is what makes the board readable.
     static func update(in scene: SCNScene,
                        diamond: Diamond,
                        battingSeat: Int,
@@ -204,7 +258,7 @@ enum BaseballColumns {
 
         for (index, occupied) in diamond.occupied.enumerated() {
             let node = container.childNode(withName: "base\(index)", recursively: false)
-            node?.isHidden = !occupied
+            show(node, occupied)
             paint(node, colour: battingColour)
         }
 
@@ -216,7 +270,7 @@ enum BaseballColumns {
             for slot in 0..<poolOffsets.count {
                 let node = container.childNode(withName: "pool\(seat)_\(slot)",
                                                recursively: false)
-                node?.isHidden = slot >= standing
+                show(node, slot < standing)
                 paint(node, colour: colour)
             }
         }

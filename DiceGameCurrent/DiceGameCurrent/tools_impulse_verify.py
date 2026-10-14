@@ -23,7 +23,7 @@ import os
 import re
 import sys
 
-from tools_swiftconst import constant, source
+from tools_swiftconst import constant, source, swift_names
 
 IMPULSE = "DiceRollImpulse.swift"
 CONTROLLER = "DiceRollController.swift"
@@ -59,6 +59,65 @@ def swift_float(text, name):
         r'let %s\s*:\s*Float\s*=\s*(-?\d+(?:\.\d+)?)' % re.escape(name), text)
     assert m, "no Float named %s" % name
     return float(m.group(1))
+
+
+def check_collider_masks():
+    """Every physics body names its category and what it collides with.
+
+    This is the one failure in the physics that is completely silent. A
+    body with a shape, a restitution and no masks compiles, renders, casts
+    a shadow and sits exactly where it is drawn — and a die passes through
+    it, because the die's own `collisionBitMask` is `die | playfield` and
+    nothing told that body it was either. Nothing throws, nothing logs,
+    and the object simply is not there.
+
+    It has happened once: Baseball Dice's runner posts were built by hand
+    rather than through `DiePhysicsFactory.staticCollider`, carried a shape
+    and a restitution and nothing else, and were not obstacles at all. The
+    posts were the whole reason the runners stand on the playfield instead
+    of in a side panel.
+
+    So: every `SCNPhysicsBody(` in the suite must have all three masks set
+    within the function that builds it.
+    """
+    problems = []
+    bodies = 0
+    for filename in sorted(swift_names()):
+        text = source(filename)
+        for match in re.finditer(r'SCNPhysicsBody\(', text):
+            # The enclosing function, near enough: from the previous `func`
+            # to the next one. The masks are always set beside the body.
+            start = text.rfind("func ", 0, match.start())
+            end = text.find("\n    }", match.end())
+            if start < 0 or end < 0:
+                problems.append("%s: cannot read the function around an "
+                                "SCNPhysicsBody" % filename)
+                continue
+            bodies += 1
+            body = text[start:end]
+            name = re.match(r'func (\w+)', body)
+            name = name.group(1) if name else "?"
+            for mask in ("categoryBitMask", "collisionBitMask",
+                         "contactTestBitMask"):
+                if mask not in body:
+                    problems.append(
+                        "%s %s() builds an SCNPhysicsBody without setting "
+                        "%s — a die's own collisionBitMask is "
+                        "die | playfield, so a body that does not name "
+                        "its category is something dice can pass straight "
+                        "through, silently"
+                        % (filename, name, mask))
+    # The count is printed, not decorative: a scan that silently matched
+    # nothing would print the same "ok" as one that checked everything,
+    # which is the shape tools_qualcheck.py once failed in.
+    if not bodies:
+        problems.append("found no SCNPhysicsBody anywhere — this check is "
+                        "scanning nothing and would pass whatever the "
+                        "physics did")
+    if not problems:
+        print("  %-30s ok (%d bodies, each naming its category and its "
+              "collisions)" % ("collider masks", bodies))
+    return problems
 
 
 def main():
@@ -216,6 +275,8 @@ def main():
     print("  %-30s ceiling at %.2f catches a throw that would reach %.2f "
           "(arrives at %.1f u/s)"
           % ("ceiling containment", ceiling, peak, at_ceiling))
+
+    failed.extend(check_collider_masks())
 
     for line in failed:
         print("  %-30s FAILED  %s" % ("impulse", line))

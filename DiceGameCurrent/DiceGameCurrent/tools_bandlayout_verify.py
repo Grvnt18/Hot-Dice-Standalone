@@ -275,23 +275,46 @@ def main():
           % ("smallest playfield", tightest[0], tightest[1], tightest[2],
              MIN_SCENE))
 
-    # --- 4. Only a sandbox may be reset by a resize. ------------------
+    # --- 4. A resize must REFIT, never re-deal. -----------------------
     #
     # The arena is built for a SHAPE — PlayfieldLayout.compute takes an
     # aspect ratio and a world-width constant, and nothing in it is in
     # points — so a view that changes size keeps a valid arena and a view
-    # that changes SHAPE does not. DiceSceneView and DiceTraySceneView
-    # therefore re-assemble when the aspect drifts past
-    # `aspectRebuildThreshold`.
+    # that changes SHAPE does not.
     #
-    # Re-assembly re-deals the dice. In Free Roll that costs nothing; part
-    # way through a scored round it would throw the round away. So the
-    # threshold is only safe while the games that would be hurt by it
-    # CANNOT reach it, and that is a claim about five header fractions
-    # against every size a single device can move between — exactly the
-    # kind of claim that is true when written and false two commits later.
+    # This check used to police a threshold. Re-assembly re-dealt the
+    # dice, so `aspectRebuildThreshold` had to sit above a Duo fold and
+    # below an iPad divider drag, and the check held it there. The arena
+    # is re-fitted in place now: DiceSceneAssembler.refit swaps the arena
+    # node and leaves the dice container alone, so no shape change costs a
+    # round and the threshold is only there to stop pointless work during
+    # a layout pass.
+    #
+    # So what is worth holding is the shape of the CODE: both views must
+    # ask `needsRefit` and call `refit`, and neither may still re-enter
+    # assembly by clearing its own flag. The drift numbers below stay as a
+    # report, because they are what says a fold and a drag are different
+    # sizes of problem.
+    for filename in ("DiceGameShell.swift", "DiceTraySceneView.swift"):
+        view = code(filename)
+        if "PlayfieldLayout.needsRefit" not in view:
+            failed.append("%s does not ask PlayfieldLayout.needsRefit, so a "
+                          "window that changes shape leaves it rendering an "
+                          "arena built for the shape before" % filename)
+        if "DiceSceneAssembler.refit" not in view:
+            failed.append("%s does not call DiceSceneAssembler.refit — if it "
+                          "answers a shape change by assembling again it "
+                          "re-deals the dice mid-round, which is the fault "
+                          "the refit exists to remove" % filename)
+        # `coordinator.` on purpose: the Coordinator's own declaration is
+        # `var hasStartedAssembly = false`, so the bare spelling matches
+        # the property rather than a reset of it.
+        if "coordinator.hasStartedAssembly = false" in view:
+            failed.append("%s still clears hasStartedAssembly, which re-enters "
+                          "assembly and tears down the dice pool" % filename)
+
     layout_src = source("PlayfieldLayout.swift")
-    threshold = constant(layout_src, "aspectRebuildThreshold")
+    threshold = constant(layout_src, "aspectRefitThreshold")
     # Read, not typed. BAND_CEILING sat at 0.20 here for a while after the
     # Swift moved to 0.10: the model stayed looser than the code, so it
     # went on passing while reporting splits the app does not produce.
@@ -339,24 +362,21 @@ def main():
             if drift > threshold:
                 resettable.append((label, group, drift))
 
-    # Folding a Duo must NOT re-deal: it moves the walls about 2%, which
-    # is not worth a lost turn. Dragging an iPad divider must, because it
-    # more than doubles the shape. That split is the whole reason
-    # aspectRebuildThreshold is 0.10 rather than 0.02, so it is the thing
-    # worth holding rather than a list of screen names.
+    # Both moves must now REACH the threshold rather than clear it: a fold
+    # that goes unnoticed is a Duo showing walls for the shape it had
+    # while closed. The old threshold was set to miss a fold on purpose,
+    # because noticing cost a round; the refit means noticing is free, so
+    # anything that moves the shape at all should be picked up.
     folds = [r for r in resettable if "Duo" in r[1]]
-    unexpected = [r for r in folds if r[0] != "FreeRoll"]
-    for label, group, drift in unexpected:
-        failed.append("%s re-assembles its arena on %s — the aspect drifts "
-                      "%.3f, past the %.3f threshold — so merely opening "
-                      "the device would re-deal the dice part way through "
-                      "a scored turn. A fold is not worth that; raise the "
-                      "threshold or stop the bands moving with it"
-                      % (label, group, drift, threshold))
     drags = sorted({r[0] for r in resettable if "divider" in r[1]})
-    print("  %-26s a divider drag re-deals %d screen(s); a fold re-deals "
+    if not folds:
+        failed.append("no screen re-fits on a Duo fold at the %.3f threshold "
+                      "— the fold moves the playfield's shape by about 2%% "
+                      "and that is now worth following, since a refit keeps "
+                      "the dice" % threshold)
+    print("  %-26s a divider drag refits %d screen(s); a fold refits "
           "%d (threshold %.3f)"
-          % ("resize re-deals", len(drags), len(folds), threshold))
+          % ("resize refits", len(drags), len(folds), threshold))
 
     if failed:
         print()

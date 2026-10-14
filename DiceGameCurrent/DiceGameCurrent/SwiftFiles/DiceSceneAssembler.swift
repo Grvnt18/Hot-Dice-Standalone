@@ -1,6 +1,54 @@
 import SceneKit
 import QuartzCore
 
+/// The parts of an assembled arena that outlive a refit.
+///
+/// A reference type on purpose, and the reason the whole refit works: the
+/// sessions, the theme closures and the two screens that install their own
+/// furniture all hold THIS, not the materials and bounds it happens to
+/// carry today. A refit swaps what is inside and every holder is current,
+/// where a struct would leave each of them pointing at an arena that is no
+/// longer in the scene.
+final class ArenaHandles {
+
+    /// The node every piece of the arena hangs off, so a refit is a swap
+    /// rather than a hunt through the scene graph.
+    static let nodeName = "arenaEnvironment"
+
+    /// The playfield as the walls, the camera and the containment box
+    /// currently have it.
+    private(set) var layout: PlayfieldLayout.Result
+    private(set) var floorY: Float
+    private(set) var surfaceMaterial: SCNMaterial
+    private(set) var textMaterial: SCNMaterial
+
+    /// The view shape this arena was built for, which is what decides
+    /// whether a refit is needed at all.
+    private(set) var aspect: Float
+
+    var bounds: (x: ClosedRange<Float>, z: ClosedRange<Float>) { layout.bounds }
+
+    init(layout: PlayfieldLayout.Result, floorY: Float,
+         surfaceMaterial: SCNMaterial, textMaterial: SCNMaterial,
+         aspect: Float) {
+        self.layout = layout
+        self.floorY = floorY
+        self.surfaceMaterial = surfaceMaterial
+        self.textMaterial = textMaterial
+        self.aspect = aspect
+    }
+
+    /// Takes on a freshly built arena's handles, keeping this object's
+    /// identity so everything holding it follows.
+    func adopt(_ other: ArenaHandles) {
+        layout = other.layout
+        floorY = other.floorY
+        surfaceMaterial = other.surfaceMaterial
+        textMaterial = other.textMaterial
+        aspect = other.aspect
+    }
+}
+
 /// Everything needed to actually run a turn, handed back after assembly so
 /// the caller (your SwiftUI view/coordinator) can drive the game without
 /// needing to know how any of these pieces were wired together.
@@ -28,6 +76,11 @@ struct DiceGameSession {
     /// Settings, so a game already on screen updates live instead of only
     /// on next launch.
     let applyTheme: () -> Void
+    /// The arena this session's dice are standing in, which a refit
+    /// replaces under them. Held so the view can refit without going back
+    /// through assembly, and so `applyTheme` paints the floor that is
+    /// actually on screen rather than the one assembly first built.
+    let arena: ArenaHandles
 }
 
 /// A tray of dice you roll and read: no scoring, no banking, no selection,
@@ -51,10 +104,29 @@ final class DiceTraySession {
     /// moment assembly returns and no contact sounds ever play.
     let contactAudio: DiceContactAudio
 
+    /// The arena the dice are standing in. See `DiceGameSession.arena`.
+    let arena: ArenaHandles
+
     /// Needed on hand because re-picking the dice means calling
     /// setupPool again, which requires the bounds. DiceGameSession never
     /// exposed these — Rolls builds its pool once and never changes it.
-    let playAreaBounds: (x: ClosedRange<Float>, z: ClosedRange<Float>)
+    ///
+    /// Read through the arena rather than stored, because a refit moves
+    /// them: a stored copy would re-pool a tray into the playfield the
+    /// window used to have.
+    var playAreaBounds: (x: ClosedRange<Float>, z: ClosedRange<Float>) {
+        arena.bounds
+    }
+
+    /// Fired after the arena has been re-fitted to a view that changed
+    /// shape.
+    ///
+    /// For the screens that put their own furniture on the playfield —
+    /// Baseball Dice's runner posts and scoreboard — which are built
+    /// against the bounds and so have to be rebuilt against the new ones.
+    /// Nothing else needs it: the dice, the rim and the floor are the
+    /// arena's own business.
+    var onArenaResized: (() -> Void)?
 
     let applyTheme: () -> Void
 
@@ -140,7 +212,7 @@ final class DiceTraySession {
         lifecycle: DicePoolLifecycleController,
         rollController: DiceRollController,
         contactAudio: DiceContactAudio,
-        playAreaBounds: (x: ClosedRange<Float>, z: ClosedRange<Float>),
+        arena: ArenaHandles,
         d4Style: DieFaceLabels.D4LabelStyle,
         applyTheme: @escaping () -> Void
     ) {
@@ -148,7 +220,7 @@ final class DiceTraySession {
         self.lifecycle = lifecycle
         self.rollController = rollController
         self.contactAudio = contactAudio
-        self.playAreaBounds = playAreaBounds
+        self.arena = arena
         self.d4Style = d4Style
         self.applyTheme = applyTheme
     }
@@ -433,13 +505,17 @@ enum DiceSceneAssembler {
             turnController: turnController,
             tapHandler: tapHandler,
             contactAudio: contactAudio,
-            applyTheme: {
+            applyTheme: { [arena = env.arena] in
+                // Through the handles, so a theme change after a refit
+                // paints the floor that is on screen rather than the one
+                // assembly built and the refit replaced.
                 DiceSceneEnvironment.applyTheme(
-                    surfaceMaterial: floorSurfaceMaterial,
-                    textMaterial: floorTextMaterial,
+                    surfaceMaterial: arena.surfaceMaterial,
+                    textMaterial: arena.textMaterial,
                     title: title
                 )
-            }
+            },
+            arena: env.arena
         )
     }
 
@@ -458,6 +534,7 @@ enum DiceSceneAssembler {
         let floorSurfaceMaterial: SCNMaterial
         let floorTextMaterial: SCNMaterial
         let diceContainer: SCNNode
+        let arena: ArenaHandles
     }
 
     private static func buildEnvironment(
@@ -474,34 +551,80 @@ enum DiceSceneAssembler {
         sceneView.autoenablesDefaultLighting = false
 
         let floorY: Float = 0
-        let aspectRatio = Float(sceneView.bounds.width / max(sceneView.bounds.height, 1))
-        let layout = PlayfieldLayout.compute(screenAspectRatio: aspectRatio)
 
         DicePhysicsWorldConfigurator.configure(scene.physicsWorld)
+
+        let arena = buildArena(into: sceneView, scene: scene, floorY: floorY,
+                               title: title, style: style)
+
+        // Dice live under their own container node rather than directly on
+        // the scene root — keeps the scene graph organized and gives
+        // DicePoolLifecycleController one clear parent to add/remove from.
+        //
+        // It is also what makes a refit possible: the arena hangs off its
+        // OWN node, so re-fitting the playfield to a view that changed
+        // shape swaps that one node and never touches this one or the dice
+        // standing in it.
+        let diceContainer = SCNNode()
+        diceContainer.name = diceContainerName
+        scene.rootNode.addChildNode(diceContainer)
+        return Environment(
+            scene: scene,
+            layout: arena.layout,
+            floorY: floorY,
+            floorSurfaceMaterial: arena.surfaceMaterial,
+            floorTextMaterial: arena.textMaterial,
+            diceContainer: diceContainer,
+            arena: arena
+        )
+    }
+
+    static let diceContainerName = "diceContainer"
+
+    /// Builds the arena — camera, lights, floor, mark, rim and the
+    /// containment box — under one node, and hands back the handles
+    /// anything outside it has to keep up with.
+    ///
+    /// ONE builder, called by assembly and by `refit` both, because the
+    /// two agreeing matters more than either being readable on its own: a
+    /// refit that built a slightly different arena would be a playfield
+    /// whose walls and camera disagree, which is exactly the fault it
+    /// exists to fix.
+    @discardableResult
+    private static func buildArena(into sceneView: SCNView,
+                                   scene: SCNScene,
+                                   floorY: Float,
+                                   title: String,
+                                   style: ArenaStyle) -> ArenaHandles {
+        let aspectRatio = Float(sceneView.bounds.width
+                                / max(sceneView.bounds.height, 1))
+        let layout = PlayfieldLayout.compute(screenAspectRatio: aspectRatio)
+
+        let arenaNode = SCNNode()
+        arenaNode.name = ArenaHandles.nodeName
 
         let cameraNode = DiceCameraFactory.makeTopDownCamera(
             playfieldBounds: layout.bounds,
             orthographicScale: layout.orthographicScale,
             floorY: floorY
         )
-        scene.rootNode.addChildNode(cameraNode)
-        sceneView.pointOfView = cameraNode
+        arenaNode.addChildNode(cameraNode)
 
         DiceSceneEnvironment.addLighting(
-            to: scene.rootNode,
+            to: arenaNode,
             playfieldBounds: layout.bounds,
             floorY: floorY
         )
 
-        let floorSurfaceMaterial = DiceSceneEnvironment.addFloorSurface(
-            to: scene.rootNode,
+        let surfaceMaterial = DiceSceneEnvironment.addFloorSurface(
+            to: arenaNode,
             bounds: layout.bounds,
             floorY: floorY,
             style: style
         )
 
-        let floorTextMaterial = DiceSceneEnvironment.addFloorText(
-            to: scene.rootNode,
+        let textMaterial = DiceSceneEnvironment.addFloorText(
+            to: arenaNode,
             bounds: layout.bounds,
             floorY: floorY,
             title: title,
@@ -518,7 +641,7 @@ enum DiceSceneAssembler {
         // so an arena with no rim still cannot lose a die.
         if style.rim != .none {
             DiceSceneEnvironment.addWalls(
-                to: scene.rootNode,
+                to: arenaNode,
                 bounds: layout.bounds,
                 floorY: floorY,
                 visualHeight: 10.4, // doubled again from 5.2 per request
@@ -526,26 +649,138 @@ enum DiceSceneAssembler {
             )
         }
 
-        let playfieldContainer = DicePlayfieldPhysics.makeContainer(
-            bounds: layout.bounds,
-            floorY: floorY
+        arenaNode.addChildNode(
+            DicePlayfieldPhysics.makeContainer(bounds: layout.bounds,
+                                               floorY: floorY)
         )
-        scene.rootNode.addChildNode(playfieldContainer)
 
-        // Dice live under their own container node rather than directly on
-        // the scene root — keeps the scene graph organized and gives
-        // DicePoolLifecycleController one clear parent to add/remove from.
-        let diceContainer = SCNNode()
-        diceContainer.name = "diceContainer"
-        scene.rootNode.addChildNode(diceContainer)
-        return Environment(
-            scene: scene,
-            layout: layout,
-            floorY: floorY,
-            floorSurfaceMaterial: floorSurfaceMaterial,
-            floorTextMaterial: floorTextMaterial,
-            diceContainer: diceContainer
+        scene.rootNode.addChildNode(arenaNode)
+        // After the node is in the scene: a point of view SceneKit cannot
+        // find in the graph it is rendering is a black view.
+        sceneView.pointOfView = cameraNode
+
+        return ArenaHandles(layout: layout,
+                            floorY: floorY,
+                            surfaceMaterial: surfaceMaterial,
+                            textMaterial: textMaterial,
+                            aspect: aspectRatio)
+    }
+
+    // MARK: - Refitting
+
+    /// Re-fits a Rolls arena, and tells the controllers where the walls
+    /// went.
+    ///
+    /// The bounds reach three places that keep their own copy: the roll
+    /// controller's containment net, the turn controller's (which re-pools
+    /// at the start of a new game) and the contact audio's panning. All
+    /// three take the new ones here, because a copy left behind is a net
+    /// that catches dice at the old edge.
+    static func refit(_ session: DiceGameSession, in sceneView: SCNView,
+                      title: String = RollsGame.floorTitle,
+                      style: ArenaStyle = .house) {
+        guard refit(scene: session.scene, in: sceneView, arena: session.arena,
+                    title: title, style: style) else { return }
+        adoptBounds(session.arena, rollController: session.rollController,
+                    contactAudio: session.contactAudio)
+        session.turnController.playAreaBounds = session.arena.bounds
+    }
+
+    /// The same for a tray, plus the hook its screen may have left.
+    static func refit(_ session: DiceTraySession, in sceneView: SCNView,
+                      title: String, style: ArenaStyle) {
+        guard refit(scene: session.scene, in: sceneView, arena: session.arena,
+                    title: title, style: style) else { return }
+        adoptBounds(session.arena, rollController: session.rollController,
+                    contactAudio: session.contactAudio)
+        session.onArenaResized?()
+    }
+
+    private static func adoptBounds(_ arena: ArenaHandles,
+                                    rollController: DiceRollController,
+                                    contactAudio: DiceContactAudio) {
+        rollController.playAreaBounds = arena.bounds
+        rollController.floorY = arena.floorY
+        rollController.ceilingY = arena.floorY + PlayfieldVerticalBounds.ceilingHeight
+        contactAudio.playfieldHalfWidth = max(
+            (arena.bounds.x.upperBound - arena.bounds.x.lowerBound) / 2, 0.001
         )
+    }
+
+    /// Re-fits an assembled arena to a view that has changed shape,
+    /// WITHOUT re-dealing.
+    ///
+    /// The playfield's world bounds come from the view's aspect ratio
+    /// (`PlayfieldLayout.compute`), so a window that changes shape leaves
+    /// the walls, the camera and the containment box built for a shape
+    /// that is gone. The old answer was to assemble the whole scene again,
+    /// which also tore down the dice pool — on an iPad, dragging a Split
+    /// View divider mid-round threw the round away.
+    ///
+    /// This rebuilds the arena node alone. The dice container is a sibling
+    /// and is not touched, so every die keeps its position, its face and
+    /// its physics body; the only thing that moves a die is the clamp
+    /// below, and only when the playfield got smaller underneath it.
+    ///
+    /// Returns false when the view has no size yet, so a caller can tell
+    /// "not now" from "done".
+    @discardableResult
+    static func refit(scene: SCNScene,
+                      in sceneView: SCNView,
+                      arena: ArenaHandles,
+                      title: String,
+                      style: ArenaStyle) -> Bool {
+        guard sceneView.bounds.width > 0, sceneView.bounds.height > 0 else {
+            return false
+        }
+
+        scene.rootNode.childNode(withName: ArenaHandles.nodeName,
+                                 recursively: false)?.removeFromParentNode()
+
+        let rebuilt = buildArena(into: sceneView, scene: scene,
+                                 floorY: arena.floorY,
+                                 title: title, style: style)
+        arena.adopt(rebuilt)
+
+        clampDice(in: scene, to: rebuilt.bounds)
+        return true
+    }
+
+    /// Pulls any die that the new, smaller playfield left outside its own
+    /// walls back inside them.
+    ///
+    /// Only the depth can change — `PlayfieldLayout` holds the world WIDTH
+    /// at a constant and derives depth from the aspect — so in practice
+    /// this is a die near the top or bottom edge of a tray that just got
+    /// shorter. Without it that die is on the wrong side of a wall that
+    /// did not exist a frame ago, and the physics solver resolves that by
+    /// throwing it.
+    private static func clampDice(in scene: SCNScene,
+                                  to bounds: (x: ClosedRange<Float>,
+                                              z: ClosedRange<Float>)) {
+        guard let container = scene.rootNode.childNode(withName: diceContainerName,
+                                                       recursively: false) else { return }
+        // A die's own half-extent, near enough: the pool normalises to 1.0
+        // and the largest a round carries is 1.5, so this keeps the widest
+        // of them clear of the wall rather than touching it.
+        let inset: Float = 0.9
+        let x = (bounds.x.lowerBound + inset)...(bounds.x.upperBound - inset)
+        let z = (bounds.z.lowerBound + inset)...(bounds.z.upperBound - inset)
+        guard x.lowerBound < x.upperBound, z.lowerBound < z.upperBound else { return }
+
+        for die in container.childNodes {
+            let position = die.presentation.position
+            let clamped = SCNVector3(min(max(position.x, x.lowerBound), x.upperBound),
+                                     position.y,
+                                     min(max(position.z, z.lowerBound), z.upperBound))
+            guard clamped.x != position.x || clamped.z != position.z else { continue }
+            die.position = clamped
+            // The body carries its own copy of the transform, and a
+            // velocity pointing at the wall it was just moved off.
+            die.physicsBody?.resetTransform()
+            die.physicsBody?.velocity = SCNVector3Zero
+            die.physicsBody?.angularVelocity = SCNVector4Zero
+        }
     }
 
 
@@ -596,13 +831,13 @@ enum DiceSceneAssembler {
             lifecycle: lifecycle,
             rollController: rollController,
             contactAudio: contactAudio,
-            playAreaBounds: env.layout.bounds,
+            arena: env.arena,
             d4Style: d4Style,
-            applyTheme: {
+            applyTheme: { [arena = env.arena] in
                 DiceSceneEnvironment.applyTheme(
                     style: style,
-                    surfaceMaterial: env.floorSurfaceMaterial,
-                    textMaterial: env.floorTextMaterial,
+                    surfaceMaterial: arena.surfaceMaterial,
+                    textMaterial: arena.textMaterial,
                     title: title
                 )
             }

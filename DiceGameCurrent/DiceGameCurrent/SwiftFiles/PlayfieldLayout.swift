@@ -67,66 +67,46 @@ enum PlayfieldLayout {
     /// shape it used to be. A view that merely changes SIZE is already
     /// correct and needs nothing.
     ///
-    /// Until a foldable existed that was close to unreachable: the app is
-    /// portrait-only, so the shape only moved on a Split View drag. The
-    /// iPhone Duo changes it by folding. Measured across every size in
-    /// `tools_bandlayout_verify.py`, including both of the Duo's:
+    /// The shape moves in two ways on the devices this ships to: dragging
+    /// an iPad Split View divider, which more than doubles it (0.395 ->
+    /// 0.919, drift 0.524), and folding an iPhone Duo, which barely moves
+    /// it (0.996 -> 0.973, drift 0.024). Both figures are measured in
+    /// `tools_bandlayout_verify.py`, across every size in its table.
     ///
-    ///   | header fraction        | folded | open  | drift |
-    ///   |------------------------|--------|-------|-------|
-    ///   | Boneheads 0.14         | 1.000  | 1.000 | 0     |
-    ///   | Rolls, Royal UR 0.15   | 1.000  | 1.000 | 0     |
-    ///   | the five at 0.17       | 1.000  | 1.000 | 0     |
-    ///   | Free Roll 0.30         | 1.228  | 1.186 | 0.042 |
+    /// Six screens fill their region and so follow the window: Rolls,
+    /// Jackpot, Hog, Three Thousand, F.Y.D. and Generals. The rest keep a
+    /// square playfield, which is square at any size. The arena is
+    /// re-fitted either way — see `DiceSceneAssembler.refit`, which is
+    /// what makes "either way" affordable.
     ///
-    /// So ten of the eleven cannot drift at all: their playfield is square
-    /// at both of the Duo's sizes, and a square is a square at any size.
-    /// Free Roll's header takes 0.30 against everyone else's 0.14 to 0.17,
-    /// which is what pushes its playfield off square — and it moves on an
-    /// iPad today too, by 0.066 across a Split View drag from 320 to 744.
-    /// Raised from 0.02 when the playfield stopped being square.
+    /// How far the shape may move before the arena is re-fitted to it.
     ///
-    /// A square scene could not drift at all, so any movement was worth
-    /// rebuilding for. A scene that FILLS its region has an aspect that
-    /// depends on the window, and the two resizes this app can actually
-    /// meet are nothing like each other:
+    /// This used to be `aspectRebuildThreshold`, and it used to be a
+    /// judgement about which error a player would rather have. Re-fitting
+    /// re-assembled the scene, which re-dealt the dice, so the number had
+    /// to be wide enough that an iPhone Duo fold (drift 0.024) could not
+    /// reach it while an iPad Split View drag (drift 0.524) still could.
+    /// 0.10 sat between them.
     ///
-    ///     folding an iPhone Duo        0.996 -> 0.973   drift 0.024
-    ///     dragging an iPad divider     0.395 -> 0.919   drift 0.524
-    ///
-    /// Rebuilding re-deals the dice, so the question is which of those is
-    /// worth a lost turn. A fold moves the walls by about 2% of the
-    /// playfield's depth — call it nine points on a phone, which is not
-    /// worth interrupting a game for. A Split View drag more than doubles
-    /// the shape, which is, because the alternative is dice bouncing off
-    /// nothing in plain view.
-    ///
-    /// 0.10 sits between them with room either side. It is a judgement
-    /// about which error a player would rather have, not a measurement —
-    /// `tools_bandlayout_verify.py` holds it to the two numbers above so
-    /// the judgement at least stays the one that was made.
-    static let aspectRebuildThreshold: Float = 0.10
+    /// `DiceSceneAssembler.refit` swaps the arena node and leaves the dice
+    /// where they stand, so nothing is lost by re-fitting and there is no
+    /// trade left to judge. What remains is only this: below some movement
+    /// the walls are close enough that rebuilding them is work for
+    /// nothing, and SwiftUI hands a view's size back many times during a
+    /// layout pass. 0.005 is under a tenth of the smallest real change
+    /// either device makes and well over the rounding in a view's bounds.
+    static let aspectRefitThreshold: Float = 0.005
 
     static func aspect(of size: CGSize) -> Float {
         Float(size.width / max(size.height, 1))
     }
 
-    /// Whether the arena was built for a materially different shape.
+    /// Whether the arena was built for a different shape.
     ///
-    /// The threshold is doing real work rather than padding a comparison.
-    /// Re-assembly throws the dice away and re-deals them, which is
-    /// acceptable in a sandbox and NOT acceptable part way through a
-    /// scored round — so this has to be a test the games that would be
-    /// hurt by it cannot pass. At 0.02 the only screen that ever reaches
-    /// it is Free Roll, which has no score and no turn;
-    /// `tools_bandlayout_verify.py` asserts exactly that, at every size,
-    /// so the day somebody moves a header fraction the check says which
-    /// game just became resettable rather than a player finding out.
-    ///
-    /// Nil means nothing has been assembled yet, which is not a rebuild.
-    static func needsRebuild(assembled: Float?, now: Float) -> Bool {
-        guard let assembled else { return false }
-        return abs(now - assembled) > aspectRebuildThreshold
+    /// Nil means nothing has been assembled yet, which is not a refit.
+    static func needsRefit(built: Float?, now: Float) -> Bool {
+        guard let built else { return false }
+        return abs(now - built) > aspectRefitThreshold
     }
 }
 
@@ -319,9 +299,11 @@ enum GameBandLayout {
     /// an iPad in Slide Over it was 600 points, 54%. The band was never
     /// asking for that space; it was the only thing left holding it.
     ///
-    /// Staying square is also what keeps the arena immune to a window
+    /// Staying square also keeps the arena still through a window
     /// resize: `PlayfieldLayout.compute` takes an aspect ratio and nothing
-    /// else, and a square is a square at any size. See `needsRebuild`.
+    /// else, and a square is a square at any size. The screens that fill
+    /// their region instead are re-fitted when the shape moves — see
+    /// `needsRefit`.
     static func scene(in size: CGSize, fraction: CGFloat) -> CGFloat {
         min(size.width, max(size.height - header(in: size, fraction: fraction)
                             - buttonBandFloor, 0))

@@ -15,7 +15,14 @@ final class DiceTurnController {
     private var round: DiceGameRound
     private let lifecycle: DicePoolLifecycleController
     private let rollController: DiceRollController
-    private let playAreaBounds: (x: ClosedRange<Float>, z: ClosedRange<Float>)
+    /// Where this controller re-pools a new game's dice.
+    ///
+    /// Settable, and that is the point: the playfield's world bounds come
+    /// from the view's shape, so a window that changes shape moves them.
+    /// `DiceSceneAssembler.refit` writes the new ones here — a copy left
+    /// behind would deal the next game into the playfield the window used
+    /// to have.
+    var playAreaBounds: (x: ClosedRange<Float>, z: ClosedRange<Float>)
 
     private(set) var selectedDieIDs: Set<UUID> = []
 

@@ -79,34 +79,27 @@ struct DiceSceneView: UIViewRepresentable {
         let aspect = PlayfieldLayout.aspect(of: uiView.bounds.size)
 
         // A view that changed SHAPE since assembly has an arena built for
-        // the old one — see PlayfieldLayout.needsRebuild, which also has
-        // the measurements. Clearing the flag re-enters assembly below
-        // rather than adding a second path into it.
+        // the old one — the walls, the camera and the containment box all
+        // come from the aspect ratio. It is REFITTED rather than built
+        // again: `DiceSceneAssembler.refit` swaps the arena node and
+        // leaves the dice container alone, so a round in progress keeps
+        // its dice, their faces and the score they are holding.
         //
-        // THIS CAN FIRE ON ROLLS, and it could not before.
-        //
-        // The note here used to say it could not: the playfield was square
-        // at every supported size, so the aspect was 1.0 whatever the
-        // window did. Letting the scene fill its region instead — which is
-        // what centred the tray and shrank the button band — makes the
-        // aspect the region's, and the region moves with the window.
-        //
-        // tools_bandlayout_verify.py measures it: on the six screens that
-        // fill their region (Rolls, Jackpot, Hog, Three Thousand, F.Y.D.
-        // and Generals) dragging an iPad Split View divider crosses the
-        // threshold and re-assembles the arena, which re-deals the dice
-        // part way through a scored round. A Duo fold does not, which is
-        // what the threshold was set for and what that verifier asserts.
-        //
-        // It cannot happen on a phone: no multitasking, and the app is
-        // portrait-locked, so nothing changes the shape of the view.
-        // iPad multitasking mid-round is the whole of the exposure, and
-        // the fix is to defer the rebuild until the tray is idle rather
-        // than to stop filling the region.
+        // That is a change of kind, not of threshold. The old path
+        // re-assembled, which re-dealt, so the only safe answer was to
+        // make sure it never fired — a square playfield at every size,
+        // then an aspect threshold wide enough that a fold could not reach
+        // it. Letting the scene fill its region ended the first of those
+        // and a Duo fold was always going to test the second. A refit
+        // costs a scene node and re-deals nothing, so it can simply happen
+        // whenever the shape moves, on a divider drag and a fold alike.
         if coordinator.hasStartedAssembly,
-           PlayfieldLayout.needsRebuild(assembled: coordinator.assembledAspect,
-                                        now: aspect) {
-            coordinator.hasStartedAssembly = false
+           let live = session,
+           PlayfieldLayout.needsRefit(built: coordinator.assembledAspect,
+                                      now: aspect) {
+            DiceSceneAssembler.refit(live, in: uiView)
+            coordinator.assembledAspect = aspect
+            return
         }
 
         guard !coordinator.hasStartedAssembly else { return }
@@ -292,9 +285,10 @@ extension View {
     /// from this view's aspect ratio and nothing else, so a square scene
     /// is the same arena at every size and a stretched one is not: it
     /// would change shape when the window does, which on a foldable is
-    /// every time it opens. `PlayfieldLayout.needsRebuild` would then
-    /// re-assemble mid-game and re-deal the dice. Square keeps that
-    /// impossible rather than unlikely.
+    /// every time it opens. That used to mean a re-assembly mid-game and
+    /// a re-deal with it; `DiceSceneAssembler.refit` now swaps the arena
+    /// and leaves the dice standing, so a changing shape costs a scene
+    /// node rather than a round.
     ///
     /// Off by default, because Rollbots and Baseball Dice are handed their
     /// height by a parent and the four screens already signed off are not
@@ -322,9 +316,9 @@ extension View {
 /// The cost is named rather than hidden. The arena's world bounds come
 /// from this view's aspect ratio, so a non-square scene means an arena
 /// whose shape depends on the window — and a window that CHANGES size
-/// mid-game then has an arena built for the old one.
-/// `PlayfieldLayout.aspectRebuildThreshold` is what decides whether that
-/// is worth re-assembling for, and its own note carries the measurements.
+/// mid-game then has an arena built for the old one. That arena is
+/// re-fitted in place — see `DiceSceneAssembler.refit` — so the cost is a
+/// rebuilt floor and rim, not a re-dealt round.
 struct RollingWell: ViewModifier {
     var height: CGFloat?
     var material: WellMaterial

@@ -131,17 +131,19 @@ struct BaseballDiceScreen: View {
                                 // go in as soon as there is a scene to put
                                 // them in, and are refreshed to match the
                                 // diamond as it stands.
-                                BaseballColumns.install(
-                                    in: newSession.scene,
-                                    bounds: newSession.playAreaBounds,
-                                    floorY: 0
-                                )
-                                BaseballScoreboard.install(
-                                    in: newSession.scene,
-                                    bounds: newSession.playAreaBounds,
-                                    floorY: 0
-                                )
-                                refreshField(newSession)
+                                installField(newSession)
+                                // And again whenever the window changes
+                                // shape: both are built against the
+                                // playfield bounds, and a refit moves
+                                // those. Without this the field is
+                                // redrawn to the new floor and the posts
+                                // stay standing where the bases used to
+                                // be. `install` replaces itself, so this
+                                // leaves one set of each.
+                                newSession.onArenaResized = { [weak newSession] in
+                                    guard let live = newSession else { return }
+                                    installField(live)
+                                }
                             }
                         )
                         .rollingWell()
@@ -219,6 +221,22 @@ struct BaseballDiceScreen: View {
     ///
     /// Called after every at-bat and every half-inning, because both change
     /// who is on base, which side is batting, and what the board says.
+    /// Puts the posts and the board on the playfield, then paints them for
+    /// the game as it stands.
+    ///
+    /// Both `install` calls replace whatever they find, so this is also
+    /// how the field follows a refit: called again against the new bounds,
+    /// it leaves exactly one set of furniture standing in the right place.
+    private func installField(_ live: DiceTraySession) {
+        BaseballColumns.install(in: live.scene,
+                                bounds: live.playAreaBounds,
+                                floorY: 0)
+        BaseballScoreboard.install(in: live.scene,
+                                   bounds: live.playAreaBounds,
+                                   floorY: 0)
+        refreshField(live)
+    }
+
     private func refreshField(_ target: DiceTraySession? = nil) {
         guard let live = target ?? session else { return }
         BaseballScoreboard.update(in: live.scene, state: state)

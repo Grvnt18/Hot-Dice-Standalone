@@ -37,11 +37,10 @@ struct DiceTraySceneView: UIViewRepresentable {
     /// How the playfield is dressed. Defaults to the house style, so a
     /// game that says nothing keeps the wood and the player's table
     /// colour — which is what every game but two now does. Rollbots passes
-    /// `.steel`. Baseball Dice took `.ballpark()` until its painted pitch
-    /// was replaced by the house arena, so `.ballpark()` now has no
-    /// callers — kept rather than deleted, because removing it also means
-    /// BaseballField.swift, the texture path that draws it, and two tools,
-    /// and that is a decision rather than a tidy-up.
+    /// `.steel`. Baseball Dice takes `.ballparkMarkings`, which is the
+    /// house arena with a field laid on the floor rather than a floor made
+    /// of one — the painted pitch it used to take, and everything that
+    /// drew it, is gone.
     var arenaStyle: ArenaStyle = .house
 
     let onSessionCreated: (DiceTraySession) -> Void
@@ -68,21 +67,23 @@ struct DiceTraySceneView: UIViewRepresentable {
         let aspect = PlayfieldLayout.aspect(of: uiView.bounds.size)
 
         // The arena is built for a SHAPE, not a size — see
-        // PlayfieldLayout.needsRebuild. A view that changed shape since
+        // PlayfieldLayout.needsRefit. A view that changed shape since
         // assembly is showing walls and a camera for the shape it used to
         // be, which on a foldable happens every time the device opens.
         //
-        // Of the eight screens on this path only Free Roll ever crosses
-        // the threshold, and Free Roll is a sandbox: re-dealing its tray
-        // costs nothing. The seven that would lose a scored turn have a
-        // square playfield at every supported size and so a constant
-        // aspect of 1.0 — asserted in tools_bandlayout_verify.py, because
-        // "only Free Roll reaches it" is a claim about five header
-        // fractions and two device tables, not something to assume.
+        // Refitted, not rebuilt: the arena node is swapped and the dice
+        // container is left where it is, so a tray mid-turn keeps its
+        // dice. The old path re-assembled, which re-dealt them, and the
+        // argument for why that was survivable rested on seven of these
+        // eight screens having a playfield that never changed shape.
         if coordinator.hasStartedAssembly,
-           PlayfieldLayout.needsRebuild(assembled: coordinator.assembledAspect,
-                                        now: aspect) {
-            coordinator.hasStartedAssembly = false
+           let live = session,
+           PlayfieldLayout.needsRefit(built: coordinator.assembledAspect,
+                                      now: aspect) {
+            DiceSceneAssembler.refit(live, in: uiView,
+                                     title: floorTitle, style: arenaStyle)
+            coordinator.assembledAspect = aspect
+            return
         }
 
         guard !coordinator.hasStartedAssembly else { return }

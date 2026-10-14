@@ -323,6 +323,13 @@ enum BaseballField {
     enum Mark {
         static let height: CGFloat = 1.344
 
+        /// How much of the playfield the mark covers, both ways.
+        ///
+        /// Stated here rather than at the call site because the posts have
+        /// to land on the bases the paint draws, and a second copy of this
+        /// number is how they would stop agreeing.
+        static let floorInset: CGFloat = 0.92
+
         static let home = CGPoint(x: 0.500, y: 0.953)
         static let first = CGPoint(x: 0.846, y: 0.600)
         static let second = CGPoint(x: 0.500, y: 0.256)
@@ -355,6 +362,27 @@ enum BaseballField {
         /// point of a mark rather than a material is that the surface's
         /// own cells carry on through it.
         static let clayAlpha: CGFloat = 0.80
+
+        /// Where the composition lands on a playfield, in that playfield's
+        /// own units.
+        ///
+        /// `renderMarkings` fits itself inside the canvas it is given and
+        /// `addFloorText` hands it the playfield's proportion, so the
+        /// drawing ends up scaled by whichever axis runs out first and
+        /// centred in the other. This repeats that arithmetic for anything
+        /// that has to stand ON the drawing — which is to say the runner
+        /// posts, which were placed from the OLD composition's fractions
+        /// and so stood in the outfield once the field was redrawn.
+        ///
+        /// `scale` is one composition unit. `originX` and `originZ` are the
+        /// composition's top-left corner, measured from the playfield's.
+        static func frame(width: CGFloat, depth: CGFloat)
+            -> (scale: CGFloat, originX: CGFloat, originZ: CGFloat) {
+            let scale = min(width * floorInset, depth * floorInset / height)
+            return (scale,
+                    (width - scale) / 2,
+                    (depth - scale * height) / 2)
+        }
     }
 
     /// The field alone, on a transparent background, in flat colour.

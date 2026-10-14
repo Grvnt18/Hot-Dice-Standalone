@@ -33,9 +33,9 @@ enum BaseballColumns {
     /// narrower than a die, so the cluster behaves as one obstacle rather
     /// than a trap a die could wedge into.
     private static let poolOffsets: [CGPoint] = [
-        CGPoint(x: -0.030, y: -0.012),
-        CGPoint(x: 0.030, y: -0.012),
-        CGPoint(x: 0.0, y: 0.020)
+        CGPoint(x: -0.034, y: -0.014),
+        CGPoint(x: 0.034, y: -0.014),
+        CGPoint(x: 0.0, y: 0.024)
     ]
 
     // MARK: Building
@@ -50,19 +50,30 @@ enum BaseballColumns {
         let container = SCNNode()
         container.name = containerName
 
-        for (index, base) in [BaseballField.first,
-                              BaseballField.second,
-                              BaseballField.third].enumerated() {
+        // Mark's bases, not the pitch texture's.
+        //
+        // These were `BaseballField.first/second/third`, which are
+        // fractions of the 820x1100 composition `render` draws — a
+        // different coordinate space from the one the floor mark is drawn
+        // in, and on a different sized canvas. So a post stood where that
+        // old composition put a base, which after the field was redrawn
+        // was out on the grass: a runner on second was nowhere near
+        // second. Index order is first, second, third, matching
+        // `Diamond.occupied`, so a single puts a post on first and a
+        // double puts one on second.
+        for (index, base) in [BaseballField.Mark.first,
+                              BaseballField.Mark.second,
+                              BaseballField.Mark.third].enumerated() {
             container.addChildNode(
                 column(named: "base\(index)",
                        at: base, bounds: bounds, floorY: floorY)
             )
         }
 
-        for (seat, x) in BaseballField.onDeckX.enumerated() {
+        for (seat, x) in BaseballField.Mark.onDeckX.enumerated() {
             for (slot, offset) in poolOffsets.enumerated() {
                 let spot = CGPoint(x: x + offset.x,
-                                   y: BaseballField.onDeckY + offset.y)
+                                   y: BaseballField.Mark.onDeckY + offset.y)
                 container.addChildNode(
                     column(named: "pool\(seat)_\(slot)",
                            at: spot, bounds: bounds, floorY: floorY)
@@ -138,20 +149,25 @@ enum BaseballColumns {
     private static let capLift: CGFloat = 0.34
     private static let sideDrop: CGFloat = 0.32
 
-    /// Maps a field fraction onto the playfield.
+    /// Maps a point in the floor mark's composition onto the playfield.
     ///
-    /// `x` is a fraction of the width and `y` a fraction of the DEPTH — the
-    /// same split the texture uses, because the floor image and these posts
-    /// have to agree about where second base is.
+    /// Through `BaseballField.Mark.frame`, which is the same fit
+    /// `renderMarkings` performs on the canvas it draws into — ONE scale
+    /// for both axes, centred. The old version read `x` as a fraction of
+    /// the width and `y` as a fraction of the DEPTH, which is right only
+    /// while the drawing stretches to fill the floor, and it does not: it
+    /// is fitted, so a post placed that way drifts further from its base
+    /// the further the playfield is from the composition's own shape.
     private static func world(_ spot: CGPoint,
                               bounds: (x: ClosedRange<Float>, z: ClosedRange<Float>),
                               floorY: Float) -> SCNVector3 {
-        let width = bounds.x.upperBound - bounds.x.lowerBound
-        let depth = bounds.z.upperBound - bounds.z.lowerBound
+        let width = CGFloat(bounds.x.upperBound - bounds.x.lowerBound)
+        let depth = CGFloat(bounds.z.upperBound - bounds.z.lowerBound)
+        let frame = BaseballField.Mark.frame(width: width, depth: depth)
         return SCNVector3(
-            bounds.x.lowerBound + Float(spot.x) * width,
+            bounds.x.lowerBound + Float(frame.originX + spot.x * frame.scale),
             floorY,
-            bounds.z.lowerBound + Float(spot.y) * depth
+            bounds.z.lowerBound + Float(frame.originZ + spot.y * frame.scale)
         )
     }
 

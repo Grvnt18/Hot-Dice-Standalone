@@ -21,14 +21,10 @@ enum BaseballField {
 
     // MARK: Palette
 
-    /// The turf's default, used when nothing else is supplied.
-    ///
-    /// The pitch is the one floor in the suite the colour picker could not
-    /// touch, because this surface ignored `ArenaStyle.surfaceColor`
-    /// entirely. It follows the picker now — but only the TURF. The dirt,
-    /// the chalk, the bases and the panel keep their own colours: a blue
-    /// infield stops reading as a ballpark, and the ask was the green.
-    static let grass = UIColor(hex: "#7BA07E")
+    /// The clay, the chalk and the bases do not follow the colour picker,
+    /// and that is deliberate: the floor under them already does, and a
+    /// blue infield stops reading as a ballpark. There is no turf colour
+    /// here any more — the grass IS the player's table.
     static let dirt = UIColor(hex: "#C9B18A")
     static let chalk = UIColor(hex: "#FFFFFF")
     static let baseWhite = UIColor(hex: "#F4F4F0")
@@ -63,22 +59,18 @@ enum BaseballField {
     static let panelBevelW: CGFloat = 0.0035
 
     // MARK: Geometry
-
-    static let home = CGPoint(x: 0.500, y: 0.800)
-    static let first = CGPoint(x: 0.760, y: 0.665)
-    static let second = CGPoint(x: 0.500, y: 0.530)
-    static let third = CGPoint(x: 0.240, y: 0.665)
-
-    static let mound = CGPoint(x: 0.500, y: 0.665)
-    static let moundRadius: CGFloat = 0.078
-    static let skinRadius: CGFloat = 0.330
-    static let homeCircleRadius: CGFloat = 0.125
-    static let pathWidth: CGFloat = 0.034
-    static let baseSize: CGFloat = 0.034
-
-    static let onDeckRadius: CGFloat = 0.072
-    static let onDeckY: CGFloat = 0.930
-    static let onDeckX: [CGFloat] = [0.150, 0.850]
+    //
+    // The field's own geometry lives in `Mark`, below. There used to be a
+    // second set here — home, first, second, third, the mound and their
+    // radii, as fractions of an 820x1100 portrait pitch — belonging to
+    // `render`, which drew that pitch as the floor's material. Both the
+    // pitch and those constants are gone: a game whose floor is a
+    // different material from the other ten reads as a different app, so
+    // the field is a MARK on the house floor now.
+    //
+    // What remains below is the scoreboard's, which is still drawn, still
+    // against that same 820x1100 composition, and still pinned to the
+    // preview by tools_baseball_field_verify.py.
 
     // MARK: The scoreboard
 
@@ -116,157 +108,6 @@ enum BaseballField {
             outsTop: outsTop,
             height: (outsTop + outsHeight + boardPad) - boardY
         )
-    }
-
-    // MARK: Drawing
-
-    /// Renders the pitch at `size`.
-    ///
-    /// No innings parameter: the scoreboard left this texture (see the note
-    /// where it used to be drawn), and the grass does not care how long the
-    /// game is. `renderScoreboard` draws only as many columns as the match
-    /// has, which is where that rule now lives.
-    static func render(size: CGSize, turf: UIColor = grass) -> UIImage {
-        let renderer = UIGraphicsImageRenderer(size: size)
-        return renderer.image { context in
-            let cg = context.cgContext
-            let w = size.width
-            let h = size.height
-            func px(_ value: CGFloat) -> CGFloat { value * w }
-            func py(_ value: CGFloat) -> CGFloat { value * h }
-            func point(_ p: CGPoint) -> CGPoint { CGPoint(x: px(p.x), y: py(p.y)) }
-
-            // NO ANTIALIASING ANYWHERE ON THIS PITCH.
-            //
-            // The faceted surfaces were always hard-edged, but the chalk, the
-            // foul lines, the batter's boxes, the mound and the bases are
-            // drawn with CoreGraphics strokes and fills — so they came out
-            // smooth, and they were the only smooth thing left once the dice,
-            // the floor and the rim had all gone to a pixel grid. A soft
-            // white line over hard-edged turf reads as vector art laid on top
-            // of pixel art rather than as part of it.
-            cg.setShouldAntialias(false)
-            cg.interpolationQuality = .none
-
-            // The clay and the chalk belong to the chosen colourway now.
-            //
-            // The turf already followed the picker; these two were fixed
-            // (#C9B18A and pure white), so a blue table gave a tinted pitch
-            // with a sand infield that answered to nothing. They are TINTED
-            // TOWARD the swatch rather than derived from it: clay that is
-            // literally a ramp off a green turf stops being clay, and the
-            // dirt's job is to be a different material from the grass. A
-            // partial blend keeps that job and still ties both to the table.
-            let clayColour = tinted(dirt, toward: turf, amount: 0.35)
-            let chalkColour = tinted(chalk, toward: turf, amount: 0.18)
-            let baseColour = tinted(baseWhite, toward: turf, amount: 0.18)
-
-            // The turf and the dirt are FACETED, not flat.
-            //
-            // Every other playfield in the suite is a low-poly surface, and
-            // a pitch painted in two flat colours read as a different app.
-            // The layout is untouched — the same diamond, the same circles,
-            // the same measurements — and only what fills them changes.
-            // The turf posterises to the floor's own four tones; the dirt
-            // does NOT.
-            //
-            // That asymmetry is the whole point rather than an oversight.
-            // The dirt is what makes the green read as grass — it is the
-            // one surface on this pitch whose job is to be a different
-            // material, and flattening it to four tones off its own base
-            // narrows exactly the contrast that does that work. Same
-            // argument that keeps the chalk, the bases and the panel off
-            // the picker.
-            let turfTexture = faceted(turf, size: size, seed: 771001,
-                                      posterised: true)
-            // Posterised like the turf. It was deliberately left smooth —
-            // "the one surface on this pitch whose job is to be a different
-            // material" — and that argument held while the dirt's contrast
-            // against the grass was the only thing telling them apart. It
-            // does not hold now: the clay is tinted toward the swatch, so the
-            // two are told apart by hue as well, and being the single
-            // continuous-tone surface on a pixel-art pitch cost more than the
-            // contrast was worth.
-            let clay = faceted(clayColour, size: size, seed: 771002,
-                               posterised: true)
-
-            turfTexture.draw(in: CGRect(origin: .zero, size: size))
-
-            // Infield skin: a dirt disc around the mound with the grass
-            // infield laid back over it, which is how the real shape is made.
-            fill(cg, with: clay, size: size) {
-                $0.addEllipse(in: circle(at: point(mound), radius: px(skinRadius)))
-            }
-            fill(cg, with: turfTexture, size: size) {
-                $0.addPath(diamondPath(centre: mound, half: 0.190, in: size))
-            }
-
-            // Base paths, stroked along the diamond's edges — clipped to the
-            // stroke rather than stroked flat, so the facets run through the
-            // basepath the way they do through the skin around it.
-            fill(cg, with: clay, size: size) { ctx in
-                let bases = [home, first, second, third].map(point)
-                ctx.addLines(between: bases + [bases[0]])
-                ctx.setLineWidth(px(pathWidth))
-                ctx.setLineJoin(.round)
-                ctx.replacePathWithStrokedPath()
-            }
-
-            // Foul lines, running out past the corners.
-            chalkColour.setStroke()
-            cg.setLineWidth(px(0.008))
-            for corner in [CGPoint(x: -0.05, y: 0.330), CGPoint(x: 1.05, y: 0.330)] {
-                cg.move(to: point(home))
-                cg.addLine(to: point(corner))
-            }
-            cg.strokePath()
-
-            // Mound, its rubber, and the plate circle.
-            fill(cg, with: clay, size: size) {
-                $0.addEllipse(in: circle(at: point(mound), radius: px(moundRadius)))
-            }
-            chalkColour.setFill()
-            cg.fill(CGRect(x: px(mound.x - 0.030), y: py(mound.y) - px(0.006),
-                           width: px(0.060), height: px(0.012)))
-            fill(cg, with: clay, size: size) {
-                $0.addEllipse(in: circle(at: point(home), radius: px(homeCircleRadius)))
-            }
-
-            // Batter's boxes.
-            chalkColour.setStroke()
-            cg.setLineWidth(px(0.006))
-            for side in [-1.0, 1.0] as [CGFloat] {
-                let left = home.x + (side > 0 ? 0.028 : -0.076)
-                cg.stroke(CGRect(x: px(left), y: py(home.y) - px(0.055),
-                                 width: px(0.048), height: px(0.100)))
-            }
-
-            baseColour.setFill()
-            for centre in [first, second, third] {
-                cg.addPath(diamondPath(centre: centre, half: baseSize, in: size))
-                cg.fillPath()
-            }
-            cg.addPath(platePath(in: size))
-            cg.fillPath()
-
-            // On-deck circles, which double as the two runner pools.
-            for (index, x) in onDeckX.enumerated() {
-                fill(cg, with: clay, size: size) {
-                    $0.addEllipse(in: circle(at: CGPoint(x: px(x), y: py(onDeckY)),
-                                             radius: px(onDeckRadius)))
-                }
-                draw(index == 0 ? "VISITORS" : "HOME",
-                     centredAt: CGPoint(x: px(x), y: py(onDeckY) + px(0.082)),
-                     size: px(0.026), colour: chalk.withAlphaComponent(0.9))
-            }
-
-            // The scoreboard is NOT drawn here. It has to change as runs
-            // and outs come in, and this texture is rendered once from the
-            // innings count alone — which is exactly why the board showed
-            // an empty grid and three empty circles for a whole game.
-            // `renderScoreboard` draws it onto its own plane instead, and
-            // `BaseballScoreboard` repaints that after every at-bat.
-        }
     }
 
     /// The scoreboard panel on its own, with the game's live state in it.
@@ -545,48 +386,6 @@ enum BaseballField {
 
     // MARK: Pieces
 
-    /// A faceted texture the size of the field, in one of its own colours.
-    ///
-    /// Through `LowPolyTextures.facetedSurface`, the same generator every
-    /// other playfield uses, so the pitch is made of the same material as
-    /// the rest of the suite rather than merely resembling it. Portrait, so
-    /// the cell counts follow the canvas and the triangles stay roughly
-    /// equilateral instead of stretching into slivers.
-    /// Every surface on the pitch, as a pixel grid.
-    ///
-    /// This used to be `facetedSurface` — triangles, 22 columns wide — which
-    /// was the suite's look when the ballpark was drawn and is not any more.
-    /// The timber, the steel, the floor and the dice are all pixel grids, so
-    /// a diamond built out of facets was the one surface in the app still
-    /// speaking the old language.
-    ///
-    /// The cell is a fraction of the width rather than a fixed count, so the
-    /// blocks are the same size on a phone and an iPad instead of growing
-    /// with the canvas.
-    ///
-    /// `posterised` is gone with it: pixelSurface always draws off
-    /// SmokeFloor's ramp, because posterising some surfaces and not others
-    /// is what made the clay the one smooth thing on the pitch.
-    private static func faceted(_ colour: UIColor, size: CGSize,
-                                seed: UInt64,
-                                posterised: Bool = false) -> UIImage {
-        return LowPolyTextures.pixelSurface(
-            baseColor: colour,
-            cell: max(3, (size.width / 64).rounded()),
-            pixelSize: size.width,
-            pixelHeight: size.height,
-            seed: seed
-        )
-    }
-
-    /// Fills whatever `region` adds to the context with a texture.
-    ///
-    /// Clipping and drawing the whole image rather than using a pattern
-    /// fill: a pattern tiles from the context's origin at its own size, so
-    /// two regions filled with the same pattern show the same facets in the
-    /// same places. Clipping one continuous image means the dirt under the
-    /// mound and the dirt at first base are different parts of one surface,
-    /// which is what stops the repetition reading as wallpaper.
     /// `base` moved `amount` of the way toward `tint`, in straight RGB.
     ///
     /// Partial on purpose. A full derivation would make the clay a ramp off
@@ -605,55 +404,9 @@ enum BaseballField {
                        alpha: ba)
     }
 
-    private static func fill(_ cg: CGContext, with texture: UIImage,
-                             size: CGSize, region: (CGContext) -> Void) {
-        cg.saveGState()
-        region(cg)
-        cg.clip()
-        // UIImage.draw rather than CGContext.draw: a renderer's context is
-        // already flipped for UIKit drawing, so the CG call would place the
-        // texture upside down. Invisible on noise, wrong all the same, and
-        // the sort of thing that only shows up once something directional
-        // is drawn into one of these.
-        texture.draw(in: CGRect(origin: .zero, size: size))
-        cg.restoreGState()
-    }
-
     private static func circle(at centre: CGPoint, radius: CGFloat) -> CGRect {
         CGRect(x: centre.x - radius, y: centre.y - radius,
                width: radius * 2, height: radius * 2)
-    }
-
-    /// A base, kept square on screen.
-    ///
-    /// `half` is a fraction of the WIDTH; the vertical half is scaled by the
-    /// aspect so the shape stays a diamond rather than stretching with a
-    /// portrait canvas.
-    private static func diamondPath(centre: CGPoint, half: CGFloat,
-                                    in size: CGSize) -> CGPath {
-        let hx = half * size.width
-        let hy = half * size.width          // deliberately width-based
-        let c = CGPoint(x: centre.x * size.width, y: centre.y * size.height)
-        let path = CGMutablePath()
-        path.move(to: CGPoint(x: c.x, y: c.y - hy))
-        path.addLine(to: CGPoint(x: c.x + hx, y: c.y))
-        path.addLine(to: CGPoint(x: c.x, y: c.y + hy))
-        path.addLine(to: CGPoint(x: c.x - hx, y: c.y))
-        path.closeSubpath()
-        return path
-    }
-
-    private static func platePath(in size: CGSize) -> CGPath {
-        let p = size.width * 0.022
-        let c = CGPoint(x: home.x * size.width, y: home.y * size.height)
-        let path = CGMutablePath()
-        path.move(to: CGPoint(x: c.x - p, y: c.y - p))
-        path.addLine(to: CGPoint(x: c.x + p, y: c.y - p))
-        path.addLine(to: CGPoint(x: c.x + p, y: c.y + p * 0.3))
-        path.addLine(to: CGPoint(x: c.x, y: c.y + p * 1.3))
-        path.addLine(to: CGPoint(x: c.x - p, y: c.y + p * 0.3))
-        path.closeSubpath()
-        return path
     }
 
     /// The panel, with the game in it.

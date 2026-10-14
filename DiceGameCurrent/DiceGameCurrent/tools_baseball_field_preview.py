@@ -44,6 +44,12 @@ PANEL = "#111111"
 PANEL_TEXT = "#FFFFFF"
 CELL = "#E9E9E9"
 RIM = "#6B4E31"          # the small wooden border
+# The mound, lifted 16% toward white off the clay — the Swift tints it
+# the same way, through BaseballField.tinted(dirt, toward: .white).
+MOUND_TONE = "#D3BF9E"
+
+# The wooden rim around the playfield, deliberately thin.
+RIM_WIDTH = 0.028
 
 # The board's lettering.
 #
@@ -63,26 +69,50 @@ RIM = "#6B4E31"          # the small wooden border
 BOARD_FONT = "Poppins SemiBold, Poppins, sans-serif"
 FONT_TOKEN = "@BOARD_FONT@"
 
-# --- geometry, all fractions of the square -------------------------------
-RIM_WIDTH = 0.028        # the wooden border, deliberately thin
+# --- the field mark, in units of its own WIDTH ---------------------------
+#
+# Mirrors BaseballField.Mark. `y` is a fraction of the WIDTH as well, running
+# from the top of the composition rather than the top of the canvas, so the
+# shape is the shape whatever it is drawn on. MARK_HEIGHT is how tall the
+# whole thing is in those same units.
+#
+# These replaced a set of fractions-of-their-own-axis constants belonging to
+# the painted pitch, where x was a fraction of the width and y a fraction of
+# the height. On any canvas but the one they were chosen on that put the
+# bases 0.52 of the width apart and home and second 0.27 of it, which is a
+# diamond half as tall as it is wide.
+MARK_HEIGHT = 1.344
 
-# x is a fraction of WIDTH, y a fraction of HEIGHT.
-HOME = (0.500, 0.800)
-FIRST = (0.760, 0.665)
-SECOND = (0.500, 0.530)
-THIRD = (0.240, 0.665)
+HOME = (0.500, 0.953)
+FIRST = (0.846, 0.600)
+SECOND = (0.500, 0.256)
+THIRD = (0.154, 0.600)
+MOUND = (0.500, 0.605)
 
-MOUND = (0.500, 0.665)
-MOUND_R = 0.078          # radii are fractions of WIDTH
-SKIN_R = 0.330
-HOME_CIRCLE_R = 0.125
-PATH_W = 0.034
-BASE_SIZE = 0.034
+SKIN_R = 0.419           # the clay disc around the mound
+WEDGE_APEX_Y = 1.060     # where the edges parallel to the foul lines meet
+MOUND_R = 0.116
+HOME_CIRCLE_R = 0.195
+ON_DECK_R = 0.126
+ON_DECK_Y = 1.219
+ON_DECK_X = (0.153, 0.847)
 
-ON_DECK_R = 0.072
-ON_DECK_Y = 0.930
-ON_DECK_X = (0.150, 0.850)
+BASE_SIZE = 0.047        # a base's half-diagonal
+PLATE_HALF = 0.033
+RUBBER = (0.074, 0.019)  # the pitcher's rubber
+BOX = (0.102, 0.153)     # a batter's box
+BOX_GAP = 0.028
+FOUL_W = 0.009
+BOX_LINE = 0.007
+LABEL_SIZE = 0.052
+CLAY_ALPHA = 0.80
 
+# One composition unit in pixels, and where its top-left corner lands. The
+# Swift fits the same way: one scale for both axes, centred, so a circle is
+# a circle on any canvas.
+MARK_SCALE = min(WIDTH, HEIGHT / MARK_HEIGHT)
+MARK_X = (WIDTH - MARK_SCALE) / 2
+MARK_Y = (HEIGHT - MARK_SCALE * MARK_HEIGHT) / 2
 # The scoreboard sits top left and the dice roll straight over it.
 #
 # Narrowed from 56% of the width to 42% and the total column dropped: it is
@@ -113,22 +143,32 @@ def py(value):
     return value * HEIGHT
 
 
+def u(value):
+    """A length in composition units, in pixels."""
+    return value * MARK_SCALE
+
+
+def mark(point):
+    """A point in the mark's composition, in pixels."""
+    return MARK_X + point[0] * MARK_SCALE, MARK_Y + point[1] * MARK_SCALE
+
+
 def poly(points, fill, extra=""):
     pts = " ".join("%.1f,%.1f" % (px(x), py(y)) for x, y in points)
     return '<polygon points="%s" fill="%s" %s/>' % (pts, fill, extra)
 
 
-def diamond_at(centre, half, fill, extra=""):
-    """A base or the infield, kept square on screen.
+def mark_diamond(centre, half, fill, extra=""):
+    """A base: a square stood on its corner, in mark space.
 
-    `half` is a fraction of the WIDTH; the vertical half is scaled by the
-    aspect so the shape stays a diamond rather than stretching with the
-    canvas.
+    One scale on both axes, so it is a square turned 45 degrees rather than
+    something that stretches with the canvas.
     """
-    cx, cy = centre
-    half_y = half * WIDTH / HEIGHT
-    return poly([(cx, cy - half_y), (cx + half, cy),
-                 (cx, cy + half_y), (cx - half, cy)], fill, extra)
+    cx, cy = mark(centre)
+    h = u(half)
+    pts = " ".join("%.1f,%.1f" % p for p in
+                   ((cx, cy - h), (cx + h, cy), (cx, cy + h), (cx - h, cy)))
+    return '<polygon points="%s" fill="%s" %s/>' % (pts, fill, extra)
 
 
 def build(innings=9, overlay=None):
@@ -136,66 +176,85 @@ def build(innings=9, overlay=None):
     out = ['<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" '
            'viewBox="0 0 %d %d">' % (WIDTH, HEIGHT, WIDTH, HEIGHT)]
 
+    # The floor itself. In the app this is the player's own table colour
+    # with the suite's moving field on it; flat green here, because what is
+    # being looked at is the composition laid ON it.
     out.append('<rect width="%d" height="%d" fill="%s"/>' % (WIDTH, HEIGHT, GRASS))
 
-    # Infield skin: a dirt disc around the mound with the grass infield laid
-    # back over it, which is how the real shape is made. Drawn as an ellipse
-    # so a radius given in WIDTH fractions stays circular on a tall canvas.
-    out.append('<ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="%s"/>'
-               % (px(MOUND[0]), py(MOUND[1]), px(SKIN_R), px(SKIN_R), DIRT))
-    out.append(diamond_at(MOUND, 0.190, GRASS))
+    # All the clay at one opacity, as one group: the skin, the plate circle
+    # and the two on-deck circles overlap, and four translucent fills
+    # stacked would darken every overlap into a visible seam. The Swift
+    # does this with a transparency layer.
+    out.append('<g opacity="%.2f">' % CLAY_ALPHA)
 
-    # Base paths, stroked along the diamond edges.
-    path = " ".join("%.1f,%.1f" % (px(x), py(y))
-                    for x, y in (HOME, FIRST, SECOND, THIRD))
-    out.append('<polygon points="%s" fill="none" stroke="%s" stroke-width="%.1f"/>'
-               % (path, DIRT, px(PATH_W)))
+    # The skin: a disc around the mound, cut off down each side by a line
+    # parallel to the foul line. That silhouette is what a field diagram
+    # actually has — a plain disc reads as a running track.
+    apex_x, apex_y = mark((0.5, WEDGE_APEX_Y))
+    reach = u(2)
+    out.append('<clipPath id="wedge"><polygon points="%.1f,%.1f %.1f,%.1f '
+               '%.1f,%.1f %.1f,%.1f %.1f,%.1f"/></clipPath>'
+               % (apex_x, apex_y,
+                  apex_x - reach, apex_y - reach,
+                  apex_x - reach, MARK_Y - reach,
+                  apex_x + reach, MARK_Y - reach,
+                  apex_x + reach, apex_y - reach))
+    mx, my = mark(MOUND)
+    out.append('<circle cx="%.1f" cy="%.1f" r="%.1f" fill="%s" '
+               'clip-path="url(#wedge)"/>' % (mx, my, u(SKIN_R), DIRT))
 
-    # Foul lines run from home out past the corners.
-    for corner in ((-0.05, 0.330), (1.05, 0.330)):
-        out.append('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" '
-                   'stroke="%s" stroke-width="%.1f"/>'
-                   % (px(HOME[0]), py(HOME[1]), px(corner[0]), py(corner[1]),
-                      LINE, px(0.008)))
+    hx, hy = mark(HOME)
+    out.append('<circle cx="%.1f" cy="%.1f" r="%.1f" fill="%s"/>'
+               % (hx, hy, u(HOME_CIRCLE_R), DIRT))
+    for x in ON_DECK_X:
+        ox, oy = mark((x, ON_DECK_Y))
+        out.append('<circle cx="%.1f" cy="%.1f" r="%.1f" fill="%s"/>'
+                   % (ox, oy, u(ON_DECK_R), DIRT))
 
-    # Mound, its rubber, and the home-plate circle.
-    out.append('<ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="%s"/>'
-               % (px(MOUND[0]), py(MOUND[1]), px(MOUND_R), px(MOUND_R), DIRT))
-    out.append('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" fill="%s"/>'
-               % (px(MOUND[0] - 0.030), py(MOUND[1]) - px(0.006),
-                  px(0.060), px(0.012), LINE))
-    out.append('<ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="%s"/>'
-               % (px(HOME[0]), py(HOME[1]), px(HOME_CIRCLE_R), px(HOME_CIRCLE_R), DIRT))
+    # The mound, a shade up from the skin it sits in — the one place the
+    # field needs a tone of its own to read at all.
+    out.append('<circle cx="%.1f" cy="%.1f" r="%.1f" fill="%s"/>'
+               % (mx, my, u(MOUND_R), MOUND_TONE))
+    out.append('</g>')
 
-    # Batter's boxes, either side of the plate.
+    # Foul lines, running off the corners of the canvas rather than
+    # stopping at the skin, which is what makes the shape read as a field.
     for side in (-1, 1):
-        left = HOME[0] + (0.028 if side > 0 else -0.076)
+        out.append('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" '
+                   'stroke="%s" stroke-width="%.1f" opacity="0.92"/>'
+                   % (hx, hy, hx + side * u(1.4), hy - u(1.4), LINE, u(FOUL_W)))
+
+    # Batter's boxes, outlined either side of the plate.
+    for side in (-1, 1):
+        near = -BOX_GAP - BOX[0] if side < 0 else BOX_GAP
         out.append('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" '
-                   'fill="none" stroke="%s" stroke-width="%.1f"/>'
-                   % (px(left), py(HOME[1]) - px(0.055),
-                      px(0.048), px(0.100), LINE, px(0.006)))
+                   'fill="none" stroke="%s" stroke-width="%.1f" opacity="0.92"/>'
+                   % (hx + u(near), hy - u(BOX[1] * 0.55),
+                      u(BOX[0]), u(BOX[1]), LINE, u(BOX_LINE)))
 
-    # Bases, then home plate's pentagon.
+    # The pitcher's rubber.
+    out.append('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" fill="%s"/>'
+               % (mx - u(RUBBER[0] / 2), my - u(RUBBER[1] / 2),
+                  u(RUBBER[0]), u(RUBBER[1]), BASE))
+
+    # The three bases, then home plate, which has its own shape.
     for centre in (FIRST, SECOND, THIRD):
-        out.append(diamond_at(centre, BASE_SIZE, BASE,
-                              'stroke="#CFCFC8" stroke-width="2"'))
-    plate = px(0.022)
-    out.append('<polygon points="%.1f,%.1f %.1f,%.1f %.1f,%.1f %.1f,%.1f %.1f,%.1f" '
-               'fill="%s"/>'
-               % (px(HOME[0]) - plate, py(HOME[1]) - plate,
-                  px(HOME[0]) + plate, py(HOME[1]) - plate,
-                  px(HOME[0]) + plate, py(HOME[1]) + plate * 0.3,
-                  px(HOME[0]),         py(HOME[1]) + plate * 1.3,
-                  px(HOME[0]) - plate, py(HOME[1]) + plate * 0.3, BASE))
+        out.append(mark_diamond(centre, BASE_SIZE, BASE))
+    h = u(PLATE_HALF)
+    out.append('<polygon points="%.1f,%.1f %.1f,%.1f %.1f,%.1f %.1f,%.1f '
+               '%.1f,%.1f" fill="%s"/>'
+               % (hx - h, hy - h, hx + h, hy - h,
+                  hx + h, hy + h * 0.3, hx, hy + h * 1.3,
+                  hx - h, hy + h * 0.3, BASE))
 
-    # On-deck circles, which double as the two runner pools.
+    # The on-deck circles say whose they are. The only lettering on the
+    # floor.
     for x, label in zip(ON_DECK_X, ("VISITORS", "HOME")):
-        out.append('<ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f" fill="%s"/>'
-                   % (px(x), py(ON_DECK_Y), px(ON_DECK_R), px(ON_DECK_R), DIRT))
+        ox, oy = mark((x, ON_DECK_Y))
         out.append('<text x="%.1f" y="%.1f" fill="%s" font-size="%.0f" '
                    'font-family="@BOARD_FONT@" text-anchor="middle" '
-                   'opacity="0.9">%s</text>'
-                   % (px(x), py(ON_DECK_Y) + px(0.100), LINE, px(0.026), label))
+                   'dominant-baseline="middle" opacity="0.85">%s</text>'
+                   % (ox, oy, LINE, u(LABEL_SIZE), label))
 
     out.extend(scoreboard(innings))
     if overlay:

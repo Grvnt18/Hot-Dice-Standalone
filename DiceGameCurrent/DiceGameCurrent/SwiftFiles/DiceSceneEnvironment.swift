@@ -17,17 +17,13 @@ import UIKit
 /// exactly what they had.
 struct ArenaStyle {
 
-    /// What the floor is made of.
+    /// There is no `Surface` any more, and its absence is the point.
     ///
-    /// Faceted for nine games and Rollbots; Baseball Dice draws an actual
-    /// pitch instead, because its board IS the game — the runners, the outs
-    /// and the line score all live on it.
-    enum Surface {
-        case faceted
-        case baseballField
-    }
-
-    var surface: Surface = .faceted
+    /// It had two cases: the faceted field every game uses, and a rendered
+    /// pitch for Baseball Dice. The pitch is gone — a game whose floor is
+    /// a different MATERIAL from the other ten reads as a different app,
+    /// so Baseball Dice takes the house floor and lays a field on it as a
+    /// MARK, the way the other games lay a wordmark. See `FloorMark`.
 
     /// The base colour the faceted floor texture is generated from. Nil
     /// follows the player's table colour, which is what the house style is.
@@ -74,9 +70,7 @@ struct ArenaStyle {
 
     static let house = ArenaStyle(surfaceOverride: nil, rim: .wood)
 
-    /// Baseball Dice: the house floor, with the diamond laid on it.
-    ///
-    /// Replaces `ballpark()`, which made the pitch the surface itself.
+    /// Baseball Dice: the house floor, with the field laid on it.
     static let ballparkMarkings = ArenaStyle(surfaceOverride: nil,
                                              rim: .wood,
                                              floorMark: .baseballDiamond)
@@ -89,13 +83,6 @@ struct ArenaStyle {
     /// has without reversing it.
     static let steel = ArenaStyle(surfaceOverride: UIColor(hex: "#3A424C"),
                                   rim: .steel)
-
-    /// Baseball Dice: the pitch itself, inside a thin wooden rim.
-    static func ballpark() -> ArenaStyle {
-        ArenaStyle(surface: .baseballField,
-                   surfaceOverride: nil,
-                   rim: .wood)
-    }
 
     var surfaceColor: UIColor { surfaceOverride ?? AppTheme.shared.floorBaseColor }
 }
@@ -231,42 +218,25 @@ enum DiceSceneEnvironment {
     /// bleed, and because everything it covers is off-camera anyway.
     static let floorOverscan: Float = 1.06
 
-    /// Dresses a floor material for a style: the flowing field for the house
-    /// and steel arenas, a rendered pitch for the ballpark.
+    /// Dresses a floor material for a style.
     ///
     /// One function, so building the scene and re-applying the theme cannot
     /// disagree about what a style draws.
     private static func applySurface(style: ArenaStyle, to material: SCNMaterial,
                                      worldAspect: Float = 1) {
-        switch style.surface {
-        case .faceted:
-            // The floor's own shape, so the field's dither cells stay
-            // square on a playfield that is not — see
-            // SmokeFloor.surfaceModifier(worldAspect:).
-            SmokeFloor.apply(to: material, color: style.surfaceColor,
-                             worldAspect: worldAspect)
-        case .baseballField:
-            // The pitch is a picture of a specific place, not a field of
-            // noise, so it stays an image and takes no shader.
-            material.shaderModifiers = nil
-            material.diffuse.contents = ballparkTexture(for: style)
-            material.diffuse.wrapS = .clamp
-            material.diffuse.wrapT = .clamp
-            material.lightingModel = .lambert
-        }
+        // The floor's own shape, so the field's dither cells stay square on
+        // a playfield that is not — see
+        // SmokeFloor.surfaceModifier(worldAspect:).
+        SmokeFloor.apply(to: material, color: style.surfaceColor,
+                         worldAspect: worldAspect)
     }
 
     /// Re-dresses a floor already on screen, when the player changes colour.
+    ///
+    /// Retint only — the shader, and the shape baked into it, are already
+    /// on the material and a colour change does not move the floor.
     private static func retintSurface(style: ArenaStyle, on material: SCNMaterial) {
-        switch style.surface {
-        case .faceted:
-            // Retint only — the shader, and the shape baked into it, are
-            // already on the material and a colour change does not move
-            // the floor.
-            SmokeFloor.retint(material, color: style.surfaceColor)
-        case .baseballField:
-            material.diffuse.contents = ballparkTexture(for: style)
-        }
+        SmokeFloor.retint(material, color: style.surfaceColor)
     }
 
     /// "ROLLS" written across the center of the floor in Aguafina Script,
@@ -425,22 +395,6 @@ enum DiceSceneEnvironment {
     }
 
     /// The floor image a style asks for.
-    ///
-    /// The ballpark pitch. Portrait, matching the composition the preview
-    /// settled. The scoreboard is NOT part of this: it changes during the
-    /// game and this texture is built once, so it is its own plane (see
-    /// BaseballScoreboard).
-    ///
-    /// The turf takes the table colour, so the pitch answers the picker like
-    /// every other floor. Only the turf — see BaseballField.grass.
-    ///
-    /// The house and steel arenas have no equivalent, because their floor is
-    /// no longer a picture: see `SmokeFloor`.
-    private static func ballparkTexture(for style: ArenaStyle) -> UIImage {
-        BaseballField.render(size: CGSize(width: 820, height: 1100),
-                             turf: style.surfaceColor)
-    }
-
     /// Visible wood frame around the play area — separate from the
     /// invisible physics wall colliders in DicePlayfieldPhysics, which are
     /// kept MUCH taller (effectively infinite containment) than this looks.

@@ -26,14 +26,30 @@ PREVIEW = os.path.join(HERE, "tools_baseball_field_preview.py")
 SWIFT = "BaseballField.swift"
 
 # preview name -> Swift name. Points are compared component-wise.
-SCALARS = {
-    "MOUND_R": "moundRadius",
+#
+# Two groups, because there are two compositions. The MARK's constants are
+# in units of its own width and live in `BaseballField.Mark`; the BOARD's
+# are fractions of the 820x1100 canvas and live beside it. A third group —
+# the painted pitch's own geometry — is gone from both files with the pitch
+# itself.
+MARK_SCALARS = {
+    "MARK_HEIGHT": "height",
     "SKIN_R": "skinRadius",
-    "HOME_CIRCLE_R": "homeCircleRadius",
-    "PATH_W": "pathWidth",
-    "BASE_SIZE": "baseSize",
+    "WEDGE_APEX_Y": "wedgeApexY",
+    "MOUND_R": "moundRadius",
+    "HOME_CIRCLE_R": "homeRadius",
     "ON_DECK_R": "onDeckRadius",
     "ON_DECK_Y": "onDeckY",
+    "BASE_SIZE": "baseHalf",
+    "PLATE_HALF": "plateHalf",
+    "BOX_GAP": "boxGap",
+    "FOUL_W": "foulWidth",
+    "BOX_LINE": "boxLine",
+    "LABEL_SIZE": "labelSize",
+    "CLAY_ALPHA": "clayAlpha",
+}
+
+BOARD_SCALARS = {
     "BOARD_X": "boardX",
     "BOARD_Y": "boardY",
     "BOARD_W": "boardW",
@@ -44,6 +60,8 @@ SCALARS = {
     "OUTS_GAP": "outsGap",
     "OUTS_H": "outsHeight",
 }
+
+SCALARS = dict(MARK_SCALARS, **BOARD_SCALARS)
 
 POINTS = {
     "HOME": "home",

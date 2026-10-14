@@ -759,7 +759,29 @@ enum SmokeFloor {
     ///    and was wrong: with the base field pinned in space, anywhere the warp
     ///    gradient was weak simply did not move, so the floor churned in one
     ///    band and sat still everywhere else.
-    static let surfaceModifier: String = """
+    ///
+    /// ---
+    ///
+    /// The field, for a floor of a given world shape.
+    ///
+    /// `worldAspect` is the floor's width over its depth. It was not a
+    /// parameter while every playfield was square, and the day the tray
+    /// started filling a region taller than it is wide, the dither cells
+    /// went with it: `floor(uv * cellsAcross)` counts the same number of
+    /// cells along both axes, so on a 393x535 floor every cell — and the
+    /// noise sampled per cell — came out 1.36 times taller than it is
+    /// wide.
+    ///
+    /// Note this is NOT `fieldAspect`, which stays where it is: that is an
+    /// artistic squash that makes the smoke drift wider than it is tall,
+    /// and it is wanted on every floor whatever its shape. This is the
+    /// correction that makes a cell square in WORLD space, which is what
+    /// stops the correction and the art fighting each other.
+    static func surfaceModifier(worldAspect: Float = 1) -> String {
+        modifierSource(cellsDown: cellsAcross / max(worldAspect, 0.0001))
+    }
+
+    private static func modifierSource(cellsDown: Float) -> String { """
     #pragma arguments
     float3 smokeToneA;
     float3 smokeToneB;
@@ -817,7 +839,9 @@ enum SmokeFloor {
     // constant across a cell by construction, so sampling per-fragment would
     // compute an identical five-octave warp many times over and then throw
     // the difference away.
-    float2 cell = floor(uv * \(cellsAcross));
+    // Cells counted per axis, so one stays square in world space on a
+    // floor that is not. See surfaceModifier(worldAspect:).
+    float2 cell = floor(float2(uv.x * \(cellsAcross), uv.y * \(cellsDown)));
 
     float2 p;
     p.x = (cell.x + 0.5) / \(cellsAcross) * \(fieldScale) + \(originX);
@@ -866,6 +890,7 @@ enum SmokeFloor {
 
     _surface.diffuse = float4(tone, 1.0);
     """
+    }
 
     // MARK: - The constants the shader is built from
     //
@@ -1029,7 +1054,8 @@ enum SmokeFloor {
     /// the still is never seen, and if it does not, the still is already
     /// there. Either way the tray is a four-tone floor and never a black
     /// rectangle.
-    static func apply(to material: SCNMaterial, color: UIColor) {
+    static func apply(to material: SCNMaterial, color: UIColor,
+                      worldAspect: Float = 1) {
         let tones = ramp(from: color)
 
         material.diffuse.contents = fallbackTexture(tones: tones)
@@ -1039,7 +1065,7 @@ enum SmokeFloor {
         // floor shades under the existing key/ambient rig the same way the
         // dice do.
         material.lightingModel = .lambert
-        material.shaderModifiers = [.surface: surfaceModifier]
+        material.shaderModifiers = [.surface: surfaceModifier(worldAspect: worldAspect)]
 
         applyTones(tones, to: material)
     }

@@ -210,7 +210,10 @@ enum DiceSceneEnvironment {
         let plane = SCNPlane(width: CGFloat(width * floorOverscan),
                              height: CGFloat(depth * floorOverscan))
         let material = SCNMaterial()
-        applySurface(style: style, to: material)
+        // The plane is overscanned equally on both axes, so its shape is
+        // the playfield's: width over depth.
+        applySurface(style: style, to: material,
+                     worldAspect: width / max(depth, 0.0001))
         plane.materials = [material]
 
         let node = SCNNode(geometry: plane)
@@ -233,10 +236,15 @@ enum DiceSceneEnvironment {
     ///
     /// One function, so building the scene and re-applying the theme cannot
     /// disagree about what a style draws.
-    private static func applySurface(style: ArenaStyle, to material: SCNMaterial) {
+    private static func applySurface(style: ArenaStyle, to material: SCNMaterial,
+                                     worldAspect: Float = 1) {
         switch style.surface {
         case .faceted:
-            SmokeFloor.apply(to: material, color: style.surfaceColor)
+            // The floor's own shape, so the field's dither cells stay
+            // square on a playfield that is not — see
+            // SmokeFloor.surfaceModifier(worldAspect:).
+            SmokeFloor.apply(to: material, color: style.surfaceColor,
+                             worldAspect: worldAspect)
         case .baseballField:
             // The pitch is a picture of a specific place, not a field of
             // noise, so it stays an image and takes no shader.
@@ -252,6 +260,9 @@ enum DiceSceneEnvironment {
     private static func retintSurface(style: ArenaStyle, on material: SCNMaterial) {
         switch style.surface {
         case .faceted:
+            // Retint only — the shader, and the shape baked into it, are
+            // already on the material and a colour change does not move
+            // the floor.
             SmokeFloor.retint(material, color: style.surfaceColor)
         case .baseballField:
             material.diffuse.contents = ballparkTexture(for: style)

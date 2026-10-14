@@ -145,8 +145,14 @@ def shader_source(text):
     it, and the shader's own `//` comments legitimately NAME the OpenGL
     spellings while explaining why they are not used — a check that fails
     on the note explaining itself is worse than no check.
+
+    The shader is built by `modifierSource(cellsDown:)` rather than held in
+    a `static let`: the dither grid has to know the floor's aspect ratio or
+    its cells come out stretched on a non-square playfield. Anchoring on
+    the declaration rather than the name keeps this off the doc comments
+    that mention `surfaceModifier` higher up the file.
     """
-    start = text.index('static let surfaceModifier: String = """')
+    start = text.index("private static func modifierSource(")
     body = text[start:]
     body = body[body.index('"""') + 3:]
     body = body[: body.index('"""')]
@@ -329,8 +335,8 @@ def main():
               % ("constants", len(CONSTANTS)))
 
     # --- 2. The shader still does the things that matter. ------------
-    shader = text[text.index("surfaceModifier"):] if "surfaceModifier" in text else ""
-    check_metal_only(shader_source(text), failed)
+    shader = shader_source(text)
+    check_metal_only(shader, failed)
     missing = [why for pattern, why in SHADER_SHAPE
                if not re.search(pattern, shader)]
     for why in missing:

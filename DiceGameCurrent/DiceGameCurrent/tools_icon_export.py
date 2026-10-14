@@ -38,7 +38,7 @@ that changes.
 import os
 import sys
 
-from PIL import Image
+from PIL import Image, ImageCms
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MASTER = os.path.join(HERE, "Icons", "Master icon Default.png")
@@ -104,26 +104,44 @@ def shaped(square, width, height):
     return canvas
 
 
+def srgb_profile():
+    """An sRGB ICC profile to stamp on every export.
+
+    The fourth thing the export has to get right, found on the first real
+    Xcode build: Pillow writes a PNG with no colour profile at all, and
+    Xcode warns about an app icon that does not declare one. An untagged
+    image is not WRONG — everything downstream assumes sRGB, which is what
+    these are — but "assumed" and "stated" are different claims, and the
+    one place that difference is expensive is App Store validation.
+
+    So it is stated. The profile is built rather than shipped as a file:
+    it is derived from a name Pillow already knows, and a committed .icc
+    would be one more binary nobody in this repo can read.
+    """
+    return ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
+
+
 def main():
     outdir = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "Icons", "export")
     os.makedirs(outdir, exist_ok=True)
+    icc = srgb_profile()
 
     master = Image.open(MASTER).convert("RGBA")
     square, inset = squared(master)
     print("master %s, bevel cropped at %dpx" % (master.size, inset))
 
     name, width, height = APP_ICON
-    square.save(os.path.join(outdir, name + ".png"), "PNG")
+    square.save(os.path.join(outdir, name + ".png"), "PNG", icc_profile=icc)
     print("  %-30s %4d x %-4d %s" % (name, width, height, square.mode))
 
     for name, width, height in LADDER:
         image = shaped(square, width, height)
         assert image.size == (width, height), (name, image.size)
         assert image.mode == "RGB", (name, image.mode)
-        image.save(os.path.join(outdir, name + ".png"), "PNG")
+        image.save(os.path.join(outdir, name + ".png"), "PNG", icc_profile=icc)
         print("  %-30s %4d x %-4d %s" % (name, width, height, image.mode))
 
-    print("icons: %d slots written to %s, none carrying alpha"
+    print("icons: %d slots written to %s, sRGB-tagged, none carrying alpha"
           % (len(LADDER) + 1, outdir))
 
 

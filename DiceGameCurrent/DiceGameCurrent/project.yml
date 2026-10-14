@@ -47,7 +47,11 @@
 #     git clone https://github.com/yonaskolb/XcodeGen.git
 #     cd XcodeGen && git checkout 2.42.0 && make install PREFIX=$HOME/.local
 #
-#   The CI runner is a supported macOS, so it just brews it.
+#   The CI runner is a supported macOS, so it just brews it — which means
+#   the two machines run DIFFERENT XcodeGen versions, and that is exactly
+#   why `projectFormat` is stated below rather than left to the default.
+#   2.42.0 predates that option and ignores it, which is harmless: its own
+#   default is the older format already.
 #
 # GENERATING THE PROJECT:               xcodegen generate
 #
@@ -82,6 +86,29 @@ options:
   createIntermediateGroups: true
   # Generated, so it is never in the repo to go stale.
   generateEmptyDirectories: false
+
+  # THE PROJECT FILE FORMAT, STATED RATHER THAN INHERITED.
+  #
+  # XcodeGen defaults this to whatever Xcode was current when the version
+  # you happen to have was released — today `xcode16_0`, which writes
+  # object version 77. The first archive on CI died on it:
+  #
+  #     The project 'HotDice' cannot be opened because it is in a future
+  #     Xcode project file format (77)
+  #
+  # The two machines that build this run DIFFERENT Xcodes — 14.2 on the
+  # Monterey Mac, because that is the last one that runs there, and
+  # whatever the runner image carries (15.4 at the time of writing). A
+  # default that tracks the generator rather than the compiler is a
+  # project the older of the two cannot open, and the Mac is the one that
+  # cannot be upgraded.
+  #
+  # So it is pinned to the floor. A newer Xcode opens an older format
+  # without complaint; the reverse is the error above. `xcodeVersion`
+  # comes with it so LastUpgradeCheck does not claim a version neither
+  # machine has.
+  projectFormat: xcode14_0
+  xcodeVersion: "14.2"
 
 settings:
   base:

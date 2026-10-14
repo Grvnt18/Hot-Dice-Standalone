@@ -83,10 +83,26 @@ struct DiceSceneView: UIViewRepresentable {
         // the measurements. Clearing the flag re-enters assembly below
         // rather than adding a second path into it.
         //
-        // This cannot fire on Rolls: its playfield is square at every
-        // supported size, so the aspect is 1.0 whatever the window does,
-        // and a rebuild here would throw away a round in progress. That is
-        // asserted rather than hoped — tools_bandlayout_verify.py.
+        // THIS CAN FIRE ON ROLLS, and it could not before.
+        //
+        // The note here used to say it could not: the playfield was square
+        // at every supported size, so the aspect was 1.0 whatever the
+        // window did. Letting the scene fill its region instead — which is
+        // what centred the tray and shrank the button band — makes the
+        // aspect the region's, and the region moves with the window.
+        //
+        // tools_bandlayout_verify.py measures it: on the six screens that
+        // fill their region (Rolls, Jackpot, Hog, Three Thousand, F.Y.D.
+        // and Generals) dragging an iPad Split View divider crosses the
+        // threshold and re-assembles the arena, which re-deals the dice
+        // part way through a scored round. A Duo fold does not, which is
+        // what the threshold was set for and what that verifier asserts.
+        //
+        // It cannot happen on a phone: no multitasking, and the app is
+        // portrait-locked, so nothing changes the shape of the view.
+        // iPad multitasking mid-round is the whole of the exposure, and
+        // the fix is to defer the rebuild until the tray is idle rather
+        // than to stop filling the region.
         if coordinator.hasStartedAssembly,
            PlayfieldLayout.needsRebuild(assembled: coordinator.assembledAspect,
                                         now: aspect) {

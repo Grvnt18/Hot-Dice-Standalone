@@ -8,17 +8,20 @@ import UIKit
 /// nothing ever filled them. The board showed the inning numbers and no
 /// game, for the whole game.
 ///
-/// Shaped exactly like `BaseballColumns`, and mapping field fractions to
-/// world space the same way, so the paint and the posts cannot disagree
-/// about where anything on the pitch is.
+/// It does NOT share `BaseballColumns`' mapping, which it used to: the
+/// posts stand on the floor mark and go through `BaseballField.Mark.frame`
+/// to find it, while the board is a sign in a corner of the playfield and
+/// is placed against the playfield's own edges. Two different jobs; the
+/// board has nothing on the field to line up with.
 enum BaseballScoreboard {
 
     static let containerName = "baseballScoreboard"
 
-    /// The panel's texture, in pixels. Derived from the field canvas
-    /// `DiceSceneEnvironment.surfaceTexture` uses (820x1100) times the
-    /// panel's own fractions, so a pixel here is the same size as a pixel
-    /// of the grass it sits on.
+    /// The composition the board's fractions are measured against: the
+    /// 820x1100 pitch `BaseballField.render` draws. Nothing renders that
+    /// pitch onto a floor any more, but the board's own constants —
+    /// `boardX`, `boardW`, `boardMetrics` — are still fractions of it, and
+    /// `tools_baseball_field_verify.py` pins them there.
     private static let fieldPixels = CGSize(width: 820, height: 1100)
 
     /// The panel's own canvas, in pixels, and so its own shape.

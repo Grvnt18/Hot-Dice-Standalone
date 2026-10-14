@@ -37,7 +37,11 @@ struct DiceTraySceneView: UIViewRepresentable {
     /// How the playfield is dressed. Defaults to the house style, so a
     /// game that says nothing keeps the wood and the player's table
     /// colour — which is what every game but two now does. Rollbots passes
-    /// `.steel` and Baseball Dice `.ballpark()`.
+    /// `.steel`. Baseball Dice took `.ballpark()` until its painted pitch
+    /// was replaced by the house arena, so `.ballpark()` now has no
+    /// callers — kept rather than deleted, because removing it also means
+    /// BaseballField.swift, the texture path that draws it, and two tools,
+    /// and that is a decision rather than a tidy-up.
     var arenaStyle: ArenaStyle = .house
 
     let onSessionCreated: (DiceTraySession) -> Void

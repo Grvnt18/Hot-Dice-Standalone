@@ -71,7 +71,9 @@ struct GeneralsScreen: View {
                 // rather than typed as 100.
                 let bands = GameBandLayout.bands(in: geo.size)
                 let headerHeight = bands.header
-                let sceneHeight = bands.scene
+                // The REGION, not the square: the well fills 60% of the
+                // screen and the playfield stays square inside it.
+                let sceneHeight = bands.sceneRegion
                 let buttonHeight = bands.buttonBand
 
                 VStack(spacing: 0) {
@@ -100,7 +102,7 @@ struct GeneralsScreen: View {
                             }
                         }
                     )
-                    .rollingWell(height: sceneHeight)
+                    .rollingWell(height: sceneHeight, square: true)
                     .overlay(alignment: .topLeading) {
                         if let onExit {
                             OverlayChromeButton(systemName: "chevron.left") { onExit() }

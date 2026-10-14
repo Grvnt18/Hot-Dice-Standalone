@@ -291,17 +291,67 @@ enum GameBandLayout {
     /// square — which is also why a wider screen buys the scene nothing,
     /// and why landscape costs these games height for width they cannot
     /// spend.
+    /// It used to take whatever was left after the header and the band's
+    /// FLOOR, which is why the band grew instead of the scene: on an
+    /// iPhone 14 the scene capped out at its 393pt width and the other
+    /// 237 points — 31% of the screen — all went to the button band. On
+    /// an iPad in Slide Over it was 600 points, 54%. The band was never
+    /// asking for that space; it was the only thing left holding it.
+    ///
+    /// Staying square is also what keeps the arena immune to a window
+    /// resize: `PlayfieldLayout.compute` takes an aspect ratio and nothing
+    /// else, and a square is a square at any size. See `needsRebuild`.
     static func scene(in size: CGSize, fraction: CGFloat) -> CGFloat {
-        let spare = size.height - header(in: size, fraction: fraction)
-            - buttonBandFloor
-        return min(size.width, max(spare, 0))
+        min(size.width, max(size.height - header(in: size, fraction: fraction)
+                            - buttonBandFloor, 0))
     }
+
+    /// The region the playfield sits in. The timber well fills THIS, and
+    /// the square scene is centred inside it — so where the screen is
+    /// taller than the scene can use, what shows above and below is tray
+    /// rather than a gap.
+    static func sceneRegion(in size: CGSize, fraction: CGFloat) -> CGFloat {
+        max(size.height - header(in: size, fraction: fraction)
+            - bandShare(in: size, fraction: fraction), 0)
+    }
+
+    /// The button band: what is left over, but never more than a fifth.
+    ///
+    /// **A CAP, not a share, and that is the whole change.** The band used
+    /// to take the remainder outright, which is how a screen too tall for
+    /// its own square playfield ended up with a third of itself given to
+    /// one button:
+    ///
+    ///     iPhone 14          17 / 52 / 31   ->   17 / 63 / 20
+    ///     iPhone 15 Pro Max  17 / 51 / 32   ->   17 / 63 / 20
+    ///     iPad Slide Over    17 / 29 / 54   ->   17 / 63 / 20
+    ///     iPad mini          17 / 67 / 16   ->   17 / 67 / 16   unchanged
+    ///     iPad Air           17 / 71 / 12   ->   17 / 71 / 12   unchanged
+    ///
+    /// The iPad rows are the point of writing it as a cap. Those layouts
+    /// were signed off as they are, and their band is already under a
+    /// fifth — so the clamp never binds and not one point moves. Only the
+    /// screens that were actually broken change.
+    ///
+    /// The floor still wins underneath it, because a band that cannot hold
+    /// a 48pt button and its caption is not a band.
+    static func bandShare(in size: CGSize, fraction: CGFloat) -> CGFloat {
+        let leftover = size.height - header(in: size, fraction: fraction)
+            - scene(in: size, fraction: fraction)
+        return min(max(leftover, buttonBandFloor),
+                   max(size.height * bandCeiling, buttonBandFloor))
+    }
+
+    /// The most of the screen the button band may hold.
+    ///
+    /// A fifth, which is what was asked for. It binds on phones and on a
+    /// narrow iPad window, and on a full-screen iPad it never does.
+    static let bandCeiling: CGFloat = 0.20
 
     /// Whatever the scene did not take. Never below `buttonBandFloor`,
     /// because the scene gives way first.
     static func buttonBand(in size: CGSize, fraction: CGFloat) -> CGFloat {
-        size.height - header(in: size, fraction: fraction)
-            - scene(in: size, fraction: fraction)
+        bandShare(in: size, fraction: fraction)
     }
 
     /// The header fraction the alternating games share.
@@ -310,6 +360,11 @@ enum GameBandLayout {
     /// same number in fifteen places, and no way to change it without
     /// finding all of them. Free Roll is the exception and still passes its
     /// own, because its header genuinely moves when the totals panel opens.
+    /// Still 0.17, deliberately. Raising it to a fifth would have matched
+    /// the band's ceiling and looked tidier in this file — and it would
+    /// have moved the iPad, whose layout was reviewed on the device and
+    /// signed off. The header is the one band with real content in it, so
+    /// it is not where slack belongs anyway.
     static let scoreboardFraction: CGFloat = 0.17
 
     /// All three band heights at once.
@@ -320,6 +375,9 @@ enum GameBandLayout {
     /// answers it.
     struct Bands {
         let header: CGFloat
+        /// The 60% the tray fills.
+        let sceneRegion: CGFloat
+        /// The square playfield, centred inside it.
         let scene: CGFloat
         let buttonBand: CGFloat
     }
@@ -327,6 +385,7 @@ enum GameBandLayout {
     static func bands(in size: CGSize,
                       fraction: CGFloat = scoreboardFraction) -> Bands {
         Bands(header: header(in: size, fraction: fraction),
+              sceneRegion: sceneRegion(in: size, fraction: fraction),
               scene: scene(in: size, fraction: fraction),
               buttonBand: buttonBand(in: size, fraction: fraction))
     }

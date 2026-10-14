@@ -73,8 +73,18 @@ RESIZE_GROUPS = [
 # floor to grow before anything is said.
 MIN_SCENE = 260
 
+# The most of the screen the button band may take — GameBandLayout's
+# bandCeiling. A CAP rather than a share: on a full-screen iPad the band
+# is already under it and nothing moves, which is the property worth
+# checking rather than assuming.
+BAND_CEILING = 0.20
+
 # Each screen and the header fraction it asks for.
 SCREENS = {
+    # Rolls joined the shared split — it used to compute 0.15 and a typed
+    # 100 inline, which is how it ended up with a 237pt button band on an
+    # iPhone 14 while its tray stopped at 393.
+    "DiceGameShell.swift": 0.17,
     "JackpotScreen.swift": 0.17,
     "HogScreen.swift": 0.17,
     "ThreeThousandScreen.swift": 0.17,
@@ -247,6 +257,10 @@ def main():
     for filename, fraction in sorted(SCREENS.items()):
         for name, width, height in SIZES:
             header = height * fraction
+            # The scene is unchanged: the square it always was. What
+            # changed is where the LEFTOVER goes — the band is capped at a
+            # fifth now and the rest becomes tray around the scene, so
+            # this still measures the playfield itself.
             scene = min(width, max(height - header - floor, 0))
             if scene < MIN_SCENE:
                 failed.append("%s on %s (%dx%d): the playfield comes to "
@@ -278,28 +292,30 @@ def main():
     # kind of claim that is true when written and false two commits later.
     threshold = constant(source("PlayfieldLayout.swift"),
                          "aspectRebuildThreshold")
-    # Rolls is not in SCREENS: it splits its bands inline, with its own
-    # fraction and its own 100, rather than through GameBandLayout. It is
-    # also the screen a reset would cost the most, so it is checked here
-    # explicitly rather than left out.
-    shell = code("DiceGameShell.swift")
-    rolls_fraction = float(re.search(
-        r"geo\.size\.height \* (0\.\d+)", shell).group(1))
-    rolls_floor = float(re.search(
-        r"minButtonHeight: CGFloat = (\d+)", shell).group(1))
-
+    # Rolls used to be absent here, because it split its bands inline with
+    # its own fraction and its own typed 100. It goes through
+    # GameBandLayout now like the other five, so it is simply a row in
+    # SCREENS and this no longer needs a special case for it.
     by_name = {name: (w, h) for name, w, h in SIZES}
     resettable = []
-    for label, fraction, band in (
-            [("Rolls", rolls_fraction, rolls_floor)]
-            + [(f.replace("Screen.swift", ""), fr, floor)
-               for f, fr in sorted(SCREENS.items())]):
+    for filename, fraction in sorted(SCREENS.items()):
+        label = filename.replace("Screen.swift", "").replace("DiceGameShell", "Rolls")
+        squared = "square: true" in code(filename)
         for group, members in RESIZE_GROUPS:
-            ratios = []
-            for name in members:
-                width, height = by_name[name]
-                scene = min(width, max(height - height * fraction - band, 0))
-                ratios.append(width / scene if scene > 0 else float("inf"))
+            if squared:
+                # `rollingWell(square: true)` puts an aspectRatio(1, .fit)
+                # on the scene, so it is a square at every size and its
+                # aspect is 1.0 by construction. The tray around it has no
+                # aspect ratio to drift. Asserted below rather than
+                # assumed: if that modifier ever comes off, the screen
+                # stops being in this branch and starts being measured.
+                ratios = [1.0]
+            else:
+                ratios = []
+                for name in members:
+                    width, height = by_name[name]
+                    scene = min(width, max(height - height * fraction - floor, 0))
+                    ratios.append(width / scene if scene > 0 else float("inf"))
             drift = max(ratios) - min(ratios)
             if drift > threshold:
                 resettable.append((label, group, drift))

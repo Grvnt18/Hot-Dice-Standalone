@@ -115,7 +115,14 @@ struct BaseballDiceScreen: View {
                             session: $session,
                             makeInitialDice: { [BaseballArt.die(sides: 8, isBatter: true)] },
                             floorTitle: "",
-                            arenaStyle: .ballpark(),
+                            // The house arena, not the painted pitch.
+                            // The ballpark texture stretched to a
+                            // non-square well and its markings carried a
+                            // contrast nothing else in the suite has, so
+                            // it read as a different app's screen. This is
+                            // the faceted floor in the player's own table
+                            // colour, which is what the other ten wear.
+                            arenaStyle: .house,
                             onSessionCreated: { newSession in
                                 newSession.onRollSettled = { results in
                                     settled(results)

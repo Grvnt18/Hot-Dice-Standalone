@@ -264,15 +264,52 @@ enum WellMaterial {
 
 extension View {
     @ViewBuilder
+    /// `square` keeps the PLAYFIELD square while the well around it fills
+    /// whatever height it is given.
+    ///
+    /// The two were the same thing until the bands became 20/60/20. The
+    /// well is handed 60% of the screen now, and on a phone that is taller
+    /// than the screen is wide — so without this the scene would stretch
+    /// to fill it and stop being square.
+    ///
+    /// That matters for more than shape. The arena's world bounds come
+    /// from this view's aspect ratio and nothing else, so a square scene
+    /// is the same arena at every size and a stretched one is not: it
+    /// would change shape when the window does, which on a foldable is
+    /// every time it opens. `PlayfieldLayout.needsRebuild` would then
+    /// re-assemble mid-game and re-deal the dice. Square keeps that
+    /// impossible rather than unlikely.
+    ///
+    /// Off by default, because Rollbots and Baseball Dice are handed their
+    /// height by a parent and the four screens already signed off are not
+    /// changing shape for this.
     func rollingWell(height: CGFloat? = nil,
                      material: WellMaterial = .timber,
-                     inset: CGFloat = 10) -> some View {
-        let lipped = self
-            // The backdrop stays directly behind the scene, inside the lip,
-            // so a sliver showing during assembly still reads as field
-            // rather than as a gap in the surround.
-            .background(SmokeFloor.backdropColor)
-            .pixelWell(radius: ControlShape.cornerRadius)
+                     inset: CGFloat = 10,
+                     square: Bool = false) -> some View {
+        modifier(RollingWell(height: height, material: material,
+                             inset: inset, square: square))
+    }
+}
+
+/// The well itself.
+///
+/// A ViewModifier rather than the one-expression extension it was, because
+/// `square` has to add a modifier or add nothing — and "nothing" is not
+/// something an expression can be. The first cut wrote
+/// `aspectRatio(1, contentMode: square ? .fit : .fill)`, which is not the
+/// same thing at all: `.fill` on the five screens that do NOT square would
+/// have grown their scene past its frame and clipped it, and four of those
+/// five are screens already signed off on the device.
+struct RollingWell: ViewModifier {
+    var height: CGFloat?
+    var material: WellMaterial
+    var inset: CGFloat
+    var square: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        let lipped = dressed(content)
             .padding(inset)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -281,6 +318,39 @@ extension View {
             lipped.background(WoodTiledBackground()).frame(height: height)
         case .plate:
             lipped.background(SteelTiledBackground()).frame(height: height)
+        }
+    }
+
+    /// The scene, with its backdrop and its sunken lip — and squared, when
+    /// the caller asks.
+    ///
+    /// `square` keeps the PLAYFIELD square while the well around it fills
+    /// whatever height it is handed. The two were the same thing until the
+    /// button band became a capped share: the well is given the leftover
+    /// now, and on a phone that is taller than the screen is wide, so
+    /// without this the scene would stretch to fill it.
+    ///
+    /// That matters for more than shape. The arena's world bounds come
+    /// from this view's aspect ratio and nothing else, so a square scene
+    /// is the same arena at every size and a stretched one is not — it
+    /// would change shape when the window does, which on a foldable is
+    /// every time it opens, and `PlayfieldLayout.needsRebuild` would then
+    /// re-assemble mid-game and re-deal the dice. Square keeps that
+    /// impossible rather than unlikely, and
+    /// `tools_bandlayout_verify.py` reads this flag back to prove it.
+    @ViewBuilder
+    private func dressed(_ content: Content) -> some View {
+        let plain = content
+            // The backdrop stays directly behind the scene, inside the lip,
+            // so a sliver showing during assembly still reads as field
+            // rather than as a gap in the surround.
+            .background(SmokeFloor.backdropColor)
+            .pixelWell(radius: ControlShape.cornerRadius)
+
+        if square {
+            plain.aspectRatio(1, contentMode: .fit)
+        } else {
+            plain
         }
     }
 }
@@ -946,10 +1016,14 @@ struct DiceGameScreen: View {
                 // button's row rather than removed from the game — see
                 // DiceRollButton's own wood backdrop for why that freed
                 // space doesn't just become bare background.
-                let headerHeight = geo.size.height * 0.15
-                let minButtonHeight: CGFloat = 100
-                let sceneHeight = min(geo.size.width, max(geo.size.height - headerHeight - minButtonHeight, 0))
-                let buttonHeight = geo.size.height - headerHeight - sceneHeight
+                // Through GameBandLayout now, like the other five. This
+                // was 0.15 and a typed 100, computed here and nowhere
+                // else — which is how Rolls ended up with a 237pt button
+                // band on an iPhone 14 while its tray stopped at 393.
+                let bands = GameBandLayout.bands(in: geo.size)
+                let headerHeight = bands.header
+                let sceneHeight = bands.sceneRegion
+                let buttonHeight = bands.buttonBand
 
                 VStack(spacing: 0) {
                     DiceScoreBar(
@@ -1009,7 +1083,7 @@ struct DiceGameScreen: View {
                             ui.sync(from: controller)
                         }
                     )
-                        .rollingWell(height: sceneHeight)
+                        .rollingWell(height: sceneHeight, square: true)
                         .overlay(alignment: .topLeading) {
                             if let onExit {
                                 Button {

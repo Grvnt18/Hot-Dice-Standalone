@@ -301,8 +301,17 @@ enum BaseballDiceGame: SuiteGame {
     static let displayName = "Baseball Dice"
     static let tagline = "Beat the pitch. Take the plate."
 
-    /// The floor is the ballpark itself, so it carries no wordmark.
-    static let floorTitle = ""
+    // No floorTitle override any more, so this takes the default — its
+    // own display name, like nine of the eleven. It was "" because "the
+    // floor is the ballpark itself, so it carries no wordmark", and the
+    // ballpark is gone: the arena is `.house` now, the same faceted floor
+    // in the player's own table colour that the rest of the suite wears.
+    // A plain floor with no name on it was the one thing left making this
+    // screen read as a different app.
+    //
+    // "Baseball Dice" is thirteen characters against "Three Thousand"'s
+    // fourteen, which takes the default and fits — so this needs no
+    // abbreviation the way Freighter.Yacht.Dinghy does.
 
     static let rules: [GameRuleSection] = [
         GameRuleSection(

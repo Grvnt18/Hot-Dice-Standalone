@@ -504,7 +504,8 @@ enum DiceSceneAssembler {
             to: scene.rootNode,
             bounds: layout.bounds,
             floorY: floorY,
-            title: title
+            title: title,
+            mark: style.floorMark
         )
 
         // Visual height only — the actual containment boundary (in

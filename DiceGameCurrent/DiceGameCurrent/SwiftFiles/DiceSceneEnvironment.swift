@@ -53,7 +53,33 @@ struct ArenaStyle {
 
     var rim: RimMaterial
 
+    /// What is laid flat on the floor, where nine games put their name.
+    ///
+    /// The floor mark and the floor SURFACE are different questions, and
+    /// conflating them is what the pitch got wrong. Baseball Dice needs a
+    /// diamond on its floor; it does not need its own material to draw it
+    /// on, and taking one cost the screen its place in the suite — the
+    /// turf and the clay were `pixelSurface` grids at a contrast nothing
+    /// else has, and the texture was composed portrait and then stretched
+    /// onto a square floor.
+    ///
+    /// So the surface stays `.faceted`, in the player's own table colour,
+    /// like every other game. Only the mark changes.
+    enum FloorMark {
+        case script
+        case baseballDiamond
+    }
+
+    var floorMark: FloorMark = .script
+
     static let house = ArenaStyle(surfaceOverride: nil, rim: .wood)
+
+    /// Baseball Dice: the house floor, with the diamond laid on it.
+    ///
+    /// Replaces `ballpark()`, which made the pitch the surface itself.
+    static let ballparkMarkings = ArenaStyle(surfaceOverride: nil,
+                                             rim: .wood,
+                                             floorMark: .baseballDiamond)
 
     /// Rollbots: the arena is steel, and so is its rim.
     ///
@@ -251,12 +277,29 @@ enum DiceSceneEnvironment {
         to rootNode: SCNNode,
         bounds: (x: ClosedRange<Float>, z: ClosedRange<Float>),
         floorY: Float,
-        title: String
+        title: String,
+        mark: ArenaStyle.FloorMark = .script
     ) -> SCNMaterial {
         let playfieldWidth = bounds.x.upperBound - bounds.x.lowerBound
-        let textWidth = playfieldWidth * 0.45 // was 0.3 — enlarged another 50% per request (0.2 -> 0.3 -> 0.45 across two rounds)
+        // The diamond is a FIELD, not a word: it wants most of the floor,
+        // where a script wordmark wants a band across the middle of it.
+        let textWidth = mark == .baseballDiamond
+            ? playfieldWidth * 0.92
+            : playfieldWidth * 0.45 // was 0.3 — enlarged another 50% per request (0.2 -> 0.3 -> 0.45 across two rounds)
 
-        let textImage = renderScriptText(title, pointSize: 220, isDark: AppTheme.shared.rollsTextIsDark)
+        let textImage: UIImage
+        switch mark {
+        case .script:
+            textImage = renderScriptText(title, pointSize: 220,
+                                         isDark: AppTheme.shared.rollsTextIsDark)
+        case .baseballDiamond:
+            // Square, because the playfield is — which is the other half
+            // of what was wrong before. The pitch was composed at 820x1100
+            // and clamped onto a square floor, so every chalk line came
+            // out of true.
+            textImage = BaseballField.renderMarkings(size: CGSize(width: 1024,
+                                                                  height: 1024))
+        }
         let aspect = textImage.size.height / max(textImage.size.width, 1)
         let textHeight = textWidth * Float(aspect)
 

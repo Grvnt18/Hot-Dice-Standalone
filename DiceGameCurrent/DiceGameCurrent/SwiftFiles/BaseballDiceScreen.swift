@@ -115,14 +115,14 @@ struct BaseballDiceScreen: View {
                             session: $session,
                             makeInitialDice: { [BaseballArt.die(sides: 8, isBatter: true)] },
                             floorTitle: "",
-                            // The house arena, not the painted pitch.
-                            // The ballpark texture stretched to a
-                            // non-square well and its markings carried a
-                            // contrast nothing else in the suite has, so
-                            // it read as a different app's screen. This is
-                            // the faceted floor in the player's own table
-                            // colour, which is what the other ten wear.
-                            arenaStyle: .house,
+                            // The house floor, with the diamond laid on
+                            // it as a MARK — see ArenaStyle.FloorMark.
+                            // The pitch used to be the surface itself,
+                            // which stretched a portrait composition onto
+                            // a square floor and put a pixelSurface grid
+                            // at a contrast nothing else in the suite
+                            // carries across the whole of it.
+                            arenaStyle: .ballparkMarkings,
                             onSessionCreated: { newSession in
                                 newSession.onRollSettled = { results in
                                     settled(results)

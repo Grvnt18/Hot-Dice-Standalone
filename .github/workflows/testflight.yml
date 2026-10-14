@@ -244,6 +244,7 @@ jobs:
             -project HotDice.xcodeproj \
             -scheme HotDice \
             -destination 'generic/platform=iOS' \
+            -configuration Release \
             -archivePath "$RUNNER_TEMP/HotDice.xcarchive" \
             -allowProvisioningUpdates \
             -authenticationKeyID "$ASC_KEY_ID" \

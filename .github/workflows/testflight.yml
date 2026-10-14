@@ -86,6 +86,33 @@ jobs:
           xcodebuild -version
           swift --version
 
+      # A virtual environment, because the runner's Python refuses to be
+      # installed into.
+      #
+      # Its python3 comes from Homebrew, which marks itself
+      # externally-managed (PEP 668): `pip install` into it fails outright
+      # rather than warning, and the first run of this workflow died on
+      # exactly that. A venv is the answer the error itself gives, and it
+      # is the right one here — `--break-system-packages` would work by
+      # overriding a protection that exists because breaking the runner's
+      # Python breaks Homebrew, which the job needs two steps later for
+      # xcodegen.
+      #
+      # Added to GITHUB_PATH rather than activated, so every later step
+      # gets this python3 without each one having to remember: the
+      # verifiers need Pillow, and so does the icon export.
+      - name: Python with Pillow
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install --quiet --upgrade pip pillow
+          echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+
+      - name: Show the Python
+        run: |
+          which python3
+          python3 -c "import PIL; print('Pillow', PIL.__version__)"
+
       # The checks that do not need a compiler. They are the whole of this
       # repo's verification — there is no Swift toolchain in the authoring
       # environment, so these run before the one place that can actually
@@ -103,7 +130,6 @@ jobs:
         working-directory: DiceGameCurrent/DiceGameCurrent
         run: |
           set -euo pipefail
-          python3 -m pip install --quiet --upgrade pillow
           for check in tools_*_verify.py; do
             echo "--- $check"
             python3 "$check"

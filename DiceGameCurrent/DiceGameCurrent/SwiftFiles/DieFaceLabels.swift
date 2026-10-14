@@ -44,10 +44,24 @@ enum DieFaceLabels {
         // the table stays complete for every shape the app can build.
         case 4: return 0.90
         case 6: return 0.65
-        case 8: return 0.49
-        case 10: return 0.455
-        case 12: return 0.39
-        case 20: return 0.64
+        // The four many-sided dice are +30% on what the note above set,
+        // asked for directly after a round on the simulator: 0.49, 0.455,
+        // 0.39 and 0.64. Those were the "reasonable starting point, not a
+        // confirmed-good size" that note describes, and the look confirmed
+        // they were small.
+        //
+        // The headroom is in the LABEL, not the plane. `glyphPointSize`
+        // draws the numeral at 340/512 of its canvas and the text box
+        // centres in it, so the digit itself is about 0.47 of the plane —
+        // a d8 numeral stood 0.23 local units tall inside a face whose
+        // inscribed circle is 0.82 across. +30% puts it at 0.30, still
+        // well inside the 0.85 chamfer inset. The widest case is two
+        // digits on a d12: about 0.37 across a face measuring 0.60 inside
+        // its chamfer.
+        case 8: return 0.64
+        case 10: return 0.59
+        case 12: return 0.51
+        case 20: return 0.83
         default: return 0.40
         }
     }

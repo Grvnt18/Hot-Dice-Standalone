@@ -359,9 +359,44 @@ enum GameBandLayout {
     static func bandShare(in size: CGSize, fraction: CGFloat) -> CGFloat {
         let leftover = size.height - header(in: size, fraction: fraction)
             - scene(in: size, fraction: fraction)
+        guard isTall(size) else { return max(leftover, buttonBandFloor) }
         return min(max(leftover, buttonBandFloor),
                    max(size.height * bandCeiling, buttonBandFloor))
     }
+
+    /// Whether the window is much taller than it is wide.
+    ///
+    /// **This is what stops the fix reaching a screen that was not
+    /// broken.** The whole problem is a window too tall for its own width:
+    /// the playfield can only be as wide as the screen, so on a tall one
+    /// every point of height past that fell to the button band. A window
+    /// that is nearly as wide as it is tall never had the problem — its
+    /// band was already small and its playfield already large.
+    ///
+    /// Measured, as height over width:
+    ///
+    ///     iPad Pro            1.31
+    ///     iPad Air            1.41     full-screen iPads, all below
+    ///     iPad mini           1.49
+    ///     -------------------------   1.60
+    ///     iPhone SE           1.71
+    ///     iPhone 14           1.93     phones, all above
+    ///     iPhone 15 Pro Max   1.95
+    ///     iPad Slide Over     3.47     an iPad, and the worst case of all
+    ///
+    /// The gap either side of 1.60 is wide, and the Slide Over row is why
+    /// this is about SHAPE and not about idiom: it is an iPad window and
+    /// it had a 600-point button band, more than half the screen. A rule
+    /// keyed on "is this an iPad" would have left it there.
+    ///
+    /// Below the line the band takes the remainder exactly as it always
+    /// did, so the layouts reviewed on a full-screen iPad are the ones
+    /// that ship.
+    static func isTall(_ size: CGSize) -> Bool {
+        size.width > 0 && size.height / size.width > tallAspect
+    }
+
+    static let tallAspect: CGFloat = 1.60
 
     /// The most of the screen the button band may hold.
     ///

@@ -8,6 +8,10 @@ import UIKit
 /// this screen's own accent.
 struct SettingsView: View {
 
+    /// Whether the wire-payload probe shows in Settings. Off — see the
+    /// note beside the panel itself.
+    private static let showsPayloadPanel = false
+
     /// The game whose rules How to Play should show, if any.
     ///
     /// Nil from the hub, where no game is open — the button is hidden
@@ -295,8 +299,20 @@ struct SettingsView: View {
                         // unreferenced private view costs nothing and means
                         // a release build cannot fail on a type only the
                         // debug branch mentions.
+                        //
+                        // AND OFF, even in a debug build. The gate above
+                        // was compile-time, which is the right shape for
+                        // a release and does nothing in the Simulator —
+                        // every build you run from Xcode is a debug one,
+                        // so the panel was still sitting in Settings
+                        // while the app was being reviewed on screen.
+                        //
+                        // A constant rather than a deletion: this is the
+                        // only way to exercise the wire format until the
+                        // Messages extension runs, and that repository is
+                        // still being built. One word brings it back.
                         #if DEBUG
-                        if rules.isEmpty {
+                        if Self.showsPayloadPanel, rules.isEmpty {
                             panel("Message Payloads",
                                   footer: AnyView(
                                     Text("Each game packs a turn, sends it "

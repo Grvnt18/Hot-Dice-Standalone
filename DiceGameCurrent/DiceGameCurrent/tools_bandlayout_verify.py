@@ -73,11 +73,11 @@ RESIZE_GROUPS = [
 # floor to grow before anything is said.
 MIN_SCENE = 260
 
-# The most of the screen the button band may take — GameBandLayout's
-# bandCeiling. A CAP rather than a share: on a full-screen iPad the band
-# is already under it and nothing moves, which is the property worth
-# checking rather than assuming.
-BAND_CEILING = 0.20
+# The cap on the button band (`bandCeiling`) and the shape gate that
+# decides whether it applies at all (`tallAspect`) are READ out of
+# PlayfieldLayout.swift where they are used, not restated here — a typed
+# copy of 0.20 outlived the Swift's move to 0.10 and the model went on
+# passing while modelling a layout the app no longer draws.
 
 # Each screen and the header fraction it asks for.
 SCREENS = {
@@ -290,8 +290,15 @@ def main():
     # CANNOT reach it, and that is a claim about five header fractions
     # against every size a single device can move between — exactly the
     # kind of claim that is true when written and false two commits later.
-    threshold = constant(source("PlayfieldLayout.swift"),
-                         "aspectRebuildThreshold")
+    layout_src = source("PlayfieldLayout.swift")
+    threshold = constant(layout_src, "aspectRebuildThreshold")
+    # Read, not typed. BAND_CEILING sat at 0.20 here for a while after the
+    # Swift moved to 0.10: the model stayed looser than the code, so it
+    # went on passing while reporting splits the app does not produce.
+    # Same for the shape gate below, which did not exist in the model at
+    # all — and it is the whole reason full-screen iPads do not move.
+    ceiling = constant(layout_src, "bandCeiling")
+    tall = constant(layout_src, "tallAspect")
     # Rolls used to be absent here, because it split its bands inline with
     # its own fraction and its own typed 100. It goes through
     # GameBandLayout now like the other five, so it is simply a row in
@@ -317,8 +324,15 @@ def main():
                 if not fills:
                     ratios.append(width / square if square > 0 else float("inf"))
                     continue
-                band = min(max(height - height * fraction - square, floor),
-                           max(height * BAND_CEILING, floor))
+                leftover = height - height * fraction - square
+                if width > 0 and height / width > tall:
+                    band = min(max(leftover, floor),
+                               max(height * ceiling, floor))
+                else:
+                    # Not a tall screen, so the cap does not apply at all
+                    # and the band keeps whatever the square leaves it —
+                    # this is what holds the full-screen iPads still.
+                    band = max(leftover, floor)
                 region = max(height - height * fraction - band, 0)
                 ratios.append(width / region if region > 0 else float("inf"))
             drift = max(ratios) - min(ratios)

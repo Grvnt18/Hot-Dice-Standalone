@@ -114,6 +114,17 @@ half-updated checkout:
 Xcode project first, or be ready for it to reload: `xcodegen generate`
 rewrites the .xcodeproj underneath it.
 
+ONE-TIME: tools_icon_export.py needs Pillow, which macOS does not ship.
+
+    python3 -m pip install --user pillow
+
+It is the only thing in this directory with a dependency outside the
+standard library — the verifiers parse the font files themselves — and
+without it the chain above stops on line four with the icon unbuilt. If
+you are only trying to BUILD, skip those two lines: the icon already in
+XcodeOnly/Assets.xcassets compiles and runs fine. It is the upload that
+wants a fresh, sRGB-tagged one.
+
 RUN `xcodegen generate` EVERY TIME, not just when something looks wrong.
 XcodeGen expands SwiftFiles/ into explicit file references AT GENERATE
 TIME — the folder reference is a convenience for you, not a live link —

@@ -38,7 +38,29 @@ that changes.
 import os
 import sys
 
-from PIL import Image, ImageCms
+# The ONE tool here with a dependency outside the standard library, and
+# the only one that cannot be written without it: the rest of this
+# directory parses fonts and reads Swift, which is plain Python, but
+# resampling a 1024px master down sixteen ways is not.
+#
+# Caught rather than left to traceback, because the machine this fails on
+# is not the one it was written on. The container has Pillow and the Mac
+# does not, so the first person to meet this is someone midway through a
+# six-line paste wondering which of the six broke.
+try:
+    from PIL import Image, ImageCms
+except ImportError:
+    sys.exit(
+        "tools_icon_export.py needs Pillow, which is not installed.\n"
+        "\n"
+        "    python3 -m pip install --user pillow\n"
+        "\n"
+        "(If pip itself is missing: python3 -m ensurepip --user)\n"
+        "\n"
+        "Nothing else in this directory needs it — the verifiers parse\n"
+        "the font files themselves. If you are only trying to build, the\n"
+        "icon already in XcodeOnly/Assets.xcassets is enough to compile\n"
+        "and run; it is the App Store upload that wants a fresh one.")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MASTER = os.path.join(HERE, "Icons", "Master icon Default.png")

@@ -182,6 +182,38 @@ jobs:
           security list-keychain -d user -s "$KEYCHAIN" login.keychain-db
           rm "$RUNNER_TEMP/cert.p12"
 
+      # The team, read out of the certificate rather than stored.
+      #
+      # Automatic signing needs a DEVELOPMENT_TEAM and nothing was giving
+      # it one, so the first archive that got as far as compiling said:
+      #
+      #     Signing for "HotDice" requires a development team
+      #
+      # It could be a seventh secret or a line in project.yml. It is
+      # neither, because the certificate imported one step ago already
+      # carries it — `Apple Distribution: Name (TEAMID)` — and a value
+      # derived from the thing that has to match it cannot drift from it.
+      # Hardcoding the team in the project would also put it in a public
+      # repository for no gain.
+      - name: Read the team from the certificate
+        run: |
+          set -euo pipefail
+          IDENTITIES=$(security find-identity -v -p codesigning || true)
+          TEAM_ID=$(printf '%s\n' "$IDENTITIES" \
+            | grep "Apple Distribution" \
+            | head -1 \
+            | sed -E 's/.*\(([A-Z0-9]{10})\)".*/\1/' || true)
+          if [ -z "$TEAM_ID" ]; then
+            echo "No Apple Distribution identity in the signing keychain." >&2
+            echo "SIGNING_CERTIFICATE_P12 is either a development" >&2
+            echo "certificate, or an export that did not include the" >&2
+            echo "private key. What the keychain does hold:" >&2
+            printf '%s\n' "$IDENTITIES" >&2
+            exit 1
+          fi
+          echo "Signing as team $TEAM_ID"
+          echo "TEAM_ID=$TEAM_ID" >> "$GITHUB_ENV"
+
       - name: Place the App Store Connect key
         env:
           ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
@@ -218,6 +250,7 @@ jobs:
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
             CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
 
       - name: Export and upload to TestFlight
@@ -226,11 +259,12 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
           set -euo pipefail
-          cat > "$RUNNER_TEMP/ExportOptions.plist" <<'PLIST'
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
+            <key>teamID</key><string>${TEAM_ID}</string>
             <key>method</key><string>app-store</string>
             <key>destination</key><string>upload</string>
             <key>uploadSymbols</key><true/>

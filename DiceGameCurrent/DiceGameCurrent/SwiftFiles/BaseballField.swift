@@ -305,14 +305,66 @@ enum BaseballField {
 
     // MARK: The floor mark
 
-    /// The diamond alone, on a transparent background, in flat colour.
+    /// The field's own composition, in units of its WIDTH.
     ///
-    /// **This is what Baseball Dice draws on its floor now, and `render`
-    /// above is not.** Three things were wrong with putting the pitch in
-    /// the surface itself, and only the third is a matter of taste:
+    /// Separate from the constants above on purpose. Those describe the
+    /// 820x1100 pitch `render` draws, where `y` is a fraction of the
+    /// HEIGHT — which is exactly what went wrong when they were reused for
+    /// the floor: on a square canvas the same fractions put first and
+    /// third base 0.52 of the width apart and home and second 0.27 of it,
+    /// so the diamond came out half as tall as it is wide and every angle
+    /// with it. `tools_baseball_field_verify.py` pins those against the
+    /// Python preview and they have not moved.
     ///
-    ///   * it was composed at 820x1100 and clamped onto a floor that is
-    ///     square, so every chalk line arrived out of true;
+    /// Here `y` is a fraction of the WIDTH as well, running from the top
+    /// of the composition rather than the top of the canvas, so the shape
+    /// is the shape whatever it is drawn on. `height` is how tall the
+    /// whole thing is in those same units.
+    enum Mark {
+        static let height: CGFloat = 1.344
+
+        static let home = CGPoint(x: 0.500, y: 0.953)
+        static let first = CGPoint(x: 0.846, y: 0.600)
+        static let second = CGPoint(x: 0.500, y: 0.256)
+        static let third = CGPoint(x: 0.154, y: 0.600)
+        static let mound = CGPoint(x: 0.500, y: 0.605)
+
+        /// The skin is one disc around the mound, cut off down each side
+        /// by a line parallel to the foul line — which is the silhouette a
+        /// field diagram actually has, and the reason the first attempt's
+        /// plain disc read as a running track. `wedgeApexY` is where those
+        /// two lines would meet, below home.
+        static let skinRadius: CGFloat = 0.419
+        static let wedgeApexY: CGFloat = 1.060
+        static let moundRadius: CGFloat = 0.116
+        static let homeRadius: CGFloat = 0.195
+        static let onDeckRadius: CGFloat = 0.126
+        static let onDeckY: CGFloat = 1.219
+        static let onDeckX: [CGFloat] = [0.153, 0.847]
+
+        static let baseHalf: CGFloat = 0.047
+        static let plateHalf: CGFloat = 0.033
+        static let rubber = CGSize(width: 0.074, height: 0.019)
+        static let box = CGSize(width: 0.102, height: 0.153)
+        static let boxGap: CGFloat = 0.028
+        static let foulWidth: CGFloat = 0.009
+        static let boxLine: CGFloat = 0.007
+        static let labelSize: CGFloat = 0.052
+
+        /// How much of the floor the clay covers. Not opaque: the whole
+        /// point of a mark rather than a material is that the surface's
+        /// own cells carry on through it.
+        static let clayAlpha: CGFloat = 0.80
+    }
+
+    /// The field alone, on a transparent background, in flat colour.
+    ///
+    /// **This is what Baseball Dice draws on its floor, and `render` above
+    /// is not.** Three things were wrong with putting the pitch in the
+    /// surface itself, and only the third is a matter of taste:
+    ///
+    ///   * it was composed at 820x1100 and clamped onto the floor, so
+    ///     every chalk line arrived out of true;
     ///   * the turf and the clay were `pixelSurface` grids, which put a
     ///     texture at a contrast nothing else in the suite carries across
     ///     the whole floor rather than in the places a field needs it;
@@ -321,96 +373,146 @@ enum BaseballField {
     ///
     /// So the floor is the house floor, in the player's own table colour,
     /// and this is laid on top of it the way the other games lay a script
-    /// wordmark — a field SHAPE where they have a name. Flat fills, no
-    /// generated texture: the facets the surface already has show through
-    /// the transparent background, so the diamond sits ON the suite's
-    /// material instead of replacing it.
+    /// wordmark — a field SHAPE where they have a name.
     ///
-    /// The geometry is the same geometry — `home`, `first`, `second`,
-    /// `third`, `mound`, `skinRadius`, `pathWidth` and the rest are the
-    /// constants `tools_baseball_field_verify.py` already pins against the
-    /// Python preview. Only the fill changed, so that check still holds.
-    ///
-    /// Square, because the playfield is. The constants are fractions of
-    /// their own axis, and the vertical ones were chosen against a
-    /// portrait canvas — so they are re-centred here rather than used
-    /// raw, which is what keeps the diamond centred and round.
+    /// `size` is the canvas, and the composition is FITTED inside it:
+    /// scaled by whichever of the two dimensions runs out first and
+    /// centred in the other. So a caller that hands this the playfield's
+    /// own shape gets a field that fills it with round circles, and one
+    /// that hands it a square gets the same field with space above and
+    /// below rather than a squashed one.
     static func renderMarkings(size: CGSize) -> UIImage {
         let renderer = UIGraphicsImageRenderer(size: size)
         return renderer.image { context in
             let cg = context.cgContext
-            let w = size.width, h = size.height
-            func px(_ value: CGFloat) -> CGFloat { value * w }
-            func py(_ value: CGFloat) -> CGFloat { value * h }
-            func point(_ p: CGPoint) -> CGPoint {
-                CGPoint(x: px(p.x), y: py(p.y))
+
+            // Fit, never fill: one scale for both axes is what keeps the
+            // mound round and the base paths at 45 degrees.
+            let scale = min(size.width, size.height / Mark.height)
+            let originX = (size.width - scale) / 2
+            let originY = (size.height - scale * Mark.height) / 2
+            func u(_ value: CGFloat) -> CGFloat { value * scale }
+            func p(_ point: CGPoint) -> CGPoint {
+                CGPoint(x: originX + point.x * scale,
+                        y: originY + point.y * scale)
             }
 
-            // Centred by moving the CANVAS, not the mapping.
+            // All the clay in one transparency layer.
             //
-            // The constants are fractions of a PORTRAIT composition — the
-            // mound sits at y 0.665, which is where it belongs on a tall
-            // pitch and low on a square floor. Shifting it with a modified
-            // `py` was the obvious fix and the wrong one: `diamondPath`
-            // and `platePath` do their own fraction-to-point mapping, so
-            // half the drawing would have moved and half would not.
-            // Translating the context moves all of it, and those two
-            // helpers stay exactly as the verifier pins them.
-            cg.translateBy(x: 0, y: (0.5 - mound.y) * h)
+            // The skin, the plate circle and the two on-deck circles
+            // overlap, and four translucent fills stacked would darken
+            // every overlap into a visible seam. Drawn opaque inside a
+            // layer and faded once, they read as one continuous surface.
+            cg.setAlpha(Mark.clayAlpha)
+            cg.beginTransparencyLayer(auxiliaryInfo: nil)
 
-            // The skin, as a flat wash rather than a textured disc. Low
-            // alpha on purpose: it tints the floor toward clay and lets
-            // the surface's own facets read through, which is the whole
-            // difference between a mark and a replacement material.
-            cg.setFillColor(dirt.withAlphaComponent(0.55).cgColor)
-            cg.fillEllipse(in: circle(at: point(mound), radius: px(skinRadius)))
-
-            // Grass back over the middle of the skin, the way the real
-            // shape is made — here as a clear hole punched in the wash so
-            // the floor itself shows, rather than as a second fill.
             cg.saveGState()
-            cg.addPath(diamondPath(centre: mound, half: 0.190, in: size))
-            cg.setBlendMode(.clear)
-            cg.fillPath()
+            let apex = p(CGPoint(x: 0.5, y: Mark.wedgeApexY))
+            let reach = u(2)
+            let wedge = CGMutablePath()
+            wedge.move(to: apex)
+            wedge.addLine(to: CGPoint(x: apex.x - reach, y: apex.y - reach))
+            wedge.addLine(to: CGPoint(x: apex.x - reach, y: originY - reach))
+            wedge.addLine(to: CGPoint(x: apex.x + reach, y: originY - reach))
+            wedge.addLine(to: CGPoint(x: apex.x + reach, y: apex.y - reach))
+            wedge.closeSubpath()
+            cg.addPath(wedge)
+            cg.clip()
+            cg.setFillColor(dirt.cgColor)
+            cg.fillEllipse(in: circle(at: p(Mark.mound), radius: u(Mark.skinRadius)))
             cg.restoreGState()
 
-            let bases = [home, first, second, third].map(point)
+            // The plate's own circle, which reaches past the wedge, and
+            // the on-deck circles, which are outside it altogether.
+            cg.setFillColor(dirt.cgColor)
+            cg.fillEllipse(in: circle(at: p(Mark.home), radius: u(Mark.homeRadius)))
+            for x in Mark.onDeckX {
+                let centre = p(CGPoint(x: x, y: Mark.onDeckY))
+                cg.fillEllipse(in: circle(at: centre, radius: u(Mark.onDeckRadius)))
+            }
 
-            // Base paths.
-            cg.setStrokeColor(dirt.withAlphaComponent(0.75).cgColor)
-            cg.setLineWidth(px(pathWidth))
-            cg.setLineJoin(.round)
-            cg.addLines(between: bases + [bases[0]])
-            cg.strokePath()
+            // The mound, a shade up from the skin it sits in — the one
+            // place the field needs a tone of its own to read at all.
+            cg.setFillColor(tinted(dirt, toward: .white, amount: 0.16).cgColor)
+            cg.fillEllipse(in: circle(at: p(Mark.mound), radius: u(Mark.moundRadius)))
 
-            // Foul lines, running off the corners of the floor. Drawn in
-            // the untranslated corners' direction, so they leave the plate
-            // at the angle the diamond sets rather than at 45 degrees.
-            cg.setStrokeColor(chalk.withAlphaComponent(0.85).cgColor)
-            cg.setLineWidth(px(0.010))
-            cg.setLineCap(.round)
-            for x in [CGFloat(0.02), CGFloat(0.98)] {
-                cg.move(to: point(home))
-                cg.addLine(to: CGPoint(x: px(x), y: py(mound.y) - h))
+            cg.endTransparencyLayer()
+            cg.setAlpha(1)
+
+            // Foul lines, running off the corners of the canvas rather
+            // than stopping at the skin, which is what makes the shape
+            // read as a field and not as a track.
+            cg.setStrokeColor(chalk.withAlphaComponent(0.92).cgColor)
+            cg.setLineWidth(u(Mark.foulWidth))
+            cg.setLineCap(.butt)
+            let plate = p(Mark.home)
+            for side in [CGFloat(-1), 1] {
+                cg.move(to: plate)
+                cg.addLine(to: CGPoint(x: plate.x + side * u(1.4),
+                                       y: plate.y - u(1.4)))
             }
             cg.strokePath()
 
-            // The mound.
-            cg.setFillColor(dirt.withAlphaComponent(0.85).cgColor)
-            cg.fillEllipse(in: circle(at: point(mound), radius: px(moundRadius)))
+            // Batter's boxes, outlined either side of the plate.
+            cg.setLineWidth(u(Mark.boxLine))
+            for side in [CGFloat(-1), 1] {
+                let near = side < 0 ? -Mark.boxGap - Mark.box.width : Mark.boxGap
+                cg.stroke(CGRect(x: plate.x + u(near),
+                                 y: plate.y - u(Mark.box.height * 0.55),
+                                 width: u(Mark.box.width),
+                                 height: u(Mark.box.height)))
+            }
 
-            // The three bases, as squares on their corners.
+            // The pitcher's rubber.
             cg.setFillColor(baseWhite.cgColor)
-            for corner in [first, second, third] {
-                cg.addPath(diamondPath(centre: corner, half: baseSize,
-                                       in: size))
+            let rubber = p(Mark.mound)
+            cg.fill(CGRect(x: rubber.x - u(Mark.rubber.width / 2),
+                           y: rubber.y - u(Mark.rubber.height / 2),
+                           width: u(Mark.rubber.width),
+                           height: u(Mark.rubber.height)))
+
+            // The three bases, as squares on their corners, and the plate,
+            // which has its own shape.
+            for centre in [Mark.first, Mark.second, Mark.third] {
+                cg.addPath(markDiamond(at: p(centre), half: u(Mark.baseHalf)))
             }
             cg.fillPath()
-
-            // And home plate, which has its own shape.
-            cg.addPath(platePath(in: size))
+            cg.addPath(markPlate(at: plate, half: u(Mark.plateHalf)))
             cg.fillPath()
+
+            // The two on-deck circles say whose they are, the way the
+            // board does. They are the only lettering on the floor.
+            for (index, x) in Mark.onDeckX.enumerated() {
+                draw(index == 0 ? "VISITORS" : "HOME",
+                     centredAt: p(CGPoint(x: x, y: Mark.onDeckY)),
+                     size: u(Mark.labelSize),
+                     colour: chalk.withAlphaComponent(0.85))
+            }
         }
+    }
+
+    /// A base: a square stood on its corner, in POINTS rather than
+    /// fractions, because the floor mark has already resolved its own
+    /// scale by the time it draws one.
+    private static func markDiamond(at centre: CGPoint, half: CGFloat) -> CGPath {
+        let path = CGMutablePath()
+        path.move(to: CGPoint(x: centre.x, y: centre.y - half))
+        path.addLine(to: CGPoint(x: centre.x + half, y: centre.y))
+        path.addLine(to: CGPoint(x: centre.x, y: centre.y + half))
+        path.addLine(to: CGPoint(x: centre.x - half, y: centre.y))
+        path.closeSubpath()
+        return path
+    }
+
+    private static func markPlate(at centre: CGPoint, half: CGFloat) -> CGPath {
+        let path = CGMutablePath()
+        path.move(to: CGPoint(x: centre.x - half, y: centre.y - half))
+        path.addLine(to: CGPoint(x: centre.x + half, y: centre.y - half))
+        path.addLine(to: CGPoint(x: centre.x + half, y: centre.y + half * 0.3))
+        path.addLine(to: CGPoint(x: centre.x, y: centre.y + half * 1.3))
+        path.addLine(to: CGPoint(x: centre.x - half, y: centre.y + half * 0.3))
+        path.closeSubpath()
+        return path
     }
 
     // MARK: Pieces

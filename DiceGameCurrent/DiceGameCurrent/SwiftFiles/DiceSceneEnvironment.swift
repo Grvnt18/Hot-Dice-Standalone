@@ -304,12 +304,17 @@ enum DiceSceneEnvironment {
             textImage = renderScriptText(title, pointSize: 220,
                                          isDark: AppTheme.shared.rollsTextIsDark)
         case .baseballDiamond:
-            // Square, because the playfield is — which is the other half
-            // of what was wrong before. The pitch was composed at 820x1100
-            // and clamped onto a square floor, so every chalk line came
-            // out of true.
-            textImage = BaseballField.renderMarkings(size: CGSize(width: 1024,
-                                                                  height: 1024))
+            // The canvas takes the PLAYFIELD's shape, so the field is
+            // fitted to the floor it lands on rather than composed on a
+            // square and stretched onto it — which is what put every
+            // chalk line out of true before. renderMarkings fits its
+            // composition inside whatever it is given, so the only thing
+            // this has to get right is the proportion.
+            let depth = bounds.z.upperBound - bounds.z.lowerBound
+            let ratio = CGFloat(depth / max(playfieldWidth, 0.0001))
+            textImage = BaseballField.renderMarkings(
+                size: CGSize(width: 1024,
+                             height: min(max(1024 * ratio, 512), 2048)))
         }
         let aspect = textImage.size.height / max(textImage.size.width, 1)
         let textHeight = textWidth * Float(aspect)
@@ -346,7 +351,19 @@ enum DiceSceneEnvironment {
         title: String
     ) {
         retintSurface(style: style, on: surfaceMaterial)
-        textMaterial.diffuse.contents = renderScriptText(title, pointSize: 220, isDark: AppTheme.shared.rollsTextIsDark)
+        switch style.floorMark {
+        case .script:
+            textMaterial.diffuse.contents = renderScriptText(
+                title, pointSize: 220, isDark: AppTheme.shared.rollsTextIsDark)
+        case .baseballDiamond:
+            // Left alone, and this is a fix rather than an omission: the
+            // old line re-rendered the SCRIPT wordmark whatever the mark
+            // was, so changing the table colour mid-game would have
+            // replaced Baseball Dice's field with the words "Baseball
+            // Dice". The field's clay and chalk do not follow the picker
+            // anyway, so there is nothing here to repaint.
+            break
+        }
     }
 
     /// Rendered floor titles, kept because `applyTheme` rebuilds this on

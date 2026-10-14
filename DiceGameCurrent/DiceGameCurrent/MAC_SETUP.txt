@@ -98,6 +98,36 @@ STEP 4 — ADD THE CODE AND THE FILES
 IF YOU EVER PULL A NEW VERSION
 ===============================================================================
 
+IF YOU USE XCODEGEN, THIS IS THE WHOLE ROUTINE. Paste it as one block —
+Terminal runs the lines in order, and the `&&` on the end of each one
+stops the chain at the first failure rather than carrying on from a
+half-updated checkout:
+
+    cd ~/Developer/Hot-Dice-Standalone &&
+    git pull &&
+    cd DiceGameCurrent/DiceGameCurrent &&
+    python3 tools_icon_export.py &&
+    cp Icons/export/AppIcon-1024.png ../../XcodeOnly/Assets.xcassets/AppIcon.appiconset/ &&
+    xcodegen generate
+
+(Adjust the first path if the clone is not in ~/Developer.) Close the
+Xcode project first, or be ready for it to reload: `xcodegen generate`
+rewrites the .xcodeproj underneath it.
+
+RUN `xcodegen generate` EVERY TIME, not just when something looks wrong.
+XcodeGen expands SwiftFiles/ into explicit file references AT GENERATE
+TIME — the folder reference is a convenience for you, not a live link —
+so a .swift file that arrives in a pull is on disk and not in the target
+until you regenerate. That is the same failure the rest of this section
+describes, and regenerating is the one-second version of fixing it.
+
+If `git pull` reports local changes, stop rather than forcing it. You
+are only reading this repository, so there should not be any.
+
+-------------------------------------------------------------------------------
+
+THE HAND-BUILT PROJECT, if you went that route instead:
+
 Replacing CHANGED files is enough. A file that already exists in the
 project updates itself when you overwrite it on disk.
 

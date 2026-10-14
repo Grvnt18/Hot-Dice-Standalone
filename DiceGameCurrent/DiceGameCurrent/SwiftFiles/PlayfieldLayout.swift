@@ -335,6 +335,33 @@ enum GameBandLayout {
     ///
     /// The floor still wins underneath it, because a band that cannot hold
     /// a 48pt button and its caption is not a band.
+    /// How much tray sits ABOVE the scene, inside the region.
+    ///
+    /// Centring the square in the region is not the same as centring it on
+    /// the SCREEN, because the header and the band are not the same height
+    /// — and the gap grew when the band shrank. Measured, centred in the
+    /// region:
+    ///
+    ///     band at a fifth   the scene's centre sits 11-13pt ABOVE
+    ///     band at a tenth   the scene's centre sits 17-24pt BELOW
+    ///
+    /// Neither is centred, and the second is worse. So the offset is
+    /// computed rather than left to fall out: put the square's middle on
+    /// the screen's middle, and clamp it into the region so it cannot ride
+    /// up under the scoreboard or down behind the button.
+    ///
+    /// On a full-screen iPad the clamp binds at zero — the header alone is
+    /// taller than the slack — and the scene ends up a few points low.
+    /// That is the best the geometry allows without moving the header,
+    /// which has content in it.
+    static func sceneTopPad(in size: CGSize, fraction: CGFloat) -> CGFloat {
+        let square = scene(in: size, fraction: fraction)
+        let slack = sceneRegion(in: size, fraction: fraction) - square
+        let centred = size.height / 2 - square / 2
+            - header(in: size, fraction: fraction)
+        return min(max(centred, 0), max(slack, 0))
+    }
+
     static func bandShare(in size: CGSize, fraction: CGFloat) -> CGFloat {
         let leftover = size.height - header(in: size, fraction: fraction)
             - scene(in: size, fraction: fraction)
@@ -344,9 +371,20 @@ enum GameBandLayout {
 
     /// The most of the screen the button band may hold.
     ///
-    /// A fifth, which is what was asked for. It binds on phones and on a
-    /// narrow iPad window, and on a full-screen iPad it never does.
-    static let bandCeiling: CGFloat = 0.20
+    /// A tenth — and on a phone it never actually gets there, because
+    /// `buttonBandFloor` binds first. 95 points is a 48pt button, its
+    /// caption, the gap that keeps the button's shadow off it and the
+    /// padding around the lot, so it is the smallest a band can be and
+    /// still be one:
+    ///
+    ///     iPhone SE          95pt = 17.3%
+    ///     iPhone 14          95pt = 12.5%
+    ///     iPhone 15 Pro Max  95pt = 11.3%
+    ///     iPad mini         111pt = 10.0%   the ceiling, at last
+    ///
+    /// Which is the honest answer to "as small as 10%": on the screens
+    /// that prompted it, the content is the limit rather than the share.
+    static let bandCeiling: CGFloat = 0.10
 
     /// Whatever the scene did not take. Never below `buttonBandFloor`,
     /// because the scene gives way first.
@@ -377,8 +415,10 @@ enum GameBandLayout {
         let header: CGFloat
         /// The 60% the tray fills.
         let sceneRegion: CGFloat
-        /// The square playfield, centred inside it.
+        /// The square playfield.
         let scene: CGFloat
+        /// Tray above the square, so its middle lands on the screen's.
+        let sceneTopPad: CGFloat
         let buttonBand: CGFloat
     }
 
@@ -387,6 +427,7 @@ enum GameBandLayout {
         Bands(header: header(in: size, fraction: fraction),
               sceneRegion: sceneRegion(in: size, fraction: fraction),
               scene: scene(in: size, fraction: fraction),
+              sceneTopPad: sceneTopPad(in: size, fraction: fraction),
               buttonBand: buttonBand(in: size, fraction: fraction))
     }
 

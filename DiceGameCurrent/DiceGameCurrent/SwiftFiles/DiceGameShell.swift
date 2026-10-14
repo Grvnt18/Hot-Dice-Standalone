@@ -286,9 +286,10 @@ extension View {
     func rollingWell(height: CGFloat? = nil,
                      material: WellMaterial = .timber,
                      inset: CGFloat = 10,
-                     square: Bool = false) -> some View {
+                     square: Bool = false,
+                     topPad: CGFloat = 0) -> some View {
         modifier(RollingWell(height: height, material: material,
-                             inset: inset, square: square))
+                             inset: inset, square: square, topPad: topPad))
     }
 }
 
@@ -307,11 +308,22 @@ struct RollingWell: ViewModifier {
     var inset: CGFloat
     var square: Bool
 
+    /// Tray above the square, so its middle lands on the SCREEN's middle
+    /// rather than the region's — see GameBandLayout.sceneTopPad. Zero
+    /// for the screens that do not square, which centre as they always
+    /// did.
+    var topPad: CGFloat = 0
+
     @ViewBuilder
     func body(content: Content) -> some View {
         let lipped = dressed(content)
             .padding(inset)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.top, topPad)
+            // Top-aligned, because the padding above is what does the
+            // positioning now. Centre alignment would halve the offset
+            // and put the scene back where it was.
+            .frame(maxWidth: .infinity, maxHeight: .infinity,
+                   alignment: square ? .top : .center)
 
         switch material {
         case .timber:
@@ -1083,7 +1095,8 @@ struct DiceGameScreen: View {
                             ui.sync(from: controller)
                         }
                     )
-                        .rollingWell(height: sceneHeight, square: true)
+                        .rollingWell(height: sceneHeight, square: true,
+                                     topPad: bands.sceneTopPad)
                         .overlay(alignment: .topLeading) {
                             if let onExit {
                                 Button {

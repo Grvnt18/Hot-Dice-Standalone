@@ -422,8 +422,6 @@ enum DiceSceneAssembler {
         let scene = env.scene
         let layout = env.layout
         let floorY = env.floorY
-        let floorSurfaceMaterial = env.floorSurfaceMaterial
-        let floorTextMaterial = env.floorTextMaterial
         let diceContainer = env.diceContainer
 
         // Seeded, so a Rolls match in a conversation deals every
@@ -531,9 +529,10 @@ enum DiceSceneAssembler {
         let scene: SCNScene
         let layout: PlayfieldLayout.Result
         let floorY: Float
-        let floorSurfaceMaterial: SCNMaterial
-        let floorTextMaterial: SCNMaterial
         let diceContainer: SCNNode
+        /// The floor's materials live on this, not beside it: a refit
+        /// replaces them, and a second copy out here would be the pair
+        /// assembly built rather than the pair on screen.
         let arena: ArenaHandles
     }
 
@@ -572,8 +571,6 @@ enum DiceSceneAssembler {
             scene: scene,
             layout: arena.layout,
             floorY: floorY,
-            floorSurfaceMaterial: arena.surfaceMaterial,
-            floorTextMaterial: arena.textMaterial,
             diceContainer: diceContainer,
             arena: arena
         )

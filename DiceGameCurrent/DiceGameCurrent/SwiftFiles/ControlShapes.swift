@@ -182,7 +182,8 @@ extension View {
             )
     }
 
-    /// The app's TOP edge, and deliberately nothing else.
+    /// The app's edge: capped at the top, railed down both sides, open at
+    /// the bottom.
     ///
     /// `gameFrame` draws all four sides on the safe-area rect, which was
     /// the right call for a sheet and the wrong one for the whole screen.
@@ -200,8 +201,12 @@ extension View {
     /// both guide screens.
     ///
     /// So: the top inset is painted over — matting, outline, bevel, in
-    /// that order outward-in — and the sides and the bottom are left to
-    /// bleed as they do now. The height comes from
+    /// that order outward-in — the side rails stay exactly where
+    /// `gameFrame` had them, and only the bottom is left open. The first
+    /// cut of this dropped the rails along with the bottom, which was a
+    /// mistake rather than a decision: they sat at the display edge and
+    /// read as the app's own rim, and nothing about the notch touched
+    /// them. The height comes from
     /// `safeAreaInsets.top`, which is the real number for the real
     /// device, so there is no corner radius to guess at and nothing to
     /// update when a new phone ships. The iPhone Duo folding is a window
@@ -211,7 +216,7 @@ extension View {
     /// type was sitting on mid-tone timber, which is a poor contrast. It
     /// sits on the matting now.
     func screenFrame() -> some View {
-        overlay(alignment: .top) { ScreenTopCap() }
+        overlay(alignment: .top) { ScreenEdges() }
     }
 
     /// Frames this view as a pixel panel.
@@ -247,7 +252,8 @@ extension View {
     }
 }
 
-/// The matting and the single edge that `screenFrame` lays over the top.
+/// The three edges `screenFrame` draws: a capped top and a rail down each
+/// side. The bottom is deliberately open.
 ///
 /// A view of its own rather than an inline overlay, for the reason
 /// `GameTile` and `HubTitle` are: it reads a measurement, and a view that
@@ -258,9 +264,59 @@ extension View {
 /// would swallow taps and pulls in the top of the screen — which on the
 /// hub is the scroll view, and on a game is nothing, until the day it is
 /// something and nobody remembers this is here.
-private struct ScreenTopCap: View {
+private struct ScreenEdges: View {
 
     var body: some View {
+        ZStack(alignment: .top) {
+            rails
+            cap
+        }
+        .allowsHitTesting(false)
+    }
+
+    /// Down both sides, the full height of the glass.
+    ///
+    /// These are the strokes `gameFrame` already drew and the first cut
+    /// of this took away with it. They were never the problem: portrait
+    /// has no horizontal safe-area inset, so they sat at the display edge
+    /// already and read as the app's own rim.
+    ///
+    /// Full height rather than inside the safe area, which is the whole
+    /// difference between "the bottom border was removed" and "the
+    /// border stops short": a rail that ends at the bottom inset leaves
+    /// two stubs with nothing joining them. Running them off the edge
+    /// reads as a frame that is simply open at the bottom. The top ends
+    /// are covered by the cap, which is drawn over them.
+    private var rails: some View {
+        HStack(spacing: 0) {
+            // Outward-in on each side, mirrored: outline at the very
+            // edge, bevel just inside it.
+            HStack(spacing: 0) {
+                PixelPanel.outlineColor
+                    .frame(width: PixelPanel.outlineWidth)
+                PieceSheen.bevel
+                    .frame(width: PixelPanel.bevelWidth)
+            }
+
+            Spacer(minLength: 0)
+
+            HStack(spacing: 0) {
+                PieceSheen.bevel
+                    .frame(width: PixelPanel.bevelWidth)
+                PixelPanel.outlineColor
+                    .frame(width: PixelPanel.outlineWidth)
+            }
+        }
+        // The shared bevel is a VERTICAL gradient, so a side rail comes
+        // out lit at the top and shaded at the bottom — which is what
+        // `gameFrame`'s own strokeBorder did to those same two edges,
+        // because it was stroking a shape with that gradient. Same light,
+        // same direction, drawn a different way.
+        .ignoresSafeArea()
+    }
+
+    /// The top: matting over the inset, then the edge.
+    private var cap: some View {
         // The reader sits in NORMAL space so `safeAreaInsets.top` is the
         // real inset; the stack inside it is what expands upward to cover
         // the region that inset describes. Reading the inset from inside
@@ -271,9 +327,9 @@ private struct ScreenTopCap: View {
                 SmokeFloor.backdropColor
                     .frame(height: geo.safeAreaInsets.top)
 
-                // Outward-in, matching gameFrame's own order: the outline
-                // is the outermost line and the bevel sits just inside
-                // it. The bevel is the shared gradient rather than a flat
+                // Outward-in, matching gameFrame's order: the outline is
+                // the outermost line and the bevel sits just inside it.
+                // The bevel is the shared gradient rather than a flat
                 // tone, so a 2pt bar comes out lit above and shaded
                 // below — which is what makes an edge read as turned
                 // rather than drawn.
@@ -287,7 +343,6 @@ private struct ScreenTopCap: View {
             .frame(width: geo.size.width)
             .ignoresSafeArea(edges: .top)
         }
-        .allowsHitTesting(false)
     }
 }
 

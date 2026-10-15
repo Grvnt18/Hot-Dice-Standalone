@@ -165,6 +165,24 @@ struct ThreeThousandState: Codable, Equatable {
 enum ThreeThousandGame: SuiteGame {
     static let id = "three_thousand"
     static let displayName = "Three Thousand"
+
+    /// Broken by hand, like Freighter.Yacht.Dinghy's and for a related
+    /// reason — the opposite half of the same SwiftUI behaviour.
+    ///
+    /// That name has no spaces, so SwiftUI could not wrap it. This one
+    /// has one and still would not: a `minimumScaleFactor` lets Text
+    /// shrink to stay on FEWER lines, and it prefers that to wrapping.
+    /// "THREE THOUSAND" is 219pt at the iPhone 15 Pro Max's 24pt label
+    /// against 172pt of tile — 175pt at the 0.8 floor, which is within a
+    /// couple of points of fitting, so the tile set the whole name on one
+    /// shrunken line while every name beside it stayed full size.
+    ///
+    /// An explicit break takes the choice away. Measured off the real TTF
+    /// at the narrowest width this app meets: "THOUSAND" is 99pt against
+    /// the iPhone SE's 117pt of label, so both lines fit without the
+    /// floor having to fire.
+    static let tileName = "Three\nThousand"
+
     static let tagline = "Bank it or lose it."
 
     /// Two or more, per GAME_RULES.txt. The turns alternate and the state

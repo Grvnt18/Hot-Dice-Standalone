@@ -225,6 +225,10 @@ final class DiceTraySession {
         self.applyTheme = applyTheme
     }
 
+    /// Every die at the oversized size, for a tray that shows one at a
+    /// time. Set by the screen; see DicePoolSceneBuilder.buildNodes.
+    var alwaysLargestDice = false
+
     /// The d4 labelling this tray was built with, so a re-pooled tray keeps
     /// the same style rather than silently reverting to the default.
     private let d4Style: DieFaceLabels.D4LabelStyle
@@ -316,6 +320,7 @@ final class DiceTraySession {
             dice,
             playAreaBounds: playAreaBounds,
             styleAsRolls: false,
+            alwaysLargest: alwaysLargestDice,
             d4Style: d4Style
         )
         onStateChanged?()

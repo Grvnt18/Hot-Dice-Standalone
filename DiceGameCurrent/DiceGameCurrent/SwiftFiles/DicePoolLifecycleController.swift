@@ -49,6 +49,7 @@ final class DicePoolLifecycleController {
         playAreaBounds: (x: ClosedRange<Float>, z: ClosedRange<Float>),
         restHeight: Float = 1.0,
         styleAsRolls: Bool = true,
+        alwaysLargest: Bool = false,
         d4Style: DieFaceLabels.D4LabelStyle = .topRead
     ) {
         // Contact-audio cooldown state is keyed on node identity, so it
@@ -74,6 +75,7 @@ final class DicePoolLifecycleController {
             for: dice,
             includeRollsFace: styleAsRolls,
             includeOversizedDie: styleAsRolls,
+            alwaysLargest: alwaysLargest,
             d4Style: d4Style
         )
         // The POSITIONS are shuffled, not the dice.

@@ -150,8 +150,18 @@ enum DicePoolSceneBuilder {
     private static let sizeVariance: Float = 0.15
     private static let oversizeMultiplier: Float = 1.5
 
-    private static func normalSizeMultiplier() -> Float {
-        Float.random(in: (1 - sizeVariance)...(1 + sizeVariance))
+    /// ONLY A d6 MAY COME OUT SMALL.
+    ///
+    /// The variance ran both ways on every shape, and on everything but a
+    /// d6 that is a legibility cost with nothing to show for it: a d6 reads
+    /// at a glance from its pip pattern, while a d12 at 0.85 is a two-digit
+    /// numeral on the smallest face in the suite, shrunk again. The spread
+    /// is what makes a handful of dice look thrown rather than placed, and
+    /// a handful is d6s — so the many-sided shapes keep the range and lose
+    /// the bottom half of it.
+    private static func normalSizeMultiplier(sides: Int) -> Float {
+        let floor: Float = sides == 6 ? (1 - sizeVariance) : 1
+        return Float.random(in: floor...(1 + sizeVariance))
     }
 
     /// Returns one SCNNode per die in the pool, keyed by the die's id so
@@ -162,10 +172,18 @@ enum DicePoolSceneBuilder {
     /// the player chose each die deliberately, so branding one of them
     /// "ROLLS" and inflating another to 1.5x would read as a bug rather
     /// than a flourish.
+    /// `alwaysLargest` puts EVERY die at the oversized multiplier.
+    ///
+    /// For Rollbots, which shows one die at a time and asks you to read a
+    /// number off it that decides the exchange. There is no handful to
+    /// look thrown and nothing to compare a size against, so the only
+    /// thing the variance does there is make some throws harder to read
+    /// than others.
     static func buildNodes(
         for pool: [Die],
         includeRollsFace: Bool = true,
         includeOversizedDie: Bool = true,
+        alwaysLargest: Bool = false,
         d4Style: DieFaceLabels.D4LabelStyle = .topRead
     ) -> [UUID: SCNNode] {
         var nodesByID: [UUID: SCNNode] = [:]
@@ -189,9 +207,12 @@ enum DicePoolSceneBuilder {
             // DiePhysicsFactory passes it as the collision hull's scale
             // (so the hull matches the visual size). Scaling afterwards
             // would leave labels floating and the hull mismatched.
-            let variation = (die.id == oversizedDieID)
-                ? oversizeMultiplier
-                : normalSizeMultiplier()
+            let variation: Float
+            if alwaysLargest || die.id == oversizedDieID {
+                variation = oversizeMultiplier
+            } else {
+                variation = normalSizeMultiplier(sides: die.sides)
+            }
             node.scale = SCNVector3(
                 node.scale.x * variation,
                 node.scale.y * variation,

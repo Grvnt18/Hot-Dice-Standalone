@@ -886,11 +886,34 @@ enum DieFaceLabels {
             // deliberately gapped, wider, thicker bar is unmistakably a
             // "which way is up" indicator — matching how real tabletop
             // dice mark their 6 and 9.
-            let barWidth = textSize.width * 0.62
-            let barHeight = size.height * 0.035
-            let barY = origin.y + textSize.height * 0.86
+            // BIGGER than it was, and snapped to whole texels.
+            //
+            // It was 0.62 of the numeral's advance by 0.035 of the canvas,
+            // which on the 48px canvas is 15.2 x 1.68 — and 1.68 is the
+            // problem. The label is drawn at 48px and magnified across a
+            // face under a NEAREST filter (see artworkMaterial), so a bar
+            // less than two texels tall lands as one lit row and one
+            // half-lit one, and the half-lit row is then blown up as its
+            // own band of grey. A faint double stripe is exactly what an
+            // orientation mark cannot be.
+            //
+            // 3 texels by 0.80 of the advance: 20 x 3 against a numeral
+            // whose own advance is 24.6 and whose ink is 28.7 tall at
+            // 38.4pt, measured off Poppins-SemiBold. Rounded, so both
+            // edges fall on texel boundaries and the bar magnifies as a
+            // solid block.
+            //
+            // The gap above it is what makes it read as a mark rather than
+            // as part of the glyph, so the bar grows DOWNWARD from the
+            // same `barY`: the digit's ink ends at 37.6 and the bar still
+            // starts at 43.4, leaving the 5.8 that was there before, and
+            // its new bottom edge at 46.4 keeps a texel and a half of
+            // canvas under it.
+            let barWidth = (textSize.width * 0.80).rounded()
+            let barHeight = (size.height * 0.0625).rounded()
+            let barY = (origin.y + textSize.height * 0.86).rounded()
             let bar = CGRect(
-                x: (size.width - barWidth) / 2,
+                x: ((size.width - barWidth) / 2).rounded(),
                 y: barY,
                 width: barWidth,
                 height: barHeight

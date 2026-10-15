@@ -329,7 +329,7 @@ struct MatchSetupView: View {
 
     private var footnote: some View {
         Text("Names show on the scoreboard, the handover screens and "
-             + "the result. Leave one blank for \"Player 1\".")
+             + "the result. Leave blank for \"Player 1\".")
             .font(.poppins(11, .semibold))
             .foregroundStyle(.white.opacity(0.6))
             .multilineTextAlignment(.center)

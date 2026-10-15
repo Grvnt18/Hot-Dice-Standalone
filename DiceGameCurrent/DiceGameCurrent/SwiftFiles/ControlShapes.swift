@@ -565,16 +565,70 @@ extension UIView {
     }
 }
 
+/// `gameFrame`'s border with the bottom edge left out: up the left side,
+/// round the top, down the right.
+///
+/// A Path rather than an inset RoundedRectangle because there is no way to
+/// ask a shape to skip one of its sides, and `UnevenRoundedRectangle` is
+/// iOS 17 where this suite's floor is 16.
+///
+/// `inset` is how far in from the bounds the LINE'S CENTRE sits, because a
+/// stroked path straddles its own path where `strokeBorder` would keep
+/// itself inside. Each caller passes half its own width, plus whatever is
+/// outside it.
+private struct OpenBottomFrame: Shape {
+    var radius: CGFloat
+    var inset: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let r = rect.insetBy(dx: inset, dy: inset)
+        let corner = max(radius - inset, 0)
+        var path = Path()
+        // Start below the bottom edge on the left, so the rail runs off
+        // rather than stopping with a visible end — the same reasoning
+        // ScreenEdges' rails are full height for.
+        path.move(to: CGPoint(x: r.minX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: r.minX, y: r.minY + corner))
+        path.addQuadCurve(to: CGPoint(x: r.minX + corner, y: r.minY),
+                          control: CGPoint(x: r.minX, y: r.minY))
+        path.addLine(to: CGPoint(x: r.maxX - corner, y: r.minY))
+        path.addQuadCurve(to: CGPoint(x: r.maxX, y: r.minY + corner),
+                          control: CGPoint(x: r.maxX, y: r.minY))
+        path.addLine(to: CGPoint(x: r.maxX, y: rect.maxY))
+        return path
+    }
+}
+
 extension View {
-    /// The app's own sheet: squared corners and the same border the games
-    /// wear.
+    /// The app's own sheet: squared corners and the games' border, OPEN AT
+    /// THE BOTTOM.
     ///
     /// One modifier because it is one look. Settings had the two halves
     /// applied by hand and the two guide screens had neither, which is
     /// exactly how a "sheet style" ends up meaning three different things.
+    ///
+    /// The bottom edge is left out for the same reason `screenFrame` leaves
+    /// it out on a game: a sheet is presented from the bottom of the glass
+    /// and ends at it, so a line drawn across there is a line under the
+    /// home indicator with nothing beneath it to frame. It was the one
+    /// place the old four-sided border survived after the screens dropped
+    /// theirs.
     func menuSheet() -> some View {
-        self
+        let outline = PixelPanel.outlineWidth
+        let bevel = PixelPanel.bevelWidth
+        return self
             .background(SheetCorners(radius: ControlShape.cornerRadius))
-            .gameFrame()
+            // Outward-in, matching gameFrame's order: the outline is the
+            // outermost line and the bevel sits just inside it.
+            .overlay(
+                OpenBottomFrame(radius: ControlShape.cornerRadius,
+                                inset: outline + bevel / 2)
+                    .stroke(PieceSheen.bevel, lineWidth: bevel)
+            )
+            .overlay(
+                OpenBottomFrame(radius: ControlShape.cornerRadius,
+                                inset: outline / 2)
+                    .stroke(PixelPanel.outlineColor, lineWidth: outline)
+            )
     }
 }

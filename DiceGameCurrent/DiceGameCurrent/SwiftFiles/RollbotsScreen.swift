@@ -34,6 +34,24 @@ struct RollbotsScreen: View {
     /// True while the d6 in the air is a Corrosive Virus activation check.
     @State private var pendingVirus = false
 
+    /// The move the player has TAPPED but not yet confirmed.
+    ///
+    /// Every card on this screen used to fire the moment it was touched,
+    /// so a mis-tap spent a turn — and on the defence menu it spent the
+    /// only reaction you had. Choosing and committing are two gestures
+    /// now: the card selects, the bar below does it, and the bar says
+    /// which one it is about to do.
+    @State private var pendingMove: PendingMove?
+
+    private enum PendingMove: Equatable {
+        case attack
+        case ware
+        case openSwap
+        case swapTo(CyberWeapon)
+        case cancelSwap
+        case defend(CyberDefence)
+    }
+
     @State private var lastLine: String?
     @State private var handoverTo: Int?
     @State private var showingSettings = false
@@ -271,10 +289,19 @@ struct RollbotsScreen: View {
                     NetArt.background.opacity(0.80)
                     menu
                 }
-                // Setup has the longest list and no dice worth seeing yet,
-                // so it takes the whole column; every other menu leaves the
-                // top of the tray clear.
-                .frame(height: geo.size.height * (phase == .setup ? 1.0 : 0.58))
+                // CHOOSING takes the whole column; READING leaves the
+                // tray clear.
+                //
+                // Setup, the action menu and the weapon picker are all
+                // "pick one of these" and there is nothing on the table
+                // worth seeing behind them — at setup no dice have been
+                // thrown, and on your own turn the dice from the last
+                // exchange are spent. The defence menu is the exception
+                // and the reason this is not simply 1.0: the whole point
+                // of throwing the accuracy die BEFORE the defender
+                // chooses is that they can see it, and a full-height
+                // panel hides the die they are answering.
+                .frame(height: geo.size.height * (phase == .defending ? 0.58 : 1.0))
                 .overlay(alignment: .top) {
                     Rectangle().fill(NetArt.line.opacity(0.4)).frame(height: 1)
                 }
@@ -292,6 +319,11 @@ struct RollbotsScreen: View {
             // screen still reading as every other game.
             arenaStyle: .steel,
             onSessionCreated: { newSession in
+                // One die at a time, and the number on it decides the
+                // exchange — so every throw gets the largest size rather
+                // than a random one. There is no handful here for the
+                // variance to make look thrown.
+                newSession.alwaysLargestDice = true
                 newSession.onRollSettled = { results in
                     settled(results)
                 }
@@ -304,7 +336,16 @@ struct RollbotsScreen: View {
     // MARK: Setup
 
     private var setupView: some View {
-        ScrollView {
+        // The button is OUTSIDE the ScrollView.
+        //
+        // It was the last item in the list, so on a phone it sat below
+        // the fold behind two sets of cards — you chose a weapon and an
+        // ability and then had to scroll to find the way forward, with
+        // nothing on screen saying there was one. Pinned here it is
+        // always visible, and greyed until both choices are made so it
+        // also says what is still missing.
+        VStack(spacing: 0) {
+            ScrollView {
             VStack(alignment: .leading, spacing: 10) {
                 Text("\(names[setupSeat]) — choose your loadout")
                     .font(.poppins(13))
@@ -339,26 +380,30 @@ struct RollbotsScreen: View {
                     ) { pendingWare = ware }
                 }
 
-                Button {
-                    SoundEngine.shared.play(.buttonTap)
-                    confirmSetup()
-                } label: {
-                    Text(setupSeat == 0 ? "Lock In" : "Begin The Duel")
-                        .font(.poppins(15))
-                        .foregroundStyle(NetArt.background)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 46)
-                        .background(
-                            RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
-                                .fill(canConfirmSetup
-                                      ? NetArt.seat(setupSeat)
-                                      : NetArt.text.opacity(0.25))
-                        )
-                }
-                .disabled(!canConfirmSetup)
-                .padding(.vertical, 8)
             }
             .padding(.horizontal, 14)
+            .padding(.bottom, 8)
+            }
+
+            Button {
+                SoundEngine.shared.play(.buttonTap)
+                confirmSetup()
+            } label: {
+                Text(setupSeat == 0 ? "Lock In" : "Begin The Duel")
+                    .font(.poppins(15))
+                    .foregroundStyle(NetArt.background)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 46)
+                    .background(
+                        RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
+                            .fill(canConfirmSetup
+                                  ? NetArt.seat(setupSeat)
+                                  : NetArt.text.opacity(0.25))
+                    )
+            }
+            .disabled(!canConfirmSetup)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
         }
     }
 
@@ -400,8 +445,9 @@ struct RollbotsScreen: View {
                         ? "Throw for accuracy with the \(weapon.displayName). They answer it."
                         : "The Rail Rifle needs a turn to spin up. You cannot fire until it has.",
                     icon: weapon.iconName,
-                    tint: NetArt.seat(attacker)
-                ) { beginAttack() }
+                    tint: NetArt.seat(attacker),
+                    isSelected: pendingMove == .attack
+                ) { pendingMove = .attack }
 
                 if !state.wareUsed[attacker] {
                     NetCard(
@@ -409,15 +455,17 @@ struct RollbotsScreen: View {
                         summary: ware.reward,
                         detail: "Strain: \(ware.strain)",
                         icon: ware.iconName,
-                        tint: NetArt.warn
-                    ) { activateWare() }
+                        tint: NetArt.warn,
+                        isSelected: pendingMove == .ware
+                    ) { pendingMove = .ware }
                 }
 
                 NetCard(
                     title: "Swap Loadout",
                     summary: "Spend the turn changing weapon. Any held charge is lost.",
-                    tint: NetArt.text.opacity(0.8)
-                ) { swapLoadout() }
+                    tint: NetArt.text.opacity(0.8),
+                    isSelected: pendingMove == .openSwap
+                ) { pendingMove = .openSwap }
             }
             .padding(.horizontal, 14)
         }
@@ -444,15 +492,16 @@ struct RollbotsScreen: View {
                         summary: weapon.tagline,
                         icon: weapon.iconName,
                         tint: isCurrent ? NetArt.text.opacity(0.6) : NetArt.seat(attacker),
-                        isSelected: isCurrent
-                    ) { completeSwap(to: weapon) }
+                        isSelected: pendingMove == .swapTo(weapon)
+                    ) { pendingMove = .swapTo(weapon) }
                 }
 
                 NetCard(
                     title: "Cancel",
                     summary: "Go back without spending your turn.",
-                    tint: NetArt.text.opacity(0.8)
-                ) { phase = .action }
+                    tint: NetArt.text.opacity(0.8),
+                    isSelected: pendingMove == .cancelSwap
+                ) { pendingMove = .cancelSwap }
             }
             .padding(.horizontal, 14)
         }
@@ -480,8 +529,9 @@ struct RollbotsScreen: View {
                         // Greyed, not removed. A card that vanishes
                         // teaches nothing; one that is there and greyed
                         // says "this exists, and not against this".
+                        isSelected: pendingMove == .defend(option),
                         isEnabled: canHelp(option)
-                    ) { choose(option) }
+                    ) { pendingMove = .defend(option) }
                 }
             }
             .padding(.horizontal, 14)
@@ -745,9 +795,8 @@ struct RollbotsScreen: View {
         if r.evaded && r.counter > 0 {
             return "Phased clean through — and hit back for \(r.counter)."
         }
-        if r.evaded { return "Dodged it entirely." }
-        if r.lockedDown { return "Hard Lockdown — the whole shot absorbed." }
-        if r.damage == 0 { return "The Firewall swallowed it." }
+        if r.evaded { return "Dodged!" }
+        if r.lockedDown || r.damage == 0 { return "Fully Absorbed!" }
         let crit = r.isCrit ? "Critical — " : ""
         return "\(crit)\(names[defender]) took \(r.damage)."
     }
@@ -756,6 +805,7 @@ struct RollbotsScreen: View {
     /// player presses Continue, so nobody hands over a device before
     /// reading what just happened to them.
     private func finishTurn() {
+        pendingMove = nil
         if !state.defeated.isEmpty {
             phase = .finished
             return
@@ -765,6 +815,7 @@ struct RollbotsScreen: View {
 
     /// Ticks anything burning, checks for a winner, hands over.
     private func endExchange() {
+        pendingMove = nil
         match.advanceTurn()
         let next = match.activeIndex
 
@@ -822,24 +873,64 @@ struct RollbotsScreen: View {
 
     // MARK: Buttons
 
+    /// The bar says what pressing it will DO.
+    ///
+    /// In the choosing phases that is whichever card is selected — the
+    /// bar reads "Attack", "Overclock", "Dodge" — and before anything is
+    /// selected it asks for a choice. The two reading phases name the act
+    /// the dice have already decided.
     private var primaryLabel: String {
+        if let pendingMove { return label(for: pendingMove) }
         switch phase {
-        case .action, .swapping: return "Choose Above"
+        case .action, .swapping, .defending: return "Choose Above"
         case .rollingAttack:   return "Rolling"
-        case .readingAttack:   return "Send It"
-        case .defending:       return "Choose Above"
+        case .readingAttack:   return "Attack"
         case .rollingDefence:  return "Rolling Defence"
-        case .readingDefence:  return "Resolve"
+        case .readingDefence:  return defenceOutcomeLabel
         case .resolved:        return "Continue"
         case .finished:        return "Done"
         case .setup:           return ""
         }
     }
 
-    /// The three phases where the button is the way forward: read your
-    /// attack, read your defence, or end the exchange.
+    private func label(for move: PendingMove) -> String {
+        switch move {
+        case .attack:          return state.canFire(attacker) ? "Attack" : "Charge"
+        case .ware:            return state.ware[attacker].barLabel
+        case .openSwap:        return "Swap"
+        case .swapTo(let weapon):
+            return weapon == state.weapon[attacker] ? "Keep It" : weapon.displayName
+        case .cancelSwap:      return "Cancel"
+        case .defend(let option): return option.barLabel
+        }
+    }
+
+    /// What the defence die just decided, on the button that resolves it.
+    ///
+    /// The number is on the table and the outcome follows from it, so the
+    /// bar says the outcome rather than "Resolve". `RollbotsRules.resolve`
+    /// takes every input as an argument and returns a value, so asking it
+    /// now and again a moment later cannot disagree.
+    private var defenceOutcomeLabel: String {
+        let preview = RollbotsRules.resolve(
+            weapon: state.activeWeapon(attacker),
+            accuracy: accuracy,
+            damageRoll: damageRoll,
+            defence: defence,
+            defenceRoll: defenceRoll,
+            ignoresFirewall: usedOverclock
+        )
+        if preview.evaded { return "Dodged!" }
+        if preview.lockedDown || preview.damage == 0 { return "Fully Absorbed!" }
+        return "Attack Lands"
+    }
+
+    /// Enabled when there is something to confirm: a selected card, a
+    /// roll that has been read, or a resolution to send on.
     private var isPrimaryEnabled: Bool {
-        phase == .resolved || phase == .readingAttack || phase == .readingDefence
+        if pendingMove != nil { return true }
+        return phase == .resolved || phase == .readingAttack
+            || phase == .readingDefence
     }
 
     private var barSubtitle: String {
@@ -847,7 +938,7 @@ struct RollbotsScreen: View {
         case .action:    return "Pick a move"
         case .swapping:  return "Pick a weapon, or cancel"
         case .readingAttack:
-            return "Accuracy \(accuracy) · damage \(damageRoll) — send it when you have read them"
+            return "You attack for \(damageRoll) damage with \(accuracy) accuracy"
         case .defending:
             return "Accuracy \(accuracy), damage \(damageRoll) — answer it"
         case .readingDefence:
@@ -858,11 +949,29 @@ struct RollbotsScreen: View {
     }
 
     private func primaryAction() {
+        // A selected card is what the bar is about to do; the phase only
+        // decides when there is nothing selected.
+        if let move = pendingMove {
+            pendingMove = nil
+            perform(move)
+            return
+        }
         switch phase {
         case .readingAttack:  sendAttack()
         case .readingDefence: resolveExchange()
         case .resolved:       endExchange()
         default:              break
+        }
+    }
+
+    private func perform(_ move: PendingMove) {
+        switch move {
+        case .attack:             beginAttack()
+        case .ware:               activateWare()
+        case .openSwap:           swapLoadout()
+        case .swapTo(let weapon): completeSwap(to: weapon)
+        case .cancelSwap:         phase = .action
+        case .defend(let option): choose(option)
         }
     }
 
@@ -873,6 +982,7 @@ struct RollbotsScreen: View {
         setupSeat = 0
         pendingWeapon = nil
         pendingWare = nil
+        pendingMove = nil
         lastLine = nil
         accuracy = 0
         damageRoll = 0

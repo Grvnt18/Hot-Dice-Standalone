@@ -239,18 +239,26 @@ INTRO (setup, each runner in turn)
   "Ada — choose your loadout"
   "Weapon"     then the three weapon cards, each with its die and its trick.
   "Cyberware"  then the four ability cards, each with its cost.
-  "Choose Above"  → "Lock In"  once both are picked.
+  "Lock In", pinned below the list so it is never scrolled past.
   "Begin The Duel"
+
+  CHOOSING IS TWO GESTURES, HERE AND EVERYWHERE ELSE ON THIS SCREEN.
+  A card SELECTS; the bar underneath DOES it, and says which. Every card
+  used to fire on the first touch, so a mis-tap spent a turn — and on the
+  defence menu it spent the only reaction you had.
 
 ATTACKING
   Header    "Ada — your move"        with "Pick a move"
-  Buttons   "Attack"  "Charge"  "Swap Loadout"  "Activate Quantum Phase"
+  Cards     "Attack"  "Charge"  "Swap Loadout"  "Activate Quantum Phase"
+  Bar       "Choose Above" → the chosen move's own word once one is picked:
+            "Attack"  "Charge"  "Overclock"  "Phase"  "Virus"  "Repair"
+            "Swap"
   Swapping  "Ada — switch weapon", "Pick a weapon, or cancel",
             "Switching costs your turn, and any held charge.", "Cancel"
   After the throw:
             "Mono-Blade · accuracy 8"
-            "Accuracy 8 · damage 6 — send it when you have read them"
-            Button "Send It"  — nothing is sent until the attacker has read
+            "You attack for 6 damage with 8 accuracy"
+            Button "Attack"  — nothing is sent until the attacker has read
             their own roll.
 
 DEFENDING
@@ -259,13 +267,13 @@ DEFENDING
   Cards     "Dodge"     and its d6
             "Firewall"  "Roll a d8 and subtract it from the damage. A natural
                         8 stops everything."
-  Button    "Rolling Defence" → "Resolve"  — the defender reads their own roll
-            before it is applied, the same as the attacker.
+  Bar       "Choose Above" → "Dodge" / "Firewall" / "Phase" / "Take It"
+  Button    "Rolling Defence" → then what the die decided, on the button
+            that applies it: "Dodged!", "Fully Absorbed!" or "Attack Lands".
 
-RESOLUTION (one line, after Resolve)
-  "Dodged it entirely."
-  "The Firewall swallowed it."
-  "Hard Lockdown — the whole shot absorbed."
+RESOLUTION (one line, after the bar)
+  "Dodged!"
+  "Fully Absorbed!"
   "Bo took 6."      /  "Critical — Bo took 11."
   "Phased clean through — and hit back for 3."
   "The Overclock left you wide open. You take this one in full."

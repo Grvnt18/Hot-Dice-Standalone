@@ -140,6 +140,21 @@ enum CyberDefence: String, Codable, Identifiable {
         }
     }
 
+    /// What the confirm bar says once this reaction is the chosen one.
+    ///
+    /// A verb rather than a name: the bar is the button you press to DO
+    /// the thing, so it reads "Dodge", not "Quantum Phase". Exposed is
+    /// the odd one, because it is not a reaction at all — it is what is
+    /// left when none of them can help.
+    var barLabel: String {
+        switch self {
+        case .dodge:    return "Dodge"
+        case .firewall: return "Firewall"
+        case .phase:    return "Phase"
+        case .exposed:  return "Take It"
+        }
+    }
+
     /// The die this reaction throws. Distinct from every damage die that
     /// could be in the air at the same moment, because each throw in this
     /// game carries exactly one role.
@@ -176,6 +191,18 @@ enum Cyberware: String, CaseIterable, Codable, Identifiable {
         case .corrosiveVirus:      return "Corrosive Virus"
         case .quantumPhase:        return "Quantum Phase"
         case .emergencySubroutine: return "Emergency Sub-Routine"
+        }
+    }
+
+    /// What the confirm bar says once this ability is the chosen move.
+    /// One word where the card has two: the bar is narrow and the card
+    /// above it is already carrying the full name.
+    var barLabel: String {
+        switch self {
+        case .neuralOverclock:     return "Overclock"
+        case .corrosiveVirus:      return "Virus"
+        case .quantumPhase:        return "Phase"
+        case .emergencySubroutine: return "Repair"
         }
     }
 

@@ -202,6 +202,20 @@ struct TurnActionBar: View {
                 } label: {
                     Text(primaryLabel)
                         .font(.poppins(15))
+                        // One line, shrinking if it has to.
+                        //
+                        // Nothing capped this, and a label too wide for its
+                        // button WRAPS — inside a fixed 48pt frame, which
+                        // is one line of 15pt Poppins plus padding, so the
+                        // second line draws outside the panel. It took a
+                        // long label to reach: Generals' confirm names the
+                        // box being taken, and "TAKE PACKED HOUSE" is
+                        // 149.4pt against the 141 a button gets beside a
+                        // secondary on a 320pt window. At this floor it
+                        // sets at 112 and fits, and no other label in the
+                        // suite comes close enough to shrink at all.
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                         .frame(maxWidth: .infinity)
                         .frame(height: 48)
                         // Load-bearing: `.plain` hit-tests what it draws,
@@ -228,6 +242,11 @@ struct TurnActionBar: View {
                     } label: {
                         Text(secondaryLabel)
                             .font(.poppins(15))
+                            // The same cap, for the same reason — the
+                            // secondary is the narrower of the two when
+                            // the primary has a long label.
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
                             .frame(maxWidth: .infinity)
                             .frame(height: 48)
                             .contentShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))

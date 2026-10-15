@@ -14,6 +14,16 @@ struct GeneralsScreen: View {
     @State private var lastSummary: String?
     @State private var showingSettings = false
     @State private var showingCard = false
+
+    /// The box the player has tapped but not yet taken.
+    ///
+    /// Taking a category is the one irreversible move in the game — the box
+    /// is gone for the rest of the match, and the turn ends with it — and it
+    /// used to happen on the first tap, with nothing between a misread cell
+    /// and a spent category. So the card SELECTS and the bar CONFIRMS, which
+    /// is the shape Rollbots' attack menu already uses: pick the thing, read
+    /// what it does, then commit on the bar.
+    @State private var pendingCategory: GeneralsCategory?
     @ObservedObject private var theme = AppTheme.shared
 
 
@@ -122,24 +132,39 @@ struct GeneralsScreen: View {
                     TurnActionBar(
                         primaryLabel: primaryLabel,
                         primaryEnabled: isPrimaryEnabled,
-                        secondaryLabel: phase == .decide ? "Claim" : nil,
+                        secondaryLabel: secondaryLabel,
                         subtitle: subtitle,
                         onPrimary: { primaryAction() },
-                        onSecondary: { openCard() }
+                        onSecondary: { secondaryAction() }
                     )
                     .frame(height: buttonHeight)
                 }
-            }
-
-            if showingCard {
-                GeneralsCardView(
-                    card: card,
-                    match: match,
-                    hand: phase == .decide ? hand : nil,
-                    onClaim: { category in claim(category) },
-                    onClose: { showingCard = false }
-                )
-                .transition(.opacity)
+                // The card sits OVER the table and UNDER the bar.
+                //
+                // It was a full-screen layer in the outer ZStack, which
+                // covered the bar along with everything else — fine while
+                // a tap on a box was the whole move, and impossible once
+                // the bar is what confirms it. So it is an overlay on the
+                // split instead, given the screen less the band, and the
+                // two scrims inside it no longer reach past that.
+                //
+                // Same region the Rollbots menu takes for the same reason:
+                // the choice covers the table, the thing that commits it
+                // stays where it always is.
+                .overlay(alignment: .top) {
+                    if showingCard {
+                        GeneralsCardView(
+                            card: card,
+                            match: match,
+                            hand: phase == .decide ? hand : nil,
+                            selected: pendingCategory,
+                            onSelect: { category in select(category) },
+                            onClose: { closeCard() }
+                        )
+                        .frame(height: max(geo.size.height - buttonHeight, 0))
+                        .transition(.opacity)
+                    }
+                }
             }
 
             if phase == .handover {
@@ -175,7 +200,17 @@ struct GeneralsScreen: View {
 
     // MARK: Button
 
+    /// What the bar says, and the card is what changes it.
+    ///
+    /// While the card is open over the table the bar is the confirm: it
+    /// names the box that is about to be taken, so the commitment is
+    /// readable on the thing being pressed rather than only in the cell
+    /// that was tapped.
     private var primaryLabel: String {
+        if showingCard {
+            guard let pendingCategory else { return "Take a Category" }
+            return "Take \(pendingCategory.displayName)"
+        }
         switch phase {
         case .ready:    return "Roll"
         case .rolling:  return "Rolling"
@@ -186,7 +221,30 @@ struct GeneralsScreen: View {
         }
     }
 
+    /// Which secondary the bar carries: the one that OPENS the card, or
+    /// the one that backs out of it.
+    private var secondaryLabel: String? {
+        if showingCard {
+            // The read-only card keeps its own Back button, so the bar
+            // stays out of it rather than putting a second closer an inch
+            // under the first.
+            guard phase == .decide else { return nil }
+            return pendingCategory == nil ? "Close" : "Not Yet"
+        }
+        return phase == .decide ? "Claim" : nil
+    }
+
     private var subtitle: String {
+        if showingCard {
+            guard phase == .decide else { return "" }
+            guard let pendingCategory else {
+                return "Tap a category, then confirm below"
+            }
+            let points = pendingCategory.score(for: hand)
+            return points > 0
+                ? "\(pendingCategory.displayName) pays \(points)"
+                : "\(pendingCategory.displayName) scores nothing — crossing it off"
+        }
         switch phase {
         case .decide:
             let left = GeneralsRules.rollsPerTurn - rollsUsed
@@ -215,6 +273,11 @@ struct GeneralsScreen: View {
     /// is nil for the first moments on screen — rolling is gated on it for
     /// the same reason Jackpot gates it.
     private var isPrimaryEnabled: Bool {
+        // With the card open the bar has exactly one job, and nothing to do
+        // until a box is picked. This is also what stops a roll being
+        // thrown through the card — the bar is visible under it now, and
+        // "Roll Again" behind a scorecard would be a turn spent blind.
+        if showingCard { return pendingCategory != nil }
         switch phase {
         case .ready:
             return session != nil
@@ -231,6 +294,13 @@ struct GeneralsScreen: View {
     }
 
     private func primaryAction() {
+        // The confirm, when the card is what is on screen. `claim` plays
+        // its own tap and checks the phase, so this neither sounds twice
+        // nor needs to.
+        if showingCard {
+            if let pendingCategory { claim(pendingCategory) }
+            return
+        }
         SoundEngine.shared.play(.buttonTap)
         switch phase {
         case .ready, .decide:
@@ -246,9 +316,36 @@ struct GeneralsScreen: View {
         }
     }
 
+    private func secondaryAction() {
+        showingCard ? closeCard() : openCard()
+    }
+
     private func openCard() {
         SoundEngine.shared.play(.buttonTap)
+        pendingCategory = nil
         showingCard = true
+    }
+
+    /// Backs out, and forgets the selection with it.
+    ///
+    /// A pending box left behind a closed card is a bar still offering to
+    /// take something the player cannot see — and the chrome button can
+    /// reopen the card between turns, when the hand it was selected
+    /// against is long gone.
+    private func closeCard() {
+        SoundEngine.shared.play(.buttonTap)
+        pendingCategory = nil
+        showingCard = false
+    }
+
+    /// Picks a box, or unpicks it.
+    ///
+    /// Tapping the selected one again clears it, so a change of mind needs
+    /// no separate control — the same thing the dice selection does.
+    private func select(_ category: GeneralsCategory) {
+        guard phase == .decide else { return }
+        SoundEngine.shared.play(.buttonTap)
+        pendingCategory = pendingCategory == category ? nil : category
     }
 
     // MARK: Turn flow
@@ -283,6 +380,7 @@ struct GeneralsScreen: View {
         // Also drops every highlight, so the next player does not inherit a
         // table of pulsing dice.
         session?.isSelectionEnabled = false
+        pendingCategory = nil
         showingCard = false
         phase = .scored
     }
@@ -301,6 +399,7 @@ struct GeneralsScreen: View {
         hand = []
         keptCount = 0
         rollsUsed = 0
+        pendingCategory = nil
         session?.beginTurn()
         phase = .ready
     }
@@ -331,7 +430,11 @@ struct GeneralsCardView: View {
     /// The hand being claimed with, or nil when this is just a look at the
     /// card — which is what makes the boxes tappable or not.
     let hand: [Int]?
-    let onClaim: (GeneralsCategory) -> Void
+    /// The box the bar is currently offering to take, drawn as picked.
+    let selected: GeneralsCategory?
+    /// Picks a box. Taking it is the BAR's job — see
+    /// GeneralsScreen.pendingCategory for why the two are separate.
+    let onSelect: (GeneralsCategory) -> Void
     let onClose: () -> Void
 
     @ObservedObject private var theme = AppTheme.shared
@@ -340,10 +443,13 @@ struct GeneralsCardView: View {
 
     var body: some View {
         ZStack {
+            // NOT ignoresSafeArea, either of them. This view is given the
+            // screen less the button band now — see the overlay in
+            // GeneralsScreen — and a scrim that ignores the safe area
+            // ignores that frame too, which would put a 62% black over the
+            // bar the card is waiting on.
             WoodTiledBackground()
-                .ignoresSafeArea()
             Color.black.opacity(0.62)
-                .ignoresSafeArea()
 
             VStack(spacing: 10) {
                 // Which of these two words appears is the only signal that
@@ -406,22 +512,33 @@ struct GeneralsCardView: View {
                     }
                 }
 
-                Button {
-                    SoundEngine.shared.play(.buttonTap)
-                    onClose()
-                } label: {
-                    Text(hand == nil ? "Back" : "Not Yet")
-                        .font(.poppins(15))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 46)
-                        .contentShape(RoundedRectangle(cornerRadius: ControlShape.cornerRadius))
+                // Only when the card is a LOOK at the card.
+                //
+                // While a hand is on the table the bar below carries both
+                // halves — "Take <category>" and "Not Yet" — and a third
+                // closer sitting directly above it was two buttons doing
+                // one job, an inch apart. The read-only card has no bar to
+                // lean on: every other phase leaves the primary disabled
+                // and the secondary absent, so this is its only way out.
+                if hand == nil {
+                    Button {
+                        SoundEngine.shared.play(.buttonTap)
+                        onClose()
+                    } label: {
+                        Text("Back")
+                            .font(.poppins(15))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 46)
+                            .contentShape(RoundedRectangle(
+                                cornerRadius: ControlShape.cornerRadius))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.white)
+                    .pixelPanel(fill: .solid(theme.accentColor.opacity(0.35)),
+                                elevation: .resting)
+                    .padding(.horizontal, 44)
+                    .padding(.bottom, 10)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white)
-                .pixelPanel(fill: .solid(theme.accentColor.opacity(0.35)),
-                            elevation: .resting)
-                .padding(.horizontal, 44)
-                .padding(.bottom, 10)
             }
             .padding(.top, 14)
         }
@@ -433,8 +550,10 @@ struct GeneralsCardView: View {
     /// The accent keeps its job — "this one is yours to take" — but as a
     /// wash on the paper rather than a fill under white text. A claimed
     /// cell goes a shade darker, the way a filled-in box does.
-    private func cellWash(isOpen: Bool, claimable: Bool) -> Color {
+    private func cellWash(isOpen: Bool, claimable: Bool,
+                          picked: Bool) -> Color {
         guard isOpen else { return GeneralsPaper.ink.opacity(0.12) }
+        if picked { return theme.accentColor.opacity(0.72) }
         return theme.accentColor.opacity(claimable ? 0.30 : 0.14)
     }
 
@@ -443,9 +562,11 @@ struct GeneralsCardView: View {
         let isOpen = claim == nil
         let wouldScore = hand.map { category.score(for: $0) }
 
+        let picked = selected == category
+
         return Button {
             guard isOpen, hand != nil else { return }
-            onClaim(category)
+            onSelect(category)
         } label: {
             VStack(spacing: 2) {
                 Text(category.displayName)
@@ -481,11 +602,19 @@ struct GeneralsCardView: View {
             // the sheet underneath already carries it.
             .background(
                 RoundedRectangle(cornerRadius: ControlShape.cornerRadius * 0.5)
-                    .fill(cellWash(isOpen: isOpen, claimable: hand != nil))
+                    .fill(cellWash(isOpen: isOpen, claimable: hand != nil,
+                                   picked: picked))
             )
+            // The picked box takes a heavier rule as well as a deeper
+            // wash. Two cues rather than one, because the wash is the
+            // accent colour and the player chooses that: on the paler
+            // colourways a single step of opacity is not much of a
+            // signal, and this is the box about to be spent.
             .overlay(
                 RoundedRectangle(cornerRadius: ControlShape.cornerRadius * 0.5)
-                    .stroke(GeneralsPaper.ink.opacity(isOpen ? 0.45 : 0.25), lineWidth: 1)
+                    .strokeBorder(GeneralsPaper.ink.opacity(
+                        picked ? 0.95 : (isOpen ? 0.45 : 0.25)),
+                                  lineWidth: picked ? 3 : 1)
             )
         }
         .disabled(!isOpen || hand == nil)

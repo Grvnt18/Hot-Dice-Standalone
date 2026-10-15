@@ -411,6 +411,35 @@ enum DieSlotShape: Equatable {
         default: return .square
         }
     }
+
+    /// How far below the middle of its box the slot's own centre sits, as a
+    /// fraction of the box height.
+    ///
+    /// A numeral centred in the BOX reads as top-aligned in two of these
+    /// four shapes, and that is geometry rather than taste: a point-up
+    /// triangle carries its area along the bottom edge, so the middle of
+    /// the box is up in the narrow part of it. Area centroids of the
+    /// polygons `DieSlot.polygon` actually builds — stretched to fill the
+    /// box, so not the regular figures' own values — measured as a
+    /// fraction of height from the top:
+    ///
+    ///     square     0.500     a rectangle, so no bias
+    ///     diamond    0.500     symmetric top to bottom
+    ///     pentagon   0.553
+    ///     triangle   0.667
+    ///
+    /// The triangle is the one a player sees: on a 40pt slot it moves the
+    /// numeral 6.7pt down, into the two-thirds of the shape that has any
+    /// ink either side of it. There is room — the triangle is 0.667 of the
+    /// box wide at that height, about 27pt against a digit's 10 — and the
+    /// pentagon's 2pt is the same correction where it is barely visible.
+    var centreBias: CGFloat {
+        switch self {
+        case .triangle: return 0.667 - 0.5
+        case .pentagon: return 0.553 - 0.5
+        case .square, .diamond: return 0
+        }
+    }
 }
 
 /// `DieSlotShape` as something SwiftUI can fill and stroke.

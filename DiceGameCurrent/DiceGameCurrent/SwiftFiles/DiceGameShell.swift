@@ -502,6 +502,20 @@ struct DiceScoreBar: View {
                 // against its body, so this reuses the same pairing the
                 // 3D dice use.
                 .foregroundStyle(Color(hex: die.colorway.numberHex))
+                // Down to the SLOT's centre, not the box's.
+                //
+                // Before the frame on purpose: `offset` does not take part
+                // in layout, so the frame below still measures and centres
+                // the numeral as if it had not moved, and the background
+                // and overlays attached after that frame — the slot's own
+                // fill, bevel and outline — stay exactly where they were.
+                // Offsetting the whole composite instead would slide the
+                // slot out of the grid.
+                //
+                // Zero for a square and a diamond; see
+                // DieSlotShape.centreBias for why the triangle and the
+                // pentagon are not.
+                .offset(y: height * shape(at: index).centreBias)
                 .frame(width: width, height: height)
                 // A banked die is a solid thing sitting on the panel, so it
                 // gets the panel treatment the rest of the chrome has —

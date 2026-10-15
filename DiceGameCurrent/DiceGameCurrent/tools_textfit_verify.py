@@ -117,11 +117,35 @@ def font_call(text, anchor, after=0):
     tail = text.split(anchor, 1)
     if len(tail) < 2:
         raise AssertionError("no %r in the source" % anchor)
-    match = re.search(r'\.poppins\((\d+)(?:,\s*\.(\w+))?\)',
+    match = re.search(r'\.poppins\(([\w.]+)(?:,\s*\.(\w+))?\)',
                       tail[1][after:])
     if not match:
         raise AssertionError("no .poppins(...) after %r" % anchor)
-    return int(match.group(1)), (match.group(2) or "regular")
+    return point_size(match.group(1), anchor), (match.group(2) or "regular")
+
+
+def point_size(token, anchor):
+    """A `.poppins(...)` size, whether it is a literal or a constant.
+
+    The scoreboard's sizes moved out of the view and into
+    `GameBandLayout`, because the header is sized in one file and the
+    thing it has to hold described in another. A digits-only pattern did
+    not just fail on that — it skipped the call and matched the NEXT
+    `.poppins` in the file, and reported the seat names and the status
+    line as 15pt regular when both are 11pt semibold. The status line
+    then failed against a width it has no trouble with.
+    """
+    if token.isdigit():
+        return int(token)
+    name = token.split(".")[-1]
+    for filename in ("PlayfieldLayout.swift", "AppFonts.swift"):
+        try:
+            return int(constant(uncommented(filename), name))
+        except (AssertionError, AttributeError, ValueError, TypeError):
+            continue
+    raise AssertionError("the .poppins size after %r is %r, which is not a "
+                         "number and not a constant this can read"
+                         % (anchor, token))
 
 
 def scale_floor(text, anchor):
@@ -151,15 +175,33 @@ def check_seat_tiles(problems):
     max_length = constant(names, "maxLength")
 
     # Both numbers off the view rather than this file.
-    pad = float(re.search(r'\.padding\(\.horizontal, (\d+)\)',
-                          host.split("VStack(spacing: 4)", 1)[-1]).group(1))
-    spacing = float(re.search(r'HStack\(spacing: (\d+)\) \{\s*ForEach\(match\.participants',
-                              host).group(1))
+    pad = float(re.search(r'\.padding\(\.horizontal, (\d+)\)', host).group(1))
+    spacing = float(constant(host, "seatGap"))
+
+    # How many tiles share a row, which is no longer the seat count.
+    #
+    # Four seats are drawn as a 2x2 — see MatchScoreboard.seatRows — so a
+    # tile at four is HALF the strip rather than a quarter of it, and this
+    # check was the thing that would otherwise go on measuring the row
+    # that used to be there. The rule is read out of GameBandLayout for
+    # the same reason the fonts now are.
+    layout = uncommented("PlayfieldLayout.swift")
+    grid = re.search(r"func scoreboardRows\(seats: Int\) -> Int \{\s*"
+                     r"seats == (\d+) \? (\d+) : 1", layout)
+    if not grid:
+        raise AssertionError("GameBandLayout.scoreboardRows is no longer "
+                             "'N rows at one seat count', so a tile's width "
+                             "cannot be derived")
+    grid_at, grid_rows = int(grid.group(1)), int(grid.group(2))
+
+    def columns(seats):
+        return seats // grid_rows if seats == grid_at else seats
 
     rows = []
     for label, width in WIDTHS:
         for seats in (2, max_seats):
-            tile = (width - pad * 2 - spacing * (seats - 1)) / seats
+            across = columns(seats)
+            tile = (width - pad * 2 - spacing * (across - 1)) / across
             room = tile / floor          # the widest string the floor allows
             typical = chars_that_fit(weight, size, room, TYPICAL)
             widest = chars_that_fit(weight, size, room, WIDEST)

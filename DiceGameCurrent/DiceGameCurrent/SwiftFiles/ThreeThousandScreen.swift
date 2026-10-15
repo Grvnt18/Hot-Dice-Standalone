@@ -88,7 +88,8 @@ struct ThreeThousandScreen: View {
                 // bounds come from this view's measured aspect ratio, and
                 // the button band's floor is summed from what it holds
                 // rather than typed as 100.
-                let bands = GameBandLayout.bands(in: geo.size)
+                let bands = GameBandLayout.bands(in: geo.size,
+                                                 seats: match.participants.count)
                 let headerHeight = bands.header
                 // The REGION, not the square: the well fills 60% of the
                 // screen and the playfield stays square inside it.

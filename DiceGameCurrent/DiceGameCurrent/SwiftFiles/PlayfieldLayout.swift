@@ -416,6 +416,88 @@ enum GameBandLayout {
     /// it is not where slack belongs anyway.
     static let scoreboardFraction: CGFloat = 0.17
 
+    // MARK: What the scoreboard holds
+    //
+    // The numbers `MatchScoreboard` is actually built from, stated here
+    // rather than there, because the header is sized in this file and the
+    // thing it has to hold is described in that one. Four seats on two
+    // rows is the case where the two have to agree: a strip that wants
+    // 167pt inside a header given 113 does not fail, it draws over the
+    // tray below it — a ZStack does not clip — and nothing in the sweep
+    // was looking. `tools_bandlayout_verify.py` reads these.
+
+    /// The seat tile's two lines: the name and the score.
+    static let scoreboardNameFont: CGFloat = 11
+    static let scoreboardScoreFont: CGFloat = 22
+
+    /// Poppins' own line box, ascent plus descent, as a multiple of the
+    /// point size. Measured off the TTF: 1050 and 350 against a 1000 em.
+    static let scoreboardLineFactor: CGFloat = 1.4
+
+    /// `VStack(spacing: 1)` inside a tile, `.padding(.vertical, 4)` round
+    /// it, `VStack(spacing: 4)` between the strip's own rows, and
+    /// `.padding(.vertical, 6)` round the lot.
+    static let scoreboardTileGap: CGFloat = 1
+    static let scoreboardTilePadding: CGFloat = 4
+    static let scoreboardRowGap: CGFloat = 4
+    static let scoreboardPadding: CGFloat = 6
+
+    /// The round counter above the seats and the status line below them.
+    /// Both are optional per game; both are assumed present here, because
+    /// a header that only fits while a game happens not to show its
+    /// subtitle is a header that overflows the first time it does.
+    static let scoreboardRoundFont: CGFloat = 12
+    static let scoreboardSubtitleFont: CGFloat = 11
+
+    /// One seat tile: name, score, and the padding round them.
+    static var scoreboardTile: CGFloat {
+        (scoreboardNameFont + scoreboardScoreFont) * scoreboardLineFactor
+            + scoreboardTileGap + scoreboardTilePadding * 2
+    }
+
+    /// How many rows of seat tiles a given number of seats takes.
+    ///
+    /// Two only at exactly FOUR. Three seats in a 2x2 is a grid with a
+    /// hole in it, which reads as a missing player rather than as a
+    /// layout; and three tiles across are 110.3pt on the narrowest phone,
+    /// comfortably wider than the 75pt a twelve-character name sets at.
+    /// Four across are 80.2pt, which is where the names start shrinking —
+    /// see MatchSetup.maxSeats, measured to exactly that limit.
+    static func scoreboardRows(seats: Int) -> Int {
+        seats == 4 ? 2 : 1
+    }
+
+    /// The height the strip's content needs, for that many seats.
+    static func scoreboardHeight(seats: Int) -> CGFloat {
+        let rows = CGFloat(scoreboardRows(seats: seats))
+        let tiles = rows * scoreboardTile + (rows - 1) * scoreboardRowGap
+        return scoreboardPadding * 2
+            + scoreboardRoundFont * scoreboardLineFactor + scoreboardRowGap
+            + tiles
+            + scoreboardRowGap + scoreboardSubtitleFont * scoreboardLineFactor
+    }
+
+    /// The header's share for a game that can seat four.
+    ///
+    /// The fixed 0.17 holds one row everywhere — 113pt against 107 on the
+    /// narrowest phone, which is thin but real. It does not hold two: four
+    /// seats want 167pt, and no iPhone's 17% reaches that. So the share is
+    /// the LARGER of the two, which leaves every signed-off layout exactly
+    /// where it was — at two and three seats this returns 0.17 at every
+    /// size the app meets, and on an iPad it returns 0.17 at four as well,
+    /// because 17% of 1133 is already 193.
+    ///
+    /// What the extra costs is tray, not playfield: in portrait the scene
+    /// is capped by WIDTH — see `scene` — so the points come out of the
+    /// timber showing above and below a square that was not going to grow.
+    /// The two shapes that are height-bound instead, the folded Duo and a
+    /// landscape iPad mini, pay about 45pt of playfield and stay well
+    /// clear of what the tray needs.
+    static func scoreboardFraction(in size: CGSize, seats: Int) -> CGFloat {
+        guard size.height > 0 else { return scoreboardFraction }
+        return max(scoreboardFraction, scoreboardHeight(seats: seats) / size.height)
+    }
+
     /// All three band heights at once.
     ///
     /// The five scoreboard games computed the same three values from the
@@ -431,6 +513,16 @@ enum GameBandLayout {
         /// actually draws fills `sceneRegion`.
         let scene: CGFloat
         let buttonBand: CGFloat
+    }
+
+    /// The bands for a game whose seat count decides its header.
+    ///
+    /// Separate from the overload below rather than a defaulted argument,
+    /// because the three games that can seat four are the only callers:
+    /// the other four scoreboard games are two-player by their own
+    /// `localSeats` and have nothing to ask.
+    static func bands(in size: CGSize, seats: Int) -> Bands {
+        bands(in: size, fraction: scoreboardFraction(in: size, seats: seats))
     }
 
     static func bands(in size: CGSize,

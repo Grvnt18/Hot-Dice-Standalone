@@ -79,11 +79,19 @@ enum MatchSetup {
     /// which lays its seat tiles out in one row across the screen.
     ///
     /// Measured, at Poppins-SemiBold 11pt on the narrowest phone this app
-    /// meets (375pt): four tiles come to 80.2pt each against about 75pt
-    /// for a twelve-character name, so four fits. Five is 62.2pt and needs
-    /// every name scaled; six is 50.2pt and truncates past the 0.7 floor.
-    /// See the note on `MatchScoreboard.seat`, which is where those
-    /// numbers are used.
+    /// meets (375pt): four tiles ACROSS come to 80.2pt each against about
+    /// 75pt for a twelve-character name, so four fits in a row and five,
+    /// at 62.2pt, does not — every name would need scaling, and six at
+    /// 50.2 truncates past the 0.7 floor.
+    ///
+    /// Four is also where the strip stopped being a row: `MatchScoreboard`
+    /// draws four seats as a 2x2, which makes a tile 170.5pt and takes the
+    /// shrinking off every name — and the header grows to hold the second
+    /// row, which is why this stays at four rather than following the
+    /// grid up. A 2x3 would fit the width and not the band.
+    /// See the notes on `MatchScoreboard.seatRows` and
+    /// `GameBandLayout.scoreboardRows`, which is where those numbers are
+    /// used.
     static let maxSeats = 4
 
     private static func key(_ gameID: String) -> String {

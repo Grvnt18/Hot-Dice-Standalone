@@ -18,7 +18,7 @@ the only screen in the app with a device matrix behind it.
 import re
 import sys
 
-from tools_swiftconst import constant, source
+from tools_swiftconst import constant, source, swift_names
 
 LAYOUT = "PlayfieldLayout.swift"
 
@@ -27,7 +27,18 @@ LAYOUT = "PlayfieldLayout.swift"
 # narrowest case is an iPad rather than a phone.
 SIZES = [
     ("iPad Slide Over", 320, 1133),
-    ("iPhone SE", 320, 568),
+    # The SMALLEST IPHONE IS 375x667, and this row used to say 320x568.
+    #
+    # That is the 4-inch SE, which stops at iOS 15.8 — the deployment
+    # floor here is iOS 16, so no device the app can install on is that
+    # shape. It is not a harmless extra either: it is 60 points shorter
+    # than anything real, and the scoreboard check below reported three
+    # screens overflowing a header on a phone that cannot run the app.
+    #
+    # The narrow case is not lost with it. 320 points wide is still here,
+    # as Slide Over above — which is where it always came from, per the
+    # note at the top of this list.
+    ("iPhone SE 2/3", 375, 667),
     ("iPhone 13 mini", 375, 812),
     ("iPhone 15", 393, 852),
     ("iPhone 15 Pro Max", 430, 932),
@@ -140,6 +151,200 @@ def swift_constant(text, name):
 TAP_MINIMUM = 44.0
 
 
+# The strip's own metrics, by the names GameBandLayout gives them. Read,
+# not typed: the point of moving them out of MatchScoreboard was that the
+# header is sized in one file and its content described in another.
+SCOREBOARD_METRICS = ("scoreboardNameFont", "scoreboardScoreFont",
+                      "scoreboardLineFactor", "scoreboardTileGap",
+                      "scoreboardTilePadding", "scoreboardRowGap",
+                      "scoreboardPadding", "scoreboardRoundFont",
+                      "scoreboardSubtitleFont")
+
+SCOREBOARD = "PassAndPlayHost.swift"
+
+
+def four_seat_screens():
+    """The screens whose game can seat four, derived from the games.
+
+    `localSeats = Int.max` is a game saying it will take as many seats as
+    the setup gate offers, and the gate offers four — see
+    MatchSetup.maxSeats. Each such game's screen is its own file plus
+    "Screen", which holds for all four of them.
+
+    Derived rather than listed so a FIFTH game opening up to four seats
+    cannot quietly keep a one-row header: it appears here the moment its
+    `localSeats` changes, and the checks below then have something to say
+    about it.
+
+    One game is deliberately outside this: Rolls seats four through
+    `RollsPassAndPlayHost`, one screen per seat, and its header is its own
+    banked-dice grid rather than `MatchScoreboard`. It drops out here
+    because `SuiteGameScreen.swift` does not exist, which is luck rather
+    than design — a game whose screen is not named after its rules file
+    would drop out the same way.
+    """
+    screens = []
+    for name in swift_names():
+        if name.endswith("Screen.swift") or "/" in name:
+            continue
+        if not re.search(r"static let localSeats = Int\.max", code(name)):
+            continue
+        screen = name.replace(".swift", "Screen.swift")
+        if screen in swift_names():
+            screens.append(screen)
+    return sorted(screens)
+
+
+def check_scoreboard(failed, floor):
+    """The header has to HOLD the scoreboard, at four seats as at two.
+
+    Nothing checked this, and it is the one band whose content is not
+    bounded by its own frame: `MatchScoreboard` is a ZStack inside a
+    `.frame(height:)`, and a ZStack does not clip. A strip taller than its
+    header does not fail or compress — it draws over the tray below it,
+    on one seat count, on some devices, in three games nobody plays
+    two-handed while testing.
+
+    Which is exactly what four seats on two rows would have done: the
+    content comes to about 167pt and 17% of an iPhone is 113 to 158.
+    """
+    layout = code(LAYOUT)
+    metrics = {}
+    for name in SCOREBOARD_METRICS:
+        try:
+            metrics[name] = swift_constant(layout, name)
+        except AssertionError:
+            failed.append("GameBandLayout no longer states %s, so the "
+                          "header cannot be checked against what it holds"
+                          % name)
+            return
+
+    line = metrics["scoreboardLineFactor"]
+    tile = ((metrics["scoreboardNameFont"] + metrics["scoreboardScoreFont"])
+            * line + metrics["scoreboardTileGap"]
+            + metrics["scoreboardTilePadding"] * 2)
+    gap = metrics["scoreboardRowGap"]
+
+    def content(rows, rounds=True):
+        """The strip's height: padding, the optional round line, the seat
+        tiles, the status line.
+
+        `rounds` because four of the seven screens pass `totalRounds:
+        nil` — HOG and Three Thousand are races, Royal UR and Boneheads
+        have no round count — and a model that assumes the line is always
+        there prices Boneheads' 14% header against 21 points it does not
+        draw. Every screen passes a subtitle, so that one is not
+        optional.
+        """
+        tiles = rows * tile + (rows - 1) * gap
+        head = (metrics["scoreboardRoundFont"] * line + gap) if rounds else 0
+        return (metrics["scoreboardPadding"] * 2
+                + head
+                + tiles
+                + gap + metrics["scoreboardSubtitleFont"] * line)
+
+    def shows_rounds(filename):
+        call = re.search(r"MatchScoreboard\((.*?)\n\s*\)", code(filename),
+                         flags=re.S)
+        return bool(call) and "totalRounds: nil" not in call.group(1)
+
+    # The rule the Swift states, ported: two rows at four seats, one
+    # otherwise. Read from the source so it cannot drift out of this.
+    rows_rule = re.search(r"func scoreboardRows\(seats: Int\) -> Int \{\s*"
+                          r"seats == (\d+) \? 2 : 1", layout)
+    if not rows_rule:
+        failed.append("GameBandLayout.scoreboardRows is no longer "
+                      "'two rows at one seat count', so this check's model "
+                      "of the strip is guesswork")
+        return
+    grid_at = int(rows_rule.group(1))
+
+    # --- a. One row fits each screen's OWN share, everywhere. ---------
+    #
+    # Not one fraction: Boneheads asks for 0.14 and Royal UR 0.15, and
+    # both are below the 0.17 the rest take. The seats-aware fraction only
+    # ever raises a header, so every screen that does not ask for it — and
+    # every 4-seat screen below the grid count — is relying on its own
+    # share alone.
+    strips = [f for f in sorted(SCREENS) if "MatchScoreboard(" in code(f)]
+    if not strips:
+        failed.append("no screen uses MatchScoreboard any more, so this "
+                      "check is measuring a strip nothing draws")
+        return
+    tightest = ("", "", 1e9)
+    for filename in strips:
+        one = content(1, rounds=shows_rounds(filename))
+        for name, _, height in SIZES:
+            slack = height * SCREENS[filename] - one
+            if slack < 0:
+                failed.append("%s's scoreboard wants %.1fpt and its %.0f%% "
+                              "of %s is %.1f — the strip would draw over "
+                              "the tray"
+                              % (filename, one, SCREENS[filename] * 100,
+                                 name, height * SCREENS[filename]))
+            if slack < tightest[2]:
+                tightest = (filename.replace("Screen.swift", ""), name, slack)
+    print("  %-26s %d strips, tightest margin %.1fpt (%s on %s)"
+          % ("one-row scoreboard", len(strips), tightest[2],
+             tightest[0], tightest[1]))
+
+    # --- b. The grid's taller header must not starve the playfield. ---
+    #
+    # `scene` is capped by WIDTH in portrait, so on a phone the extra
+    # header comes out of tray rather than playfield. The two shapes that
+    # are height-bound instead — a folded Duo, a landscape iPad mini — pay
+    # in playfield, and this is where that is priced.
+    four = four_seat_screens()
+    grid = max(content(2, rounds=shows_rounds(f)) for f in four) if four \
+        else content(2)
+    worst = ("", 1e9)
+    for name, width, height in SIZES:
+        header = max(height * 0.17, grid)
+        scene = min(width, max(height - header - floor, 0))
+        if scene < MIN_SCENE:
+            failed.append("at four seats %s leaves a %.1fpt playfield, "
+                          "under the %d it needs" % (name, scene, MIN_SCENE))
+        if scene < worst[1]:
+            worst = (name, scene)
+    print("  %-26s %.1fpt of content, smallest playfield %.1f on %s"
+          % ("2x2 scoreboard", grid, worst[1], worst[0]))
+
+    # --- c. The strip and the header read the SAME numbers. -----------
+    #
+    # A retyped literal in MatchScoreboard is the silent half of this: the
+    # model above would go on passing while the strip grew.
+    strip = code(SCOREBOARD)
+    for name in SCOREBOARD_METRICS:
+        if name == "scoreboardLineFactor":
+            continue               # the font's own metric, not a spacing
+        if "GameBandLayout.%s" % name not in strip:
+            failed.append("MatchScoreboard no longer reads %s from "
+                          "GameBandLayout, so the header's model of its "
+                          "height is only a copy" % name)
+    if "GameBandLayout.scoreboardRows" not in strip:
+        failed.append("MatchScoreboard splits its seats by something other "
+                      "than GameBandLayout.scoreboardRows, which is what "
+                      "sized the header it sits in")
+
+    # --- d. Every screen that can seat four asks for the seat-aware
+    #        header, and the ones that cannot do not. ------------------
+    for filename in sorted(SCREENS):
+        asks = "seats: match.participants.count" in code(filename)
+        is_four = filename in four_seat_screens()
+        if is_four and not asks:
+            failed.append("%s can seat %d but takes the fixed header share "
+                          "— at four seats its scoreboard is %.1fpt in a "
+                          "header of %.1f on an iPhone 15"
+                          % (filename, grid_at, grid, 852 * 0.17))
+        if asks and not is_four:
+            failed.append("%s passes a seat count but its game cannot seat "
+                          "four, so the header moves for nothing" % filename)
+    print("  %-26s %s"
+          % ("seat-aware headers", ", ".join(s.replace("Screen.swift", "")
+                                             for s in four_seat_screens())
+             or "none"))
+
+
 def check_tap_targets():
     """Every control you press, measured at every size.
 
@@ -239,6 +444,9 @@ def main():
 
     if "CGFloat = 100" in layout or re.search(r"minButtonHeight", layout):
         failed.append("a typed button-band height is back in GameBandLayout")
+
+    # --- 1b. The header holds the scoreboard, at every seat count. ----
+    check_scoreboard(failed, floor)
 
     # --- 2. Nothing types its own band height any more. ---------------
     for filename in sorted(SCREENS):

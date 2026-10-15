@@ -27,7 +27,7 @@ struct MatchScoreboard: View {
             // the row of seat tiles happens to be wide. A VStack hugs its
             // widest child, which means two seats of uneven name length
             // were quietly deciding where "Round 3 of 6" sat.
-            VStack(spacing: 4) {
+            VStack(spacing: GameBandLayout.scoreboardRowGap) {
                 if let totalRounds {
                     Text("Round \(min(match.round, totalRounds)) of \(totalRounds)")
                         // Semibold throughout this strip and the bar below
@@ -37,24 +37,20 @@ struct MatchScoreboard: View {
                         // is printed on — which is exactly the state the
                         // header of Rolls was in, and the same fix applies
                         // to the ten games that use this instead.
-                        .font(.poppins(12, .semibold))
+                        .font(.poppins(GameBandLayout.scoreboardRoundFont, .semibold))
                         .foregroundStyle(.white.opacity(0.75))
                         .frame(maxWidth: .infinity)
                         .multilineTextAlignment(.center)
                 }
 
-                HStack(spacing: 10) {
-                    ForEach(match.participants, id: \.self) { participant in
-                        seat(participant)
-                    }
-                }
+                seatRows
 
                 if let subtitle, !subtitle.isEmpty {
                     // "<name> to roll" and the other phase lines — see
                     // each screen's `statusLine`. The white text the
                     // request named.
                     Text(subtitle)
-                        .font(.poppins(11, .semibold))
+                        .font(.poppins(GameBandLayout.scoreboardSubtitleFont, .semibold))
                         .foregroundStyle(.white.opacity(0.7))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
@@ -64,7 +60,7 @@ struct MatchScoreboard: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .padding(.vertical, GameBandLayout.scoreboardPadding)
         }
         // Pinned like every game screen (see DiceGameShell's note): these
         // layouts are geometric, and at the larger accessibility sizes the
@@ -74,36 +70,85 @@ struct MatchScoreboard: View {
         .dynamicTypeSize(.large)
     }
 
+    /// Between two seat tiles ACROSS a row. Down the strip they take
+    /// `GameBandLayout.scoreboardRowGap`, which is the spacing everything
+    /// else in here is stacked at and the one the header's own height
+    /// model counts.
+    private static let seatGap: CGFloat = 10
+
+    /// The seats, on one row or on two.
+    ///
+    /// FOUR goes to a 2x2, and that is a width problem rather than a
+    /// preference: four tiles across the narrowest phone are 80.2pt each
+    /// against a twelve-character name's 75pt, which is the measurement
+    /// `MatchSetup.maxSeats` was set to. On two rows they are 170.5pt and
+    /// nothing has to shrink. Two and three seats stay on one row — see
+    /// `GameBandLayout.scoreboardRows`, which is also what sized the
+    /// header this sits in.
+    ///
+    /// Split out of `body` rather than nested in it, for the usual reason
+    /// in this project: a nested pair of ForEach over a computed split is
+    /// the shape Xcode 14.2's solver gives up on inside a ViewBuilder.
+    private var seatRows: some View {
+        let rows = seatSplit
+        return VStack(spacing: GameBandLayout.scoreboardRowGap) {
+            ForEach(rows.indices, id: \.self) { row in
+                HStack(spacing: Self.seatGap) {
+                    ForEach(rows[row], id: \.self) { participant in
+                        seat(participant)
+                    }
+                }
+            }
+        }
+    }
+
+    /// The participants, in the rows they are drawn on.
+    ///
+    /// Not `chunked(into:)` — that is not in the standard library, and a
+    /// generic extension for one two-case split is more code than the
+    /// split. Four is the only case that divides, so it is the only case
+    /// written.
+    private var seatSplit: [[String]] {
+        let seats = match.participants
+        guard GameBandLayout.scoreboardRows(seats: seats.count) == 2 else {
+            return [seats]
+        }
+        let half = seats.count / 2
+        return [Array(seats[0..<half]), Array(seats[half...])]
+    }
+
     private func seat(_ participant: String) -> some View {
         let isActive = participant == match.activeParticipant && !match.isOver
-        return VStack(spacing: 1) {
+        return VStack(spacing: GameBandLayout.scoreboardTileGap) {
             Text(match.displayName(for: participant))
-                .font(.poppins(11, .semibold))
+                .font(.poppins(GameBandLayout.scoreboardNameFont, .semibold))
                 .foregroundStyle(.white.opacity(isActive ? 0.95 : 0.6))
                 // Shrink rather than wrap, now that these are typed names
                 // at up to twelve characters and there can be four of them
                 // across the strip.
                 //
-                // Measured off Poppins-SemiBold at 11pt: four tiles on the
-                // narrowest phone this app meets (375pt, iPhone SE) come to
-                // 80.2pt each, and a twelve-character name sets at about
-                // 75pt — "Alexandria W" is 74.7. So it fits, and this fires
-                // only for a name of unusually wide glyphs: twelve capital
-                // Ms is 118.7pt, which scales to 83pt at the 0.7 floor and
-                // still truncates. Without the two lines the tile grows a
-                // SECOND LINE instead, and the whole strip changes height
-                // the moment somebody types a long name.
+                // Measured off Poppins-SemiBold at 11pt: THREE tiles on the
+                // narrowest phone this app meets (375pt) come to 110.3pt
+                // each, and four on two rows to 170.5 — against about 75pt
+                // for a twelve-character name ("Alexandria W" is 74.7) and
+                // 118.7 for twelve capital Ms. So nothing shrinks at any
+                // seat count now.
                 //
-                // Four is also why `MatchSetup.maxSeats` is four — see
-                // there; this is the measurement it is standing on.
+                // It was four ACROSS at 80.2pt each, which is where that
+                // 118.7 scaled to 83 at the 0.7 floor and still truncated
+                // — the measurement `MatchSetup.maxSeats` was set to, and
+                // the reason the fourth seat went to a second row. The
+                // floor stays: it is the thing that keeps a long name from
+                // growing the tile a SECOND LINE and changing the strip's
+                // height, which is now also the header's height.
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Text("\(match.score(for: participant))")
-                .font(.poppins(22, .semibold))
+                .font(.poppins(GameBandLayout.scoreboardScoreFont, .semibold))
                 .foregroundStyle(.white.opacity(isActive ? 1 : 0.65))
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 4)
+        .padding(.vertical, GameBandLayout.scoreboardTilePadding)
         .background(
             RoundedRectangle(cornerRadius: ControlShape.cornerRadius)
                 // The active seat is the only lit one, so whose turn it is

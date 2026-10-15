@@ -35,9 +35,17 @@ SIZES = [
     ("iPad mini", 744, 1133),
     ("iPad Air", 820, 1180),
     ("iPad Pro", 1024, 1366),
-    # Landscape is not a supported orientation, and is checked anyway: it
-    # is the only shape where the band bottoms out, so it is the one that
-    # says how much margin the floor really has.
+    # Landscape IS a supported orientation on iPad now, and these are no
+    # longer hypothetical. Apple will not accept an iPad app that claims
+    # one orientation while also allowing Slide Over and Split View, and
+    # multitasking is the half this suite keeps — so an iPad can be
+    # turned, and every one of these shapes is a screen somebody sees.
+    #
+    # The note here used to say landscape was unsupported and checked
+    # anyway, "the only shape where the band bottoms out". That part is
+    # still true and is now load-bearing rather than curiosity.
+    ("iPad mini landscape", 1133, 744),
+    ("iPad Air landscape", 1180, 820),
     ("iPad Pro landscape", 1366, 1024),
     # The iPhone Duo, Apple's first foldable, in both states. It is the
     # squattest thing the app meets in PORTRAIT — 1.46 and 1.42, where

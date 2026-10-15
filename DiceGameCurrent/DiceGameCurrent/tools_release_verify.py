@@ -174,8 +174,39 @@ def check_plist_keys(problems):
              "every single upload")):
         if key not in project:
             problems.append("%s is not set — %s" % (key, why))
-    print("  %-26s generated plist, portrait, export compliance answered"
-          % "plist keys")
+    # The pair Apple refuses, caught here rather than at the upload.
+    #
+    # An iPad app that does not require full screen has its window sized
+    # by the system, so Apple will not also let it claim one orientation:
+    #
+    #     The "UIInterfaceOrientationPortrait" orientations were provided
+    #     ... but you need to include all of the ... orientations to
+    #     support iPad multitasking
+    #
+    # That arrived at the END of a twenty-minute job, from Apple's own
+    # validator, on a build that had already compiled, signed and
+    # uploaded. It is two lines of this file to know it in two seconds.
+    ipad = re.search(r'INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad:'
+                     r'\s*(.+)', project)
+    fullscreen = re.search(r'INFOPLIST_KEY_UIRequiresFullScreen:\s*(\w+)',
+                           project)
+    if ipad and fullscreen and fullscreen.group(1).upper() == "NO":
+        listed = ipad.group(1).split()
+        wanted = ["UIInterfaceOrientationPortrait",
+                  "UIInterfaceOrientationPortraitUpsideDown",
+                  "UIInterfaceOrientationLandscapeLeft",
+                  "UIInterfaceOrientationLandscapeRight"]
+        missing = [w for w in wanted if w not in listed]
+        if missing:
+            problems.append(
+                "the iPad allows multitasking (UIRequiresFullScreen NO) but "
+                "lists only %d of the four orientations — Apple refuses that "
+                "pair at upload. Missing: %s"
+                % (len(listed), ", ".join(m.replace("UIInterfaceOrientation", "")
+                                          for m in missing)))
+
+    print("  %-26s generated plist, iPhone portrait, iPad all four, export "
+          "compliance answered" % "plist keys")
 
 
 def main():

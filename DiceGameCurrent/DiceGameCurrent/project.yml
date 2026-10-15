@@ -210,7 +210,28 @@ targets:
         # project settings, and an Xcode target defaults to all four
         # orientations, so it is quietly re-enabled on every fresh project.
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
-        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait
+        # THE iPAD TAKES ALL FOUR, AND IT IS NOT OPTIONAL.
+        #
+        # Apple's validator refuses the pair "portrait only" and
+        # "multitasking allowed" together:
+        #
+        #     The "UIInterfaceOrientationPortrait" orientations were
+        #     provided ... but you need to include all of the ...
+        #     orientations to support iPad multitasking
+        #
+        # An iPad app that does not require full screen has its window
+        # sized by the system, so Apple will not let it also claim one
+        # orientation. The choice was which half to give up, and
+        # multitasking won: Slide Over and Split View are supported
+        # cases this suite is measured against, and the arena re-fits
+        # itself to a window that changes shape rather than re-dealing.
+        #
+        # So an iPad can now be turned to landscape, where ten of the
+        # eleven games show a square playfield with empty width either
+        # side. That is the cost, and it is a worse-looking screen rather
+        # than a broken one: the layout comes from the view's shape and
+        # nothing in it assumes portrait.
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
         # Slide Over and Split View stay allowed: a 320-point window is just
         # a narrow phone, and tools_bandlayout_verify.py checks that case.
         INFOPLIST_KEY_UIRequiresFullScreen: NO

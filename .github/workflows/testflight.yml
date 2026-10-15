@@ -83,19 +83,55 @@ on:
 
 jobs:
   upload:
-    # macos-14 carries Xcode 15.x, which is above Apple's current SDK
-    # floor and well above the iOS 16 the code targets. Pinned rather than
-    # macos-latest: a runner image that moves under you is a build that
-    # fails on a morning you changed nothing.
-    runs-on: macos-14
+    # macos-26, because Apple's SDK floor moved and this is what clears it.
+    #
+    # This was macos-14 (Xcode 15.4) on the reasoning that it was "above
+    # Apple's current SDK floor". It was when written; the first upload
+    # that reached Apple's validator was refused:
+    #
+    #     This app was built with the iOS 17.5 SDK. All iOS and iPadOS
+    #     apps must be built with the iOS 26 SDK or later
+    #
+    # That floor rises every year, so the comment about not tracking
+    # macos-latest was half right and half a trap: an image that moves
+    # under you can break a build you did not change, and an image that
+    # never moves is guaranteed to stop being accepted. Pinned to a
+    # specific image still, so the move is a commit — and macos-14 is
+    # deprecated by GitHub now as well.
+    #
+    # None of this touches the code. The SDK is what you BUILD AGAINST;
+    # the iOS 16 deployment target is what you RUN ON, and it is
+    # unchanged. The one place those two differ is the onChange shim in
+    # SharedExtensions.swift, which is why it tests both.
+    runs-on: macos-26
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Show the toolchain
+      # The newest Xcode on the image, named rather than assumed, and the
+      # SDK checked against Apple's floor before anything is built.
+      #
+      # A runner image carries several Xcodes and the default is not
+      # always the newest. Finding out at the END of a twenty-minute job
+      # that the SDK is a year too old is the most expensive way to learn
+      # it, and that is exactly how it was learned once.
+      - name: Choose the newest Xcode
         run: |
+          set -euo pipefail
+          NEWEST=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          echo "Selecting $NEWEST"
+          sudo xcode-select -s "$NEWEST"
           xcodebuild -version
           swift --version
+          SDK=$(xcodebuild -showsdks | sed -n 's/.*iphoneos\([0-9][0-9.]*\).*/\1/p' | sort -V | tail -1)
+          echo "iOS SDK $SDK"
+          MAJOR=${SDK%%.*}
+          if [ "$MAJOR" -lt 26 ]; then
+            echo "Apple requires the iOS 26 SDK or later for uploads;" >&2
+            echo "this image's newest is $SDK. Move the runs-on label to" >&2
+            echo "a newer image." >&2
+            exit 1
+          fi
 
       # A virtual environment, because the runner's Python refuses to be
       # installed into.

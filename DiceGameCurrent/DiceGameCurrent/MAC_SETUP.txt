@@ -262,11 +262,16 @@ To check from a terminal, in the repo:
 ORIENTATION — SET THIS, IT IS NOT IN THE REPO
 ===============================================================================
 
-Portrait only. Set it in Swift Playgrounds' project settings now, and in
-the Xcode target's Deployment Info when the project moves across. Like
-the icon below, it does not travel in the repo in the hand-built route,
-so an Xcode build will quietly re-enable everything unless it is set
-again.
+Portrait on iPhone. ALL FOUR on iPad, and that is not a preference —
+Apple's validator refuses an iPad app that claims one orientation while
+also allowing Slide Over and Split View, and multitasking is the half
+this suite keeps. The first upload that reached Apple was rejected for
+exactly this.
+
+Set it in Swift Playgrounds' project settings now, and in the Xcode
+target's Deployment Info when the project moves across. Like the icon
+below, it does not travel in the repo in the hand-built route, so an
+Xcode build will quietly re-enable everything unless it is set again.
 
 If you took the XcodeGen route (see PROJECT.YML below), it is already
 stated there and you can skip this. If you are clicking the project
@@ -280,6 +285,9 @@ Info.plist, Open As → Source Code, paste:
     <key>UISupportedInterfaceOrientations~ipad</key>
     <array>
         <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationPortraitUpsideDown</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
     </array>
     <key>UIRequiresFullScreen</key>
     <false/>
@@ -287,7 +295,8 @@ Info.plist, Open As → Source Code, paste:
 The last one keeps Slide Over and Split View allowed, which is
 deliberate — see the note at the end of this section.
 
-Why portrait, measured rather than assumed:
+Why portrait is still the shape the suite is DESIGNED for, even though
+the iPad may now be turned — measured rather than assumed:
 
   * Ten of the eleven games build a SQUARE playfield — min(width, height
     available) — because the physics arena and its orthographic camera are

@@ -15,54 +15,67 @@ import UIKit
 /// index using this same order) — no longer purely decorative.
 enum DieFaceLabels {
 
-    /// d6 and d8 both +30% per explicit aesthetic request (0.50 -> 0.65,
-    /// 0.38 -> 0.49). d10/d12 given the same proportional bump — they'd
-    /// never actually been visible before this round (their face normals
-    /// were wrong; see DieFaceNormals in DiceRollController.swift), so
-    /// their previous values were never really evaluated on screen. These
-    /// are a reasonable starting point, not a confirmed-good size — worth
-    /// a look once you can finally see them.
+    /// How big a numeral's plane is, DERIVED from the face it has to fit
+    /// on and from how many digits it carries.
     ///
-    /// d4/d20 weren't chosen by eye like the rest (no device to look at
-    /// them on) — derived instead from a ratio measured against the two
-    /// shapes above where labelSize IS confirmed-reasonable: labelSize /
-    /// (0.85 x face apothem) is ~1.32 for d6 and ~1.41 for d8 (0.85 being
-    /// the chamfer inset fraction every mesh here shares, so this compares
-    /// against the ACTUAL rendered face size, not the pre-chamfer one).
-    /// Using 1.3 (near that range) against d4/d20's own local-unit
-    /// apothems (0.816 and 0.577, computed the same way from their
-    /// generator's vertex data) gives 0.90 and 0.64. A tetrahedron's 4
-    /// faces are proportionally much larger than a cube's 6, so a bigger
-    /// label than every other die is the expected direction, not a red
-    /// flag — but exactly like d10/d12 above, worth a look once this can
-    /// actually be seen on screen.
-    private static func labelSize(forSides sides: Int) -> CGFloat {
+    /// Every earlier version of this table was chosen by eye, said so, and
+    /// was wrong twice — "a reasonable starting point, not a confirmed-good
+    /// size", then +30% on top of that. The faces are in the repository, so
+    /// they are measured now. Merging each `.obj`'s coplanar triangles back
+    /// into its logical faces and taking the largest circle that fits one:
+    ///
+    ///     die   numbered faces   inscribed radius (local units)
+    ///     d4          4                0.694
+    ///     d6          6                0.491
+    ///     d8          8                0.347
+    ///     d10        10                0.299
+    ///     d12        12                0.418
+    ///     d20        20                0.491
+    ///
+    /// A numeral is sized so its own half-diagonal is `faceUse` of that
+    /// radius. The numeral is `glyphFill` of its plane and Poppins
+    /// SemiBold's digits are about 0.70 em tall and 0.60 em wide, so the
+    /// half-diagonal is 0.461 of the plane for ONE digit and 0.695 for two
+    /// — which is the whole reason this takes a number and not just a
+    /// shape.
+    ///
+    /// **"10" was the thing holding every other numeral down.** On a d10 it
+    /// was already at 91% of the face: the die with the smallest faces and
+    /// the only single-digit die that reaches two digits. Sizing per die
+    /// meant 1 through 9 were kept small to make room for it. Sized per
+    /// NUMBER, a d10's single digits grow 46% and "10" stays where it has
+    /// to; a d12's grow 136%.
+    ///
+    /// d6 is not in here and keeps its own number: it was signed off on
+    /// device and nothing about it was asked for.
+    private static func labelSize(forSides sides: Int, number: Int) -> CGFloat {
+        if sides == 6 { return 0.65 }
+        let digits: CGFloat = number >= 10 ? 0.695 : 0.461
+        return faceUse * inscribedRadius(forSides: sides)
+             / (digits * glyphFill(forSides: sides))
+    }
+
+    /// How much of a face's inscribed circle a numeral may reach across.
+    ///
+    /// Not 1.0, and not because of doubt: the half-diagonal measures to the
+    /// CORNER of the glyph's box, which is empty — a digit is narrower than
+    /// the box it is set in — so this is already conservative before the
+    /// margin is applied. 0.85 leaves a visible rim of face around the
+    /// number at the tightest case.
+    private static let faceUse: CGFloat = 0.85
+
+    /// The largest circle that fits on a numbered face, in the mesh's own
+    /// local units — the same units `labelSize` and `localFaceDistance`
+    /// are in. Measured off the shipped `.obj` files; see labelSize.
+    private static func inscribedRadius(forSides sides: Int) -> CGFloat {
         switch sides {
-        // Unused since the d4 became top-read: addPermanentFaceNumbers
-        // routes 4-sided dice to addD4TopReadNumbers, which sizes its
-        // three-per-face numerals with d4TopReadLabelSize instead. Kept so
-        // the table stays complete for every shape the app can build.
-        case 4: return 0.90
-        case 6: return 0.65
-        // The four many-sided dice are +30% on what the note above set,
-        // asked for directly after a round on the simulator: 0.49, 0.455,
-        // 0.39 and 0.64. Those were the "reasonable starting point, not a
-        // confirmed-good size" that note describes, and the look confirmed
-        // they were small.
-        //
-        // The headroom is in the LABEL, not the plane. `glyphPointSize`
-        // draws the numeral at 340/512 of its canvas and the text box
-        // centres in it, so the digit itself is about 0.47 of the plane —
-        // a d8 numeral stood 0.23 local units tall inside a face whose
-        // inscribed circle is 0.82 across. +30% puts it at 0.30, still
-        // well inside the 0.85 chamfer inset. The widest case is two
-        // digits on a d12: about 0.37 across a face measuring 0.60 inside
-        // its chamfer.
-        case 8: return 0.64
-        case 10: return 0.59
-        case 12: return 0.51
-        case 20: return 0.83
-        default: return 0.40
+        case 4:  return 0.694
+        case 6:  return 0.491
+        case 8:  return 0.347
+        case 10: return 0.299
+        case 12: return 0.418
+        case 20: return 0.491
+        default: return 0.35
         }
     }
 
@@ -149,10 +162,13 @@ enum DieFaceLabels {
         }
 
         let normals = DieFaceNormals.normals(forSides: sides)
-        let size = labelSize(forSides: sides)
 
         for (index, normal) in normals.enumerated() {
             let number = index + 1
+            // Per NUMBER, not per die: "10" needs a wider plane than "7"
+            // and was holding every single digit on the die down to its
+            // own size. See labelSize.
+            let size = labelSize(forSides: sides, number: number)
             let plane = SCNPlane(width: size, height: size)
 
             // Building a new SCNMaterial and assigning the whole array
@@ -174,7 +190,8 @@ enum DieFaceLabels {
             let isRollsFace = (number == rollsFaceNumber)
             let image = isRollsFace
                 ? rollsWordmarkImage()
-                : labelImage(number: number, underlined: needsUnderline)
+                : labelImage(number: number, underlined: needsUnderline,
+                             sides: sides)
             plane.materials = [artworkMaterial(image: image, colorway: colorway)]
 
             let labelNode = SCNNode(geometry: plane)
@@ -329,9 +346,13 @@ enum DieFaceLabels {
         (1...4).filter { $0 != face + 1 }
     }
 
-    /// Numeral size for the top-read layout. Smaller than
-    /// `labelSize(forSides: 4)`'s 0.90 because three now share one face
-    /// rather than one having it to itself.
+    /// Numeral size for the top-read layout.
+    ///
+    /// Its own constant rather than derived like the numbered faces: three
+    /// numerals share a d4 face, so what bounds one is the gap to its two
+    /// neighbours rather than the face's inscribed circle. They grow with
+    /// `glyphFill` all the same, which is where this round's legibility
+    /// comes from for a d4.
     private static let d4TopReadLabelSize: CGFloat = 0.50
 
     /// How far out from the face's centre each numeral sits, as a fraction
@@ -388,9 +409,10 @@ enum DieFaceLabels {
                 switch style {
                 case .topRead:
                     image = labelImage(number: d4VertexNumbers[vertexIndex],
-                                       underlined: false)
+                                       underlined: false, sides: 4)
                 case .faceNumbers:
-                    image = labelImage(number: faceIndex + 1, underlined: false)
+                    image = labelImage(number: faceIndex + 1, underlined: false,
+                                       sides: 4)
                 case .markedTips:
                     // An unmarked vertex gets nothing at all, which is what
                     // makes the die readable at a glance: count the pips
@@ -464,8 +486,8 @@ enum DieFaceLabels {
     private static let d4MarkedVertexIndices: Set<Int> = [0, 3]
 
     /// Size of the corner mark's own square plane, in local units. Much
-    /// smaller than a numbered face's label (labelSize(forSides: 4) is
-    /// 0.90): the chamfered vertex cap itself is tiny (its own apothem is
+    /// smaller than a numbered face's label: the chamfered vertex cap
+    /// itself is tiny (its own apothem is
     /// roughly 6% of a main face's), so the mark is sized as a fraction of
     /// the numeral label instead of trying to inscribe it in that sliver —
     /// same "fits within the die, legible, not exactly inscribed in its
@@ -560,9 +582,27 @@ enum DieFaceLabels {
     /// Still a twentieth of the old memory, and one die face in one game.
     static let wordmarkCanvas: CGFloat = 96
 
-    /// The numeral's point size, as the fraction of the canvas it has
-    /// always been (340 of 512).
-    private static var glyphPointSize: CGFloat { labelCanvas * 340 / 512 }
+    /// How much of its canvas a numeral fills, per die.
+    ///
+    /// 340 of 512 — about 0.66 — is what every numeral was drawn at, and
+    /// it leaves a third of the canvas empty: the plane is sized to the
+    /// face, and then the digit only uses the middle of the plane. Raising
+    /// this is free legibility, because it changes nothing about the
+    /// plane's footprint on the face.
+    ///
+    /// 0.80 is the ceiling rather than a taste: a text box is about 1.2
+    /// times its point size tall, so 0.80 puts the box at 0.96 of the
+    /// canvas and anything higher starts clipping the glyph.
+    ///
+    /// d6 keeps the old value. It was signed off on device, and widening
+    /// its numerals was not asked for.
+    private static func glyphFill(forSides sides: Int) -> CGFloat {
+        sides == 6 ? 340.0 / 512.0 : 0.80
+    }
+
+    private static func glyphPointSize(forSides sides: Int) -> CGFloat {
+        labelCanvas * glyphFill(forSides: sides)
+    }
 
     /// Rendered face images, kept because they are rebuilt far more often
     /// than they change.
@@ -762,13 +802,21 @@ enum DieFaceLabels {
         }
     }
 
-    private static func labelImage(number: Int, underlined: Bool) -> UIImage {
-        cached("n\(number)-\(underlined)") {
-            drawLabel(number: number, underlined: underlined)
+    /// `sides` only to pick the glyph fill — a d6's numerals are drawn at
+    /// the old, smaller fraction and everything else at 0.80. It is in the
+    /// cache key for the same reason: two dice wanting different fills of
+    /// the same digit are two images, and keying on the number alone would
+    /// hand the second one the first one's.
+    private static func labelImage(number: Int, underlined: Bool,
+                                   sides: Int) -> UIImage {
+        let fill = glyphFill(forSides: sides)
+        return cached("n\(number)-\(underlined)-\(fill)") {
+            drawLabel(number: number, underlined: underlined, sides: sides)
         }
     }
 
-    private static func drawLabel(number: Int, underlined: Bool) -> UIImage {
+    private static func drawLabel(number: Int, underlined: Bool,
+                                  sides: Int) -> UIImage {
         // The history here is worth keeping, because the cause has only
         // now actually been removed.
         //
@@ -817,8 +865,10 @@ enum DieFaceLabels {
                 // Derived from the canvas rather than restated: the two
                 // moved together once already, and a font size left behind
                 // by a canvas change is a glyph that no longer fits.
-                .font: UIFont(name: AppFonts.Weight.semibold.rawValue, size: glyphPointSize)
-                    ?? UIFont.systemFont(ofSize: glyphPointSize, weight: .semibold),
+                .font: UIFont(name: AppFonts.Weight.semibold.rawValue,
+                              size: glyphPointSize(forSides: sides))
+                    ?? UIFont.systemFont(ofSize: glyphPointSize(forSides: sides),
+                                         weight: .semibold),
                 .foregroundColor: UIColor.white
             ]
             let textSize = text.size(withAttributes: attrs)

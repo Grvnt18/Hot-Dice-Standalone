@@ -40,11 +40,12 @@ unmissable:
     python3 tools_dice_verify.py
 """
 import glob
+import math
 import os
 import re
 import sys
 
-from tools_swiftconst import source, SWIFT as SWIFT_DIR
+from tools_swiftconst import source, RESOURCES, SWIFT as SWIFT_DIR
 
 import tools_dice_preview as preview
 
@@ -143,6 +144,162 @@ def check_numerals(failed):
         note = ", under 4.5:1 on %s (fine for large numerals)" % ", ".join(below_aa)
     print("  %-26s ok (%d bodies, worst %s at %.2f:1%s)"
           % ("numeral contrast", len(bodies), worst[0], worst[1], note))
+
+
+def die_faces(path):
+    """Each numbered face's inscribed radius, straight out of the .obj.
+
+    The meshes are triangulated and chamfered, so neither thing a reader
+    wants is in the file: a d12's "face" is a dozen triangles, and the
+    bevel between faces is dozens more. Triangles are grouped by the plane
+    they lie in, the boundary of a group is the edges only one triangle
+    owns, and the inscribed radius is the shortest distance from the
+    group's centroid to that boundary. The numbered faces are the large
+    groups; the chamfer facets fall out as the small ones.
+
+    Returns radii in the mesh's own local units — what labelSize is in.
+    """
+    verts, tris = [], []
+    for line in open(path):
+        if line.startswith("v "):
+            verts.append(tuple(float(x) for x in line.split()[1:4]))
+        elif line.startswith("f "):
+            idx = [int(part.split("/")[0]) for part in line.split()[1:]]
+            idx = [i - 1 if i > 0 else len(verts) + i for i in idx]
+            for k in range(1, len(idx) - 1):
+                tris.append((idx[0], idx[k], idx[k + 1]))
+
+    planes = {}
+    for tri in tris:
+        a, b, c = (verts[i] for i in tri)
+        u = [b[i] - a[i] for i in range(3)]
+        v = [c[i] - a[i] for i in range(3)]
+        n = [u[1] * v[2] - u[2] * v[1],
+             u[2] * v[0] - u[0] * v[2],
+             u[0] * v[1] - u[1] * v[0]]
+        length = math.sqrt(sum(x * x for x in n)) or 1.0
+        n = [x / length for x in n]
+        key = (round(n[0], 3), round(n[1], 3), round(n[2], 3),
+               round(sum(n[i] * a[i] for i in range(3)), 3))
+        planes.setdefault(key, []).append(tri)
+
+    radii = []
+    for group in planes.values():
+        edges = {}
+        for tri in group:
+            for i in range(3):
+                edge = tuple(sorted((tri[i], tri[(i + 1) % 3])))
+                edges[edge] = edges.get(edge, 0) + 1
+        border = [e for e, count in edges.items() if count == 1]
+        points = {i for e in border for i in e}
+        if not points:
+            continue
+        centre = [sum(verts[i][k] for i in points) / len(points)
+                  for k in range(3)]
+        best = None
+        for i, j in border:
+            a, b = verts[i], verts[j]
+            ab = [b[k] - a[k] for k in range(3)]
+            ac = [centre[k] - a[k] for k in range(3)]
+            squared = sum(x * x for x in ab)
+            t = (sum(ac[k] * ab[k] for k in range(3)) / squared) if squared else 0.0
+            t = max(0.0, min(1.0, t))
+            near = [a[k] + t * ab[k] for k in range(3)]
+            d = math.dist(near, centre)
+            best = d if best is None else min(best, d)
+        radii.append(best)
+
+    biggest = max(radii)
+    return [r for r in radii if r > biggest * 0.6]
+
+
+def check_numeral_fit(failed):
+    """No numeral may run off the face it is printed on.
+
+    This is the check that was missing while the sizes were chosen by eye.
+    A numeral that crosses a face edge throws nothing and logs nothing —
+    it is simply a die that looks wrong, on one of twenty faces, which is
+    why it survived two rounds of "worth a look on device".
+
+    Both halves are measured rather than trusted: the inscribed radii in
+    the Swift are checked against the shipped .obj files, and then every
+    numeral each die can show is sized the way DieFaceLabels sizes it and
+    held inside its face.
+    """
+    labels = source(LABELS)
+
+    face_use = float(re.search(r'faceUse: CGFloat = ([\d.]+)', labels).group(1))
+    fill_six, fill_rest = (float(x) for x in re.search(
+        r'sides == 6 \? ([\d.]+) / ([\d.]+) : ([\d.]+)', labels).group(1, 3))
+    fill_six = fill_six / float(re.search(
+        r'sides == 6 \? [\d.]+ / ([\d.]+)', labels).group(1))
+    six_plane = float(re.search(r'if sides == 6 \{ return ([\d.]+) \}',
+                                labels).group(1))
+    d4_plane = float(re.search(r'd4TopReadLabelSize: CGFloat = ([\d.]+)',
+                               labels).group(1))
+    d4_offset = float(re.search(r'd4CornerLabelRadiusFraction: Float = ([\d.]+)',
+                                labels).group(1))
+
+    # Bounded to the function's own body. Read to end-of-file it swept up
+    # localFaceDistance's table further down — a different set of numbers
+    # about a different thing, which made this report a mesh mismatch that
+    # was really a parsing bug.
+    body = labels[labels.index("func inscribedRadius"):]
+    body = body[: body.index("\n    }")]
+    declared = {int(sides): float(radius)
+                for sides, radius in re.findall(r'case (\d+):\s*return ([\d.]+)',
+                                                body)}
+
+    worst = (0.0, "")
+    for sides in (4, 6, 8, 10, 12, 20):
+        measured = die_faces(os.path.join(RESOURCES, "d%d.obj" % sides))
+        if len(measured) != sides:
+            failed.append("d%d.obj merges to %d numbered faces, not %d — the "
+                          "mesh changed shape, and every numeral on it is "
+                          "sized from a face that is no longer there"
+                          % (sides, len(measured), sides))
+            continue
+        radius = min(measured)
+        if abs(radius - declared.get(sides, 0)) > 0.005:
+            failed.append("DieFaceLabels says a d%d face holds a circle of "
+                          "%.3f; d%d.obj measures %.3f. The numerals are "
+                          "sized off that number"
+                          % (sides, declared.get(sides, 0), sides, radius))
+            continue
+
+        fill = fill_six if sides == 6 else fill_rest
+
+        # A d4 is read at the APEX, not off the face: three numerals share
+        # one face, each pushed out toward a corner. So its bound is the
+        # far corner of an offset numeral rather than a centred one, and
+        # its plane is its own constant — the derivation below describes
+        # the other five.
+        if sides == 4:
+            reach = d4_offset * radius + 0.461 * fill * d4_plane
+            if reach > radius:
+                failed.append("a d4's corner numerals reach %.3f from the "
+                              "middle of a face that holds %.3f" % (reach, radius))
+            if reach / radius > worst[0]:
+                worst = (reach / radius, "a d4's corner numerals")
+            continue
+
+        for number in range(1, sides + 1):
+            if sides == 6:
+                plane = six_plane
+            else:
+                digits = 0.695 if number >= 10 else 0.461
+                plane = face_use * radius / (digits * fill)
+            half = (0.695 if number >= 10 else 0.461) * fill * plane
+            if half > radius:
+                failed.append("a d%d's %d reaches %.3f from the middle of a "
+                              "face that holds %.3f — it runs off the edge"
+                              % (sides, number, half, radius))
+            if half / radius > worst[0]:
+                worst = (half / radius, "a d%d's %d" % (sides, number))
+
+    if not failed:
+        print("  %-26s ok (6 meshes measured, worst is %s at %.0f%% of its "
+              "face)" % ("numerals fit", worst[1], worst[0] * 100))
 
 
 def main():
@@ -399,6 +556,7 @@ def main():
         print("  %-26s ok (hard texels both ways)" % "label filtering")
 
     check_numerals(failed)
+    check_numeral_fit(failed)
 
     if failed:
         print()

@@ -188,50 +188,33 @@ enum DicePoolSceneBuilder {
     ) -> [UUID: SCNNode] {
         var nodesByID: [UUID: SCNNode] = [:]
 
-        // Exactly one die per round is the oversized one. Drawn from the
-        // whole pool, not just d6s, so any shape can be the big one.
-        let oversizedDieID = includeOversizedDie ? pool.randomElement()?.id : nil
-
-        // Sizes first, because which die carries "ROLLS" now depends on
-        // them.
-        var scaleByID: [UUID: Float] = [:]
-        for die in pool {
-            if alwaysLargest || die.id == oversizedDieID {
-                scaleByID[die.id] = oversizeMultiplier
-            } else {
-                scaleByID[die.id] = normalSizeMultiplier(sides: die.sides)
-            }
-        }
-
-        // The BIGGEST d6 wears it, not a random one.
+        // ONE DIE CARRIES BOTH FLOURISHES, AND IT IS A d6.
         //
-        // The wordmark is a flourish, and a flourish on the smallest die
-        // in a handful of fifteen is a flourish nobody sees — it was
-        // landing on a 0.85x d6 as often as on the 1.5x one. On the
-        // largest it reads as the thing it is: one die, the one your eye
-        // goes to anyway, with the suite's name on its six.
+        // They were drawn separately — the wordmark onto a random d6, the
+        // 1.5x onto any die in the pool — so three things could happen
+        // and two of them were wrong. The brand landed on a 0.85x die
+        // nobody looks at; the big die was sometimes a d12, which has no
+        // six to put a wordmark on; and on the throws where the two did
+        // coincide it looked deliberate, which is the tell that the rest
+        // of the time it was not.
         //
-        // Which d6 that is depends on the throw. When the oversized die
-        // is a d6 — twelve of Rolls' fifteen dice are — it is that one at
-        // 1.5x; otherwise it is whichever d6 the size variance dealt
-        // highest, somewhere up to 1.15x. The ROLLS face is never on a
-        // d8, d10 or d12, since those have no 6 to replace.
+        // One die now: the biggest die in the handful is a d6, and the
+        // suite's name is on its six. A flourish you can find every
+        // round rather than one you notice occasionally.
         //
-        // Ties go to pool order, which `alwaysLargest` makes the norm
-        // rather than the exception: every die is oversized there, so the
-        // first d6 wins. Deterministic beats arbitrary when a tie is the
-        // usual case.
-        var rollsDieID: UUID?
-        if includeRollsFace {
-            var best: Float = -1
-            for die in pool where die.sides == 6 {
-                let scale = scaleByID[die.id] ?? 1
-                if scale > best {
-                    best = scale
-                    rollsDieID = die.id
-                }
-            }
-        }
+        // Nil when the pool holds no d6 at all, which gives that pool
+        // neither flourish — a wordmark needs a six to replace, and an
+        // oversized die that is not the branded one is the arrangement
+        // this exists to remove. Rolls always has twelve, so this is the
+        // shape of the code rather than a case it meets.
+        //
+        // Only Rolls meets any of it: both DiceTraySession paths pass
+        // `styleAsRolls: false`, so the other ten games have neither an
+        // oversized die nor a branded one. See
+        // DicePoolLifecycleController.setupPool.
+        let featureDieID = pool.filter { $0.sides == 6 }.randomElement()?.id
+        let oversizedDieID = includeOversizedDie ? featureDieID : nil
+        let rollsDieID = includeRollsFace ? featureDieID : nil
 
         for die in pool {
             guard let node = DieMeshLibrary.templateNode(forSides: die.sides) else {
@@ -244,10 +227,18 @@ enum DicePoolSceneBuilder {
             // DiePhysicsFactory passes it as the collision hull's scale
             // (so the hull matches the visual size). Scaling afterwards
             // would leave labels floating and the hull mismatched.
-            // Read back rather than re-rolled: `normalSizeMultiplier` is
-            // random, so asking it twice would give this die one size and
-            // the ROLLS choice above a different one.
-            let variation = scaleByID[die.id] ?? 1
+            // Computed here rather than from a table of sizes decided
+            // up front. That table existed for one commit, while the
+            // wordmark went to whichever d6 the variance dealt largest
+            // — the choice needed every die's size before any die was
+            // built. Naming the die first makes the sizes nobody's
+            // business but their own again.
+            let variation: Float
+            if alwaysLargest || die.id == oversizedDieID {
+                variation = oversizeMultiplier
+            } else {
+                variation = normalSizeMultiplier(sides: die.sides)
+            }
             node.scale = SCNVector3(
                 node.scale.x * variation,
                 node.scale.y * variation,

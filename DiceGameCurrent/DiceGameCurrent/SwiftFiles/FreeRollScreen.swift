@@ -6,6 +6,14 @@ struct FreeRollScreen: View {
 
     var onExit: (() -> Void)? = nil
 
+    /// True while a settled die sits under the tray's top corners.
+    ///
+    /// Fades the back and settings buttons and lets taps through to the
+    /// die — see OverlayChromeButton, which reads it from the
+    /// environment so its twenty-odd call sites do not each have to know
+    /// about the dice.
+    @State private var chromeCornersOccupied = false
+
     @State private var pool = FreeRollPool.default
     @State private var session: DiceTraySession?
     @State private var canRoll = false
@@ -49,6 +57,9 @@ struct FreeRollScreen: View {
                     floorTitle: FreeRollGame.floorTitle,
                     arenaStyle: .house,
                     onSessionCreated: { newSession in
+                        newSession.onChromeCornersChanged = { occupied in
+                            chromeCornersOccupied = occupied
+                        }
                         newSession.onRollSettled = { results in
                             lastThrow = results
                         }
@@ -66,6 +77,7 @@ struct FreeRollScreen: View {
                     }
                 )
                 .rollingWell(height: sceneHeight)
+                .environment(\.trayCornersOccupied, chromeCornersOccupied)
                 .overlay(alignment: .topLeading) {
                     if let onExit {
                         OverlayChromeButton(systemName: "chevron.left") {

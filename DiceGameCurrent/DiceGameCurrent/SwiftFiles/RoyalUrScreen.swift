@@ -5,6 +5,14 @@ struct RoyalUrScreen: View {
     var onExit: (() -> Void)? = nil
 
     /// Scores are pieces brought home, so the scoreboard is the race.
+    /// True while a settled die sits under the tray's top corners.
+    ///
+    /// Fades the back and settings buttons and lets taps through to the
+    /// die — see OverlayChromeButton, which reads it from the
+    /// environment so its twenty-odd call sites do not each have to know
+    /// about the dice.
+    @State private var chromeCornersOccupied = false
+
     @State private var match = TurnMatch.passAndPlay()
     @State private var state = RoyalUrState()
     @State private var session: DiceTraySession?
@@ -155,12 +163,16 @@ struct RoyalUrScreen: View {
                         floorTitle: RoyalUrGame.floorTitle,
                         arenaStyle: .house,
                         onSessionCreated: { newSession in
+                            newSession.onChromeCornersChanged = { occupied in
+                                chromeCornersOccupied = occupied
+                            }
                             newSession.onRollSettled = { results in
                                 applyRoll(results)
                             }
                         }
                     )
                     .rollingWell(height: trayHeight)
+                    .environment(\.trayCornersOccupied, chromeCornersOccupied)
                     .overlay(alignment: .topLeading) {
                         if let onExit {
                             OverlayChromeButton(systemName: "chevron.left") { onExit() }

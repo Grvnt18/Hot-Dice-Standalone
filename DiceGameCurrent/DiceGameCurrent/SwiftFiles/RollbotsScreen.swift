@@ -4,6 +4,14 @@ struct RollbotsScreen: View {
 
     var onExit: (() -> Void)? = nil
 
+    /// True while a settled die sits under the tray's top corners.
+    ///
+    /// Fades the back and settings buttons and lets taps through to the
+    /// die — see OverlayChromeButton, which reads it from the
+    /// environment so its twenty-odd call sites do not each have to know
+    /// about the dice.
+    @State private var chromeCornersOccupied = false
+
     @State private var match = TurnMatch.passAndPlay()
     @State private var state = RollbotsState(
         weapons: [.monoBlade, .monoBlade],
@@ -190,6 +198,7 @@ struct RollbotsScreen: View {
                         }
                     }
                     .frame(height: bodyHeight)
+                    .environment(\.trayCornersOccupied, chromeCornersOccupied)
                     .overlay(alignment: .topLeading) {
                         if let onExit {
                             OverlayChromeButton(systemName: "chevron.left", tint: NetArt.text) { onExit() }
@@ -319,6 +328,9 @@ struct RollbotsScreen: View {
             // screen still reading as every other game.
             arenaStyle: .steel,
             onSessionCreated: { newSession in
+                            newSession.onChromeCornersChanged = { occupied in
+                                chromeCornersOccupied = occupied
+                            }
                 // One die at a time, and the number on it decides the
                 // exchange — so every throw gets the largest size rather
                 // than a random one. There is no handful here for the

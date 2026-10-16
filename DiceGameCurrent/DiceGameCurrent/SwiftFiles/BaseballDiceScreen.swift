@@ -19,6 +19,14 @@ struct BaseballDiceScreen: View {
 
     var onExit: (() -> Void)? = nil
 
+    /// True while a settled die sits under the tray's top corners.
+    ///
+    /// Fades the back and settings buttons and lets taps through to the
+    /// die — see OverlayChromeButton, which reads it from the
+    /// environment so its twenty-odd call sites do not each have to know
+    /// about the dice.
+    @State private var chromeCornersOccupied = false
+
     @State private var match = TurnMatch.passAndPlay()
     @State private var state = BaseballDiceState(innings: 6)
 
@@ -124,6 +132,9 @@ struct BaseballDiceScreen: View {
                             // carries across the whole of it.
                             arenaStyle: .ballparkMarkings,
                             onSessionCreated: { newSession in
+                            newSession.onChromeCornersChanged = { occupied in
+                                chromeCornersOccupied = occupied
+                            }
                                 newSession.onRollSettled = { results in
                                     settled(results)
                                 }
@@ -156,6 +167,7 @@ struct BaseballDiceScreen: View {
                         }
                     }
                     .frame(height: fieldHeight)
+                    .environment(\.trayCornersOccupied, chromeCornersOccupied)
                     .overlay(alignment: .topLeading) {
                         if let onExit { OverlayChromeButton(systemName: "chevron.left") { onExit() } }
                     }

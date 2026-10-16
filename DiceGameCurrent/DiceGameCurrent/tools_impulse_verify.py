@@ -277,6 +277,62 @@ def main():
                      bleed["bleedStartFraction"] * 100,
                      bleed["bleedEndFraction"] * 100))
 
+    # --- 3c. Nothing settles under the chrome. ------------------------
+    #
+    # The tray's top corners are the one place a 2D overlay and the 3D
+    # playfield share pixels: a die that stops under the back or settings
+    # button is unreadable AND untappable, because the button eats the
+    # tap. Two mechanisms answer that and BOTH fail silently — a push
+    # that no longer runs leaves dice in the corner with nothing to say
+    # so, and a screen that never publishes the occupancy leaves a button
+    # sitting opaque on top of a die it was supposed to defer to.
+    radius = re.search(r'chromeCornerRadius: Float = ([\d.]+)', controller)
+    force = re.search(r'chromeCornerForce: Float = ([\d.]+)', controller)
+    if not radius or not force:
+        failed.append("SettleTuning no longer states the chrome corner "
+                      "radius and force")
+    elif "pushOutOfChromeCorners(" not in controller:
+        failed.append("applyRepulsion no longer pushes dice out of the "
+                      "chrome corners")
+    else:
+        # The radius has to cover the button plus the biggest die, or a
+        # die can rest half under it and still be clear of the push.
+        oversize = swift_float(source("DiceSceneBuilder.swift"),
+                               "oversizeMultiplier")
+        needed = 1.07 + 0.5 * oversize
+        if float(radius.group(1)) < needed:
+            failed.append("the chrome corner radius is %s, under the %.2f a "
+                          "40pt button (1.07 units on the narrowest tray) "
+                          "plus an oversized die's half-extent needs"
+                          % (radius.group(1), needed))
+        else:
+            print("  %-30s ok (%.2f units, force %s, against %.2f needed)"
+                  % ("chrome corners", float(radius.group(1)),
+                     force.group(1), needed))
+
+    # And the fallback: every screen with a tray publishes the occupancy,
+    # and the button reads it.
+    chrome = source("ControlShapes.swift")
+    if "trayCornersOccupied" not in chrome or "allowsHitTesting" not in chrome:
+        failed.append("OverlayChromeButton no longer fades and stops "
+                      "hit-testing when a die is under it")
+    unwired = []
+    for name in sorted(swift_names()):
+        if not name.endswith("Screen.swift"):
+            continue
+        body = source(name)
+        if "OverlayChromeButton(" not in body or "DiceTraySceneView(" not in body:
+            continue
+        if ("onChromeCornersChanged" not in body
+                or "trayCornersOccupied" not in body):
+            unwired.append(name)
+    if unwired:
+        failed.append("%s put chrome over a dice tray without publishing "
+                      "whether a die is under it" % ", ".join(unwired))
+    else:
+        print("  %-30s ok (every tray screen publishes it)"
+              % "chrome fallback")
+
     # --- 4. Nothing tunnels at the new speed. -------------------------
     #
     # A collider is only safe up to thickness / timeStep units per second:

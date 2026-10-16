@@ -136,6 +136,21 @@ final class DiceTraySession {
     /// Fired when the player taps a die and the selection changes.
     var onSelectionChanged: ((Set<UUID>) -> Void)?
 
+    /// Fired when a die comes to rest under the tray's chrome, and again
+    /// when the corner clears.
+    ///
+    /// The screens hand this to `trayCornersOccupied`, which fades the
+    /// back and settings buttons and stops them eating taps meant for the
+    /// die beneath — see OverlayChromeButton. `DiceRollController` pushes
+    /// dice out of those corners as a roll loses energy, so this is the
+    /// backstop for the die that gets there anyway: a force-settle at the
+    /// time cap, or a corner the push could not clear in time.
+    var onChromeCornersChanged: ((Bool) -> Void)?
+
+    /// What that callback last reported, so it fires on CHANGE rather
+    /// than on every roll.
+    private var chromeCornersOccupied = false
+
     /// Whether taps select dice at all.
     ///
     /// Off by default: Free Roll, Jackpot and Freighter.Yacht.Dinghy all select
@@ -341,8 +356,43 @@ final class DiceTraySession {
         // happened to stop moving first. Kept dice are included at their
         // retained faces — see `turnValues`.
         let ordered = lifecycle.rollableDice.compactMap { turnValues[$0.id] }
+        updateChromeCorners()
         onStateChanged?()
         if !ordered.isEmpty { onRollSettled?(ordered) }
+    }
+
+    /// Whether any die has ended up in a top corner, under the chrome.
+    ///
+    /// Reads the same radius the roll controller pushes dice out with, so
+    /// the thing that fades the button and the thing that tries to empty
+    /// the corner cannot disagree about where the corner is. Positions
+    /// come from `presentation`, which is where a settled die actually
+    /// is rather than where its node was last set.
+    private func updateChromeCorners() {
+        let bounds = arena.bounds
+        let radius = DiceRollController.chromeCornerRadius
+        let corners = [
+            (bounds.x.lowerBound, bounds.z.lowerBound),
+            (bounds.x.upperBound, bounds.z.lowerBound)
+        ]
+
+        var occupied = false
+        for die in lifecycle.rollableDice {
+            let position = die.node.presentation.position
+            for corner in corners {
+                let dx = position.x - corner.0
+                let dz = position.z - corner.1
+                if (dx * dx + dz * dz).squareRoot() < radius {
+                    occupied = true
+                    break
+                }
+            }
+            if occupied { break }
+        }
+
+        guard occupied != chromeCornersOccupied else { return }
+        chromeCornersOccupied = occupied
+        onChromeCornersChanged?(occupied)
     }
 
     /// Forgets the faces retained from the previous turn.

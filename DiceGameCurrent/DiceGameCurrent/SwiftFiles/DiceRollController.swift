@@ -92,6 +92,21 @@ private enum SettleTuning {
     static let bleedStartFraction: Double = 0.45
     static let bleedEndFraction: Double = 0.95
 
+    // MARK: Keeping clear of the chrome
+
+    /// How far from a top corner a die is pushed away, in world units.
+    ///
+    /// Measured against the narrowest tray: a 40pt chrome button on a
+    /// 373pt scene of world width 10 covers 1.07 units, and an oversized
+    /// die's half-extent is 0.75. See
+    /// DiceRollController.pushOutOfChromeCorners.
+    static let chromeCornerRadius: Float = 1.9
+
+    /// And how hard. A fraction of the separation force's own base, so a
+    /// die being eased out of a corner never out-shoves a die being
+    /// separated from a neighbour it is resting on.
+    static let chromeCornerForce: Float = 6.0
+
     /// Duration of the corrective snap that rotates a settled die onto its
     /// nearest valid resting face, ironing out any odd angle left over from
     /// physics jitter or a forced (time-cap) settle.
@@ -385,6 +400,15 @@ final class DiceRollController: NSObject, SCNSceneRendererDelegate {
         return false
     }
 
+    /// The corner radius, published for the one other place that needs
+    /// it.
+    ///
+    /// `SettleTuning` is private to this file and stays that way — the
+    /// session only needs to know WHERE the corner is, so that it and the
+    /// push cannot disagree about it, and nothing else in the tuning table
+    /// is anyone else's business.
+    static var chromeCornerRadius: Float { SettleTuning.chromeCornerRadius }
+
     private var trackedDice: [DieSettleState] = []
     private var rollStartTime: TimeInterval = 0
     private var maxDurationForThisRoll: TimeInterval = SettleTuning.minRollDuration
@@ -650,6 +674,76 @@ final class DiceRollController: NSObject, SCNSceneRendererDelegate {
         }
     }
 
+    /// Keeps dice out from under the back and settings buttons.
+    ///
+    /// **The one place a 2D overlay and the 3D playfield share pixels.**
+    /// The chrome sits in the tray's top corners, and a die that comes to
+    /// rest under one is both unreadable and untappable — the button eats
+    /// the tap. Measured on the narrowest tray the app meets: the button
+    /// is a 40pt box against a 373pt scene whose world width is 10, so it
+    /// covers about 1.07 world units in from each top corner, and an
+    /// oversized die's half-extent is another 0.75. 1.9 is that, rounded
+    /// up. On a wider screen the same 40pt is a smaller fraction of the
+    /// width, so this is the worst case rather than the usual one.
+    ///
+    /// A push rather than a wall, and on the same escalation as the
+    /// separation force above. During the lively part of a roll a die
+    /// crosses the corner freely, which is what it should look like; as
+    /// the energy bleeds out the push firms up, so the corner stops being
+    /// somewhere a die can SETTLE without ever having been somewhere it
+    /// could not go. A static collider there would be an invisible wall
+    /// in open space.
+    ///
+    /// The two TOP corners only. The bottom two carry no chrome, and
+    /// shoving dice out of a corner nothing overlaps is interference the
+    /// player would feel without ever learning why.
+    private func pushOutOfChromeCorners(_ active: [DieSettleState],
+                                        escalation: Float,
+                                        isEscalating: Bool) {
+        guard let bounds = playAreaBounds else { return }
+
+        // -Z is the top of the screen: the camera looks straight down and
+        // z grows downward in view space — the same mapping Baseball's
+        // floor markings are placed through.
+        let corners = [
+            SCNVector3(bounds.x.lowerBound, 0, bounds.z.lowerBound),
+            SCNVector3(bounds.x.upperBound, 0, bounds.z.lowerBound)
+        ]
+
+        for state in active {
+            guard let body = state.node.physicsBody else { continue }
+            let position = state.node.presentation.position
+
+            for corner in corners {
+                let dx = position.x - corner.x
+                let dz = position.z - corner.z
+                let distance = (dx * dx + dz * dz).squareRoot()
+                guard distance < SettleTuning.chromeCornerRadius else { continue }
+
+                // Out along the diagonal, hardest at the corner itself.
+                let push = (SettleTuning.chromeCornerRadius - distance)
+                    / SettleTuning.chromeCornerRadius
+                // Mid-roll this is a nudge; once the bleed is on it is the
+                // same escalating force the separation pass uses, so a die
+                // that has slowed down in the corner is moved out rather
+                // than left to settle there.
+                let strength = SettleTuning.chromeCornerForce * push
+                    * (isEscalating ? escalation : 1)
+                guard distance > 0.001 else {
+                    // Dead centre of the corner: push along the diagonal
+                    // rather than dividing by zero.
+                    let sign: Float = corner.x < 0 ? 1 : -1
+                    body.applyForce(SCNVector3(sign * strength, 0, strength),
+                                    asImpulse: false)
+                    continue
+                }
+                body.applyForce(
+                    SCNVector3(dx / distance * strength, 0, dz / distance * strength),
+                    asImpulse: false)
+            }
+        }
+    }
+
     /// Gently pushes nearby, still-active dice apart — specifically aimed
     /// at preventing dice from settling stacked on top of one another,
     /// which becomes more likely once real bouncing/collision physics is
@@ -702,6 +796,13 @@ final class DiceRollController: NSObject, SCNSceneRendererDelegate {
         let escalationMultiplier: Float = 1.0 + Float(escalationProgress) * 39.0
 
         let active = trackedDice.filter { !$0.isSettled }
+
+        // The chrome corners first, because that one is about a die and a
+        // BUTTON rather than a die and another die — it applies to a lone
+        // die on the table, where the pair loop below has nothing to do.
+        pushOutOfChromeCorners(active, escalation: escalationMultiplier,
+                               isEscalating: isEscalating)
+
         guard active.count > 1 else { return }
 
         for i in 0..<active.count {

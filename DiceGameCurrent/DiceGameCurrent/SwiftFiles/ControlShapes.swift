@@ -366,6 +366,15 @@ struct OverlayChromeButton: View {
     var tint: Color = .white
     let action: () -> Void
 
+    /// Whether a die has come to rest under the tray's chrome.
+    ///
+    /// Read from the environment rather than passed in, because this
+    /// button has twenty-odd call sites and none of them should have to
+    /// know about the dice. The tray screens publish it on the view the
+    /// chrome overlays — see `trayCornersOccupied` — and the ones with no
+    /// tray at all, the hub among them, never set it and never dim.
+    @Environment(\.trayCornersOccupied) private var occupied
+
     var body: some View {
         Button {
             SoundEngine.shared.play(.buttonTap)
@@ -380,6 +389,40 @@ struct OverlayChromeButton: View {
                 .pixelPanel(radius: PixelPanel.cellRadius)
         }
         .padding(10)
+        // Out of the way of the die beneath it, in both senses.
+        //
+        // The opacity is so the numeral can be READ through the chrome,
+        // and the hit testing is so the die can be TAPPED — a kept-dice
+        // game has a selection to make, and a button sitting on top of a
+        // die eats the tap that would make it. Both come back the moment
+        // the corner clears, which is the next roll.
+        //
+        // 0.15 rather than 0: a control that vanishes reads as a bug,
+        // where one that fades reads as deferring to what is underneath.
+        .opacity(occupied ? 0.15 : 1)
+        .allowsHitTesting(!occupied)
+        .animation(.easeOut(duration: 0.2), value: occupied)
+    }
+}
+
+// MARK: - Tray chrome and the dice under it
+
+private struct TrayCornersOccupiedKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// True while a settled die is under one of the tray's top corners.
+    ///
+    /// A single flag rather than a corner each: a die in either corner
+    /// dims both buttons, which is one line of state per screen instead of
+    /// two and a mapping. The case it over-serves — a die under the back
+    /// button fading the settings button as well — lasts until the next
+    /// roll and costs nothing, where the case it would under-serve is a
+    /// button nobody can see past.
+    var trayCornersOccupied: Bool {
+        get { self[TrayCornersOccupiedKey.self] }
+        set { self[TrayCornersOccupiedKey.self] = newValue }
     }
 }
 

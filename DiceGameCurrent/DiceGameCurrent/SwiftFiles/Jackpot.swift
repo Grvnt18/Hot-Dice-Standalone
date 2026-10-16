@@ -57,6 +57,33 @@ extension JackpotRules {
     static func d20Face(from results: [DiceTraySession.DieResult]) -> Int? {
         results.first(where: { $0.sides == 20 })?.value
     }
+
+    /// What each die showed, as a line: "d4 2·3·4   d6 5   d8 1   d12 9   d20 17".
+    ///
+    /// Jackpot scores SEVEN numbers off five dice, and which seven is the
+    /// one thing the table cannot be asked. The d4 contributes three — the
+    /// faces that are not against the floor — so two of its numbers are on
+    /// the far side of the die from wherever the player is sitting, and
+    /// the summary line only ever named the sets that paid. A player who
+    /// wanted to know why a roll scored what it scored had to take the
+    /// score's word for it.
+    ///
+    /// Built from `numbers(from:)`'s own reading rather than a second one,
+    /// so the line cannot say something the scoring disagrees with — the
+    /// d4 especially, where `value` is a resting face and not a number
+    /// anybody can see.
+    ///
+    /// Sorted by die rather than left in settle order: the dice land in a
+    /// different order every throw, and a readout that reshuffles itself
+    /// each time is one the eye has to re-read from scratch.
+    static func readout(from results: [DiceTraySession.DieResult]) -> String {
+        results.sorted { $0.sides < $1.sides }.map { result in
+            let faces = numbers(from: [result])
+            return "d\(result.sides) "
+                + faces.map(String.init).joined(separator: "·")
+        }
+        .joined(separator: "   ")
+    }
 }
 
 // MARK: - Scoring

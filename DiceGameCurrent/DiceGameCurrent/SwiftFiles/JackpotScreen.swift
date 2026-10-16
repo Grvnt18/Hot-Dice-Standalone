@@ -8,6 +8,15 @@ struct JackpotScreen: View {
     @State private var session: DiceTraySession?
     @State private var phase: Phase = .ready
     @State private var lastSummary: String?
+
+    /// What the five dice showed on the turn just scored.
+    ///
+    /// Held as the finished line rather than the results, because that is
+    /// all the screen does with it — and because a `DieResult` kept across
+    /// a phase change is a snapshot of a table that has since been
+    /// re-dealt. Cleared when the next turn begins, so the gate between
+    /// turns cannot show the last player's dice to the next one.
+    @State private var lastDice: String?
     @State private var showingSettings = false
     @ObservedObject private var theme = AppTheme.shared
 
@@ -41,6 +50,7 @@ struct JackpotScreen: View {
     func adopt(_ incoming: MatchPayload<JackpotState>) {
         match = incoming.match
         jackpotsThisRound = incoming.state.jackpotsThisRound
+        lastDice = nil
         phase = .ready
     }
 
@@ -121,6 +131,7 @@ struct JackpotScreen: View {
 
             if phase == .handover {
                 HandoverGate(match: match, lastTurnSummary: lastSummary) {
+                    lastDice = nil
                     phase = .ready
                 }
                 .transition(.opacity)
@@ -180,6 +191,11 @@ struct JackpotScreen: View {
         switch phase {
         case .ready:   return "\(match.activeDisplayName) to roll"
         case .rolling: return "Rolling…"
+        // The dice themselves, where the strip already has a line for
+        // saying what is going on. The button's own subtitle carries the
+        // SCORE at this phase — see buttonSubtitle — so the two read as a
+        // pair: what was rolled up here, what it paid down there.
+        case .scored:  return lastDice
         default:       return nil
         }
     }
@@ -203,6 +219,7 @@ struct JackpotScreen: View {
             // false when it did not throw anything, and moving first meant
             // a no-op left the game stuck.
             if session?.roll() == true {
+                lastDice = nil
                 phase = .rolling
             }
         case .scored:
@@ -240,6 +257,7 @@ struct JackpotScreen: View {
             match.addScore(score.total)
         }
         lastSummary = JackpotRules.summary(for: score, player: player)
+        lastDice = JackpotRules.readout(from: results)
         phase = .scored
     }
 
@@ -278,6 +296,7 @@ struct JackpotScreen: View {
         match = TurnMatch.passAndPlay()
         jackpotsThisRound.removeAll()
         lastSummary = nil
+        lastDice = nil
         session?.setPool(JackpotRules.makeDice())
         phase = .ready
     }

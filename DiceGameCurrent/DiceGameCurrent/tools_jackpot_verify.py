@@ -80,4 +80,26 @@ for rest in range(4):
     assert rest + 1 not in ex
     print("  resting face %d -> exposed %s (complement, all distinct)" % (rest + 1, ex))
 
+# The readout reads the dice the way the SCORING does.
+#
+# A line that shows what each die rolled has one way to be quietly wrong,
+# and it is the d4: `value` is the face it came to rest ON, not a number
+# anyone can see, so printing it would show a number that scores nothing
+# while the three that scored stay hidden. The player would then be
+# reading a line that contradicts the score beside it, which is worse than
+# no line at all.
+#
+# Checked as code shape rather than by re-implementing it here: the point
+# is that `readout` goes through `numbers(from:)` — the one reading — and
+# never reaches for a raw value of its own.
+_readout = swiftconst.source("Jackpot.swift")
+_readout = _readout[_readout.index("static func readout("):]
+_readout = _readout[: _readout.index("\n    }")]
+assert "numbers(from:" in _readout, \
+    "JackpotRules.readout no longer reads the dice through numbers(from:)"
+assert "result.value" not in _readout, \
+    "JackpotRules.readout reads a raw die value — on a d4 that is the " \
+    "resting face, which is the one number not on show"
+print("\n  readout: reads through numbers(from:), no raw values")
+
 swiftconst.expect("Jackpot", "Jackpot.swift", SWIFT_CONSTANTS)

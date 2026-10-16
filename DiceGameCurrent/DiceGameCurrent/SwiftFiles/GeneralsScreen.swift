@@ -229,7 +229,13 @@ struct GeneralsScreen: View {
             // stays out of it rather than putting a second closer an inch
             // under the first.
             guard phase == .decide else { return nil }
-            return pendingCategory == nil ? "Close" : "Not Yet"
+            // "View Dice" once a box is picked, because that is what
+            // closing the card actually does from here: the hand is on the
+            // table under it, and a player checking a count before they
+            // commit wants to look at the dice rather than to be told they
+            // have not decided yet. With nothing picked there is nothing to
+            // go back to, so it stays "Close".
+            return pendingCategory == nil ? "Close" : "View Dice"
         }
         return phase == .decide ? "Claim" : nil
     }

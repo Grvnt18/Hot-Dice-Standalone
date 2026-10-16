@@ -352,7 +352,15 @@ struct HandoverGate: View {
                     SoundEngine.shared.play(.buttonTap)
                     onReady()
                 } label: {
-                    Text("I'm Ready")
+                    // "Ready", not "I'm Ready".
+                    //
+                    // A button says what pressing it does, and the player
+                    // pressing it is already the subject — the gate is
+                    // addressed to one person, by name, on a device being
+                    // handed to them. The pronoun was the only one in the
+                    // suite's controls, and it read as dialogue rather than
+                    // as a control.
+                    Text("Ready")
                         .font(.poppins(16))
                         .frame(maxWidth: .infinity)
                         .frame(height: 50)

@@ -237,8 +237,17 @@ def check_numeral_fit(failed):
                                 labels).group(1))
     d4_plane = float(re.search(r'd4TopReadLabelSize: CGFloat = ([\d.]+)',
                                labels).group(1))
+    d4_pip = float(re.search(r'd4PipLabelSize: CGFloat = ([\d.]+)',
+                             labels).group(1))
     d4_offset = float(re.search(r'd4CornerLabelRadiusFraction: Float = ([\d.]+)',
                                 labels).group(1))
+    d4_limit = float(re.search(r'd4FaceReachLimit: Float = ([\d.]+)',
+                               labels).group(1))
+    d4_safety = float(re.search(r'd4CornerLabelSafety: Float = ([\d.]+)',
+                                labels).group(1))
+    d4_inradius = float(re.search(r'case 4: return ([\d.]+)',
+                                  labels[labels.index("func localFaceDistance"):]
+                                  ).group(1))
 
     # Bounded to the function's own body. Read to end-of-file it swept up
     # localFaceDistance's table further down — a different set of numbers
@@ -269,19 +278,49 @@ def check_numeral_fit(failed):
 
         fill = fill_six if sides == 6 else fill_rest
 
-        # A d4 is read at the APEX, not off the face: three numerals share
-        # one face, each pushed out toward a corner. So its bound is the
-        # far corner of an offset numeral rather than a centred one, and
-        # its plane is its own constant — the derivation below describes
-        # the other five.
+        # A d4 carries TWO layouts and they are bounded differently.
+        #
+        # Free Roll's and Royal UR's are read at the APEX: three labels
+        # share a face, each pushed out toward a corner, so what bounds
+        # one is the chamfered face's own reach rather than the circle
+        # that fits inside it. Jackpot's is one numeral in the middle,
+        # which is the same case as every other die and falls through to
+        # the loop below.
+        #
+        # The corner numerals doubled, which is why this models the
+        # Swift's placement rather than approximating it: the offset is
+        # pulled in as the label grows, and a model that assumed a fixed
+        # fraction would have reported a collision that the code does not
+        # have — or missed one it does.
         if sides == 4:
-            reach = d4_offset * radius + 0.461 * fill * d4_plane
-            if reach > radius:
-                failed.append("a d4's corner numerals reach %.3f from the "
-                              "middle of a face that holds %.3f" % (reach, radius))
-            if reach / radius > worst[0]:
-                worst = (reach / radius, "a d4's corner numerals")
-            continue
+            # The reach limit is a measurement of the same mesh, so it is
+            # checked against it rather than trusted: on a triangular face
+            # the distance to a corner is twice the distance to an edge,
+            # and the chamfer takes both down together.
+            if abs(d4_limit - radius * 2) > 0.05:
+                failed.append("DieFaceLabels says a d4 face reaches %.3f, "
+                              "but d4.obj holds a circle of %.3f and a "
+                              "triangle's corner is twice its edge — the "
+                              "corner labels are placed against that number"
+                              % (d4_limit, radius))
+            circumradius = d4_inradius * math.sqrt(8)
+            for plane, what in ((d4_plane, "a d4's corner numerals"),
+                                (d4_pip, "a Royal UR die's pips")):
+                half = 0.461 * fill * plane
+                offset = min(circumradius * d4_offset,
+                             d4_limit * d4_safety - half)
+                reach = offset + half
+                if reach > d4_limit:
+                    failed.append("%s reach %.3f across a face that stops "
+                                  "at %.3f" % (what, reach, d4_limit))
+                # Three of them, 120 degrees apart, so the gap between two
+                # centres is the offset times root three.
+                if offset * math.sqrt(3) < half * 2:
+                    failed.append("%s are %.3f apart and %.3f wide — they "
+                                  "overlap each other"
+                                  % (what, offset * math.sqrt(3), half * 2))
+                if reach / d4_limit > worst[0]:
+                    worst = (reach / d4_limit, what)
 
         for number in range(1, sides + 1):
             if sides == 6:

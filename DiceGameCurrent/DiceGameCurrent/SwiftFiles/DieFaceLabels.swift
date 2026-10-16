@@ -153,9 +153,10 @@ enum DieFaceLabels {
         rollsFaceNumber: Int? = nil,
         d4Style: D4LabelStyle = .topRead
     ) {
-        // A d4 is not a "number on each face" die — it is read at the
-        // apex, with three numerals per face, one beside each corner.
-        // Different enough in both layout and meaning to be its own path.
+        // A d4 is labelled by its own rules — read at the apex with three
+        // numerals per face for Free Roll and Royal UR, or one big numeral
+        // per face for Jackpot. Different enough in both layout and
+        // meaning to be its own path; `d4Style` picks which.
         if sides == 4 {
             addD4TopReadNumbers(to: node, colorway: colorway, style: d4Style)
             return
@@ -285,22 +286,28 @@ enum DieFaceLabels {
 
     /// How a numbered d4 is labelled.
     ///
-    /// A tetrahedron cannot carry one centred numeral per face and stay
-    /// legible: each face is visible in three orientations with a different
-    /// corner uppermost each time, so a single numeral would read upright
-    /// in at most one of them. Both modes below put numerals at the corners
-    /// for exactly that reason; they differ only in which number goes where.
+    /// A tetrahedron shows each face in three orientations, with a
+    /// different corner uppermost each time, so a single centred numeral
+    /// reads upright in only one of the three. Two of the modes below
+    /// answer that by printing at the corners instead; the third takes the
+    /// trade the other way, because the game using it reads faces rather
+    /// than a value at the point.
     enum D4LabelStyle {
         /// Each corner carries its own vertex's number, so all three
         /// visible faces show the SAME number at the apex — one value, read
         /// at the point. Free Roll uses this.
         case topRead
 
-        /// Each face carries its own number at all three of its corners, so
-        /// the three visible faces show three DIFFERENT numbers around the
-        /// apex — one per face, every one upright. Jackpot uses this,
-        /// since it reads the three exposed faces rather than a single
-        /// value.
+        /// One big numeral in the middle of each face, the way a
+        /// single-number d4 is printed. Jackpot uses this: it reads the
+        /// three exposed faces rather than a value at the point, so each
+        /// number only has to be unmistakable, not upright — and alone on
+        /// its face a numeral is 1.60 across where three sharing one are
+        /// 1.00. See `addD4FaceNumbers`.
+        ///
+        /// This used to be the corner layout with the FACE's number at all
+        /// three corners, which kept every numeral upright and paid for it
+        /// in size. The legibility went the other way on device.
         case faceNumbers
 
         /// No numbers at all: two of the four vertices carry a mark, and
@@ -353,7 +360,17 @@ enum DieFaceLabels {
     /// neighbours rather than the face's inscribed circle. They grow with
     /// `glyphFill` all the same, which is where this round's legibility
     /// comes from for a d4.
-    private static let d4TopReadLabelSize: CGFloat = 0.50
+    private static let d4TopReadLabelSize: CGFloat = 1.00
+
+    /// The pip on a marked-tip d4, which keeps the size the corner
+    /// numerals used to share.
+    ///
+    /// Separated when the numerals doubled, and that separation is the
+    /// point: Royal UR's dice were signed off on device and nothing about
+    /// them was asked for. A mark is not a numeral — it is read by
+    /// presence rather than by shape — so it gains nothing from the size
+    /// the numbers needed, and the two no longer have to move together.
+    private static let d4PipLabelSize: CGFloat = 0.50
 
     /// How far out from the face's centre each numeral sits, as a fraction
     /// of the distance from the centre to a corner.
@@ -364,6 +381,47 @@ enum DieFaceLabels {
     /// apart, more than three times the 0.50 label size, so they cannot
     /// collide.
     private static let d4CornerLabelRadiusFraction: Float = 0.62
+
+    /// How far a label may reach from a d4 face's centre before it runs
+    /// off the chamfered edge, in local units.
+    ///
+    /// The measurement the paragraph above was already standing on, now
+    /// stated so the placement can be derived from it rather than checked
+    /// against it by hand.
+    private static let d4FaceReachLimit: Float = 1.388
+
+    /// And how much of that limit a label is allowed to use.
+    ///
+    /// The chamfer figure is measured off a mesh rather than exact, so the
+    /// doubled numerals sit inside it with room to spare instead of
+    /// against it: at 0.62 of the circumradius a 1.00 numeral reaches
+    /// 1.381 of a 1.388 limit, which is seven thousandths of margin on an
+    /// approximate number.
+    private static let d4CornerLabelSafety: Float = 0.95
+
+    /// Where a corner label's centre sits, for a label of this size.
+    ///
+    /// Pulled in from `d4CornerLabelRadiusFraction` only as far as it has
+    /// to be: a 0.50 pip keeps the exact placement it had — 1.0125 out,
+    /// reaching 1.197 — and a doubled numeral moves in to 0.9498, where it
+    /// reaches 1.319. Three of them at 120 degrees are then 1.645 apart
+    /// against the 0.738 two of them need, so they still cannot collide.
+    private static func d4CornerOffset(labelSize: CGFloat) -> Float {
+        let circumradius = localFaceDistance(forSides: 4) * (8.0 as Float).squareRoot()
+        let reach = d4LabelHalfDiagonal(labelSize)
+        return min(circumradius * d4CornerLabelRadiusFraction,
+                   d4FaceReachLimit * d4CornerLabelSafety - reach)
+    }
+
+    /// How far the DRAWN numeral reaches from the centre of its plane.
+    ///
+    /// The plane is bigger than the glyph on it — `glyphFill` of it is
+    /// inked, and a single digit's own half-diagonal is 0.461 of that, the
+    /// same two numbers `labelSize` divides by. Measuring the plane
+    /// instead would price a transparent margin as if it were ink.
+    private static func d4LabelHalfDiagonal(_ labelSize: CGFloat) -> Float {
+        Float(labelSize * 0.461 * glyphFill(forSides: 4))
+    }
 
     /// Three numerals per face, one beside each corner, each rotated so it
     /// reads upright when that corner is the apex.
@@ -377,15 +435,20 @@ enum DieFaceLabels {
         colorway: DieColorway,
         style: D4LabelStyle
     ) {
+        // One big numeral per face is its own layout, not a variation on
+        // this one. See addD4FaceNumbers.
+        if style == .faceNumbers {
+            addD4FaceNumbers(to: node, colorway: colorway)
+            return
+        }
+
         let normals = DieFaceNormals.normals(forSides: 4)
         let faceDistance = localFaceDistance(forSides: 4)
 
-        // Distance from a face's centre to its corners, derived from the
-        // inradius rather than hardcoded so the two cannot drift apart.
-        // For a regular tetrahedron the circumradius is 3x the inradius,
-        // so the in-face circumradius is sqrt(R^2 - r^2) = r * sqrt(8).
-        let faceCircumradius = faceDistance * (8.0 as Float).squareRoot()
-        let cornerOffset = faceCircumradius * d4CornerLabelRadiusFraction
+        // How big a corner label is, and therefore how far out it can sit.
+        // A numeral is double what it was; a Royal UR pip is untouched.
+        let labelSize = style == .markedTips ? d4PipLabelSize : d4TopReadLabelSize
+        let cornerOffset = d4CornerOffset(labelSize: labelSize)
         let liftedDistance = faceDistance * surfaceLiftFactor
 
         for (faceIndex, normal) in normals.enumerated() {
@@ -401,19 +464,13 @@ enum DieFaceLabels {
                 guard simd_length(towardCorner) > 0.001 else { continue }
                 towardCorner = simd_normalize(towardCorner)
 
-                // The ONLY difference between the styles. Placement,
-                // orientation and count are identical — what lands at this
-                // corner is what decides whether the die reads as one
-                // value at the point, three around it, or a bare mark.
+                // What lands at this corner: the corner's own number, or a
+                // mark on the two vertices that carry one. `.faceNumbers`
+                // never reaches here — it returned above, being one
+                // numeral in the middle of the face rather than three
+                // round the edge of it.
                 let image: UIImage
-                switch style {
-                case .topRead:
-                    image = labelImage(number: d4VertexNumbers[vertexIndex],
-                                       underlined: false, sides: 4)
-                case .faceNumbers:
-                    image = labelImage(number: faceIndex + 1, underlined: false,
-                                       sides: 4)
-                case .markedTips:
+                if style == .markedTips {
                     // An unmarked vertex gets nothing at all, which is what
                     // makes the die readable at a glance: count the pips
                     // around the point that is sticking up.
@@ -421,9 +478,12 @@ enum DieFaceLabels {
                         continue
                     }
                     image = pipImage()
+                } else {
+                    image = labelImage(number: d4VertexNumbers[vertexIndex],
+                                       underlined: false, sides: 4)
                 }
 
-                let plane = SCNPlane(width: d4TopReadLabelSize, height: d4TopReadLabelSize)
+                let plane = SCNPlane(width: labelSize, height: labelSize)
 
                 plane.materials = [artworkMaterial(image: image,
                                                    colorway: colorway)]
@@ -449,6 +509,73 @@ enum DieFaceLabels {
 
                 node.addChildNode(labelNode)
             }
+        }
+    }
+
+    /// One big numeral in the middle of each face: the d4 Jackpot rolls.
+    ///
+    /// **This is a legibility trade, made deliberately.** The corner
+    /// layout above exists because a tetrahedron shows each face in three
+    /// orientations — a different corner uppermost each time — so one
+    /// numeral per face reads upright in only one of the three. Printing
+    /// it three times, once beside each corner, buys that back and costs
+    /// size: three numerals sharing a face are bounded by the gap between
+    /// each other, not by the face.
+    ///
+    /// Jackpot does not need what that buys. It reads the three exposed
+    /// FACES rather than a single value at the point, so what matters is
+    /// that each number is unmistakable, not that it is the right way up —
+    /// and 1, 2, 3 and 4 are all legible rotated, which is why the dice
+    /// this is modelled on are made at all. The numeral goes from a 1.00
+    /// plane crowded against two others to a 1.60 one alone on the face,
+    /// sized by `labelSize` off the same measured inscribed radius every
+    /// other die uses: 0.59 of reach against the face's 1.388.
+    ///
+    /// Free Roll keeps `.topRead` and Royal UR `.markedTips`, so this is
+    /// Jackpot's d4 and nothing else's.
+    private static func addD4FaceNumbers(to node: SCNNode,
+                                         colorway: DieColorway) {
+        let faceDistance = localFaceDistance(forSides: 4)
+        let liftedDistance = faceDistance * surfaceLiftFactor
+
+        for (faceIndex, normal) in DieFaceNormals.normals(forSides: 4).enumerated() {
+            let faceNormal = simd_normalize(normal.simd)
+            let number = faceIndex + 1
+            let size = labelSize(forSides: 4, number: number)
+
+            let plane = SCNPlane(width: size, height: size)
+            plane.materials = [artworkMaterial(
+                image: labelImage(number: number, underlined: false, sides: 4),
+                colorway: colorway)]
+
+            let labelNode = SCNNode(geometry: plane)
+            labelNode.name = "faceLabel"
+            labelNode.renderingOrder = 10
+            labelNode.position = SCNVector3(faceNormal.x * liftedDistance,
+                                            faceNormal.y * liftedDistance,
+                                            faceNormal.z * liftedDistance)
+
+            // Upright toward ONE of the face's corners — the lowest-index
+            // vertex that is not the one opposite this face. Which corner
+            // is arbitrary and deterministic both: a numeral alone on a
+            // triangular face has three candidate ups and no principled
+            // way to choose between them, so the choice is made the same
+            // way every time rather than left to the order the normals
+            // happen to arrive in.
+            let opposite = d4OppositeVertex[faceIndex]
+            var up = simd_float3(0, 1, 0)
+            for vertexIndex in d4VertexDirections.indices where vertexIndex != opposite {
+                let vertexDirection = simd_normalize(d4VertexDirections[vertexIndex].simd)
+                let flattened = vertexDirection
+                    - simd_dot(vertexDirection, faceNormal) * faceNormal
+                guard simd_length(flattened) > 0.001 else { continue }
+                up = simd_normalize(flattened)
+                break
+            }
+            let right = simd_normalize(simd_cross(up, faceNormal))
+            labelNode.simdOrientation = simd_quatf(simd_float3x3(right, up, faceNormal))
+
+            node.addChildNode(labelNode)
         }
     }
 

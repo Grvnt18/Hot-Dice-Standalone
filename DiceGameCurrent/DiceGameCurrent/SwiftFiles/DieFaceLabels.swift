@@ -50,9 +50,47 @@ enum DieFaceLabels {
     /// device and nothing about it was asked for.
     private static func labelSize(forSides sides: Int, number: Int) -> CGFloat {
         if sides == 6 { return 0.65 }
-        let digits: CGFloat = number >= 10 ? 0.695 : 0.461
         return faceUse * inscribedRadius(forSides: sides)
-             / (digits * glyphFill(forSides: sides))
+             / (halfDiagonal(ofDigits: number) * glyphFill(forSides: sides))
+    }
+
+    /// How far the INK reaches from its own centre, per em, for a numeral
+    /// of one digit or two.
+    ///
+    /// **Measured off Poppins-SemiBold, not modelled.** These were 0.461
+    /// and 0.695, worked out from "digits are about 0.70 em tall and 0.60
+    /// wide" — and the model was wrong in both directions. Rendering every
+    /// numeral 1 to 20 and taking the ink box says the worst single digit
+    /// is 8 at 0.497 and the worst pair is 20 at 0.715: single digits were
+    /// being sized against a box 8% smaller than they are, and 20 against
+    /// one 3% smaller. The margin `faceUse` is supposed to guarantee was
+    /// not the margin they had.
+    ///
+    /// The two-digit figure is the SQUEEZED one — see
+    /// `horizontalSqueeze`, which is what buys the d20 its legibility.
+    private static func halfDiagonal(ofDigits number: Int) -> CGFloat {
+        number >= 10 ? 0.6384 : 0.4974
+    }
+
+    /// How much a two-digit numeral is narrowed before it is drawn.
+    ///
+    /// A numeral is bounded by the half-diagonal of its ink, so a wide
+    /// short pair of digits is held down by its WIDTH — "20" is 1.22 em
+    /// across against a single digit's 0.64, which is why two-digit faces
+    /// came out about two thirds the height of single-digit ones on the
+    /// same die.
+    ///
+    /// Narrowing the pair to 0.85 and spending what that frees on size
+    /// nets a numeral 18% bigger overall: each digit is about 5% narrower
+    /// than it was and 12% taller, which is the trade that reads better at
+    /// a glance. Checked against the alternative first — fitting the box
+    /// to the d20's triangular face instead of to the circle inside it
+    /// buys nothing, because for a box this wide the two sloping edges
+    /// bind within a thousandth of what the circle does.
+    private static let twoDigitSqueeze: CGFloat = 0.85
+
+    private static func horizontalSqueeze(forDigits count: Int) -> CGFloat {
+        count > 1 ? twoDigitSqueeze : 1
     }
 
     /// How much of a face's inscribed circle a numeral may reach across.
@@ -62,7 +100,13 @@ enum DieFaceLabels {
     /// the box it is set in — so this is already conservative before the
     /// margin is applied. 0.85 leaves a visible rim of face around the
     /// number at the tightest case.
-    private static let faceUse: CGFloat = 0.85
+    /// Raised from 0.85 when the half-diagonals below became measured
+    /// rather than modelled. The two move together on purpose: against the
+    /// real ink, 0.92 leaves a single digit exactly the size it already
+    /// was — 0.3% apart — so this is the same margin honestly stated
+    /// rather than a numeral grown by stealth, and a two-digit one gains
+    /// from the measurement instead of paying for the model's error.
+    private static let faceUse: CGFloat = 0.92
 
     /// The largest circle that fits on a numbered face, in the mesh's own
     /// local units — the same units `labelSize` and `localFaceDistance`
@@ -693,7 +737,28 @@ enum DieFaceLabels {
     /// minification. That face left the project in stage C. Poppins is a
     /// much heavier geometric sans and its strokes are what a low canvas
     /// resolves best.
-    static let labelCanvas: CGFloat = 48
+    /// **96 now, and the reasoning above is the one that changed.**
+    ///
+    /// Everything below this line still holds — a numeral magnified under
+    /// a LINEAR filter is a blur, and `.nearest` is what keeps an edge
+    /// hard. What 48 added on top of that was visible blocking, and at the
+    /// sizes the numerals are now drawn, that blocking is what a two-digit
+    /// d20 face could least afford: each digit was about twelve texels
+    /// across, which is not enough to tell an 8 from a 9 at a glance.
+    ///
+    /// 96 doubles the texels in each direction and keeps the hard edges,
+    /// because the filter is what makes them hard, not the shortage of
+    /// pixels. It is also about the ceiling worth having: a die is roughly
+    /// 100-200pt on screen, so at 96 the texture is still being magnified
+    /// in the cases that matter, and a texture bigger than the face it
+    /// lands on is minified instead — which with `.nearest` and no mips
+    /// shimmers as the die tumbles.
+    ///
+    /// Memory is not the constraint at this size: the worst pool in the
+    /// app is Free Roll's twenty dice, which comes to 14 MiB of face
+    /// images against a 120 MiB budget — and that is the UNCACHED figure,
+    /// with every face its own image.
+    static let labelCanvas: CGFloat = 96
 
     /// The canvas the ROLLS wordmark alone is drawn at.
     ///
@@ -707,7 +772,17 @@ enum DieFaceLabels {
     /// 96 is visibly pixelated and still legibly the word. `drawRollsWordmark`
     /// measures and fits its own type, so this is the only number that moves.
     /// Still a twentieth of the old memory, and one die face in one game.
-    static let wordmarkCanvas: CGFloat = 96
+    /// 256, up from 96, and this is the one the request named: ROLLS was
+    /// close to unreadable.
+    ///
+    /// Lobster is a SCRIPT face and its connecting strokes are thin — the
+    /// note below already said 48 broke them into disconnected texels, and
+    /// 96 turned out to be the same failure one step down rather than a
+    /// fix for it. At 256 the thin strokes have four times the texels they
+    /// had, which is what a joined script needs to read as joined. It is
+    /// one image, drawn once per colourway and cached, so the cost is a
+    /// quarter of a megabyte.
+    static let wordmarkCanvas: CGFloat = 256
 
     /// How much of its canvas a numeral fills, per die.
     ///
@@ -976,7 +1051,7 @@ enum DieFaceLabels {
         let format = UIGraphicsImageRendererFormat()
         format.opaque = false
         let renderer = UIGraphicsImageRenderer(size: size, format: format)
-        return renderer.image { _ in
+        return renderer.image { context in
             // Transparent background — only the numeral itself is drawn,
             // so the label reads as printed directly on the body color
             // showing through underneath, not as an opaque patch.
@@ -1003,8 +1078,24 @@ enum DieFaceLabels {
                 x: (size.width - textSize.width) / 2,
                 y: (size.height - textSize.height) / 2
             )
-            text.draw(at: origin, withAttributes: attrs)
 
+            // Two digits are drawn NARROWED — see horizontalSqueeze. The
+            // scale is about the canvas's own centre line, so a numeral
+            // centred before it is centred after it.
+            let squeeze = horizontalSqueeze(forDigits: text.count)
+            if squeeze < 1 {
+                context.cgContext.saveGState()
+                context.cgContext.translateBy(x: size.width / 2, y: 0)
+                context.cgContext.scaleBy(x: squeeze, y: 1)
+                context.cgContext.translateBy(x: -size.width / 2, y: 0)
+            }
+            text.draw(at: origin, withAttributes: attrs)
+            if squeeze < 1 {
+                context.cgContext.restoreGState()
+            }
+
+            // The bar is drawn OUTSIDE that state, and only ever under a 6
+            // or a 9, so it is never narrowed with anything.
             guard underlined else { return }
             // Drawn manually rather than via NSAttributedString's
             // .underlineStyle: that attribute sits tight against the

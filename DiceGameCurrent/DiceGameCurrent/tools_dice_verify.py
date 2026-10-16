@@ -235,6 +235,56 @@ def check_numeral_fit(failed):
         r'sides == 6 \? [\d.]+ / ([\d.]+)', labels).group(1))
     six_plane = float(re.search(r'if sides == 6 \{ return ([\d.]+) \}',
                                 labels).group(1))
+    # The half-diagonals the Swift sizes against, and the squeeze it draws
+    # two digits at. Read rather than restated, then checked against the
+    # font itself below — the pair of them is what makes a numeral fit.
+    swift_single = float(re.search(r'number >= 10 \? [\d.]+ : ([\d.]+)',
+                                   labels).group(1))
+    swift_double = float(re.search(r'number >= 10 \? ([\d.]+) :', labels).group(1))
+    squeeze = float(re.search(r'twoDigitSqueeze: CGFloat = ([\d.]+)',
+                              labels).group(1))
+
+    def half_diagonal(number):
+        return swift_double if number >= 10 else swift_single
+
+    # And those two numbers are checked against the TYPEFACE, which is the
+    # whole reason they changed: they used to be worked out from "a digit
+    # is about 0.70 em tall and 0.60 wide", and the real ink is 8% wider
+    # than that for a single digit and 3% for a pair. A numeral sized
+    # against a box smaller than itself does not look wrong — it just has
+    # less margin than the code says it has, and the first thing anyone
+    # would notice is a glyph touching a chamfer on one die.
+    #
+    # Measured the way the app draws it: every numeral 1 to 20, two digits
+    # narrowed by the squeeze, worst case of each class.
+    try:
+        from PIL import ImageFont
+    except ImportError:
+        print("  %-26s skipped (Pillow unavailable)" % "numeral ink")
+    else:
+        face = os.path.join(RESOURCES, "Poppins-SemiBold.ttf")
+        font = ImageFont.truetype(face, 1000)
+        measured = {1: 0.0, 2: 0.0}
+        for number in range(1, 21):
+            text = str(number)
+            x0, y0, x1, y1 = font.getbbox(text)
+            width = (x1 - x0) / 1000.0
+            height = (y1 - y0) / 1000.0
+            if len(text) > 1:
+                width *= squeeze
+            reach = 0.5 * math.sqrt(width * width + height * height)
+            digits = 2 if len(text) > 1 else 1
+            measured[digits] = max(measured[digits], reach)
+        for digits, stated in ((1, swift_single), (2, swift_double)):
+            if measured[digits] > stated + 0.0005:
+                failed.append("DieFaceLabels sizes a %d-digit numeral "
+                              "against %.4f em, and Poppins-SemiBold draws "
+                              "one %.4f em across its diagonal — every one "
+                              "of them is bigger than the face it was fitted "
+                              "to" % (digits, stated, measured[digits]))
+        print("  %-26s ok (1 digit %.4f em, 2 at %.0f%% width %.4f em)"
+              % ("numeral ink", measured[1], squeeze * 100, measured[2]))
+
     d4_plane = float(re.search(r'd4TopReadLabelSize: CGFloat = ([\d.]+)',
                                labels).group(1))
     d4_pip = float(re.search(r'd4PipLabelSize: CGFloat = ([\d.]+)',
@@ -323,12 +373,12 @@ def check_numeral_fit(failed):
                     worst = (reach / d4_limit, what)
 
         for number in range(1, sides + 1):
+            half_em = half_diagonal(number)
             if sides == 6:
                 plane = six_plane
             else:
-                digits = 0.695 if number >= 10 else 0.461
-                plane = face_use * radius / (digits * fill)
-            half = (0.695 if number >= 10 else 0.461) * fill * plane
+                plane = face_use * radius / (half_em * fill)
+            half = half_em * fill * plane
             if half > radius:
                 failed.append("a d%d's %d reaches %.3f from the middle of a "
                               "face that holds %.3f — it runs off the edge"
@@ -559,24 +609,37 @@ def main():
     else:
         print("  %-26s ok (lambert, no highlight)" % "no specular")
 
-    # --- 10. Label canvases stay small, and filter .nearest. -----------
+    # --- 10. Label canvases stay BELOW THE FACE, and filter .nearest. --
     #
-    # The numerals were 256px minified onto a ~100-200pt face with the
-    # DEFAULT LINEAR filter, which made them the one perfectly smooth thing
-    # on an otherwise banded, stippled, hard-edged die. Both halves matter:
-    # a small canvas with linear filtering is a blurry numeral, and a large
-    # canvas with .nearest is a crisp anti-aliased one.
+    # These ceilings used to be 64 and 128, holding the canvases down so
+    # the numerals read as pixel art — the die body being a banded cel
+    # shade inside a hard silhouette, a smooth numeral was the one soft
+    # thing left on it. That was the right call when a numeral was one
+    # digit; it was the wrong one for a two-digit d20 face, where each
+    # digit came to about twelve texels and an 8 and a 9 stopped being
+    # distinguishable. The canvases went up and the ceilings with them.
+    #
+    # They are still ceilings, because the reason they exist did not go
+    # away — it moved. A texture BIGGER than the face it lands on is
+    # minified rather than magnified, and `.nearest` with no mipmaps
+    # shimmers under minification as a die tumbles. A die is roughly
+    # 100-200pt on screen, which at 3x is 300-600 device pixels; 128 keeps
+    # every numeral on the magnifying side of that with room to spare, and
+    # the wordmark is one image on one face rather than one of twenty.
+    #
+    # The filter check below is the half that never moved: a canvas of any
+    # size magnified under the default LINEAR filter is a blurry numeral.
     labels = source("DieFaceLabels.swift")
-    for const, ceiling in (("labelCanvas", 64), ("wordmarkCanvas", 128)):
+    for const, ceiling in (("labelCanvas", 128), ("wordmarkCanvas", 256)):
         m = re.search(r'static let %s: CGFloat = ([\d.]+)' % const, labels)
         if not m:
             failed.append("DieFaceLabels.swift no longer declares `%s`"
                           % const)
         elif float(m.group(1)) > ceiling:
-            failed.append("%s = %s is above %d — at that size the glyph is "
-                          "oversampled for the face it lands on and arrives "
-                          "ANTI-ALIASED, which is the one smooth thing left "
-                          "on a banded die" % (const, m.group(1), ceiling))
+            failed.append("%s = %s is above %d — bigger than the face it "
+                          "lands on, so it arrives MINIFIED, and .nearest "
+                          "with no mipmaps shimmers on a tumbling die"
+                          % (const, m.group(1), ceiling))
         else:
             print("  %-26s ok (%s px)" % (const, m.group(1)))
 

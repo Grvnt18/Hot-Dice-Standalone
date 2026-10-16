@@ -25,6 +25,24 @@ enum JackpotRules {
     /// Meeting the booster closes it and makes the rule a single sentence —
     /// low d20 jackpots, high d20 boosts.
     static let jackpotThreshold = boosterThreshold - 1   // 12
+
+    // MARK: The Big 7
+
+    /// Three 7s pay a flat 77 INSTEAD of the set's own score.
+    ///
+    /// Only three dice in the pool can show a 7 at all — the d8, the d12
+    /// and the d20 — so this is every one of them landing on the same
+    /// face, and the d4 and d6 cannot help. That is 1 in 1,920 rolls.
+    /// Scored normally it would be 7 x 3 = 21, which is less than a pair
+    /// of 11s; 77 makes the rarest thing on the table worth noticing.
+    static let bigSevenValue = 7
+    static let bigSevenCount = 3
+    static let bigSevenBonus = 77
+
+    // MARK: The Escalation
+
+    /// What a set formed on the re-roll is worth.
+    static let escalationMultiplier = 2
 }
 
 // MARK: - Reading the dice
@@ -91,24 +109,56 @@ extension JackpotRules {
 extension JackpotRules {
 
     struct TurnScore: Equatable {
-        /// Points from matching sets.
+        /// Points from matching sets, with the escalation's multiplier
+        /// already applied to anything formed on a re-roll.
         let setPoints: Int
         /// The d20's face, if it boosted.
         let booster: Int?
         /// True when the roll had no sets and a low d20.
         let isJackpot: Bool
         /// What the sets were, for the turn summary: value and how many.
+        /// A Big 7 is NOT in here — it pays its own bonus instead.
         let sets: [(value: Int, count: Int)]
+        /// Three 7s among the seven numbers.
+        let hasBigSeven: Bool
+        /// An escalation that formed no set at all. Everything the turn
+        /// had, locked points included, goes with it.
+        let isWipeout: Bool
 
-        var total: Int { setPoints + (booster ?? 0) }
+        var total: Int {
+            if isWipeout { return 0 }
+            return setPoints + (booster ?? 0) + (hasBigSeven ? bigSevenBonus : 0)
+        }
 
         static func == (lhs: TurnScore, rhs: TurnScore) -> Bool {
             lhs.setPoints == rhs.setPoints
                 && lhs.booster == rhs.booster
                 && lhs.isJackpot == rhs.isJackpot
+                && lhs.hasBigSeven == rhs.hasBigSeven
+                && lhs.isWipeout == rhs.isWipeout
                 && lhs.sets.map(\.value) == rhs.sets.map(\.value)
                 && lhs.sets.map(\.count) == rhs.sets.map(\.count)
         }
+    }
+
+    /// The sets in a handful of numbers, biggest first.
+    ///
+    /// Sorted for a stable, readable summary — dictionary order is not
+    /// stable, and the same roll should always describe itself the same
+    /// way. The order is also what `lockedSet` reads: biggest set first
+    /// means the first entry is the one the escalation locks.
+    static func sets(in numbers: [Int]) -> [(value: Int, count: Int)] {
+        var counts: [Int: Int] = [:]
+        for number in numbers { counts[number, default: 0] += 1 }
+        return counts
+            .filter { $0.value >= 2 }
+            .map { (value: $0.key, count: $0.value) }
+            .sorted { ($0.count, $0.value) > ($1.count, $1.value) }
+    }
+
+    /// Whether these numbers carry the Big 7.
+    static func hasBigSeven(_ numbers: [Int]) -> Bool {
+        numbers.filter { $0 == bigSevenValue }.count >= bigSevenCount
     }
 
     /// Scores one roll.
@@ -117,39 +167,95 @@ extension JackpotRules {
     /// scores that number times how many times it appears — two 4s is 8, a
     /// set of three 3s is 9.
     static func score(numbers: [Int], d20: Int?) -> TurnScore {
-        var counts: [Int: Int] = [:]
-        for number in numbers { counts[number, default: 0] += 1 }
+        let found = sets(in: numbers)
+        let big = hasBigSeven(numbers)
 
-        let sets = counts
-            .filter { $0.value >= 2 }
-            .map { (value: $0.key, count: $0.value) }
-            // Sorted for a stable, readable summary — dictionary order is
-            // not stable, and the same roll should always describe itself
-            // the same way.
-            .sorted { ($0.count, $0.value) > ($1.count, $1.value) }
-
-        let setPoints = sets.reduce(0) { $0 + $1.value * $1.count }
-        let hasSets = !sets.isEmpty
-
-        let booster: Int? = {
-            guard let d20, d20 >= boosterThreshold else { return nil }
-            return d20
-        }()
-
-        let isJackpot = !hasSets && (d20 ?? 0) <= jackpotThreshold
+        // The Big 7's own set does not also score. "In place of", not "as
+        // well as": three 7s scored both ways would be 98, and the bonus
+        // is meant to replace a set worth 21, not to sit on top of it.
+        let scoring = big ? found.filter { $0.value != bigSevenValue } : found
 
         return TurnScore(
-            setPoints: setPoints,
-            booster: booster,
-            isJackpot: isJackpot,
-            sets: sets
+            setPoints: scoring.reduce(0) { $0 + $1.value * $1.count },
+            booster: booster(forD20: d20),
+            // A roll with no set at all and a low d20. Unchanged by the
+            // escalation: a turn with nothing to lock has nothing to
+            // escalate, so the two can never be offered together.
+            isJackpot: found.isEmpty && (d20 ?? 0) <= jackpotThreshold,
+            sets: scoring,
+            hasBigSeven: big,
+            isWipeout: false
+        )
+    }
+
+    private static func booster(forD20 d20: Int?) -> Int? {
+        guard let d20, d20 >= boosterThreshold else { return nil }
+        return d20
+    }
+
+    /// The set an escalation would lock: the biggest one.
+    ///
+    /// `sets(in:)` is sorted by count then value, so the first entry is
+    /// the highest-scoring one — and ties break toward the bigger number,
+    /// which is the one worth keeping.
+    static func lockedSet(in numbers: [Int]) -> (value: Int, count: Int)? {
+        sets(in: numbers).first
+    }
+
+    /// Whether this roll offers the choice at all.
+    ///
+    /// A Jackpot is excluded even though it cannot have sets, because a
+    /// Jackpot has already won the turn and nothing should invite a player
+    /// to gamble it away.
+    static func canEscalate(_ score: TurnScore) -> Bool {
+        !score.isJackpot && !score.sets.isEmpty
+    }
+
+    /// The score for a turn that escalated.
+    ///
+    /// `lockedNumbers` are the ones held — every face of every die that
+    /// stayed on the table — and `rerolled` are the numbers the re-roll
+    /// produced. The locked points are the locked set scored once, at its
+    /// own value; anything the re-roll forms is scored at
+    /// `escalationMultiplier` and added.
+    ///
+    /// And if the re-roll forms nothing, the turn is a wipeout: not the
+    /// re-roll's points, the TURN's, locked set included. That is the
+    /// whole shape of the gamble, and it is why `isWipeout` lives on the
+    /// score rather than being handled by the screen — a total that
+    /// quietly keeps the locked points would be the kindest possible bug
+    /// and nobody would report it.
+    static func escalatedScore(lockedNumbers: [Int],
+                               rerolled: [Int],
+                               d20: Int?) -> TurnScore {
+        let locked = sets(in: lockedNumbers)
+        let fresh = sets(in: rerolled)
+        let big = hasBigSeven(lockedNumbers + rerolled)
+
+        let lockedScoring = big ? locked.filter { $0.value != bigSevenValue } : locked
+        let freshScoring = big ? fresh.filter { $0.value != bigSevenValue } : fresh
+
+        let points = lockedScoring.reduce(0) { $0 + $1.value * $1.count }
+            + freshScoring.reduce(0) { $0 + $1.value * $1.count } * escalationMultiplier
+
+        return TurnScore(
+            setPoints: points,
+            booster: booster(forD20: d20),
+            // An escalation cannot jackpot. It started from a roll that
+            // had a set, and the Jackpot is the absence of one.
+            isJackpot: false,
+            sets: lockedScoring + freshScoring,
+            hasBigSeven: big,
+            isWipeout: fresh.isEmpty
         )
     }
 
     /// One line describing what a turn did, for the handover screen.
     static func summary(for score: TurnScore, player: String) -> String {
         if score.isJackpot { return "\(player) hit the Jackpot!" }
+        if score.isWipeout { return "\(player) escalated into nothing — wiped out." }
         var parts: [String] = []
+        if score.hasBigSeven { parts.append("the Big 7") }
         if !score.sets.isEmpty {
             parts.append(score.sets
                 .map { "a set of \($0.count) \($0.value)'s" }
@@ -160,6 +266,25 @@ extension JackpotRules {
         }
         if parts.isEmpty { return "\(player) scored nothing." }
         return "\(player) rolled " + parts.joined(separator: ", ") + " — \(score.total) points."
+    }
+
+    /// Which dice an escalation holds: every one showing a number from the
+    /// locked set.
+    ///
+    /// The d4 is held on ANY of its three exposed faces, which is the rule
+    /// the guide states and the one that needed stating — a d4 is three of
+    /// the seven numbers, so "the dice in the set" is ambiguous for it in
+    /// a way it is not for the others.
+    ///
+    /// Reads each die through `numbers(from:)`, so a d4's resting face is
+    /// never mistaken for a number on show.
+    static func lockedDice(_ results: [DiceTraySession.DieResult],
+                           setValue: Int) -> Set<UUID> {
+        var held: Set<UUID> = []
+        for result in results where numbers(from: [result]).contains(setValue) {
+            held.insert(result.id)
+        }
+        return held
     }
 }
 
@@ -241,7 +366,11 @@ enum JackpotGame: SuiteGame {
         ),
         GameRuleSection(
             title: "Scoring & Instant Win Conditions",
-            body: "  * Sets: Any number appearing two or more times among the 7 exposed values scores:\n      Score = Number Value x Occurrences\n  * Booster: A d20 showing 13 or higher adds its raw face value to turn score.\n  * Jackpot (Instant Win): Achieved when there are ZERO sets across all 7 numbers\n    AND the d20 shows 12 or lower."
+            body: "  * Sets: Any number appearing two or more times among the 7 exposed values scores:\n      Score = Number Value x Occurrences\n  * Booster: A d20 showing 13 or higher adds its raw face value to turn score.\n  * Jackpot (Instant Win): Achieved when there are ZERO sets across all 7 numbers\n    AND the d20 shows 12 or lower.\n  * Big 7 Bonus: Three 7s among the seven numbers — the d8, d12 and d20 all\n    showing 7 — pay a flat 77 points in place of that set's normal score."
+        ),
+        GameRuleSection(
+            title: "The Escalation",
+            body: "  * After a roll that forms at least one set, the turn offers a choice:\n      Bank: take the turn as rolled and pass.\n      Escalate: lock the highest-scoring set and re-roll everything else.\n  * Locking: every die showing a number from that set is held, including the\n    d4 if any of its three exposed faces belongs to it.\n  * The Multiplier: sets formed among the re-rolled numbers score DOUBLE, and\n    are added to the locked points.\n  * Wipeout: if the re-roll forms no set at all, the whole turn scores zero —\n    the locked points go with it.\n  * One escalation per turn. The booster is read from the d20's final face, and\n    the Big 7 Bonus from the seven numbers as they finally stand."
         ),
         GameRuleSection(
             title: "Match Resolution",

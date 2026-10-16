@@ -17,6 +17,22 @@ struct JackpotScreen: View {
     /// re-dealt. Cleared when the next turn begins, so the gate between
     /// turns cannot show the last player's dice to the next one.
     @State private var lastDice: String?
+
+    /// The score as it stands before any escalation, held while the player
+    /// decides. Nil outside that moment.
+    @State private var pendingScore: JackpotRules.TurnScore?
+
+    /// The seven numbers the roll produced, and which dice are held if the
+    /// player escalates.
+    ///
+    /// Both are needed after the re-roll, not just during the choice: the
+    /// locked numbers are what the locked points are scored from, and the
+    /// held IDs are what tells the new roll's results apart from the old
+    /// ones — `onRollSettled` reports the whole hand after a partial
+    /// re-roll, kept dice included, which is what makes the readout honest
+    /// and this bookkeeping necessary.
+    @State private var lockedNumbers: [Int] = []
+    @State private var lockedDice: Set<UUID> = []
     @State private var showingSettings = false
     @ObservedObject private var theme = AppTheme.shared
 
@@ -51,6 +67,7 @@ struct JackpotScreen: View {
         match = incoming.match
         jackpotsThisRound = incoming.state.jackpotsThisRound
         lastDice = nil
+        clearEscalation()
         phase = .ready
     }
 
@@ -59,6 +76,12 @@ struct JackpotScreen: View {
         case ready
         /// Dice in the air.
         case rolling
+        /// Rolled, scored, and the roll formed a set — so the turn offers
+        /// the choice: bank what is on the table, or lock the best set and
+        /// re-roll the rest for double.
+        case deciding
+        /// The escalation's re-roll is in the air.
+        case escalating
         /// Roll scored; waiting to send the turn on or finish.
         case scored
         /// Handover gate between turns.
@@ -118,13 +141,18 @@ struct JackpotScreen: View {
                         }
                     }
 
-                    DiceRollButton(
-                        label: buttonLabel,
-                        isEnabled: isPrimaryEnabled,
-                        subtitle: buttonSubtitle
-                    ) {
-                        primaryAction()
-                    }
+                    // TurnActionBar rather than DiceRollButton, because
+                    // the turn now has a phase with two answers. With no
+                    // secondary label it renders exactly as the single
+                    // roll button did — see TurnActionBar's own note.
+                    TurnActionBar(
+                        primaryLabel: buttonLabel,
+                        primaryEnabled: isPrimaryEnabled,
+                        secondaryLabel: phase == .deciding ? "Escalate" : nil,
+                        subtitle: buttonSubtitle,
+                        onPrimary: { primaryAction() },
+                        onSecondary: { escalate() }
+                    )
                     .frame(height: buttonHeight)
                 }
             }
@@ -132,6 +160,7 @@ struct JackpotScreen: View {
             if phase == .handover {
                 HandoverGate(match: match, lastTurnSummary: lastSummary) {
                     lastDice = nil
+                    clearEscalation()
                     phase = .ready
                 }
                 .transition(.opacity)
@@ -165,17 +194,31 @@ struct JackpotScreen: View {
 
     private var buttonLabel: String {
         switch phase {
-        case .ready:    return "Roll"
-        case .rolling:  return "Rolling"
-        case .scored:   return isFinalTurn ? "Finish" : "Pass"
-        case .handover: return "Pass"
-        case .finished: return "Done"
+        case .ready:      return "Roll"
+        case .rolling:    return "Rolling"
+        case .deciding:   return "Bank \(pendingScore?.total ?? 0)"
+        case .escalating: return "Rolling"
+        case .scored:     return isFinalTurn ? "Finish" : "Pass"
+        case .handover:   return "Pass"
+        case .finished:   return "Done"
         }
     }
 
     private var buttonSubtitle: String {
+        // The choice, priced. What escalating risks is the number already
+        // on the bar, so the line says what it would cost rather than
+        // leaving "double or nothing" as a figure of speech.
+        if phase == .deciding, let pendingScore, let locked = lockedSetLine {
+            return "Escalate locks \(locked) — a bust loses \(pendingScore.total)"
+        }
         guard phase == .scored, let lastSummary else { return "" }
         return lastSummary
+    }
+
+    /// "three 4's", for the line above.
+    private var lockedSetLine: String? {
+        guard let locked = JackpotRules.lockedSet(in: lockedNumbers) else { return nil }
+        return "\(locked.count) \(locked.value)'s"
     }
 
     /// True when the turn just scored was the last one of the last round.
@@ -189,14 +232,18 @@ struct JackpotScreen: View {
 
     private var scoreboardSubtitle: String? {
         switch phase {
-        case .ready:   return "\(match.activeDisplayName) to roll"
-        case .rolling: return "Rolling…"
+        case .ready:      return "\(match.activeDisplayName) to roll"
+        case .rolling:    return "Rolling…"
         // The dice themselves, where the strip already has a line for
         // saying what is going on. The button's own subtitle carries the
         // SCORE at this phase — see buttonSubtitle — so the two read as a
         // pair: what was rolled up here, what it paid down there.
-        case .scored:  return lastDice
-        default:       return nil
+        // The dice stay on show through the choice as well as after it:
+        // deciding whether to escalate means reading what is on the table.
+        case .deciding:   return lastDice
+        case .escalating: return "Rolling…"
+        case .scored:     return lastDice
+        default:          return nil
         }
     }
 
@@ -206,9 +253,10 @@ struct JackpotScreen: View {
     /// that nothing will ever move it out of.
     private var isPrimaryEnabled: Bool {
         switch phase {
-        case .ready:  return session != nil
-        case .scored: return true
-        default:      return false
+        case .ready:    return session != nil
+        case .deciding: return true
+        case .scored:   return true
+        default:        return false
         }
     }
 
@@ -220,8 +268,11 @@ struct JackpotScreen: View {
             // a no-op left the game stuck.
             if session?.roll() == true {
                 lastDice = nil
+                clearEscalation()
                 phase = .rolling
             }
+        case .deciding:
+            bankPending()
         case .scored:
             endTurn()
         default:
@@ -232,6 +283,14 @@ struct JackpotScreen: View {
     // MARK: Turn flow
 
     private func scoreRoll(_ results: [DiceTraySession.DieResult]) {
+        // The re-roll lands here too — same callback, same complete hand —
+        // so which half of the turn this is comes from the phase rather
+        // than from the shape of the results.
+        if phase == .escalating {
+            scoreEscalation(results)
+            return
+        }
+
         // Score only a complete set. numbers(from:) happily turns four dice
         // into five numbers, and a quietly wrong score is a far worse
         // failure than an obvious one — fewer numbers means fewer possible
@@ -250,6 +309,56 @@ struct JackpotScreen: View {
             d20: JackpotRules.d20Face(from: results)
         )
 
+        lastDice = JackpotRules.readout(from: results)
+
+        // A roll with a set to lock stops here and asks. Nothing is banked
+        // and nothing is recorded yet — the turn is not over until the
+        // player says which way it ends, and a Jackpot is never offered
+        // the gamble (see JackpotRules.canEscalate).
+        if JackpotRules.canEscalate(score) {
+            pendingScore = score
+            lockedNumbers = []
+            lockedDice = []
+            if let locked = JackpotRules.lockedSet(in: numbers) {
+                lockedDice = JackpotRules.lockedDice(results, setValue: locked.value)
+                lockedNumbers = results
+                    .filter { lockedDice.contains($0.id) }
+                    .flatMap { JackpotRules.numbers(from: [$0]) }
+            }
+            phase = .deciding
+            return
+        }
+
+        bank(score)
+    }
+
+    /// Scores the re-roll an escalation threw.
+    private func scoreEscalation(_ results: [DiceTraySession.DieResult]) {
+        guard results.map(\.sides).sorted() == JackpotRules.dieSides.sorted() else {
+            phase = .ready
+            return
+        }
+
+        // The numbers that MOVED. `onRollSettled` reports every die after
+        // a partial re-roll, held ones included, so without this the
+        // locked set would be counted twice — once as locked points and
+        // again as a fresh set at double.
+        let rerolled = results
+            .filter { !lockedDice.contains($0.id) }
+            .flatMap { JackpotRules.numbers(from: [$0]) }
+
+        let score = JackpotRules.escalatedScore(
+            lockedNumbers: lockedNumbers,
+            rerolled: rerolled,
+            d20: JackpotRules.d20Face(from: results)
+        )
+
+        lastDice = JackpotRules.readout(from: results)
+        bank(score)
+    }
+
+    /// Ends the turn with this score, whichever road it took.
+    private func bank(_ score: JackpotRules.TurnScore) {
         let player = match.activeDisplayName
         if score.isJackpot {
             jackpotsThisRound.append(match.activeParticipant)
@@ -257,8 +366,33 @@ struct JackpotScreen: View {
             match.addScore(score.total)
         }
         lastSummary = JackpotRules.summary(for: score, player: player)
-        lastDice = JackpotRules.readout(from: results)
+        clearEscalation()
         phase = .scored
+    }
+
+    /// Takes the turn as rolled.
+    private func bankPending() {
+        guard let pendingScore else { return }
+        SoundEngine.shared.play(.buttonTap)
+        bank(pendingScore)
+    }
+
+    private func clearEscalation() {
+        pendingScore = nil
+        lockedNumbers = []
+        lockedDice = []
+    }
+
+    /// Locks the best set and throws everything else.
+    ///
+    /// The phase moves only if the throw actually happened — the same
+    /// guard the first roll uses, and for the same reason: a phase that
+    /// leads the dice is a turn that can hang when the roll is refused.
+    private func escalate() {
+        SoundEngine.shared.play(.buttonTap)
+        if session?.roll(keeping: lockedDice) == true {
+            phase = .escalating
+        }
     }
 
     /// Hands over, and resolves the round if this was the last seat in it.
@@ -297,6 +431,7 @@ struct JackpotScreen: View {
         jackpotsThisRound.removeAll()
         lastSummary = nil
         lastDice = nil
+        clearEscalation()
         session?.setPool(JackpotRules.makeDice())
         phase = .ready
     }

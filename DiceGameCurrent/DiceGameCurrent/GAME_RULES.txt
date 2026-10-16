@@ -110,6 +110,21 @@ SCORING & INSTANT WIN CONDITIONS
   * Booster: A d20 showing 13 or higher adds its raw face value to turn score.
   * Jackpot (Instant Win): Achieved when there are ZERO sets across all 7 numbers 
     AND the d20 shows 12 or lower.
+  * Big 7 Bonus: Three 7s among the seven numbers — the d8, d12 and d20 all 
+    showing 7 — pay a flat 77 points in place of that set's normal score.
+
+THE ESCALATION
+  * After a roll that forms at least one set, the turn offers a choice:
+      Bank: take the turn as rolled and pass.
+      Escalate: lock the highest-scoring set and re-roll everything else.
+  * Locking: every die showing a number from that set is held, including the 
+    d4 if any of its three exposed faces belongs to it.
+  * The Multiplier: sets formed among the re-rolled numbers score DOUBLE, and 
+    are added to the locked points.
+  * Wipeout: if the re-roll forms no set at all, the whole turn scores zero — 
+    the locked points go with it.
+  * One escalation per turn. The booster is read from the d20's final face, and 
+    the Big 7 Bonus from the seven numbers as they finally stand.
 
 MATCH RESOLUTION
   * An uncancelled Jackpot wins the match instantly.

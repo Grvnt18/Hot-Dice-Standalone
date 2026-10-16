@@ -242,7 +242,7 @@ def check_onchange_goes_through_the_shim():
 
     So every screen calls `.onValueChange(of:perform:)` and only
     `OnValueChange.swift` calls `.onChange`. That is the same shape as
-    `ScriptText` owning the Aguafina font and `SceneAntialiasing` owning
+    `ScriptText` owning the script font and `SceneAntialiasing` owning
     the multisampling mode: one door, checked, rather than a convention
     that holds until someone adds a screen.
     """

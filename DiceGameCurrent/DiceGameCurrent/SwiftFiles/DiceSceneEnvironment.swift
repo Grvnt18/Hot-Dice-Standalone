@@ -239,7 +239,7 @@ enum DiceSceneEnvironment {
         SmokeFloor.retint(material, color: style.surfaceColor)
     }
 
-    /// "ROLLS" written across the center of the floor in Aguafina Script,
+    /// "ROLLS" written across the center of the floor in Lobster,
     /// sized to 20% of the playfield's width. Rendered the same way as the
     /// die face labels — UIGraphicsImageRenderer text on a transparent
     /// background, applied to a flat plane — so the floor's own texture
@@ -369,9 +369,8 @@ enum DiceSceneEnvironment {
         // clips the leading stroke instead of the trailing one.
         // canvasBounds, not inkBounds: the union of the ink box and the
         // line box. Sizing from ink alone and then drawing with
-        // draw(at:) mixes two coordinate conventions — it held for
-        // Aguafina and clipped Lobster's descender off the bottom of the
-        // floor wordmark the moment the faces were swapped.
+        // draw(at:) mixes two coordinate conventions, which clips
+        // Lobster's descender off the bottom of the floor wordmark.
         let ink = AppFonts.canvasBounds(of: text, font: font)
         // A little air beyond the ink, so the wordmark is not flush to the
         // texture's edge where filtering could nibble at it.

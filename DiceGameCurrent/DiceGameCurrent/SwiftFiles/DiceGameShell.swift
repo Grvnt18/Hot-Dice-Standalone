@@ -835,7 +835,7 @@ struct TurnCompleteOverlay: View {
             VStack(spacing: 4) {
                 if let caption {
                     // ScriptText rather than a Text with its own font: it
-                    // reserves the room Aguafina's swashes need, which this
+                    // reserves the room the script's swashes need, which this
                     // site used to do by appending two literal spaces to
                     // the string. That worked at one point size and is the
                     // sort of thing a new screen never remembers to copy.
@@ -1150,10 +1150,10 @@ struct DiceGameScreen: View {
                 .transition(.opacity)
             }
         }
-        // Cascades to every Text in this view hierarchy — Stack Sans as
-        // the default font is applied per-Text above (font doesn't
-        // reliably cascade across custom sizes the same simple way), but
-        // uppercase casing genuinely does cascade from one place here.
+        // Cascades to every Text in this view hierarchy — the font is
+        // applied per-Text above (it doesn't cascade reliably across
+        // custom sizes), but uppercase casing genuinely does cascade from
+        // one place here.
         .textCase(.uppercase)
         // AppFonts' poppins/lobster use the relativeTo: overload of
         // Font.custom so minimumScaleFactor can actually shrink them

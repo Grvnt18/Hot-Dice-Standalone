@@ -222,7 +222,7 @@ enum DieFaceLabels {
     private static let surfaceLiftFactor: Float = 1.03
 
     /// `rollsFaceNumber`, when set, replaces that face's numeral with the
-    /// word "ROLLS" in Aguafina Script — an easter-egg face on one random
+    /// word "ROLLS" in Lobster — an easter-egg face on one random
     /// d6 per game (chosen in DicePoolSceneBuilder).
     static func addPermanentFaceNumbers(
         to node: SCNNode,
@@ -862,12 +862,10 @@ enum DieFaceLabels {
     /// (see `artworkMaterial`) so they stay hard instead of being
     /// interpolated back into a blur.
     ///
-    /// The reason this was 256 no longer holds, and it is worth saying so
-    /// rather than leaving a stale justification in place: it was raised from
-    /// 128 because **Stack Sans ExtraLight's** thin strokes did not survive
-    /// minification. That face left the project in stage C. Poppins is a
-    /// much heavier geometric sans and its strokes are what a low canvas
-    /// resolves best.
+    /// It was 256 for a face whose thin strokes did not survive
+    /// minification. That face is gone; Poppins is a much heavier
+    /// geometric sans, and its strokes are what a low canvas resolves
+    /// best.
     /// **96 now, and the reasoning above is the one that changed.**
     ///
     /// Everything below this line still holds — a numeral magnified under
@@ -1052,10 +1050,10 @@ enum DieFaceLabels {
         }
     }
 
-    /// "ROLLS" in Aguafina Script, sized to fill the same square label
-    /// plane a numeral would occupy. Uses aspect-aware scaling rather than
-    /// a fixed point size: "ROLLS" is far wider than a single digit, so a
-    /// numeral-sized font would overflow the plane's width badly.
+    /// "ROLLS" in Lobster, drawn across 86% of its own plane — which is
+    /// sized from the FACE rather than from a numeral's box, since the
+    /// word is two and a half times wider than it is tall. See
+    /// `rollsLabelSize`.
     private static func rollsWordmarkImage() -> UIImage {
         cached("rolls") { drawRollsWordmark() }
     }
@@ -1150,27 +1148,16 @@ enum DieFaceLabels {
 
     private static func drawLabel(number: Int, underlined: Bool,
                                   sides: Int) -> UIImage {
-        // The history here is worth keeping, because the cause has only
-        // now actually been removed.
+        // SEMIBOLD, and that is what fixed numerals vanishing on the
+        // d8, d10 and d12.
         //
-        // Numerals kept vanishing on d8/d10/d12. The diagnosis was right:
-        // Stack Sans Notch was a variable font whose ONLY registered
-        // instance was ExtraLight, and those thin strokes had very few
-        // pixels to work with once minified onto the smaller label planes
-        // — the detail was not there to survive the scale-down. The fix
-        // available at the time was resolution, so the canvas went
-        // 128 -> 512 -> 256 (see labelCanvas for why it came back down),
-        // giving the renderer more pixels to resolve thin strokes before
-        // minification. An earlier attempt had swapped in a bold system
-        // font, which was rejected for abandoning the typeface to solve a
-        // legibility problem.
-        //
-        // Poppins ends that trade: it ships as separate static weights, so
-        // the numerals can simply be SEMIBOLD. The strokes are thick enough
-        // to survive minification on their own merits, in the app's actual
-        // typeface, which is what both earlier attempts were reaching for.
-        // The larger canvas stays — it is cheap, it is cached, and it is
-        // now belt-and-braces rather than the load-bearing fix.
+        // They were drawn in a thin weight — the only instance the old
+        // variable face registered — and thin strokes had too few pixels
+        // to survive minification onto a small label plane. Resolution was
+        // the fix available at the time, and the canvas chased it from 128
+        // to 512 to 256. Poppins ships separate static weights, so the
+        // numerals can simply be heavier, which is what both earlier
+        // attempts were reaching for.
         let size = CGSize(width: labelCanvas, height: labelCanvas)
         // Explicit format with opaque = false — UIGraphicsImageRenderer's
         // default format can be opaque depending on context, which would

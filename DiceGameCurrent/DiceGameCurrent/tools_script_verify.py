@@ -6,11 +6,9 @@ The face's terminal glyphs are drawn past their own advance width. Core
 Text and `size(withAttributes:)` both measure the advance, so anything that
 sizes a box from them cuts the final glyph.
 
-Still true after the swap from Aguafina to Lobster, and checked rather than
-assumed: Lobster's `L` overhangs its advance by +0.284 em, against Aguafina's
-worst of +0.490 on `Y`. Tamer, nowhere near tame enough to retire this — and
-`L` is its worst glyph, in a face whose whole remaining job is "Rolls" and
-"ROLLS".
+Checked rather than assumed: Lobster's `L` overhangs its advance by
++0.284 em, nowhere near tame enough to retire this — and `L` is its worst
+glyph, in a face whose whole job is "Rolls" and "ROLLS".
 
 That has been fixed three times in this project, three different ways — an
 ink-measured canvas for the floor text, a guessed trailing pad for the hub,
@@ -105,7 +103,7 @@ def main():
     # a canvas somebody else sized", which wants the typographic box so
     # that rows line up with each other.
     #
-    # Scoped to the FUNCTION, not the file: DieFaceLabels draws Stack Sans
+    # Scoped to the FUNCTION, not the file: DieFaceLabels draws Poppins
     # numerals a few functions away from the script wordmark, and a plain
     # sans face has little enough overhang that its advance is fine.
     drawers = ["DiceSceneEnvironment.swift", "DieFaceLabels.swift"]
@@ -128,9 +126,8 @@ def main():
         # while drawing with the other is a mismatch that only shows up
         # when a font's metrics change.
         #
-        # That is exactly how it surfaced: the arrangement held for
-        # Aguafina for months, then the swap to Lobster clipped the floor
-        # wordmark along its bottom edge, because Lobster's descender hangs
+        # That is exactly how it surfaced: the floor wordmark came out
+        # clipped along its bottom edge, because Lobster's descender hangs
         # below a box measured without it.
         #
         # canvasBounds is the union of the two, so neither can be cut off.

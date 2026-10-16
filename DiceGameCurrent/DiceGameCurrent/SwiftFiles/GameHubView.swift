@@ -447,8 +447,8 @@ private struct GameTile: View {
                     .foregroundStyle(.black)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
-                    // Stack Sans overhangs its advance width, so a trailing
-                    // glyph can clip against a tight frame.
+                    // A glyph can overhang its advance width and clip
+                    // against a tight frame.
                     .padding(.trailing, 3)
                     .frame(height: HubLayout.labelHeight(tile: side))
             }

@@ -19,12 +19,11 @@ enum AppFonts {
     ///
     /// Five static weights, where there used to be one.
     ///
-    /// Stack Sans Notch was a VARIABLE font, and SwiftUI's `Font.custom`
-    /// does not drive variable weight axes — so only its ExtraLight
-    /// instance was ever registered and every size in the app, from an
-    /// 11pt settings row to the 220pt turn-complete score, rendered in
-    /// that one thin weight. That was a documented limitation. Poppins
-    /// ships as separate static files, so a weight is now just a file.
+    /// The face this replaced was VARIABLE, and SwiftUI's `Font.custom`
+    /// does not drive variable weight axes — so one thin instance was all
+    /// the app could render, from an 11pt settings row to the 220pt
+    /// turn-complete score. Poppins ships as separate static files, so a
+    /// weight is just a file.
     enum Weight: String, CaseIterable {
         case regular = "Poppins-Regular"
         case medium = "Poppins-Medium"
@@ -42,12 +41,10 @@ enum AppFonts {
     /// each time, because each new call site started from the raw font
     /// again.
     ///
-    /// It would have been easy to assume Lobster, being a tamer face than
-    /// Aguafina, made all of that unnecessary. Measured rather than assumed:
-    /// Lobster's `L` still overhangs its advance by **+0.284 em** (Aguafina's
-    /// worst was `Y` at +0.490). A quarter of an em is plenty to clip, and
-    /// `L` is its worst offender while the two words that stay on this face
-    /// are "Rolls" and "ROLLS". So the guard stays exactly as it was.
+    /// Measured rather than assumed: Lobster's `L` overhangs its advance
+    /// by **+0.284 em**. A quarter of an em is plenty to clip, and `L` is
+    /// its worst offender while the two words on this face are "Rolls" and
+    /// "ROLLS".
     ///
     /// The raw name does not leave this file. SwiftUI goes through
     /// `ScriptText`; UIKit goes through `scriptFont(_:)` and
@@ -118,7 +115,8 @@ enum AppFonts {
 
     // MARK: Script text, for UIKit drawing
 
-    /// Aguafina at a point size, falling back rather than trapping.
+    /// The script face at a point size, falling back rather than
+    /// trapping.
     ///
     /// A wrong-looking font is a far smaller problem than a crash inside a
     /// texture render — and a nil here once produced a zero-size image and
@@ -167,9 +165,9 @@ enum AppFonts {
     ///             first glyph's corner.
     ///
     /// Sizing from ink and then drawing with `draw(at:)` mixes the two
-    /// conventions. Aguafina survived it; Lobster did not, and the floor
-    /// title came out clipped along the bottom — a descender hanging below
-    /// a canvas that had been measured without it.
+    /// conventions, and Lobster does not survive it: the floor title came
+    /// out clipped along the bottom, a descender hanging below a canvas
+    /// that had been measured without it.
     ///
     /// Taking the union cannot clip either way: the canvas holds the
     /// glyphs wherever they fall AND the line box the draw call lays out
@@ -215,13 +213,8 @@ enum AppFonts {
 extension Font {
     /// Poppins, the default font for every piece of text in this app.
     ///
-    /// The note that used to be here described Stack Sans Notch — a
-    /// variable font whose only registered instance was ExtraLight, so
-    /// every size in the app rendered thin and no call site could ask for
-    /// heavier. That is history: Poppins ships as five separate static
-    /// files and a weight is now just a file, with `.black` the heaviest
-    /// the family has. Left stale, that note read as a live warning that
-    /// weight could not be set at all, which is the opposite of true.
+    /// Five static weights, `.black` the heaviest the family has — see
+    /// `AppFonts.Weight`.
     ///
     /// The name passed here is the face's PostScript name, verified
     /// against each TTF's name table. If a weight still looks wrong on
@@ -240,15 +233,15 @@ extension Font {
         .custom(weight.rawValue, size: size, relativeTo: .body)
     }
 
-    /// Aguafina Script — the decorative script used for the "ROLLS" floor
-    /// text, the ROLLS die face, and the settings menu. Runs noticeably
-    /// smaller than Stack Sans at the same point size (script faces have a
-    /// small x-height relative to their em), so call sites generally want
-    /// a larger number than the Stack Sans equivalent.
+    /// Lobster — the decorative script used for the "ROLLS" floor text,
+    /// the ROLLS die face, and the settings menu. Runs noticeably smaller
+    /// than Poppins at the same point size (script faces have a small
+    /// x-height relative to their em), so call sites generally want a
+    /// larger number than the Poppins equivalent.
     ///
     /// `fileprivate` for the same reason the PostScript name is: the only
-    /// way to put Aguafina on screen is `ScriptText`, which reserves the
-    /// room this face needs. See the note on
+    /// way to put this face on screen is `ScriptText`, which reserves the
+    /// room it needs. See the note on
     /// `AppFonts.lobsterPostScriptName`.
     fileprivate static func lobster(_ size: CGFloat) -> Font {
         // Same relativeTo: fix as poppins above — this face is also used
@@ -273,10 +266,9 @@ extension Font {
 /// from the raw font and rediscover the bug — which is exactly how it came
 /// back the last three times.
 ///
-/// Kept through the swap to Lobster on evidence, not habit: measured against
-/// its own advance widths, Lobster's `L` overhangs by +0.284 em (Aguafina's
-/// worst was `Y` at +0.490). Tamer, nowhere near tame enough to drop this —
-/// and `L` is its worst glyph, in a face that now renders "Rolls" and
+/// Kept on evidence, not habit: measured against its own advance widths,
+/// Lobster's `L` overhangs by +0.284 em — nowhere near tame enough to drop
+/// this, and `L` is its worst glyph in a face that renders "Rolls" and
 /// "ROLLS".
 ///
 /// Three things hold the glyph inside its box, deliberately layered,

@@ -215,28 +215,53 @@ extension JackpotRules {
     ///
     /// `lockedNumbers` are the ones held — every face of every die that
     /// stayed on the table — and `rerolled` are the numbers the re-roll
-    /// produced. The locked points are the locked set scored once, at its
-    /// own value; anything the re-roll forms is scored at
-    /// `escalationMultiplier` and added.
+    /// produced. Sets are read across ALL SEVEN as they finally stand,
+    /// and each number in a set is worth its own value: once if it was
+    /// locked, `escalationMultiplier` times if the re-roll brought it.
     ///
-    /// And if the re-roll forms nothing, the turn is a wipeout: not the
-    /// re-roll's points, the TURN's, locked set included. That is the
-    /// whole shape of the gamble, and it is why `isWipeout` lives on the
-    /// score rather than being handled by the screen — a total that
-    /// quietly keeps the locked points would be the kindest possible bug
-    /// and nobody would report it.
+    /// **Reading the sets across all seven is what makes this a choice.**
+    /// Scoring only the sets formed AMONG the re-rolled numbers was the
+    /// first cut and it was a trap: locking the best set usually holds
+    /// two or three dice — often the d4, which is three of the seven
+    /// numbers — leaving two or three dice to make a set out of, which
+    /// they rarely do. Sampled over 20,000 throws it busted 75.6% of the
+    /// time and beat banking 18.9%, which is a button no one should ever
+    /// press. Counting a re-rolled number that joins the locked set
+    /// brings that to 31.3% and 50.9%, with the two roads averaging 15.7
+    /// against 15.6 — see tools_jackpot_verify.py, which samples it.
+    ///
+    /// And if the re-roll contributes to no set at all, the turn is a
+    /// wipeout: not the re-roll's points, the TURN's, locked set
+    /// included. That is the whole shape of the gamble, and it is why
+    /// `isWipeout` lives on the score rather than being handled by the
+    /// screen — a total that quietly kept the locked points would be the
+    /// kindest possible bug and nobody would report it.
     static func escalatedScore(lockedNumbers: [Int],
                                rerolled: [Int],
                                d20: Int?) -> TurnScore {
-        let locked = sets(in: lockedNumbers)
-        let fresh = sets(in: rerolled)
-        let big = hasBigSeven(lockedNumbers + rerolled)
+        let final = lockedNumbers + rerolled
+        let found = sets(in: final)
+        let big = hasBigSeven(final)
+        let scoring = big ? found.filter { $0.value != bigSevenValue } : found
 
-        let lockedScoring = big ? locked.filter { $0.value != bigSevenValue } : locked
-        let freshScoring = big ? fresh.filter { $0.value != bigSevenValue } : fresh
+        var lockedCounts: [Int: Int] = [:]
+        for number in lockedNumbers { lockedCounts[number, default: 0] += 1 }
+        var freshCounts: [Int: Int] = [:]
+        for number in rerolled { freshCounts[number, default: 0] += 1 }
 
-        let points = lockedScoring.reduce(0) { $0 + $1.value * $1.count }
-            + freshScoring.reduce(0) { $0 + $1.value * $1.count } * escalationMultiplier
+        var points = 0
+        var rerollContributed = false
+        for set in found {
+            let fresh = freshCounts[set.value] ?? 0
+            if fresh > 0 { rerollContributed = true }
+            // The Big 7 pays its bonus instead of its set, and the bonus
+            // is flat — a 7 that arrived on the re-roll does not double
+            // it.
+            guard !(big && set.value == bigSevenValue) else { continue }
+            let held = lockedCounts[set.value] ?? 0
+            points += set.value * held
+                + set.value * fresh * escalationMultiplier
+        }
 
         return TurnScore(
             setPoints: points,
@@ -244,9 +269,9 @@ extension JackpotRules {
             // An escalation cannot jackpot. It started from a roll that
             // had a set, and the Jackpot is the absence of one.
             isJackpot: false,
-            sets: lockedScoring + freshScoring,
+            sets: scoring,
             hasBigSeven: big,
-            isWipeout: fresh.isEmpty
+            isWipeout: !rerollContributed
         )
     }
 
@@ -370,7 +395,7 @@ enum JackpotGame: SuiteGame {
         ),
         GameRuleSection(
             title: "The Escalation",
-            body: "  * After a roll that forms at least one set, the turn offers a choice:\n      Bank: take the turn as rolled and pass.\n      Escalate: lock the highest-scoring set and re-roll everything else.\n  * Locking: every die showing a number from that set is held, including the\n    d4 if any of its three exposed faces belongs to it.\n  * The Multiplier: sets formed among the re-rolled numbers score DOUBLE, and\n    are added to the locked points.\n  * Wipeout: if the re-roll forms no set at all, the whole turn scores zero —\n    the locked points go with it.\n  * One escalation per turn. The booster is read from the d20's final face, and\n    the Big 7 Bonus from the seven numbers as they finally stand."
+            body: "  * After a roll that forms at least one set, the turn offers a choice:\n      Bank: take the turn as rolled and pass.\n      Escalate: lock the highest-scoring set and re-roll everything else.\n  * Locking: every die showing a number from that set is held, including the\n    d4 if any of its three exposed faces belongs to it.\n  * The Multiplier: sets are read across all seven numbers as they finally\n    stand. Every number in a set scores its own value — once if you locked it,\n    DOUBLE if the re-roll brought it. A re-rolled number joining the locked\n    set counts as the re-roll's.\n  * Wipeout: if the re-roll adds to no set at all, the whole turn scores zero —\n    the locked points go with it.\n  * One escalation per turn. The booster is read from the d20's final face, and\n    the Big 7 Bonus from the seven numbers as they finally stand."
         ),
         GameRuleSection(
             title: "Match Resolution",

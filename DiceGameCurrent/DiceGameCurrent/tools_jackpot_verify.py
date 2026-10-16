@@ -65,16 +65,28 @@ def score(numbers, d20):
 
 
 def escalated(locked_numbers, rerolled, d20):
-    """JackpotRules.escalatedScore(lockedNumbers:rerolled:d20:)"""
-    locked = sets_in(locked_numbers)
-    fresh = sets_in(rerolled)
-    if not fresh:
+    """JackpotRules.escalatedScore(lockedNumbers:rerolled:d20:)
+
+    Sets across all seven final numbers; each number scores its own value
+    once if it was locked and ESCALATION times if the re-roll brought it.
+    A wipeout is the re-roll adding to no set at all — including the
+    locked one, which a re-rolled number can join.
+    """
+    final = locked_numbers + rerolled
+    big = has_big_seven(final)
+    held, new = Counter(locked_numbers), Counter(rerolled)
+
+    points = 0
+    contributed = False
+    for value, _ in sets_in(final):
+        if new[value]:
+            contributed = True
+        if big and value == BIG_SEVEN_VALUE:
+            continue                        # pays its bonus, flat, instead
+        points += value * held[value] + value * new[value] * ESCALATION
+
+    if not contributed:
         return 0, True                      # wipeout: the turn, not the re-roll
-    big = has_big_seven(locked_numbers + rerolled)
-    keep = lambda pairs: [(v, c) for v, c in pairs
-                          if not (big and v == BIG_SEVEN_VALUE)]
-    points = (sum(v * c for v, c in keep(locked))
-              + sum(v * c for v, c in keep(fresh)) * ESCALATION)
     booster = d20 if (d20 is not None and d20 >= BOOSTER) else None
     return points + (booster or 0) + (BIG_SEVEN_BONUS if big else 0), False
 
@@ -174,6 +186,7 @@ for _ in range(TRIALS):
     rerolled = numbers_from(rerolled_results)
     points, wiped = escalated(locked_numbers, rerolled, final_d20)
 
+
     busts += 1 if wiped else 0
     better += 1 if points > banked else 0
     bank_total += banked
@@ -185,13 +198,27 @@ print("  busts             : %.1f%% of escalations" % (100 * busts / offered))
 print("  beat banking      : %.1f%%" % (100 * better / offered))
 print("  mean banked       : %.1f" % (bank_total / offered))
 print("  mean escalated    : %.1f" % (escalate_total / offered))
-# A choice worth having: both roads win sometimes, and neither is free.
-assert 0.15 < busts / offered < 0.85, \
-    "escalation busts %.0f%% of the time — that is not a choice, it is a " \
-    "trap or a formality" % (100 * busts / offered)
-assert 0.15 < better / offered < 0.85, \
-    "escalating beats banking %.0f%% of the time — nobody would ever " \
-    "face a decision" % (100 * better / offered)
+# A choice worth having, and the band is tight on purpose now.
+#
+# The first cut of this rule scored only the sets formed AMONG the
+# re-rolled numbers, and it measured 75.6% busts against 18.9% of
+# escalations beating the bank — inside a 15-85 band, and still a button
+# nobody should ever press. The band that passes a trap is not a check.
+#
+# Counting a re-rolled number that joins the locked set is what made it a
+# gamble: 31% busts, 51% beating the bank, and the two roads averaging
+# within a point of each other. These bounds hold that, so a change to
+# the multiplier, the lock rule or the wipeout has to come back here and
+# say what it did to the odds.
+assert 0.25 < busts / offered < 0.45, \
+    "escalation busts %.0f%% of the time — the gamble has moved: under a " \
+    "quarter is free money, over 45%% is a trap" % (100 * busts / offered)
+assert 0.40 < better / offered < 0.65, \
+    "escalating beats banking %.0f%% of the time — a choice nobody has to " \
+    "think about is not a choice" % (100 * better / offered)
+assert abs(escalate_total - bank_total) / bank_total < 0.20, \
+    "the two roads pay %.1f and %.1f on average — one of them is simply " \
+    "better" % (escalate_total / offered, bank_total / offered)
 
 # the d4 contract the game depends on
 print()

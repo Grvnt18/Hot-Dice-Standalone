@@ -119,9 +119,11 @@ THE ESCALATION
       Escalate: lock the highest-scoring set and re-roll everything else.
   * Locking: every die showing a number from that set is held, including the 
     d4 if any of its three exposed faces belongs to it.
-  * The Multiplier: sets formed among the re-rolled numbers score DOUBLE, and 
-    are added to the locked points.
-  * Wipeout: if the re-roll forms no set at all, the whole turn scores zero — 
+  * The Multiplier: sets are read across all seven numbers as they finally 
+    stand. Every number in a set scores its own value — once if you locked it, 
+    DOUBLE if the re-roll brought it. A re-rolled number joining the locked 
+    set counts as the re-roll's.
+  * Wipeout: if the re-roll adds to no set at all, the whole turn scores zero — 
     the locked points go with it.
   * One escalation per turn. The booster is read from the d20's final face, and 
     the Big 7 Bonus from the seven numbers as they finally stand.

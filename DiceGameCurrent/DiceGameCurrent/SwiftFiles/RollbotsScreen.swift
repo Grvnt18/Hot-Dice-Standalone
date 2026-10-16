@@ -882,7 +882,18 @@ struct RollbotsScreen: View {
     private var primaryLabel: String {
         if let pendingMove { return label(for: pendingMove) }
         switch phase {
-        case .action, .swapping, .defending: return "Choose Above"
+        // Each choosing phase names what it wants, rather than pointing
+        // at the menu. "Choose Above" was the one label in the suite that
+        // described where to look instead of what to do — and the menu it
+        // pointed at covers the whole tray now, so "above" was also the
+        // only thing on screen.
+        //
+        // Title case, like every other label on this bar and unlike
+        // `barSubtitle` below: the labels name an action, the subtitles
+        // are sentences.
+        case .action:    return "Pick a Move"
+        case .swapping:  return "Pick a Weapon"
+        case .defending: return "Pick a Defence"
         case .rollingAttack:   return "Rolling"
         case .readingAttack:   return "Attack"
         case .rollingDefence:  return "Rolling Defence"

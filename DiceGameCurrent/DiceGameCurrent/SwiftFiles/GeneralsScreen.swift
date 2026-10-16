@@ -531,7 +531,10 @@ struct GeneralsCardView: View {
                         SoundEngine.shared.play(.buttonTap)
                         onClose()
                     } label: {
-                        Text("Back")
+                        // "Close", the same word the bar uses for the
+                        // same act in the same screen — this button and
+                        // the bar's secondary both just put the card away.
+                        Text("Close")
                             .font(.poppins(15))
                             .frame(maxWidth: .infinity)
                             .frame(height: 46)

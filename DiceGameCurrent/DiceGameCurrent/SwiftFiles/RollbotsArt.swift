@@ -514,8 +514,16 @@ struct NetResultView: View {
                         SoundEngine.shared.play(.buttonTap)
                         onPlayAgain()
                     } label: {
-                        Text("Run It Back")
+                        // The longest label in the suite, so it is also
+                        // the one that has to be told not to wrap: the
+                        // button is 232pt wide inside its 44pt padding on
+                        // a 320pt window and this sets at 199.4, which
+                        // fits — but with 32pt to spare rather than the
+                        // 80 the old "Run It Back" had.
+                        Text("Reset Combat Simulation")
                             .font(.poppins(15))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
                             .foregroundStyle(NetArt.background)
                             .frame(maxWidth: .infinity)
                             .frame(height: 46)

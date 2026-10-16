@@ -219,7 +219,7 @@ struct ThreeThousandScreen: View {
                     ? "Tap what scores — \(turnTotal) riding on it"
                     : "Tap the dice that score"
             }
-            guard let takePoints else { return "That die doesn't score — untap it" }
+            guard let takePoints else { return "That die doesn't score — unselect it" }
             if isHotDice { return "All six — roll again for \(turnTotal + takePoints)" }
             return "Taking \(takePoints), \(remainingAfterTake) dice left"
         case .scored:

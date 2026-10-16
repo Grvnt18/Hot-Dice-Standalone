@@ -213,6 +213,59 @@ def die_faces(path):
     return [r for r in radii if r > biggest * 0.6]
 
 
+def check_wordmark_fit(failed):
+    """ROLLS fits the d6 face it is printed on, measured in Lobster.
+
+    The wordmark was sized with `labelSize` — the box a single digit
+    needs — which bounds by half-diagonal, the right rule for something
+    as tall as it is wide and the wrong one for a word 2.6 times wider
+    than it is tall. The word came out at 57% of the face with the rest
+    left empty, which is what "still too small" meant.
+
+    Sized from the face now, so the thing worth checking flipped: it used
+    to be impossible for the word to run off the edge and is now merely
+    unlikely. The ink is measured in the shipped face rather than
+    modelled, like the numerals above, because the swash on the S is
+    exactly the sort of thing an advance-width model misses.
+    """
+    try:
+        from PIL import ImageFont
+    except ImportError:
+        print("  %-26s skipped (Pillow unavailable)" % "wordmark fit")
+        return
+
+    labels = source(LABELS)
+    plane = re.search(r'rollsLabelSize: CGFloat = ([\d.]+)', labels)
+    fill = re.search(r'size\.width \* ([\d.]+)\s*\n\s*let fittedSize', labels)
+    if not plane or not fill:
+        failed.append("DieFaceLabels no longer states the ROLLS plane and "
+                      "the fraction of it the word spans")
+        return
+
+    body = labels[labels.index("func inscribedRadius"):]
+    body = body[: body.index("\n    }")]
+    radius = dict((int(a), float(b)) for a, b in
+                  re.findall(r'case (\d+):\s*return ([\d.]+)', body))[6]
+
+    font = ImageFont.truetype(os.path.join(RESOURCES, "Lobster-Regular.ttf"), 1000)
+    x0, y0, x1, y1 = font.getbbox("ROLLS")
+    aspect = (y1 - y0) / float(x1 - x0)
+
+    width = float(plane.group(1)) * float(fill.group(1))
+    height = width * aspect
+    face = radius * 2
+
+    if width > face:
+        failed.append("ROLLS inks %.3f across a d6 face that holds %.3f — "
+                      "the word runs off the edge" % (width, face))
+    elif height > face:
+        failed.append("ROLLS inks %.3f tall against a face of %.3f"
+                      % (height, face))
+    else:
+        print("  %-26s ok (%.3f x %.3f on a face of %.3f, %.0f%% of its width)"
+              % ("wordmark fit", width, height, face, 100 * width / face))
+
+
 def check_label_roll(failed):
     """Every numeral stands square to its face, and none of them is a NaN.
 
@@ -748,6 +801,7 @@ def main():
     check_numerals(failed)
     check_numeral_fit(failed)
     check_label_roll(failed)
+    check_wordmark_fit(failed)
 
     if failed:
         print()

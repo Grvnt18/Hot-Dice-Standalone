@@ -99,6 +99,27 @@ enum DieFaceLabels {
         count > 1 ? twoDigitSqueeze : 1
     }
 
+    /// The plane the ROLLS wordmark is drawn on.
+    ///
+    /// **Not `labelSize`, and that is why the word was small.** It was
+    /// taking the d6 numeral's 0.65 — a box sized by the half-diagonal of
+    /// a single digit, which is the right bound for something roughly as
+    /// tall as it is wide and the wrong one for a word. "ROLLS" inks 2.59
+    /// em wide by 1.01 tall in Lobster, so its height never comes near
+    /// the face and its width is the whole question. At 0.65 the word
+    /// spanned 0.56 of a face 0.98 across: 57%, with four tenths of the
+    /// face left empty either side.
+    ///
+    /// Sized from the face instead. The word is drawn across 86% of this
+    /// plane (see `drawRollsWordmark`), so a plane of 1.028 puts the ink
+    /// at 0.884 — 90% of the d6's inscribed circle, the same margin a
+    /// two-digit numeral takes — and 0.342 tall, which is a third of the
+    /// face and nowhere near its edges.
+    ///
+    /// One number rather than a function of `sides`: only a d6 can carry
+    /// it, since it goes in place of a six.
+    private static let rollsLabelSize: CGFloat = 1.028
+
     /// How much of a face's inscribed circle a numeral may reach across.
     ///
     /// Measured to the CORNER of the ink box, which is the emptiest part
@@ -226,7 +247,10 @@ enum DieFaceLabels {
             // Per NUMBER, not per die: "10" needs a wider plane than "7"
             // and was holding every single digit on the die down to its
             // own size. See labelSize.
-            let size = labelSize(forSides: sides, number: number)
+            let isRollsFace = (number == rollsFaceNumber)
+            let size = isRollsFace
+                ? rollsLabelSize
+                : labelSize(forSides: sides, number: number)
             let plane = SCNPlane(width: size, height: size)
 
             // Building a new SCNMaterial and assigning the whole array
@@ -245,7 +269,6 @@ enum DieFaceLabels {
             // is never ambiguous (no 9 exists to confuse it with), so
             // they're left clean.
             let needsUnderline = (sides == 10 || sides == 12 || sides == 20) && (number == 6 || number == 9)
-            let isRollsFace = (number == rollsFaceNumber)
             let image = isRollsFace
                 ? rollsWordmarkImage()
                 : labelImage(number: number, underlined: needsUnderline,

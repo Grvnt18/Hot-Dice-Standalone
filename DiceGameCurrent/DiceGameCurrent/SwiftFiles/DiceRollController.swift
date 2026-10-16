@@ -21,7 +21,10 @@ private enum SettleTuning {
     /// 0.7-restitution walls before it is still enough to settle, and a
     /// budget left behind would force-settle it mid-bounce — faster dice
     /// that look worse, which is the opposite of the ask.
-    static let minRollDuration: TimeInterval = 1.4
+    /// Doubled, with the energy bleed: dice that shed velocity more slowly
+    /// are still moving at 1.4s, and a budget that short would force-settle
+    /// a roll that was going perfectly well.
+    static let minRollDuration: TimeInterval = 2.8
     /// Hard ceiling — no roll is allowed to run longer than this, no matter
     /// how many dice or how physics behaves. Raised from 3.5 to 5.0
     /// alongside this round's 2.5-3.5x motion increase: with real
@@ -39,12 +42,55 @@ private enum SettleTuning {
     /// ends on the still-frame detector well inside it, so the cap only
     /// decides how long the rare stubborn pile is given before it is
     /// separated and settled by force.
-    static let maxRollDuration: TimeInterval = 6.0
+    ///
+    /// Raised 6.0 -> 9.0 with the energy bleed. The ramp is what makes a
+    /// longer cap safe rather than slow: damping is at its full
+    /// `settlingDamping` by 95% of the budget, so a die still moving then
+    /// has a few frames of heavy drag ahead of it and stops on the
+    /// still-frame detector. Reaching 9 seconds means the bleed failed,
+    /// which is the case this number exists for.
+    static let maxRollDuration: TimeInterval = 9.0
     /// Dice count at which we hit the max duration ceiling.
     /// Raised with Free Roll's ceiling: this scales the roll's time
     /// budget, so leaving it at 15 would have given a 20-die throw the
     /// same seconds to settle as a 15-die one.
     static let maxDiceInPool = 20
+
+    // MARK: The energy bleed
+
+    /// Linear and angular damping while a die is still rolling freely.
+    ///
+    /// LOWER than the 0.08 and 0.1 `DiePhysicsFactory` builds a die with,
+    /// and that is the whole of why a roll lasts longer now: damping is a
+    /// fraction of velocity shed every step, so it is what decides how
+    /// quickly a throw runs out of energy. The factory's values are what a
+    /// die lives with off the clock; these are what it rolls with.
+    static let rollingDamping: Float = 0.02
+    static let rollingAngularDamping: Float = 0.03
+
+    /// And what it is damped to by the end of the bleed.
+    ///
+    /// High enough that a die still moving at the end of its budget is
+    /// brought down within a few frames rather than frozen mid-bounce —
+    /// which is what the force-settle path does, and why a roll that ends
+    /// there can leave dice overlapping.
+    static let settlingDamping: Float = 0.55
+    static let settlingAngularDamping: Float = 0.60
+
+    /// When the bleed starts and finishes, as fractions of THIS roll's own
+    /// time budget rather than absolute seconds.
+    ///
+    /// Proportional because the budget already scales with the pool — see
+    /// `timeBudget(forDiceCount:)` — so a one-die throw and a twenty-die
+    /// throw bleed over the same shape of roll instead of the small one
+    /// being damped from halfway through somebody else's schedule.
+    ///
+    /// The window runs to 0.95 rather than 1.0 so the damping is fully on
+    /// BEFORE the cap, not at it: the point of the ramp is that the
+    /// still-frame detector gets to end the roll naturally, with the hard
+    /// cap left as the emergency it was meant to be.
+    static let bleedStartFraction: Double = 0.45
+    static let bleedEndFraction: Double = 0.95
 
     /// Duration of the corrective snap that rotates a settled die onto its
     /// nearest valid resting face, ironing out any odd angle left over from
@@ -387,6 +433,7 @@ final class DiceRollController: NSObject, SCNSceneRendererDelegate {
         let timeIsUp = elapsed >= maxDurationForThisRoll
 
         applyRepulsion(elapsed: elapsed)
+        applyEnergyBleed(elapsed: elapsed)
         enforceContainment()
 
         for state in trackedDice where !state.isSettled {
@@ -413,6 +460,50 @@ final class DiceRollController: NSObject, SCNSceneRendererDelegate {
             DispatchQueue.main.async { [weak self] in
                 self?.onRollComplete?()
             }
+        }
+    }
+
+    /// Bleeds a roll's energy off on a schedule instead of all at once.
+    ///
+    /// **This is what lets a die roll for twice as long without the end of
+    /// the roll getting worse.** The two ways to end a roll were never
+    /// equal: a die that slows below the thresholds for six frames settles
+    /// NATURALLY, keeps its contacts, and gets its snap from an
+    /// orientation it actually reached; a die still moving at the time cap
+    /// is force-settled, which freezes it wherever it happens to be —
+    /// mid-bounce, or overlapping a neighbour. Lowering damping to make
+    /// the roll last longer, on its own, just moves dice from the first
+    /// ending to the second.
+    ///
+    /// So damping is a ramp rather than a constant. For the first 45% of
+    /// the budget a die is barely damped at all and tumbles on its own
+    /// momentum; from there it is dragged down smoothly, reaching full
+    /// `settlingDamping` at 95% — before the cap, not at it. The dice come
+    /// to rest because they have run out of energy, which is what the
+    /// still-frame detector is for, and the hard cap goes back to being
+    /// the emergency it was written as.
+    ///
+    /// Eased rather than linear: the square makes the first half of the
+    /// window almost free and the last half do most of the work, so a roll
+    /// does not visibly "start braking" at one moment.
+    private func applyEnergyBleed(elapsed: TimeInterval) {
+        let budget = max(maxDurationForThisRoll, 0.001)
+        let fraction = elapsed / budget
+        let span = SettleTuning.bleedEndFraction - SettleTuning.bleedStartFraction
+        let raw = (fraction - SettleTuning.bleedStartFraction) / max(span, 0.001)
+        let progress = Float(min(max(raw, 0), 1))
+        let eased = progress * progress
+
+        let linear = SettleTuning.rollingDamping
+            + (SettleTuning.settlingDamping - SettleTuning.rollingDamping) * eased
+        let angular = SettleTuning.rollingAngularDamping
+            + (SettleTuning.settlingAngularDamping
+               - SettleTuning.rollingAngularDamping) * eased
+
+        for state in trackedDice where !state.isSettled {
+            guard let body = state.node.physicsBody else { continue }
+            body.damping = CGFloat(linear)
+            body.angularDamping = CGFloat(angular)
         }
     }
 
@@ -585,12 +676,22 @@ final class DiceRollController: NSObject, SCNSceneRendererDelegate {
         let baseForce: Float = 18.0
         let speedCeiling: Float = 3.0 // above this speed, gentle-phase repulsion is fully off
 
-        // Kept at 3.5 while the cap moved to 6.0: a pile that has not
-        // come apart in three and a half seconds is not going to, and
-        // starting later would only shorten the window the separation
-        // force has to work in.
-        let escalationStart: TimeInterval = 3.5
-        let escalationEnd: TimeInterval = SettleTuning.maxRollDuration // 5.0 — by the hard cap, force is at its strongest
+        // ON THE SAME SCHEDULE AS THE ENERGY BLEED, and no longer a typed
+        // 3.5 seconds.
+        //
+        // This number was chosen against a 5-second cap and kept through a
+        // move to 6. At 9 it would have been actively wrong: 3.5s is 39%
+        // of a full pool's budget now, which is before the bleed even
+        // starts, so a 40x separation force would have been fighting dice
+        // that are still tumbling under their own momentum — exactly the
+        // "lively mid-roll" this is written to stay out of.
+        //
+        // Tying it to `bleedStartFraction` says what the comment above
+        // always meant: separation escalates while the momentum is
+        // bleeding out, because that is the window where a pile stops
+        // sorting itself out. One schedule, read from one place.
+        let escalationStart = maxDurationForThisRoll * SettleTuning.bleedStartFraction
+        let escalationEnd = maxDurationForThisRoll
         let isEscalating = elapsed >= escalationStart
         let escalationProgress = isEscalating
             ? min(1.0, (elapsed - escalationStart) / max(escalationEnd - escalationStart, 0.001))

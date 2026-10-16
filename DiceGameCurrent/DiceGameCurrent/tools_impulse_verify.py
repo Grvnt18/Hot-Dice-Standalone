@@ -187,15 +187,25 @@ def main():
     max_d = constant(controller, "maxRollDuration")
     max_pool = constant(controller, "maxDiceInPool")
 
-    # The band moved with the doubled throw: a die thrown twice as hard
-    # needs ~1.9 more bounce cycles to lose the energy, and a budget left
-    # at the old 2.1s would force-settle it mid-bounce. Held to 3.0s at
-    # the top, because "compensate" is not "let a one-die roll run for
-    # five seconds".
+    # The band moved again with the ENERGY BLEED, and what it measures is
+    # worth restating: this is a CAP, not how long a roll takes. A die
+    # settles when it stops moving for six frames, and the budget only
+    # decides when one that has not stopped is settled by force.
+    #
+    # It was 2.5-3.0s, set when damping was a flat 0.08 and a die bled its
+    # energy off in about two seconds. Damping now starts at 0.02 and
+    # ramps up over the roll's second half, so the same throw stays live
+    # roughly twice as long — and a budget left at 3.0 would have spent
+    # the extra by force-settling mid-bounce, which is the failure this
+    # band exists to catch rather than the one it would have caused.
+    #
+    # The top of the band is what stops "longer" from becoming "slow": a
+    # single die that somehow never settles is still on the table at six
+    # seconds, and that is the worst case anyone waits through.
     for count in (1, 2, 3, 4):
         after = time_budget(count, min_d, max_d, max_pool)
-        if not 2.5 <= after <= 3.0:
-            failed.append("%d dice: budget %.2fs is outside 2.5-3.0s"
+        if not 4.5 <= after <= 6.0:
+            failed.append("%d dice: budget %.2fs is outside 4.5-6.0s"
                           % (count, after))
     for count in (5, 10, 20):
         before = (min_d + (min(count, max_pool) - 1) / float(max_pool - 1)
@@ -213,6 +223,59 @@ def main():
           % ("time budget",
              min(time_budget(n, min_d, max_d, max_pool) for n in (1, 2, 3, 4)),
              max(time_budget(n, min_d, max_d, max_pool) for n in (1, 2, 3, 4))))
+
+    # --- 3b. The energy bleed ramps the right way, and lands early. ---
+    #
+    # What this cannot check is physics: whether a die thrown this hard,
+    # damped on this schedule, is actually still by 95% of its budget is a
+    # simulation question, and the iPad answers it. What it can check is
+    # the shape of the schedule, where the failure is silent — a ramp that
+    # ends after the cap, or one whose ends are the wrong way round, gives
+    # back exactly the force-settled roll the bleed was added to avoid,
+    # and nothing about the code would look wrong.
+    bleed = {}
+    for name in ("rollingDamping", "rollingAngularDamping",
+                 "settlingDamping", "settlingAngularDamping",
+                 "bleedStartFraction", "bleedEndFraction"):
+        m = re.search(r'static let %s: (?:Float|Double) = ([\d.]+)' % name,
+                      controller)
+        if not m:
+            failed.append("SettleTuning no longer declares %s" % name)
+        else:
+            bleed[name] = float(m.group(1))
+
+    if len(bleed) == 6:
+        if bleed["rollingDamping"] >= bleed["settlingDamping"]:
+            failed.append("the bleed runs backwards: dice are damped %.2f "
+                          "while rolling and %.2f while settling"
+                          % (bleed["rollingDamping"], bleed["settlingDamping"]))
+        if bleed["rollingAngularDamping"] >= bleed["settlingAngularDamping"]:
+            failed.append("the angular bleed runs backwards (%.2f -> %.2f)"
+                          % (bleed["rollingAngularDamping"],
+                             bleed["settlingAngularDamping"]))
+        if not 0 < bleed["bleedStartFraction"] < bleed["bleedEndFraction"]:
+            failed.append("the bleed window is not a window: %.2f to %.2f"
+                          % (bleed["bleedStartFraction"], bleed["bleedEndFraction"]))
+        if bleed["bleedEndFraction"] >= 1.0:
+            failed.append("the bleed finishes at %.2f of the budget — at or "
+                          "after the hard cap, so full damping never gets a "
+                          "frame to work in and the roll ends by force"
+                          % bleed["bleedEndFraction"])
+        # The dice must be damped BEFORE they are shoved apart, or the
+        # 40x separation force fights a roll that is still lively.
+        if not re.search(r'escalationStart = maxDurationForThisRoll'
+                         r'\s*\*\s*SettleTuning\.bleedStartFraction', controller):
+            failed.append("the repulsion escalation no longer starts with "
+                          "the bleed — a typed second schedule is how 3.5s "
+                          "outlived two changes to the cap")
+        if not failed:
+            print("  %-30s ok (%.2f/%.2f -> %.2f/%.2f over %.0f-%.0f%% of "
+                  "the budget)"
+                  % ("energy bleed", bleed["rollingDamping"],
+                     bleed["rollingAngularDamping"], bleed["settlingDamping"],
+                     bleed["settlingAngularDamping"],
+                     bleed["bleedStartFraction"] * 100,
+                     bleed["bleedEndFraction"] * 100))
 
     # --- 4. Nothing tunnels at the new speed. -------------------------
     #

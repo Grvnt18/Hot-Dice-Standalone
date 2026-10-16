@@ -188,13 +188,50 @@ enum DicePoolSceneBuilder {
     ) -> [UUID: SCNNode] {
         var nodesByID: [UUID: SCNNode] = [:]
 
-        // One random d6 per game gets "ROLLS" in place of its 6.
-        let rollsDieID = includeRollsFace
-            ? pool.filter { $0.sides == 6 }.randomElement()?.id
-            : nil
         // Exactly one die per round is the oversized one. Drawn from the
         // whole pool, not just d6s, so any shape can be the big one.
         let oversizedDieID = includeOversizedDie ? pool.randomElement()?.id : nil
+
+        // Sizes first, because which die carries "ROLLS" now depends on
+        // them.
+        var scaleByID: [UUID: Float] = [:]
+        for die in pool {
+            if alwaysLargest || die.id == oversizedDieID {
+                scaleByID[die.id] = oversizeMultiplier
+            } else {
+                scaleByID[die.id] = normalSizeMultiplier(sides: die.sides)
+            }
+        }
+
+        // The BIGGEST d6 wears it, not a random one.
+        //
+        // The wordmark is a flourish, and a flourish on the smallest die
+        // in a handful of fifteen is a flourish nobody sees — it was
+        // landing on a 0.85x d6 as often as on the 1.5x one. On the
+        // largest it reads as the thing it is: one die, the one your eye
+        // goes to anyway, with the suite's name on its six.
+        //
+        // Which d6 that is depends on the throw. When the oversized die
+        // is a d6 — twelve of Rolls' fifteen dice are — it is that one at
+        // 1.5x; otherwise it is whichever d6 the size variance dealt
+        // highest, somewhere up to 1.15x. The ROLLS face is never on a
+        // d8, d10 or d12, since those have no 6 to replace.
+        //
+        // Ties go to pool order, which `alwaysLargest` makes the norm
+        // rather than the exception: every die is oversized there, so the
+        // first d6 wins. Deterministic beats arbitrary when a tie is the
+        // usual case.
+        var rollsDieID: UUID?
+        if includeRollsFace {
+            var best: Float = -1
+            for die in pool where die.sides == 6 {
+                let scale = scaleByID[die.id] ?? 1
+                if scale > best {
+                    best = scale
+                    rollsDieID = die.id
+                }
+            }
+        }
 
         for die in pool {
             guard let node = DieMeshLibrary.templateNode(forSides: die.sides) else {
@@ -207,12 +244,10 @@ enum DicePoolSceneBuilder {
             // DiePhysicsFactory passes it as the collision hull's scale
             // (so the hull matches the visual size). Scaling afterwards
             // would leave labels floating and the hull mismatched.
-            let variation: Float
-            if alwaysLargest || die.id == oversizedDieID {
-                variation = oversizeMultiplier
-            } else {
-                variation = normalSizeMultiplier(sides: die.sides)
-            }
+            // Read back rather than re-rolled: `normalSizeMultiplier` is
+            // random, so asking it twice would give this die one size and
+            // the ROLLS choice above a different one.
+            let variation = scaleByID[die.id] ?? 1
             node.scale = SCNVector3(
                 node.scale.x * variation,
                 node.scale.y * variation,

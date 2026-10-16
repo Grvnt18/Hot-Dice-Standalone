@@ -154,13 +154,41 @@ def main():
     # --- 2. The launch actually applies it. ---------------------------
     for label, pattern in (
         ("linear", r'minLinearImpulse\.\.\.maxLinearImpulse\) \* boost'),
-        ("torque", r'minTorqueMagnitude\.\.\.maxTorqueMagnitude\) \* boost'),
+        # The line break is allowed because the torque now carries the
+        # size term as well, and the pair is too long for one line.
+        ("torque", r'minTorqueMagnitude\.\.\.maxTorqueMagnitude\)\s*\n?\s*\* boost'),
         ("upward", r'minUpwardImpulse\.\.\.maxUpwardImpulse\) \* upwardBoost'),
     ):
         if not re.search(pattern, impulse):
             failed.append("launch() does not boost %s" % label)
     if not re.search(r'let upwardBoost = sqrt\(boost\)', impulse):
         failed.append("upward no longer takes the square root of the boost")
+
+    # --- 2b. And the torque carries the die's SIZE SQUARED. -----------
+    #
+    # An angular impulse buys angular velocity through the inertia
+    # tensor, w = L / I, and I goes as m r². Every die has mass 1.0
+    # whatever its size — deliberately, so a big die and a small one
+    # collide sensibly — so the 1.5x die was handed the same L as the
+    # rest and turned at 1/1.5², which is 44% of their rate. It crossed
+    # the tray and rose off the throw exactly like its neighbours, since
+    # linear velocity is impulse over mass, while barely tumbling.
+    #
+    # This is the half of the fix that could silently come undone: drop
+    # the size term and the big die goes back to not turning over, which
+    # reads as a feel problem rather than a missing multiplier.
+    if not re.search(r'\* boost \* size \* size', impulse):
+        failed.append("torque no longer scales with the die's size squared "
+                      "— the oversized die's inertia is 2.25x a normal "
+                      "one's, so the same angular impulse spins it at 44%")
+    elif not re.search(r'DieMeshLibrary\.sizeMultiplier\(forSides:', impulse):
+        failed.append("launch computes a size for the torque without asking "
+                      "DieMeshLibrary what the node's scale means")
+    else:
+        print("  %-30s ok (%.2fx die gets %.2fx the angular impulse)"
+              % ("torque vs inertia",
+                 swift_float(source("DiceSceneBuilder.swift"), "oversizeMultiplier"),
+                 swift_float(source("DiceSceneBuilder.swift"), "oversizeMultiplier") ** 2))
 
     # The global doubling rides in the same `boost`, which is what gives
     # upward its square root for free. If it is ever applied separately to

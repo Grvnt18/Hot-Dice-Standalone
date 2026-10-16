@@ -39,6 +39,22 @@ enum DieMeshLibrary {
         20: targetSize / 3.1743
     ]
 
+    /// How much bigger than a normal die this node is, read back from the
+    /// scale it was built with.
+    ///
+    /// `targetSize` is 1.0 and every mesh is normalised to it, so a die's
+    /// PHYSICAL size is exactly the variation the builder multiplied in —
+    /// 0.85 to 1.15 for an ordinary die, 1.5 for the oversized one. That
+    /// is the number the throw needs, and dividing the node's own scale
+    /// by this shape's normalisation factor is how to get it without
+    /// anyone having to carry it alongside the node.
+    static func sizeMultiplier(forSides sides: Int, nodeScale: Float) -> Float {
+        guard let base = sizeNormalizationScale[sides], base > 0.0001 else {
+            return 1
+        }
+        return nodeScale / base
+    }
+
     /// Expects each die's mesh available as a bundle resource named "d6",
     /// "d8", "d10", "d12". Tries, in order: .scn (fastest, if you've
     /// converted via Xcode's Editor -> Convert to SceneKit scene file

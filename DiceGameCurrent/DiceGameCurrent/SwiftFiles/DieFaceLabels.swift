@@ -50,7 +50,7 @@ enum DieFaceLabels {
     /// device and nothing about it was asked for.
     private static func labelSize(forSides sides: Int, number: Int) -> CGFloat {
         if sides == 6 { return 0.65 }
-        return faceUse * inscribedRadius(forSides: sides)
+        return faceUse(ofDigits: number) * inscribedRadius(forSides: sides)
              / (halfDiagonal(ofDigits: number) * glyphFill(forSides: sides))
     }
 
@@ -68,8 +68,9 @@ enum DieFaceLabels {
     ///
     /// The two-digit figure is the SQUEEZED one — see
     /// `horizontalSqueeze`, which is what buys the d20 its legibility.
+    /// At the 0.80 squeeze the worst pair is still 20, at 0.6139.
     private static func halfDiagonal(ofDigits number: Int) -> CGFloat {
-        number >= 10 ? 0.6384 : 0.4974
+        number >= 10 ? 0.6139 : 0.4974
     }
 
     /// How much a two-digit numeral is narrowed before it is drawn.
@@ -80,14 +81,19 @@ enum DieFaceLabels {
     /// came out about two thirds the height of single-digit ones on the
     /// same die.
     ///
-    /// Narrowing the pair to 0.85 and spending what that frees on size
-    /// nets a numeral 18% bigger overall: each digit is about 5% narrower
-    /// than it was and 12% taller, which is the trade that reads better at
-    /// a glance. Checked against the alternative first — fitting the box
+    /// Narrowing the pair and spending what that frees on size is what
+    /// makes a two-digit face readable. 0.85 bought 18% and was still
+    /// short on a d20's 18 and 19 on device; 0.80, with a two-digit
+    /// `faceUse` of 1.0, brings it to 33% over where it started — each
+    /// digit about 7% narrower than unsqueezed and 25% taller.
+    ///
+    /// 0.80 is the floor. It is where a normal face stops being narrowed
+    /// and starts being condensed, and a condensed digit buys height by
+    /// giving up the thing that tells a 3 from an 8. Checked against the alternative first — fitting the box
     /// to the d20's triangular face instead of to the circle inside it
     /// buys nothing, because for a box this wide the two sloping edges
     /// bind within a thousandth of what the circle does.
-    private static let twoDigitSqueeze: CGFloat = 0.85
+    private static let twoDigitSqueeze: CGFloat = 0.80
 
     private static func horizontalSqueeze(forDigits count: Int) -> CGFloat {
         count > 1 ? twoDigitSqueeze : 1
@@ -95,18 +101,25 @@ enum DieFaceLabels {
 
     /// How much of a face's inscribed circle a numeral may reach across.
     ///
-    /// Not 1.0, and not because of doubt: the half-diagonal measures to the
-    /// CORNER of the glyph's box, which is empty — a digit is narrower than
-    /// the box it is set in — so this is already conservative before the
-    /// margin is applied. 0.85 leaves a visible rim of face around the
-    /// number at the tightest case.
-    /// Raised from 0.85 when the half-diagonals below became measured
-    /// rather than modelled. The two move together on purpose: against the
-    /// real ink, 0.92 leaves a single digit exactly the size it already
-    /// was — 0.3% apart — so this is the same margin honestly stated
-    /// rather than a numeral grown by stealth, and a two-digit one gains
-    /// from the measurement instead of paying for the model's error.
-    private static let faceUse: CGFloat = 0.92
+    /// Measured to the CORNER of the ink box, which is the emptiest part
+    /// of it — a digit is round where its box is square — so a number
+    /// below 1.0 is margin on top of margin.
+    ///
+    /// 0.92 for a single digit was set when the half-diagonals became
+    /// measured rather than modelled: against the real ink it leaves a
+    /// single digit exactly the size it already was, 0.3% apart, which
+    /// made that change honest rather than a numeral grown by stealth.
+    /// It stays there because nobody has asked for a bigger 7.
+    ///
+    /// **1.0 for a pair, and the asymmetry is the point.** A two-digit
+    /// box is twice as wide as it is for one digit and no taller, so its
+    /// corners are further from any ink than a single digit's are: the
+    /// top-left corner of "20" is out beyond the 2's shoulder, where a
+    /// single digit's corner is a few hundredths from its own. Spending
+    /// that emptiness is what a d20's 18 needs and a d12's 7 does not.
+    private static func faceUse(ofDigits number: Int) -> CGFloat {
+        number >= 10 ? 1.0 : 0.92
+    }
 
     /// The largest circle that fits on a numbered face, in the mesh's own
     /// local units — the same units `labelSize` and `localFaceDistance`
@@ -268,6 +281,23 @@ enum DieFaceLabels {
             // outward along its normal.
             let targetNormal = simd_normalize(normal.simd)
 
+            // EVERY shape gets an explicit basis now, not just the d10.
+            //
+            // `simd_quatf(from:to:)` is the shortest rotation from +Z to
+            // the face normal, which pins the plane flat and leaves the
+            // ROLL around that normal to fall out of the arithmetic — so
+            // each face's numeral sat at whatever angle the normal's
+            // direction happened to produce. On a d6 nobody notices,
+            // because a cube's normals are axis-aligned and the arbitrary
+            // answer is square anyway. On a d12 and a d20 it is visible,
+            // and it is most visible on 1 and 7: a digit that is mostly
+            // one straight stroke reads as leaning when it leans, where a
+            // 3 or an 8 is round enough to look the same either way.
+            //
+            // The d10 already solved this for itself — see below — and
+            // the fix generalises: build a basis with +Z along the face
+            // normal and +Y along something CHOSEN, so the roll is a
+            // decision rather than a leftover.
             if sides == 10 {
                 // d10 only: control the ROLL around the face normal too,
                 // so every number's baseline points toward the die's
@@ -298,11 +328,38 @@ enum DieFaceLabels {
                 up = simd_normalize(up)
                 let right = simd_normalize(simd_cross(up, targetNormal))
                 labelNode.simdOrientation = simd_quatf(simd_float3x3(right, up, targetNormal))
-            } else {
-                // A plane's default facing direction is +Z, so rotate
-                // from +Z to the target normal.
+            } else if sides == 6 {
+                // The cube keeps the shortest rotation, and that is not
+                // laziness. Its normals are axis-aligned, so the roll
+                // that falls out of the arithmetic is already square to
+                // the face — the arbitrary answer and the considered one
+                // differ by a multiple of 90 degrees, and the arbitrary
+                // one is the one that was signed off on device. Changing
+                // it would turn d6 numerals a quarter or a half turn for
+                // no gain anybody asked for.
                 let defaultFacing = simd_float3(0, 0, 1)
                 labelNode.simdOrientation = simd_quatf(from: defaultFacing, to: targetNormal)
+            } else {
+                // Square to the FACE, taken from the mesh rather than
+                // from a world axis.
+                //
+                // Projecting world +Y would square every numeral to the
+                // die instead — consistent, and still at an angle to the
+                // triangle it is printed on, because a d20's faces are
+                // not axis-aligned. It would also have turned a d6's top
+                // and bottom numerals upside down, those being the two
+                // faces where the projection vanishes.
+                //
+                // A face's nearest NEIGHBOUR points across the edge they
+                // share, so its normal projected into this face is
+                // perpendicular to that edge — which is exactly the
+                // direction a numeral should stand on. The normals table
+                // is already here and already measured off the meshes, so
+                // this needs no new data and cannot disagree with the
+                // geometry it is aligning to.
+                let up = edgeAlignedUp(for: targetNormal, among: normals)
+                let right = simd_normalize(simd_cross(up, targetNormal))
+                labelNode.simdOrientation = simd_quatf(simd_float3x3(right, up, targetNormal))
             }
 
             node.addChildNode(labelNode)
@@ -621,6 +678,57 @@ enum DieFaceLabels {
 
             node.addChildNode(labelNode)
         }
+    }
+
+    /// Which way is "up" for a numeral on this face: across its nearest
+    /// shared edge.
+    ///
+    /// The nearest other face is the one on the other side of an edge, so
+    /// its normal flattened into this face points at that edge's
+    /// midpoint. The numeral stands the other way — AWAY from that edge,
+    /// toward the vertex opposite it — which is how a numeral sits on a
+    /// real d20: level on a side, point of the triangle above it. Toward
+    /// the edge would be equally square and upside down.
+    ///
+    /// Ties are the rule rather than the exception here: a regular solid
+    /// has every neighbour at the same angle, so all three of a d20
+    /// triangle's edges are equally near. The first in table order wins,
+    /// which makes the choice arbitrary but FIXED — the same face gets
+    /// the same answer on every build, and the twenty of them are
+    /// consistent with each other because they are all measured the same
+    /// way.
+    ///
+    /// The opposite face is excluded explicitly. It shares no edge, and
+    /// its projection is zero-length anyway, but a guard that says why is
+    /// worth more than a degenerate case that happens to work.
+    private static func edgeAlignedUp(for normal: simd_float3,
+                                      among normals: [SCNVector3]) -> simd_float3 {
+        var best = simd_float3(0, 0, 0)
+        var bestDot: Float = -2
+
+        for candidate in normals {
+            let other = simd_normalize(candidate.simd)
+            let alignment = simd_dot(other, normal)
+            // Itself, or the face directly opposite it.
+            guard alignment < 0.999, alignment > -0.999 else { continue }
+            let flattened = other - alignment * normal
+            guard simd_length(flattened) > 0.001 else { continue }
+            if alignment > bestDot {
+                bestDot = alignment
+                best = -simd_normalize(flattened)
+            }
+        }
+
+        guard simd_length(best) > 0.001 else {
+            // No neighbour at all is not a die, but a NaN orientation
+            // would take the whole scene with it.
+            let fallback = simd_float3(0, 0, 1)
+            let flattened = fallback - simd_dot(fallback, normal) * normal
+            return simd_length(flattened) > 0.001
+                ? simd_normalize(flattened)
+                : simd_float3(0, 1, 0)
+        }
+        return best
     }
 
     // MARK: - D4 corner marks (alternative to numbered faces)

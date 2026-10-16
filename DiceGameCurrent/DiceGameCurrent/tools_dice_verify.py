@@ -213,6 +213,86 @@ def die_faces(path):
     return [r for r in radii if r > biggest * 0.6]
 
 
+def check_label_roll(failed):
+    """Every numeral stands square to its face, and none of them is a NaN.
+
+    A label's plane was pinned flat with the SHORTEST rotation from +Z to
+    the face normal, which leaves the roll around that normal to fall out
+    of the arithmetic — so each face's numeral sat at whatever angle its
+    normal happened to produce. Invisible on a cube, whose normals are
+    axis-aligned and whose arbitrary answer is square anyway; visible on a
+    d12 and a d20, and most visible on 1 and 7, a digit that is mostly one
+    straight stroke reading as leaning when it leans.
+
+    The roll comes from the mesh now: the nearest other face is across a
+    shared edge, so its normal flattened into this face is perpendicular
+    to that edge, and the numeral stands away from it toward the opposite
+    vertex. This ports that and checks it on the shipped tables — an
+    orientation built from a zero-length or out-of-plane vector is a NaN
+    quaternion, which does not fail loudly, it takes the die off screen.
+    """
+    labels = source(LABELS)
+    if "edgeAlignedUp(for:" not in labels:
+        failed.append("DieFaceLabels no longer derives a label's roll from "
+                      "the face normals — the shortest rotation leaves it "
+                      "arbitrary, which is what 1 and 7 showed")
+        return
+
+    controller = source("DiceRollController.swift")
+    rows = []
+    for name, sides in (("d8", 8), ("d12", 12), ("d20", 20)):
+        start = controller.index("private static let %s: [SCNVector3] = [" % name)
+        body = controller[start:controller.index("\n    ]", start)]
+        table = [tuple(float(v) for v in row) for row in
+                 re.findall(r'SCNVector3\(\s*(-?[\d.]+),\s*(-?[\d.]+),\s*(-?[\d.]+)\s*\)',
+                            body)]
+        if len(table) != sides:
+            failed.append("the %s normals table has %d entries, not %d"
+                          % (name, len(table), sides))
+            continue
+
+        def unit(v):
+            length = math.sqrt(sum(c * c for c in v))
+            return tuple(c / length for c in v)
+
+        normals = [unit(v) for v in table]
+        worst_plane = 0.0
+        for normal in normals:
+            best, best_dot = None, -2.0
+            for other in normals:
+                alignment = sum(a * b for a, b in zip(other, normal))
+                if alignment >= 0.999 or alignment <= -0.999:
+                    continue                      # itself, or the opposite face
+                flat = tuple(o - alignment * n for o, n in zip(other, normal))
+                if math.sqrt(sum(c * c for c in flat)) < 0.001:
+                    continue
+                if alignment > best_dot:
+                    best_dot = alignment
+                    length = math.sqrt(sum(c * c for c in flat))
+                    best = tuple(-c / length for c in flat)
+            if best is None:
+                failed.append("a %s face has no neighbour to square its "
+                              "numeral against, so its orientation is a NaN"
+                              % name)
+                break
+            # In the face's own plane, and unit: the two things a basis
+            # has to be before a quaternion built from it means anything.
+            worst_plane = max(worst_plane,
+                              abs(sum(a * b for a, b in zip(best, normal))))
+            if abs(math.sqrt(sum(c * c for c in best)) - 1) > 1e-5:
+                failed.append("a %s face's label up-vector is not unit "
+                              "length" % name)
+                break
+        else:
+            rows.append((name, best_dot, worst_plane))
+
+    if rows:
+        print("  %-26s ok (%s)"
+              % ("label roll",
+                 ", ".join("%s neighbour %.3f, in-plane %.0e" % row
+                           for row in rows)))
+
+
 def check_numeral_fit(failed):
     """No numeral may run off the face it is printed on.
 
@@ -228,7 +308,15 @@ def check_numeral_fit(failed):
     """
     labels = source(LABELS)
 
-    face_use = float(re.search(r'faceUse: CGFloat = ([\d.]+)', labels).group(1))
+    # Per digit count now, like the half-diagonals: a two-digit box has
+    # emptier corners than a single digit's, so it is allowed to reach
+    # further into the face. One pattern, both numbers.
+    face_use_pair, face_use_single = (float(x) for x in re.search(
+        r'number >= 10 \? ([\d.]+) : ([\d.]+)\s*\n\s*\}\s*\n\s*///',
+        labels).group(1, 2))
+
+    def face_use(number):
+        return face_use_pair if number >= 10 else face_use_single
     fill_six, fill_rest = (float(x) for x in re.search(
         r'sides == 6 \? ([\d.]+) / ([\d.]+) : ([\d.]+)', labels).group(1, 3))
     fill_six = fill_six / float(re.search(
@@ -377,7 +465,7 @@ def check_numeral_fit(failed):
             if sides == 6:
                 plane = six_plane
             else:
-                plane = face_use * radius / (half_em * fill)
+                plane = face_use(number) * radius / (half_em * fill)
             half = half_em * fill * plane
             if half > radius:
                 failed.append("a d%d's %d reaches %.3f from the middle of a "
@@ -659,6 +747,7 @@ def main():
 
     check_numerals(failed)
     check_numeral_fit(failed)
+    check_label_roll(failed)
 
     if failed:
         print()

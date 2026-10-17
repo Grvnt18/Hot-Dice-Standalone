@@ -178,18 +178,28 @@ def main():
     # This is the half of the fix that could silently come undone: drop
     # the size term and the big die goes back to not turning over, which
     # reads as a feel problem rather than a missing multiplier.
-    if not re.search(r'\* boost \* size \* size', impulse):
-        failed.append("torque no longer scales with the die's size squared "
-                      "— the oversized die's inertia is 2.25x a normal "
-                      "one's, so the same angular impulse spins it at 44%")
+    physics = source("DiePhysicsFactory.swift")
+    softened = re.search(r'momentOfInertia = SCNVector3\(derived\.x / sizeMultiplier',
+                         physics)
+    if not re.search(r'\* boost \* size(?! \* size)', impulse):
+        failed.append("torque no longer scales with the die's size — it is "
+                      "divided by an inertia that does, so a bigger die "
+                      "leaves the hand turning slower than a small one")
     elif not re.search(r'DieMeshLibrary\.sizeMultiplier\(forSides:', impulse):
         failed.append("launch computes a size for the torque without asking "
                       "DieMeshLibrary what the node's scale means")
+    elif not softened or "usesDefaultMomentOfInertia = false" not in physics:
+        failed.append("DiePhysicsFactory no longer softens the inertia "
+                      "tensor, so it goes as size SQUARED again — the "
+                      "launch torque's single size cancels half of that "
+                      "and a big die stops tumbling off friction and "
+                      "collisions, which is where a die does most of its "
+                      "rolling")
     else:
-        print("  %-30s ok (%.2fx die gets %.2fx the angular impulse)"
-              % ("torque vs inertia",
-                 swift_float(source("DiceSceneBuilder.swift"), "oversizeMultiplier"),
-                 swift_float(source("DiceSceneBuilder.swift"), "oversizeMultiplier") ** 2))
+        oversize = swift_float(source("DiceSceneBuilder.swift"), "oversizeMultiplier")
+        print("  %-30s ok (inertia as size, not size²; a %.2fx die takes "
+              "%.2fx the torque for the same spin)"
+              % ("torque vs inertia", oversize, oversize))
 
     # The global doubling rides in the same `boost`, which is what gives
     # upward its square root for free. If it is ever applied separately to

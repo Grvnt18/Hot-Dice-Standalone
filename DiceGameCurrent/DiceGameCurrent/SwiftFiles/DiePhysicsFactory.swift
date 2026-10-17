@@ -29,7 +29,10 @@ enum DiePhysicsFactory {
     /// - restitution kept high (0.7) for real, visible bounce.
     /// - friction/damping are dimensionless ratios, not mass-dependent,
     ///   so these didn't need retuning for the mass change.
-    static func addPhysicsBody(to node: SCNNode) {
+    /// `sizeMultiplier` is how much bigger than a standard die this one
+    /// is — 0.85 to 1.15 for an ordinary die, 1.5 for the oversized one.
+    /// It is what the inertia is softened against; see below.
+    static func addPhysicsBody(to node: SCNNode, sizeMultiplier: Float = 1) {
         guard let geometry = node.geometry else { return }
 
         // node.scale carries the per-shape size normalization baked in by
@@ -56,6 +59,48 @@ enum DiePhysicsFactory {
         // but SCNPhysicsContactDelegate received nothing. categoryBitMask
         // identifies what this body IS; contactTestBitMask declares what
         // it wants to be TOLD about.
+        // THE INERTIA IS SOFTENED FROM SIZE SQUARED TO SIZE, AND THIS IS
+        // WHY A BIGGER DIE WOULD NOT ROLL.
+        //
+        // SceneKit derives the inertia tensor from the hull, so with mass
+        // fixed at 1.0 it goes as m r² — size SQUARED. Every rotational
+        // thing that happens to a die then divides by it:
+        //
+        //   friction while it rolls   f = u m g is constant, its torque
+        //                             about the centre is f r = size, so
+        //                             the spin it raises goes as 1/size
+        //   a collision               the impulse acts a radius away, so
+        //                             again size / size²
+        //
+        // Both come to 1/size: the bigger the die, the less of its own
+        // motion turns into tumbling. A 1.5x die converts a knock into
+        // two thirds of the spin a standard one gets, which is the
+        // complaint exactly — dice with a positive multiplier slide and
+        // bounce where the small ones flip.
+        //
+        // The launch torque already compensated at the moment of the
+        // throw (see DiceRollImpulse), and that was not enough, because a
+        // die does most of its tumbling after the throw.
+        //
+        // Dividing the derived tensor by the size leaves I proportional
+        // to size rather than size squared, and then every one of those
+        // terms is size / size — identical for every die on the table.
+        // Each SHAPE keeps its own character, because this scales the
+        // tensor SceneKit computed for that hull rather than replacing it
+        // with a number of our own.
+        //
+        // Not physical, deliberately: real dice of different sizes do
+        // tumble at different rates. These are all meant to read as one
+        // throw.
+        let derived = body.momentOfInertia
+        if sizeMultiplier > 0.001,
+           derived.x > 0.0001 || derived.y > 0.0001 || derived.z > 0.0001 {
+            body.usesDefaultMomentOfInertia = false
+            body.momentOfInertia = SCNVector3(derived.x / sizeMultiplier,
+                                              derived.y / sizeMultiplier,
+                                              derived.z / sizeMultiplier)
+        }
+
         body.categoryBitMask = DicePhysicsCategory.die
         body.collisionBitMask = DicePhysicsCategory.die | DicePhysicsCategory.playfield
         body.contactTestBitMask = DicePhysicsCategory.die | DicePhysicsCategory.playfield

@@ -272,7 +272,7 @@ enum DicePoolSceneBuilder {
                 grainVariant: Int.random(in: 0..<DieMaterial.grainVariantCount),
                 d4Style: d4Style
             )
-            DiePhysicsFactory.addPhysicsBody(to: node)
+            DiePhysicsFactory.addPhysicsBody(to: node, sizeMultiplier: variation)
 
             // Lets hit-testing / debugging map a tapped node straight back
             // to its logical die without a separate lookup table.

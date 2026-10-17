@@ -109,34 +109,29 @@ enum DiceRollImpulse {
             )
             body.applyForce(impulse, asImpulse: true)
 
-            // TORQUE SCALES WITH THE DIE'S SIZE SQUARED, AND THIS IS THE
-            // FIX FOR THE OVERSIZED DIE THAT WOULD NOT TUMBLE.
+            // TORQUE SCALES WITH THE DIE'S SIZE, matching the inertia it
+            // is divided by.
             //
             // An angular impulse buys angular velocity through the
-            // inertia tensor: w = L / I. `DiePhysicsFactory` gives every
-            // die a mass of 1.0 whatever its size — deliberately, so a
-            // collision between a big die and a small one behaves — and
-            // SceneKit derives I from the collision hull, where I goes as
-            // m r². So the 1.5x die was handed the same L as everything
-            // else and spun at 1/1.5², which is 44% of a normal die's
-            // rate.
+            // inertia tensor: w = L / I. `DiePhysicsFactory` now holds I
+            // proportional to SIZE rather than size squared — see the
+            // long note there — so the launch multiplies by size once and
+            // the two cancel: every die leaves the hand turning at the
+            // same rate whatever its size.
             //
-            // That reads exactly as reported: the big die moves across
-            // the tray and rises off the throw like its neighbours —
-            // linear velocity is impulse over MASS, and the mass is the
-            // same — while barely turning over. The upward part of the
-            // throw is a bystander.
+            // This was size SQUARED for one commit, against the tensor
+            // SceneKit derives. It cancelled the inertia at the instant
+            // of the throw and nowhere else, which is why the dice still
+            // did not roll: a die does most of its tumbling afterwards,
+            // off friction and off its neighbours.
             //
-            // Multiplying by size² cancels the inertia term, so every die
-            // leaves the hand turning at the same rate regardless of how
-            // big it is. Size comes from the node's own scale rather than
-            // being passed along beside it — see
-            // DieMeshLibrary.sizeMultiplier.
+            // Size comes from the node's own scale rather than being
+            // passed along beside it — see DieMeshLibrary.sizeMultiplier.
             let size = DieMeshLibrary.sizeMultiplier(forSides: die.sides,
                                                      nodeScale: node.scale.x)
             let axis = randomTumbleAxis()
             let torqueMagnitude = Float.random(in: minTorqueMagnitude...maxTorqueMagnitude)
-                * boost * size * size
+                * boost * size
             let torque = SCNVector4(axis.x, axis.y, axis.z, torqueMagnitude)
             body.applyTorque(torque, asImpulse: true)
         }

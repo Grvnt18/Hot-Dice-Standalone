@@ -377,25 +377,39 @@ def main():
     # A tumbling cube sweeps a sphere of its own body diagonal — side
     # times root three — so that is the gap it needs between floor and
     # ceiling to rotate through any axis without one end striking
-    # something. The 1.5x die wants 2.598 and the lid was at 2.50: short
-    # by a tenth, which let the big die travel and bounce like its
-    # neighbours while never completing a tumble anywhere in the tray.
+    # something.
+    #
+    # THE GAP IS BETWEEN TWO SURFACES, NOT TWO COORDINATES, and this check
+    # compared the sweep against the lid HEIGHT for one commit. Both lids
+    # are colliderThickness boxes centred on their height, so the floor's
+    # top is half a thickness up and the ceiling's underside is half a
+    # thickness down: a whole thickness of the number is not air. At a lid
+    # of 3.0 the 1.5x die had 2.300, not 3.000, against a 2.598
+    # requirement — so it was still short after the lid went up, and this
+    # check said it was fine. Subtracting the thickness is the whole point
+    # of the check now.
     #
     # This is the half of "the oversized die does not spin" that is
     # geometry rather than physics — the torque fix above answers the
     # other half — and it fails silently in the worst way, because the
     # die still MOVES. Nothing about it looks stuck.
-    ceiling = swift_float(source("PlayfieldLayout.swift"), "ceilingHeight")
+    layout = source("PlayfieldLayout.swift")
+    ceiling = swift_float(layout, "ceilingHeight")
+    thickness = swift_float(layout, "colliderThickness")
     oversize = swift_float(source("DiceSceneBuilder.swift"), "oversizeMultiplier")
+    gap = ceiling - thickness
     needed = oversize * math.sqrt(3)
-    if ceiling < needed:
-        failed.append("the ceiling is %.2f and a %.2fx die sweeps %.3f as it "
-                      "tumbles — it cannot turn over anywhere in the tray"
-                      % (ceiling, oversize, needed))
+    if gap < needed:
+        failed.append("the lid is at %.2f and the floor/ceiling boxes are "
+                      "%.2f thick, so a die has %.3f of air; a %.2fx die "
+                      "sweeps %.3f as it tumbles — it cannot turn over "
+                      "anywhere in the tray"
+                      % (ceiling, thickness, gap, oversize, needed))
     else:
-        print("  %-30s ok (%.2f lid, %.2fx die sweeps %.3f, %.0f%% margin)"
-              % ("tumbling clearance", ceiling, oversize, needed,
-                 100 * (ceiling / needed - 1)))
+        print("  %-30s ok (%.2f lid less %.2f thickness = %.3f of air, "
+              "%.2fx die sweeps %.3f, %.0f%% margin)"
+              % ("tumbling clearance", ceiling, thickness, gap, oversize,
+                 needed, 100 * (gap / needed - 1)))
 
     # --- 4. Nothing tunnels at the new speed. -------------------------
     #
@@ -414,10 +428,17 @@ def main():
     gravity = abs(float(m.group(1)))
 
     wall = swift_float(physics, "wallThickness")
-    m = re.search(r'boxSize: SCNVector3\(width, (\d+(?:\.\d+)?), depth\)', physics)
-    assert m, "no floor collider in %s" % PHYSICS
-    floor = float(m.group(1))
-    ceiling = swift_float(source(LAYOUT), "ceilingHeight")
+    # The floor and ceiling boxes both take their thickness from the
+    # layout's own constant — the tumbling clearance above is derived from
+    # it, so it cannot be a literal typed here. Confirm the colliders
+    # really are built from it before trusting the number.
+    assert re.search(r'boxSize: SCNVector3\(width, lidThickness, depth\)',
+                     physics), \
+        "the floor/ceiling colliders no longer take their thickness from " \
+        "PlayfieldVerticalBounds.colliderThickness"
+    layout_src = source(LAYOUT)
+    floor = swift_float(layout_src, "colliderThickness")
+    ceiling = swift_float(layout_src, "ceilingHeight")
 
     # Mass is 1.0, so an impulse is a velocity. The worst horizontal speed
     # is the boosted maximum; the worst vertical is a die launched upward

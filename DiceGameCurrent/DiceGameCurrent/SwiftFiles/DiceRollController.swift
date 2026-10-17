@@ -665,7 +665,23 @@ final class DiceRollController: NSObject, SCNSceneRendererDelegate {
             // simply tunnel straight back out on the next step.
             let clampedX = min(max(p.x, bounds.x.lowerBound + margin), bounds.x.upperBound - margin)
             let clampedZ = min(max(p.z, bounds.z.lowerBound + margin), bounds.z.upperBound - margin)
-            let clampedY = aboveCeiling ? ceilingY - 1.0 : floorY + 1.0
+            // Mid-air, halfway between the two lids, rather than a unit in
+            // from whichever one it left.
+            //
+            // `floorY + 1.0` put the OVERSIZED die inside the floor. Its
+            // resting centre is 0.35 (the floor collider's half-thickness)
+            // plus its own 0.75 half-extent = 1.10, so a rescue dropped it
+            // 0.10 into the collider and the solver ejected it — the exact
+            // failure this routine exists to prevent, for the one die on
+            // the table big enough to hit it.
+            //
+            // The midpoint of the two centres is also the midpoint of the
+            // air between them, because both are boxes of the same
+            // thickness centred on their height. It clears either surface
+            // by half the gap, which no die's half-body-diagonal comes
+            // near — the oversized one's is 1.30 against 1.50 — so this is
+            // size-safe without reading a size.
+            let clampedY = (floorY + ceilingY) / 2
             state.node.position = SCNVector3(clampedX, clampedY, clampedZ)
             body.resetTransform()
             body.velocity = SCNVector3Zero

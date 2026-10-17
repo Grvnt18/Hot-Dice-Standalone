@@ -171,9 +171,10 @@ enum PlayfieldRim {
 /// climbing past roughly (cameraHeight - 0.1) simply vanishes — which reads
 /// exactly like "the die left the rolling area through the ceiling."
 ///
-/// ceilingHeight is set far below that camera-clipping threshold, though —
-/// low enough to double as an anti-stacking constraint, by request, while
-/// staying clear of two other numbers it has to respect:
+/// ceilingHeight is set far below that camera-clipping threshold, and the
+/// number that actually decides it is the oversized die's room to turn
+/// over — see `PlayfieldVerticalBounds.ceilingHeight`. Two other numbers
+/// it has to respect, and the one it has had to give up:
 ///
 /// - The STACKING threshold, i.e. the lowest a stacked die's center could
 ///   possibly be. The floor collider is a 0.7-thick box CENTERED on
@@ -201,49 +202,78 @@ enum PlayfieldRim {
 ///   1.85 + 0.35 (its own half-thickness) with a real margin — comfortably
 ///   satisfied above roughly 2.4.
 ///
-/// 2.5 sits inside that (2.4, 2.7) window with margin on both sides. It's
-/// not a mathematically airtight guarantee against the most idealized
-/// possible stack (that would need a tighter ceiling than spawn clearance
-/// allows without also touching DiceSpawnPattern's own numbers further),
-/// but it cuts the available vertical runway by 4x versus the previous
-/// value (10) — a huge reduction in how much energy/precision a stack
-/// would need — while DiceRollController's existing reactive anti-stacking
+/// Those two left a (2.4, 2.7) window, and the lid sat at 2.5 inside it
+/// while the anti-stacking job was the reason it was low. Tumbling room
+/// has since taken that window away: the oversized die needs 2.598 of
+/// clear air and the lid is at 3.7, well above the top of it.
+///
+/// The upper bound was never the real guarantee against a stack, which is
+/// what makes it affordable to lose. It was not airtight even at 2.5 —
+/// an idealized stack would have needed a tighter lid than spawn
+/// clearance allows — and DiceRollController's reactive anti-stacking
 /// (attemptRollOff during a roll, and resolveStacking's final geometric
-/// separation pass, whose own doc comment already guarantees "a die
-/// physically cannot be above another one" once a roll settles) remains
-/// the actual, absolute guarantee against one surviving to the end of a
-/// roll. There's still real room for visible "upward movement" well below
-/// the ceiling — resting height is ~0.85-1.1, so 2.5 leaves roughly 1.5
-/// units of clear bounce above that.
+/// separation pass, whose own doc comment guarantees "a die physically
+/// cannot be above another one" once a roll settles) is the absolute one.
+/// What the lid still does is cap the vertical runway a stack would have
+/// to be built in, at 3.7 against the unbounded version's 15.
+///
+/// Note that the stacking bullet above gets the half-thicknesses right.
+/// The clearance arithmetic that replaced this window did not, for one
+/// commit, and it is the same arithmetic — a collider's surface is half a
+/// thickness off its centre, in both directions.
 enum PlayfieldVerticalBounds {
     /// Camera height above the floor.
     static let cameraHeight: Float = 15
 
+    /// How thick the floor and ceiling colliders are.
+    ///
+    /// It lives here rather than in `DicePlayfieldPhysics`, which builds
+    /// them, because the clearance below is the only arithmetic that
+    /// cares — and reading a copy of this number was how that arithmetic
+    /// went wrong once. See `ceilingHeight`.
+    static let colliderThickness: Float = 0.7
+
     /// Height of the invisible ceiling collider above the floor.
     ///
-    /// **3.0, and 2.5 was not enough for the oversized die to turn over.**
+    /// **3.7. A die tumbles in the gap between two SURFACES, not between
+    /// two centres, and 3.0 confused the two.**
     ///
     /// A tumbling cube sweeps a sphere of its own body diagonal: side x
     /// root three. For the 1.5x die that is 2.598, and it needs that much
-    /// gap between floor and ceiling to rotate through any axis without
-    /// one end of it striking something. The gap was 2.50 — short by a
-    /// tenth of a unit, so the big die could travel and bounce like its
-    /// neighbours but could not complete a tumble anywhere in the tray.
-    /// Every other die fits: 1.992 for the largest normal one, 1.732 for
-    /// a standard, 1.472 for the smallest.
+    /// clear air to rotate through any axis without one end of it
+    /// striking something. Every other die fits easily: 1.992 for the
+    /// largest normal one, 1.732 for a standard, 1.472 for the smallest.
+    ///
+    /// The mistake is in what the 2.598 was compared against. Both lids
+    /// are `colliderThickness` boxes CENTRED on their height, so the
+    /// floor's upper surface is half a thickness up and the ceiling's
+    /// underside is half a thickness down. At a lid of 3.0 the die had
+    /// 3.0 - 0.7 = 2.300 of air, not 3.0 — still three tenths short of
+    /// turning over, which is why the big die went on sliding after the
+    /// lid was raised from 2.5. It is the same error as reading a
+    /// half-diagonal for a full one, one level further out.
+    ///
+    /// So the requirement is on the GAP: sweep + both half-thicknesses =
+    /// 3.298 at the lid's centre, and 3.7 is that with 15% of headroom on
+    /// the sweep. `tools_impulse_verify.py` now subtracts the thickness
+    /// before comparing, so the check measures the air and not the
+    /// coordinate.
     ///
     /// Raising the lid costs nothing visible. The camera is orthographic,
-    /// so a die at 3.0 is drawn exactly the size it is at 0.5 — this
+    /// so a die at 3.7 is drawn exactly the size it is at 0.5 — this
     /// cannot change how the tray reads. It costs a little airtime, which
-    /// the energy bleed now absorbs, and it makes the ceiling SAFER
-    /// rather than less safe: a die arrives at a higher lid having spent
-    /// more of its climb against gravity, so it hits it slower.
+    /// the energy bleed absorbs, and it makes the ceiling SAFER rather
+    /// than less safe: a die arrives at a higher lid having spent more of
+    /// its climb against gravity, so it hits it slower.
     ///
-    /// Derived rather than typed: 2.598 is the requirement and 3.0 is it
-    /// with 15% of headroom. `tools_impulse_verify.py` holds this against
-    /// `oversizeMultiplier`, so growing the big die without raising the
-    /// lid fails there instead of on the table.
-    static let ceilingHeight: Float = 3.0
+    /// What it does cost is the ceiling's second job. The window argued
+    /// for above wanted the lid under about 2.7 so a two-high stack could
+    /// not fit beneath it; that was already given up at 3.0, and this
+    /// gives up more of it. `DiceRollController.resolveStacking` is the
+    /// actual guarantee — it separates stacked dice geometrically before
+    /// a roll is allowed to end — and the lid is only ever an extra
+    /// discouragement.
+    static let ceilingHeight: Float = 3.7
 }
 
 

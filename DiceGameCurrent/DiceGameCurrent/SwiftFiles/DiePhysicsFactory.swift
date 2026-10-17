@@ -147,9 +147,16 @@ enum DicePlayfieldPhysics {
         // mass 1.0) — verified this keeps a healthy ~4.7x safety margin
         // against tunneling at the new speed, consistent with the margin
         // the previous thickness gave at the previous speed.
+        //
+        // Read from PlayfieldVerticalBounds rather than typed, because the
+        // tumbling clearance there is derived from it: both boxes are
+        // CENTRED on their height, so this thickness is exactly how much
+        // air the lid height overstates. A copy of it here drifting from
+        // that derivation is the failure being designed out.
+        let lidThickness = PlayfieldVerticalBounds.colliderThickness
         container.addChildNode(
             staticCollider(
-                boxSize: SCNVector3(width, 0.7, depth),
+                boxSize: SCNVector3(width, lidThickness, depth),
                 position: SCNVector3(centerX, floorY, centerZ)
             )
         )
@@ -165,7 +172,7 @@ enum DicePlayfieldPhysics {
         // still what actually guarantees no stack survives a roll.
         container.addChildNode(
             staticCollider(
-                boxSize: SCNVector3(width, 0.7, depth),
+                boxSize: SCNVector3(width, lidThickness, depth),
                 position: SCNVector3(centerX, floorY + ceilingHeight, centerZ)
             )
         )

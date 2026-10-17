@@ -41,11 +41,28 @@ against that solver's limit.
 
 ## Git
 
-- Develop on `claude/imessage-visual-audio-fixes-uzqw55`. Never push
-  elsewhere without explicit permission.
-- No pull request unless asked.
+**`Grvnt18/Hot-Dice-Standalone`, branch `main`, is the only repository.**
+`Grvnt18/Rolls` is the lineage this came from and is long out of date —
+do not read it, push to it, or compare against it.
+
+That matters more than it sounds. A cloud container is rebuilt without
+warning, and it comes back as a fresh clone of whatever the session was
+started against, which has been the OLD repository. The tell is a
+verifier reporting a number you know you changed — a ceiling of 2.5, a
+`minRollDuration` of 1.4. Check `git log --oneline -1` before believing
+anything, and if the tree is stale:
+
+    git remote remove origin
+    git remote add origin https://github.com/Grvnt18/Hot-Dice-Standalone.git
+    git fetch origin main
+    git checkout -B main refs/remotes/origin/main
+
+Work lost that way is only lost if it was never pushed, so push often.
+
+- Develop on `main` and push there. No pull request unless asked.
 - Download links: read the full SHA with `git rev-parse` or `git ls-remote`
-  and give `https://github.com/Grvnt18/Rolls/archive/<40-char-sha>.zip`.
+  and give
+  `https://github.com/Grvnt18/Hot-Dice-Standalone/archive/<40-char-sha>.zip`.
   **Never construct a SHA** — a 7-character one padded out was given once
   and did not work.
 

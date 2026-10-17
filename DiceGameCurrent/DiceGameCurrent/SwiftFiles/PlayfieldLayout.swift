@@ -220,7 +220,30 @@ enum PlayfieldVerticalBounds {
     static let cameraHeight: Float = 15
 
     /// Height of the invisible ceiling collider above the floor.
-    static let ceilingHeight: Float = 2.5
+    ///
+    /// **3.0, and 2.5 was not enough for the oversized die to turn over.**
+    ///
+    /// A tumbling cube sweeps a sphere of its own body diagonal: side x
+    /// root three. For the 1.5x die that is 2.598, and it needs that much
+    /// gap between floor and ceiling to rotate through any axis without
+    /// one end of it striking something. The gap was 2.50 — short by a
+    /// tenth of a unit, so the big die could travel and bounce like its
+    /// neighbours but could not complete a tumble anywhere in the tray.
+    /// Every other die fits: 1.992 for the largest normal one, 1.732 for
+    /// a standard, 1.472 for the smallest.
+    ///
+    /// Raising the lid costs nothing visible. The camera is orthographic,
+    /// so a die at 3.0 is drawn exactly the size it is at 0.5 — this
+    /// cannot change how the tray reads. It costs a little airtime, which
+    /// the energy bleed now absorbs, and it makes the ceiling SAFER
+    /// rather than less safe: a die arrives at a higher lid having spent
+    /// more of its climb against gravity, so it hits it slower.
+    ///
+    /// Derived rather than typed: 2.598 is the requirement and 3.0 is it
+    /// with 15% of headroom. `tools_impulse_verify.py` holds this against
+    /// `oversizeMultiplier`, so growing the big die without raising the
+    /// lid fails there instead of on the table.
+    static let ceilingHeight: Float = 3.0
 }
 
 

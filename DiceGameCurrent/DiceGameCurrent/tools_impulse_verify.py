@@ -19,6 +19,7 @@ the diff:
 Every number below is read out of the shipped Swift. If a constant moves
 and this does not, it says so by name.
 """
+import math
 import os
 import re
 import sys
@@ -360,6 +361,31 @@ def main():
     else:
         print("  %-30s ok (every tray screen publishes it)"
               % "chrome fallback")
+
+    # --- 3d. The biggest die can actually turn over. ------------------
+    #
+    # A tumbling cube sweeps a sphere of its own body diagonal — side
+    # times root three — so that is the gap it needs between floor and
+    # ceiling to rotate through any axis without one end striking
+    # something. The 1.5x die wants 2.598 and the lid was at 2.50: short
+    # by a tenth, which let the big die travel and bounce like its
+    # neighbours while never completing a tumble anywhere in the tray.
+    #
+    # This is the half of "the oversized die does not spin" that is
+    # geometry rather than physics — the torque fix above answers the
+    # other half — and it fails silently in the worst way, because the
+    # die still MOVES. Nothing about it looks stuck.
+    ceiling = swift_float(source("PlayfieldLayout.swift"), "ceilingHeight")
+    oversize = swift_float(source("DiceSceneBuilder.swift"), "oversizeMultiplier")
+    needed = oversize * math.sqrt(3)
+    if ceiling < needed:
+        failed.append("the ceiling is %.2f and a %.2fx die sweeps %.3f as it "
+                      "tumbles — it cannot turn over anywhere in the tray"
+                      % (ceiling, oversize, needed))
+    else:
+        print("  %-30s ok (%.2f lid, %.2fx die sweeps %.3f, %.0f%% margin)"
+              % ("tumbling clearance", ceiling, oversize, needed,
+                 100 * (ceiling / needed - 1)))
 
     # --- 4. Nothing tunnels at the new speed. -------------------------
     #

@@ -164,7 +164,10 @@ enum DicePoolSceneBuilder {
     /// all, others two or three. Selecting exactly one guarantees the
     /// intended "there's always one big one" read every round.
     private static let sizeVariance: Float = 0.15
-    private static let oversizeMultiplier: Float = 1.5
+    /// Internal, not private: PlayfieldVerticalBounds.ceilingHeight has to
+    /// clear a die this big tumbling, and tools_impulse_verify.py checks
+    /// the pair against each other.
+    static let oversizeMultiplier: Float = 1.5
 
     /// ONLY A d6 MAY COME OUT SMALL.
     ///
